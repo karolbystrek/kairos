@@ -21,6 +21,24 @@ services:
       - redisdata:/data
     restart: unless-stopped
 
+  client-app:
+    build:
+      context: ./apps/client-app
+      dockerfile: Dockerfile
+    container_name: kairos-client-app
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
+  staff-app:
+    build:
+      context: ./apps/staff-app
+      dockerfile: Dockerfile
+    container_name: kairos-staff-app
+    ports:
+      - "3001:3000"
+    restart: unless-stopped
+
 volumes:
   pgdata:
   redisdata:
