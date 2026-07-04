@@ -26,8 +26,8 @@ services:
       context: ./apps/client-app
       dockerfile: Dockerfile
     container_name: kairos-client-app
-    ports:
-      - "3000:3000"
+    expose:
+      - "3000"
     restart: unless-stopped
 
   staff-app:
@@ -35,10 +35,27 @@ services:
       context: ./apps/staff-app
       dockerfile: Dockerfile
     container_name: kairos-staff-app
+    expose:
+      - "3000"
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: kairos-caddy
     ports:
-      - "3001:3000"
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - client-app
+      - staff-app
     restart: unless-stopped
 
 volumes:
   pgdata:
   redisdata:
+  caddy_data:
+  caddy_config:

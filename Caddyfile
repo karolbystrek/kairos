@@ -1,0 +1,7 @@
+client.localhost {
+    reverse_proxy client-app:3000
+}
+
+staff.localhost {
+    reverse_proxy staff-app:3000
+}
