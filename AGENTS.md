@@ -1,0 +1,1 @@
+Architecture and requirements of the project are available at `docs/REQUIREMENTS.md`.
