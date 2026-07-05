@@ -5,5 +5,5 @@ Virtual pager system for restaurants. Scan QR to track your order in real-time.
 
 When running the project with Docker Compose, you can access the applications locally via secure HTTPS:
 
-* **Client Frontend (PWA):** [https://client.localhost](https://client.localhost)
-* **Staff Frontend:** [https://staff.localhost](https://staff.localhost)
+* **Customer Frontend (PWA):** [https://customer.localhost](https://customer.localhost)
+* **Panel Frontend:** [https://panel.localhost](https://panel.localhost)

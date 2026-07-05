@@ -21,27 +21,24 @@ services:
       - redisdata:/data
     restart: unless-stopped
 
-  client-app:
+  customer-app:
     build:
-      context: ./apps/client-app
+      context: ./apps/customer-app
       dockerfile: Dockerfile
-    container_name: kairos-client-app
     expose:
       - "3000"
     restart: unless-stopped
 
-  staff-app:
+  panel-app:
     build:
-      context: ./apps/staff-app
+      context: ./apps/panel-app
       dockerfile: Dockerfile
-    container_name: kairos-staff-app
     expose:
       - "3000"
     restart: unless-stopped
 
   caddy:
     image: caddy:2-alpine
-    container_name: kairos-caddy
     ports:
       - "80:80"
       - "443:443"
@@ -50,8 +47,8 @@ services:
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
-      - client-app
-      - staff-app
+      - customer-app
+      - panel-app
     restart: unless-stopped
 
 volumes:
