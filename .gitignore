@@ -1,0 +1,15 @@
+# Local environment files
+.env
+.env.local
+.env.*.local
+
+# IDE and System Files
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+Thumbs.db
