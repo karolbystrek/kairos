@@ -20,6 +20,6 @@ docker compose up --build
 ### 3. Access the Applications
 Once the containers are up and running, you can access the applications locally via secure HTTPS:
 
-* **Customer Frontend:** [https://customer.localhost](https://customer.localhost)
+* **Customer Frontend:** [https://app.localhost](https://app.localhost)
 * **Panel Frontend:** [https://panel.localhost](https://panel.localhost)
 * **Backend API:** [https://api.localhost](https://api.localhost)
