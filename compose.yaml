@@ -22,6 +22,7 @@ services:
     restart: unless-stopped
 
   api:
+    container_name: kairos-api
     build:
       context: ./apps/api
       dockerfile: Dockerfile
@@ -39,22 +40,29 @@ services:
     restart: unless-stopped
 
   customer-app:
+    container_name: kairos-customer-app
     build:
       context: ./apps/customer-app
       dockerfile: Dockerfile
     expose:
       - "3000"
+    depends_on:
+      - api
     restart: unless-stopped
 
   panel-app:
+    container_name: kairos-panel-app
     build:
       context: ./apps/panel-app
       dockerfile: Dockerfile
     expose:
       - "3000"
+    depends_on:
+      - api
     restart: unless-stopped
 
   caddy:
+    container_name: kairos-caddy
     image: caddy:2-alpine
     ports:
       - "80:80"
