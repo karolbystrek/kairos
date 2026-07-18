@@ -20,7 +20,7 @@ Both frontends use Next.js 16, React 19, TypeScript, Tailwind CSS 4, and HeroUI 
 
 HeroUI is the component library for both applications. Zod validates frontend-owned form input and real-time event payloads. Native `fetch` is the default HTTP client. SWR may be used in the staff panel where polling, caching, or client-side revalidation improves queue synchronization.
 
-The frontends must not contain domain authority. Hiding a control or redirecting an unauthenticated user does not replace backend authorization.
+The Spring API retains domain authority. Frontend controls and redirects provide user experience, while the backend enforces authorization.
 
 ### 2.2 Backend
 
@@ -35,13 +35,13 @@ The backend uses Java 25 and Spring Boot 4. It is the only system of record and 
 * POS authentication, REST integration, and webhooks;
 * transactional outbox processing.
 
-Next.js route handlers must not become a parallel domain API or backend-for-frontend layer.
+Browser-facing API requests are routed through Caddy to the Spring API. Next.js route handlers are limited to frontend rendering concerns.
 
 ### 2.3 API contracts
 
 REST is the public integration contract for frontends and external POS systems. The Spring API exposes an OpenAPI 3 description using a Spring Boot 4-compatible version of springdoc-openapi.
 
-Each frontend generates its own `typescript-fetch` client from the same OpenAPI document. Generated models and operations are the source of frontend REST types; equivalent request and response DTOs must not be maintained manually. CI must detect when generated clients no longer match the API contract.
+Each frontend generates its own `typescript-fetch` client from the same OpenAPI document. Generated models and operations are the source of frontend REST types. CI must detect when generated clients no longer match the API contract.
 
 ## 3. Functional Requirements
 
@@ -158,7 +158,7 @@ Caddy terminates TLS and routes the independently deployable services.
 * The customer and staff applications retain separate origins.
 * Browser-facing REST, WebSocket, and OAuth paths are proxied through the relevant frontend origin to avoid an unnecessary cross-origin browser architecture.
 * The dedicated API origin remains available for external POS integrations and webhook-related API access.
-* The Next.js services render frontend concerns only; Caddy proxying does not make them owners of API security.
+* The Next.js services render frontend concerns only; the Spring API owns API security.
 
 Docker Compose provides the local environment for both frontends, the API, PostgreSQL, Redis, and Caddy.
 
@@ -175,7 +175,7 @@ Docker Compose provides the local environment for both frontends, the API, Postg
 
 ## 9. Verification and Acceptance Criteria
 
-* Both frontends build and lint independently without tRPC or NextAuth.js.
+* Both frontends build and lint independently.
 * Generated TypeScript clients match the published OpenAPI contract.
 * Local login, invalid credentials, token expiry, refresh rotation, logout, and cookie/CSRF behavior are covered by tests.
 * OAuth2/OIDC login creates or links the correct staff identity and tenant membership.
@@ -186,4 +186,4 @@ Docker Compose provides the local environment for both frontends, the API, Postg
 * Customer tracking works without an account, receives validated live updates, and reconciles correctly after reconnecting.
 * A valid transition from either the staff panel or POS produces the same persisted state, history record, and customer event.
 * Outbox delivery retries failures without losing the committed order transition.
-* The REST and webhook contracts remain consumable without a TypeScript-specific client.
+* The REST and webhook contracts remain language-agnostic.

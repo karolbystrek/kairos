@@ -17,13 +17,12 @@ Full architecture and requirements: `docs/REQUIREMENTS.md`.
 * **Infra:** Docker Compose, Caddy (reverse proxy/TLS).
 
 ## Architecture Boundaries
-* Keep `customer-app`, `panel-app`, and `api` independently deployable. Do not merge the two frontends.
+* Keep `customer-app`, `panel-app`, and `api` independently deployable.
 * Spring Boot is the system of record and the sole owner of business rules, authentication, authorization, tenant isolation, persistence, WebSockets, POS integration, webhooks, and outbox processing.
 * Browser-facing `/api`, WebSocket, and OAuth paths are exposed through Caddy on the relevant frontend origin. Keep the dedicated API origin for external POS integrations.
-* The external and frontend API contract is REST documented with OpenAPI 3. Generate a `typescript-fetch` client independently for each frontend; do not maintain duplicate handwritten REST DTO types.
+* The external and frontend API contract is REST documented with OpenAPI 3. Generate a `typescript-fetch` client independently for each frontend.
 * Use STOMP over WebSocket for order events. Validate incoming WebSocket payloads with Zod before using them in the customer app.
-* Do not introduce tRPC or a Next.js backend-for-frontend layer. Use native `fetch`, and use SWR only where polling, caching, or client-side revalidation provides value.
-* Do not introduce NextAuth.js or another frontend authentication authority. Spring Security owns local credentials, OAuth2/OIDC login, JWT issuance, refresh-token rotation, and authorization.
+* Use native `fetch`, and use SWR only where polling, caching, or client-side revalidation provides value.
 
 ## Repository Structure
 ```
@@ -37,7 +36,7 @@ Caddyfile         Reverse proxy config for local HTTPS
 ```
 
 ## Conventions
-* **Always use HeroUI** (`@heroui/react`) for UI components in `apps/customer-app` and `apps/panel-app`. Do not introduce other component libraries.
+* **Always use HeroUI** (`@heroui/react`) for UI components in `apps/customer-app` and `apps/panel-app`.
 * Use Zod for frontend-owned input and event validation. Treat the generated OpenAPI client as the source of REST request and response types.
 * Enforce security and tenant access in the API. Frontend redirects and hidden controls are user-experience features, not authorization controls.
 * **Always use Conventional Commits** for commit messages (`feat:`, `fix:`, `refactor:`, `chore:`, `docs:`, `test:`, etc.).
