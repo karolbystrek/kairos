@@ -23,3 +23,7 @@ Once the containers are up and running, you can access the applications locally 
 * **Customer Frontend:** [https://app.localhost](https://app.localhost)
 * **Panel Frontend:** [https://panel.localhost](https://panel.localhost)
 * **Backend API:** [https://api.localhost](https://api.localhost)
+
+The database schema is intentionally empty. Create a tenant and at least one associated location in PostgreSQL before using the staff panel; production migrations do not install demo records.
+
+The current walking vertical slice is for local development and leaves order-management endpoints unauthenticated. Authentication, tenant/location authorization, and real-time updates are the next development phases and are required before deployment.

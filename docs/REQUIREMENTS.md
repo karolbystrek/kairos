@@ -39,9 +39,9 @@ Browser-facing API requests are routed through Caddy to the Spring API. Next.js 
 
 ### 2.3 API contracts
 
-REST is the public integration contract for frontends and external POS systems. The Spring API exposes an OpenAPI 3 description using a Spring Boot 4-compatible version of springdoc-openapi.
+REST is the integration boundary for frontends and external POS systems. During the first walking vertical slice, the endpoints are implemented as ordinary Spring MVC controllers and each frontend uses small handwritten TypeScript response types with native `fetch`. The slice does not expose an OpenAPI document or generate REST clients.
 
-Each frontend generates its own `typescript-fetch` client from the same OpenAPI document. Generated models and operations are the source of frontend REST types. CI must detect when generated clients no longer match the API contract.
+Formal, language-agnostic API documentation and automated contract checks are deferred until the REST contract needs to support external POS integrations. Introducing them later must not move business rules or API ownership out of the Spring application.
 
 ## 3. Functional Requirements
 
@@ -55,7 +55,7 @@ An order follows a controlled lifecycle:
 4. **Completed:** the order is collected, the live session ends, and later scans show a terminal state.
 5. **Canceled:** the order is canceled, connected customers are informed, and the live session ends.
 
-The backend validates every transition regardless of whether it originates from the panel or a POS. Every accepted transition is recorded in an append-only history.
+The backend validates every transition regardless of whether it originates from the panel or a POS. Every accepted resulting state is recorded in an append-only history. The prior state is derived from the preceding history entry, with the first entry representing creation.
 
 ### 3.2 Customer application
 
@@ -108,7 +108,7 @@ After either login method, Spring issues a short-lived signed access JWT and a r
 
 The authenticated principal carries the staff identity, active tenant, and tenant-level roles needed for authorization. Location assignments are resolved by the backend rather than embedded as a potentially large or stale list in the JWT. The API derives tenant and location access from authenticated memberships and never trusts a tenant or location identifier merely because it was supplied by the client.
 
-The API provides operations for local login, session refresh, logout, and retrieving the current staff identity, together with OAuth2/OIDC initiation and callback handling. Exact URL and payload naming belongs to the API design and OpenAPI contract rather than this requirements document.
+The API provides operations for local login, session refresh, logout, and retrieving the current staff identity, together with OAuth2/OIDC initiation and callback handling. Exact URL and payload naming belongs to the later API design rather than this requirements document.
 
 ### 4.2 Customer access
 
@@ -135,7 +135,7 @@ The database schema must include tables covering the following concepts. Names a
 * **Tenant memberships:** relationship between a staff account and tenant, including authorization roles.
 * **Location access:** relationship between a tenant membership and each accessible location, including location-specific roles where needed.
 * **Orders:** public tracking identity, owning location, customer-facing label, current state, and lifecycle timestamps. Tenant ownership is derived through the location.
-* **Order history:** order association, state transition, time, and transition source or actor; records are append-only.
+* **Order history:** order association, resulting state, acceptance time, and the initiator category and identity when known; records are append-only and have an unambiguous order. Initiator categories distinguish users, external integrations, and system actions without coupling history to one authentication mechanism.
 * **Refresh sessions:** staff/session association, hashed rotating credential, expiry, and revocation state.
 * **POS credentials:** tenant association, hashed API key material, and credential lifecycle state.
 * **POS location access:** relationship between a POS credential and each permitted location.
@@ -165,6 +165,7 @@ Docker Compose provides the local environment for both frontends, the API, Postg
 ## 8. Resilience and Consistency
 
 * Order transitions and their history are committed atomically.
+* Concurrent commands for the same order are serialized before validating and persisting a transition, preventing stale state decisions without duplicating an application-managed version value.
 * Order transitions and required outbox events are committed atomically.
 * WebSocket loss does not prevent later REST recovery.
 * Redis unavailability must not corrupt PostgreSQL state; event delivery may be delayed and recovered according to operational policy.
@@ -176,7 +177,7 @@ Docker Compose provides the local environment for both frontends, the API, Postg
 ## 9. Verification and Acceptance Criteria
 
 * Both frontends build and lint independently.
-* Generated TypeScript clients match the published OpenAPI contract.
+* Each frontend's handwritten request code and response types match the REST behavior covered by integration tests during the walking vertical slice.
 * Local login, invalid credentials, token expiry, refresh rotation, logout, and cookie/CSRF behavior are covered by tests.
 * OAuth2/OIDC login creates or links the correct staff identity and tenant membership.
 * A tenant administrator can access all locations in the tenant but none in another tenant.
@@ -187,3 +188,9 @@ Docker Compose provides the local environment for both frontends, the API, Postg
 * A valid transition from either the staff panel or POS produces the same persisted state, history record, and customer event.
 * Outbox delivery retries failures without losing the committed order transition.
 * The REST and webhook contracts remain language-agnostic.
+
+## 10. Incremental Delivery
+
+The first walking vertical slice is intentionally limited to local development. It provides persisted order creation and transitions in the staff panel, QR-code generation, and anonymous customer state retrieval through REST. The database starts empty; tenants and locations are not seeded by production migrations.
+
+During this slice, order-management endpoints are temporarily unauthenticated, customer updates require an explicit REST refresh, and REST calls use handwritten native `fetch` code rather than OpenAPI tooling or generated clients. This is not an alternative security or real-time architecture: staff authentication, tenant and location authorization, RLS enforcement, WebSocket/STOMP delivery, and reconnect reconciliation remain required before deployment. Formal API documentation is deferred until the contract is prepared for external integrations. Temporary unauthenticated operations must not accept a client-supplied initiator identity as trusted audit information.
