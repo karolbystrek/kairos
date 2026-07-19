@@ -9,7 +9,7 @@ Full architecture and requirements: `docs/REQUIREMENTS.md`.
 > **Development prerequisite:** Read `docs/REQUIREMENTS.md` in full before planning, implementing, reviewing, refactoring, or otherwise changing project code, database migrations, APIs, security, infrastructure, or tests. Treat it as the source of truth for system behavior and architecture throughout the task, not only during initial orientation.
 
 ## Tech Stack
-* **customer-app** (`apps/customer-app`): Next.js 16, React 19, TypeScript, Tailwind CSS 4, HeroUI 3, Zod.
+* **customer-app** (`apps/customer-app`): Next.js 16, React 19, TypeScript, Tailwind CSS 4, HeroUI 3, Zod, SWR for client-side server state.
 * **panel-app** (`apps/panel-app`): Next.js 16, React 19, TypeScript, Tailwind CSS 4, HeroUI 3, Zod, SWR where client-side synchronization is useful.
 * **api** (`apps/api`): Java 25, Spring Boot 4, Spring Security, Spring WebSocket/STOMP.
 * **Database:** PostgreSQL. Shared database/shared schema, tenant isolation via Row Level Security using direct or relationship-derived ownership as defined in `docs/REQUIREMENTS.md`.
@@ -22,7 +22,7 @@ Full architecture and requirements: `docs/REQUIREMENTS.md`.
 * Browser-facing `/api`, WebSocket, and OAuth paths are exposed through Caddy on the relevant frontend origin. Keep the dedicated API origin for external POS integrations.
 * Keep REST as the boundary between the frontends, external POS integrations, and the API. The first walking vertical slice uses small handwritten TypeScript types and native `fetch`; formal API documentation and client generation are deferred until the contract needs to support external integrations.
 * Use STOMP over WebSocket for order events. Validate incoming WebSocket payloads with Zod before using them in the customer app.
-* Use native `fetch`, and use SWR only where polling, caching, or client-side revalidation provides value.
+* Use native `fetch` inside the handwritten REST request modules. Use SWR in Client Components to manage REST-backed server state, including caching, request deduplication, mutations, focus revalidation, and reconnect revalidation. Do not add Next.js Server Actions or proxy route handlers as an API layer in front of Spring.
 
 ## Repository Structure
 ```
@@ -38,6 +38,7 @@ Caddyfile         Reverse proxy config for local HTTPS
 ## Conventions
 * **Always use HeroUI** (`@heroui/react`) for UI components in `apps/customer-app` and `apps/panel-app`.
 * Use Zod for frontend-owned input and event validation. During the walking vertical slice, keep REST request functions and response types small and handwritten in each frontend.
+* Do not use React effects to orchestrate routine REST request state. Reserve effects for synchronization with external systems, such as error reporting or future WebSocket/browser API subscriptions. Keep the official `eslint-plugin-react-hooks` recommended rules enabled, including exhaustive dependency validation; use local state hooks normally for frontend-owned interaction state.
 * Organize backend code by business feature. Within each feature, separate `api`, `application`, `domain`, and `infrastructure` packages; keep transport models and HTTP concerns at the API boundary and business behavior in the domain.
 * Enforce security and tenant access in the API. Frontend redirects and hidden controls are user-experience features, not authorization controls.
 * Keep production migrations free of seeded tenants, locations, accounts, credentials, or other environment-specific records. Tests create isolated fixtures and roll them back.
@@ -47,7 +48,7 @@ Caddyfile         Reverse proxy config for local HTTPS
 * Each app (`customer-app`, `panel-app`, `api`) is independent: separate dependency manifests, separate Dockerfiles.
 
 ## Current Development Stage
-The walking vertical slice is local-only and deliberately has no staff authentication, WebSocket delivery, OpenAPI endpoint, or generated REST client yet. It supports staff order creation and transitions, QR generation, and anonymous REST tracking with native `fetch`. The unauthenticated order-management API is a temporary delivery stage, not authorization policy; add Spring Security authentication, tenant/location enforcement, CSRF protection, and RLS before deployment. Production migrations must still create an empty, deployable schema rather than demo data.
+The walking vertical slice is local-only and deliberately has no staff authentication, WebSocket delivery, OpenAPI endpoint, or generated REST client yet. It supports staff order creation and transitions, QR generation, and anonymous REST tracking through SWR-managed client state backed by handwritten native `fetch` requests. The unauthenticated order-management API is a temporary delivery stage, not authorization policy; add Spring Security authentication, tenant/location enforcement, CSRF protection, and RLS before deployment. Production migrations must still create an empty, deployable schema rather than demo data.
 
 ## Documentation Synchronization
 * Do not leave accepted project decisions only in the conversation. When discussion with the user changes or clarifies architecture, requirements, scope, security, data ownership, technology choices, or development conventions, update the relevant documentation in the same task.

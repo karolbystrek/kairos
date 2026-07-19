@@ -18,7 +18,7 @@ Native mobile applications, App Clips, Instant Apps, and Web Push may be added l
 
 Both frontends use Next.js 16, React 19, TypeScript, Tailwind CSS 4, and HeroUI 3. They remain separate because they serve different audiences and have different authentication, PWA, caching, and release concerns.
 
-HeroUI is the component library for both applications. Zod validates frontend-owned form input and real-time event payloads. Native `fetch` is the default HTTP client. SWR may be used in the staff panel where polling, caching, or client-side revalidation improves queue synchronization.
+HeroUI is the component library for both applications. Zod validates frontend-owned form input and real-time event payloads. Native `fetch` is the HTTP transport inside small handwritten REST request modules. SWR manages REST-backed client state in both frontends where caching, request deduplication, mutations, focus revalidation, or reconnect revalidation applies. React effects are reserved for synchronization with external systems rather than routine REST request orchestration.
 
 The Spring API retains domain authority. Frontend controls and redirects provide user experience, while the backend enforces authorization.
 
@@ -39,7 +39,7 @@ Browser-facing API requests are routed through Caddy to the Spring API. Next.js 
 
 ### 2.3 API contracts
 
-REST is the integration boundary for frontends and external POS systems. During the first walking vertical slice, the endpoints are implemented as ordinary Spring MVC controllers and each frontend uses small handwritten TypeScript response types with native `fetch`. The slice does not expose an OpenAPI document or generate REST clients.
+REST is the integration boundary for frontends and external POS systems. During the first walking vertical slice, the endpoints are implemented as ordinary Spring MVC controllers and each frontend uses small handwritten TypeScript response types with native `fetch`, wrapped by SWR in Client Components that need server-state synchronization. The slice does not expose an OpenAPI document or generate REST clients. Next.js Server Actions and proxy route handlers do not replace or wrap the Spring REST boundary.
 
 Formal, language-agnostic API documentation and automated contract checks are deferred until the REST contract needs to support external POS integrations. Introducing them later must not move business rules or API ownership out of the Spring application.
 
@@ -178,6 +178,7 @@ Docker Compose provides the local environment for both frontends, the API, Postg
 
 * Both frontends build and lint independently.
 * Each frontend's handwritten request code and response types match the REST behavior covered by integration tests during the walking vertical slice.
+* REST-backed Client Components use keyed SWR state rather than effects for request orchestration, retain cached data during background revalidation, and do not apply order transitions before the Spring API accepts them.
 * Local login, invalid credentials, token expiry, refresh rotation, logout, and cookie/CSRF behavior are covered by tests.
 * OAuth2/OIDC login creates or links the correct staff identity and tenant membership.
 * A tenant administrator can access all locations in the tenant but none in another tenant.
@@ -193,4 +194,4 @@ Docker Compose provides the local environment for both frontends, the API, Postg
 
 The first walking vertical slice is intentionally limited to local development. It provides persisted order creation and transitions in the staff panel, QR-code generation, and anonymous customer state retrieval through REST. The database starts empty; tenants and locations are not seeded by production migrations.
 
-During this slice, order-management endpoints are temporarily unauthenticated, customer updates require an explicit REST refresh, and REST calls use handwritten native `fetch` code rather than OpenAPI tooling or generated clients. This is not an alternative security or real-time architecture: staff authentication, tenant and location authorization, RLS enforcement, WebSocket/STOMP delivery, and reconnect reconciliation remain required before deployment. Formal API documentation is deferred until the contract is prepared for external integrations. Temporary unauthenticated operations must not accept a client-supplied initiator identity as trusted audit information.
+During this slice, order-management endpoints are temporarily unauthenticated, customer updates use manual plus focus/reconnect REST revalidation, and SWR calls handwritten native `fetch` request modules rather than OpenAPI tooling or generated clients. This is not an alternative security or real-time architecture: staff authentication, tenant and location authorization, RLS enforcement, WebSocket/STOMP delivery, and reconnect reconciliation remain required before deployment. Formal API documentation is deferred until the contract is prepared for external integrations. Temporary unauthenticated operations must not accept a client-supplied initiator identity as trusted audit information.

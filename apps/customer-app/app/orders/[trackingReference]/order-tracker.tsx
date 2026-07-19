@@ -1,13 +1,9 @@
 "use client";
 
 import { Alert, Button, Chip, Spinner } from "@heroui/react";
-import { useCallback, useEffect, useState } from "react";
+import useSWR from "swr";
 
-import {
-  getTrackedOrder,
-  type CustomerOrder,
-  type OrderStatus,
-} from "@/src/api/orders";
+import { ApiError, getTrackedOrder, type OrderStatus } from "@/src/api/orders";
 
 const statusLabels: Record<OrderStatus, string> = {
   CREATED: "Created",
@@ -17,43 +13,55 @@ const statusLabels: Record<OrderStatus, string> = {
   CANCELED: "Canceled",
 };
 
+function shouldRetryOnError(error: Error): boolean {
+  return !(
+    error instanceof ApiError &&
+    error.status >= 400 &&
+    error.status < 500
+  );
+}
+
+function getTrackingErrorMessage(error: unknown): string {
+  if (error instanceof ApiError && error.status === 404) {
+    return "This order could not be found.";
+  }
+
+  return "The latest order status could not be loaded.";
+}
+
 export function OrderTracker({
   trackingReference,
 }: {
   trackingReference: string;
 }) {
-  const [order, setOrder] = useState<CustomerOrder>();
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string>();
+  const {
+    data: order,
+    error,
+    isLoading,
+    isValidating,
+    mutate,
+  } = useSWR(
+    ["tracked-order", trackingReference] as const,
+    ([, reference]) => getTrackedOrder(reference),
+    {
+      errorRetryCount: 3,
+      shouldRetryOnError,
+    },
+  );
 
-  const loadOrder = useCallback(async () => {
-    setIsLoading(true);
-    setError(undefined);
-    try {
-      setOrder(await getTrackedOrder(trackingReference));
-    } catch {
-      setOrder(undefined);
-      setError("This order could not be found.");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [trackingReference]);
-
-  useEffect(() => {
-    void loadOrder();
-  }, [loadOrder]);
-
-  if (isLoading) {
+  if (isLoading && !order) {
     return <Spinner aria-label="Loading order" />;
   }
 
-  if (error || !order) {
+  if (!order) {
     return (
       <Alert status="danger">
         <Alert.Indicator />
         <Alert.Content>
           <Alert.Title>Order unavailable</Alert.Title>
-          <Alert.Description>{error}</Alert.Description>
+          <Alert.Description>
+            {getTrackingErrorMessage(error)}
+          </Alert.Description>
         </Alert.Content>
       </Alert>
     );
@@ -61,6 +69,17 @@ export function OrderTracker({
 
   return (
     <section className="flex flex-col items-start gap-4">
+      {error && (
+        <Alert status="warning">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Title>Status may be out of date</Alert.Title>
+            <Alert.Description>
+              {getTrackingErrorMessage(error)} Showing the last known status.
+            </Alert.Description>
+          </Alert.Content>
+        </Alert>
+      )}
       <div>
         <h1 className="text-3xl font-semibold">Order {order.label}</h1>
         <p className="text-muted">Current order status</p>
@@ -71,8 +90,14 @@ export function OrderTracker({
       <p className="text-sm text-muted">
         Updated {new Date(order.updatedAt).toLocaleString()}
       </p>
-      <Button variant="secondary" onPress={loadOrder}>
-        Refresh
+      <Button
+        isDisabled={isValidating}
+        variant="secondary"
+        onPress={() => {
+          void mutate(undefined, { throwOnError: false });
+        }}
+      >
+        {isValidating ? "Refreshing…" : "Refresh"}
       </Button>
     </section>
   );

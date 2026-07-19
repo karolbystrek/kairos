@@ -1,6 +1,7 @@
 import { defineConfig, globalIgnores } from "eslint/config";
 import { fixupConfigRules, fixupPluginRules } from "@eslint/compat";
 import react from "eslint-plugin-react";
+import reactHooks from "eslint-plugin-react-hooks";
 import unusedImports from "eslint-plugin-unused-imports";
 import _import from "eslint-plugin-import";
 import typescriptEslint from "@typescript-eslint/eslint-plugin";
@@ -43,12 +44,11 @@ export default defineConfig([globalIgnores([
     "!**/plopfile.js",
     "!**/react-shim.js",
     "!**/tsup.config.ts",
-]), {
+]), reactHooks.configs.flat.recommended, {
     extends: [
         ...fixupConfigRules(compat.extends(
             "plugin:react/recommended",
             "plugin:prettier/recommended",
-            "plugin:react-hooks/recommended",
             "plugin:jsx-a11y/recommended",
         )),
         nextPlugin.configs.recommended,
@@ -93,7 +93,6 @@ export default defineConfig([globalIgnores([
         "react/prop-types": "off",
         "react/jsx-uses-react": "off",
         "react/react-in-jsx-scope": "off",
-        "react-hooks/exhaustive-deps": "off",
         "jsx-a11y/click-events-have-key-events": "warn",
         "jsx-a11y/interactive-supports-focus": "warn",
         "prettier/prettier": "warn",

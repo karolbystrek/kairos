@@ -17,6 +17,12 @@ export const customerOrderSchema = z.object({
 export type OrderStatus = z.infer<typeof orderStatusSchema>;
 export type CustomerOrder = z.infer<typeof customerOrderSchema>;
 
+export class ApiError extends Error {
+  constructor(public readonly status: number) {
+    super(`The API returned ${status}.`);
+  }
+}
+
 export async function getTrackedOrder(
   trackingReference: string,
 ): Promise<CustomerOrder> {
@@ -25,7 +31,7 @@ export async function getTrackedOrder(
   );
 
   if (!response.ok) {
-    throw new Error(`The API returned ${response.status}.`);
+    throw new ApiError(response.status);
   }
 
   return customerOrderSchema.parse(await response.json());
