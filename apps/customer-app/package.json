@@ -5,9 +5,13 @@
 	"private": true,
 	"scripts": {
 		"dev": "next dev --experimental-https",
+		"dev:docker": "next dev --hostname 0.0.0.0",
 		"build": "next build",
 		"start": "next start",
-		"lint": "eslint --fix"
+		"lint": "eslint . --max-warnings=0",
+		"lint:fix": "eslint . --fix --max-warnings=0",
+		"typecheck": "tsc --noEmit --incremental false",
+		"check": "npm run lint && npm run typecheck"
 	},
 	"dependencies": {
 		"@heroui/react": "3.2.2",

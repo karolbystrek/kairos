@@ -56,10 +56,31 @@ The walking vertical slice is local-only and deliberately has no staff authentic
 * Update `AGENTS.md` for repository-wide technology choices, boundaries, workflows, and implementation conventions agents must follow.
 * Keep documentation and code consistent. When a code change alters documented behavior or structure, update the affected documentation alongside the code; when a documentation decision affects existing code, identify and reconcile the mismatch rather than silently ignoring it.
 
+## Agent Development Workflow
+* Before changing files, inspect `git status --short` and run `docker compose ps`. Assume an already-running stack belongs to the user and was started with `docker compose up --build --watch`; do not start a duplicate Watch process.
+* If the stack is not running and runtime verification is needed, start it with `docker compose up --build --watch` and keep that process active for the task.
+* Compose Watch requires Docker Compose 2.32.2 or newer. Frontend source is synchronized into development containers for Next.js Fast Refresh. Backend source is synchronized, compiled with the Maven wrapper inside the container, and then reloaded by Spring Boot DevTools.
+* If a change is not reflected in a running service, inspect bounded service logs first. As a fallback, rebuild and recreate only affected services with `docker compose up -d --build --no-deps <service...>`.
+* Treat the running environment as user-owned. Never stop the complete stack, run `docker compose down`, delete volumes, reset PostgreSQL, or prune Docker state unless the user explicitly authorizes it.
+* Use repository-owned command interfaces instead of invoking installed binaries directly:
+  * From the repository root, validate a frontend with `npm --prefix apps/customer-app run check` or `npm --prefix apps/panel-app run check`.
+  * Use `npm run` or `npm --prefix` for frontend tooling. Do not invoke `node_modules/.bin`, use `npx` for an installed project tool, or run raw ESLint or TypeScript commands.
+  * Run backend Maven commands through `apps/api/mvnw` (or `./mvnw` from `apps/api`), never through a system `mvn` executable.
+  * Add or update frontend dependencies with `npm install` from the affected app so its `package-lock.json` remains synchronized. Do not edit lockfiles manually.
+* `npm run lint` and `npm run check` are read-only validation commands. Use `npm run lint:fix` only as an intentional edit, then review the resulting diff.
+* Validate the affected scope before handoff:
+  * Frontend change: run that app's `check` script.
+  * Backend change: run `./mvnw test` from `apps/api`.
+  * Shared REST contract change: run backend tests and `check` in every consuming frontend.
+  * Always run `git diff --check`.
+  * Reserve production builds for dependency, build configuration, or Dockerfile changes, explicit release verification, or when the task specifically requires them.
+* A changed Flyway migration can be rejected by a persistent local database because its recorded checksum no longer matches. Report the failure and ask before any database-volume reset; never erase the volume automatically.
+* In the final report, distinguish checks that passed, failed, were blocked by the environment, or were not run. Do not describe stale containers or interrupted commands as successfully verified.
+
 ## Local Development
 ```bash
 cp .env.example .env
-docker compose up --build
+docker compose up --build --watch
 ```
 * Customer app: https://app.localhost
 * Panel app: https://panel.localhost

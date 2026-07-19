@@ -26,6 +26,7 @@ services:
     build:
       context: ./apps/api
       dockerfile: Dockerfile
+      target: development
     expose:
       - "8080"
     environment:
@@ -37,6 +38,17 @@ services:
     depends_on:
       - postgres
       - redis
+    develop:
+      watch:
+        - action: sync+exec
+          path: ./apps/api/src
+          target: /app/src
+          initial_sync: true
+          exec:
+            command: ./mvnw compile -DskipTests
+            working_dir: /app
+        - action: rebuild
+          path: ./apps/api/pom.xml
     restart: unless-stopped
 
   customer-app:
@@ -44,10 +56,24 @@ services:
     build:
       context: ./apps/customer-app
       dockerfile: Dockerfile
+      target: development
     expose:
       - "3000"
     depends_on:
       - api
+    develop:
+      watch:
+        - action: sync
+          path: ./apps/customer-app
+          target: /app
+          initial_sync: true
+          ignore:
+            - node_modules/
+            - .next/
+        - action: rebuild
+          path: ./apps/customer-app/package.json
+        - action: rebuild
+          path: ./apps/customer-app/package-lock.json
     restart: unless-stopped
 
   panel-app:
@@ -55,10 +81,24 @@ services:
     build:
       context: ./apps/panel-app
       dockerfile: Dockerfile
+      target: development
     expose:
       - "3000"
     depends_on:
       - api
+    develop:
+      watch:
+        - action: sync
+          path: ./apps/panel-app
+          target: /app
+          initial_sync: true
+          ignore:
+            - node_modules/
+            - .next/
+        - action: rebuild
+          path: ./apps/panel-app/package.json
+        - action: rebuild
+          path: ./apps/panel-app/package-lock.json
     restart: unless-stopped
 
   caddy:

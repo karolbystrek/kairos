@@ -1,5 +1,5 @@
-# Stage 1: Build the application
-FROM eclipse-temurin:25-jdk-alpine AS builder
+# Stage 1: Resolve build dependencies
+FROM eclipse-temurin:25-jdk-alpine AS dependencies
 WORKDIR /app
 
 # Copy maven wrapper and dependencies descriptor
@@ -9,12 +9,23 @@ COPY .mvn .mvn
 # Resolve dependencies (cached unless pom.xml changes)
 RUN chmod +x mvnw && ./mvnw dependency:go-offline -B
 
-# Copy source code and build package
+# Stage 2: Development server
+FROM dependencies AS development
+
+COPY src ./src
+
+EXPOSE 8080
+
+CMD ["./mvnw", "spring-boot:run"]
+
+# Stage 3: Build the application
+FROM dependencies AS builder
+
 COPY src ./src
 RUN ./mvnw package -DskipTests
 
-# Stage 2: Create the runner image
-FROM eclipse-temurin:25-jre-alpine
+# Stage 4: Production runner
+FROM eclipse-temurin:25-jre-alpine AS runner
 WORKDIR /app
 
 COPY --from=builder /app/target/*.jar app.jar

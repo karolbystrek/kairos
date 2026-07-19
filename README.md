@@ -11,10 +11,10 @@ Copy the example environment file to create your local configuration:
 cp .env.example .env
 ```
 
-### 2. Build and Start the Containers
-Run Docker Compose to build the application images and start the services:
+### 2. Build and Start the Development Environment
+Run Docker Compose with Watch enabled. Keep this terminal open while developing so frontend source changes use Next.js Fast Refresh and backend source changes are compiled before Spring Boot restarts:
 ```bash
-docker compose up --build
+docker compose up --build --watch
 ```
 
 ### 3. Access the Applications
