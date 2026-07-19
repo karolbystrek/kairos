@@ -8,10 +8,82 @@ CREATE TABLE locations
 (
     id        UUID PRIMARY KEY,
     tenant_id UUID         NOT NULL REFERENCES tenants (id),
-    name      VARCHAR(120) NOT NULL
+    name      VARCHAR(120) NOT NULL,
+    CONSTRAINT locations_id_tenant_key UNIQUE (id, tenant_id)
 );
 
 CREATE INDEX locations_tenant_id_idx ON locations (tenant_id);
+
+CREATE TABLE accounts
+(
+    id            UUID PRIMARY KEY,
+    tenant_id     UUID                     NOT NULL REFERENCES tenants (id),
+    username      VARCHAR(120)             NOT NULL UNIQUE,
+    email         VARCHAR(254) UNIQUE,
+    password_hash VARCHAR(255)             NOT NULL,
+    display_name  VARCHAR(120)             NOT NULL,
+    tenant_role   VARCHAR(32)              NOT NULL,
+    status        VARCHAR(32)              NOT NULL,
+    created_at    TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at    TIMESTAMP WITH TIME ZONE NOT NULL,
+    CONSTRAINT accounts_username_not_blank_check CHECK (TRIM(username) <> ''),
+    CONSTRAINT accounts_username_normalized_check CHECK (username = LOWER(TRIM(username))),
+    CONSTRAINT accounts_email_check CHECK (
+        email IS NULL OR (TRIM(email) <> '' AND email = LOWER(TRIM(email)))
+        ),
+    CONSTRAINT accounts_password_hash_not_blank_check CHECK (TRIM(password_hash) <> ''),
+    CONSTRAINT accounts_display_name_not_blank_check CHECK (TRIM(display_name) <> ''),
+    CONSTRAINT accounts_id_tenant_key UNIQUE (id, tenant_id),
+    CONSTRAINT accounts_tenant_role_check CHECK (tenant_role IN ('ADMIN', 'MEMBER')),
+    CONSTRAINT accounts_status_check CHECK (status IN ('ACTIVE', 'DISABLED'))
+);
+
+CREATE INDEX accounts_tenant_id_idx ON accounts (tenant_id);
+
+CREATE TABLE location_assignments
+(
+    account_id  UUID                     NOT NULL,
+    location_id UUID                     NOT NULL,
+    tenant_id   UUID                     NOT NULL,
+    role        VARCHAR(32)              NOT NULL,
+    status      VARCHAR(32)              NOT NULL,
+    created_at  TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at  TIMESTAMP WITH TIME ZONE NOT NULL,
+    PRIMARY KEY (account_id, location_id),
+    CONSTRAINT location_assignments_account_key UNIQUE (account_id),
+    CONSTRAINT location_assignments_account_tenant_fk
+        FOREIGN KEY (account_id, tenant_id)
+            REFERENCES accounts (id, tenant_id),
+    CONSTRAINT location_assignments_location_tenant_fk
+        FOREIGN KEY (location_id, tenant_id)
+            REFERENCES locations (id, tenant_id),
+    CONSTRAINT location_assignments_role_check CHECK (role IN ('MANAGER', 'OPERATOR')),
+    CONSTRAINT location_assignments_status_check CHECK (status IN ('ACTIVE', 'SUSPENDED'))
+);
+
+CREATE INDEX location_assignments_location_id_idx
+    ON location_assignments (location_id, account_id);
+
+CREATE TABLE sessions
+(
+    id                 UUID PRIMARY KEY,
+    account_id         UUID                     NOT NULL REFERENCES accounts (id),
+    refresh_token_hash VARCHAR(255)             NOT NULL UNIQUE,
+    token_family_id    UUID                     NOT NULL,
+    created_at         TIMESTAMP WITH TIME ZONE NOT NULL,
+    expires_at         TIMESTAMP WITH TIME ZONE NOT NULL,
+    last_used_at       TIMESTAMP WITH TIME ZONE,
+    revoked_at         TIMESTAMP WITH TIME ZONE,
+    replaced_by_id     UUID REFERENCES sessions (id),
+    CONSTRAINT sessions_refresh_token_hash_not_blank_check CHECK (TRIM(refresh_token_hash) <> ''),
+    CONSTRAINT sessions_expiry_check CHECK (expires_at > created_at),
+    CONSTRAINT sessions_last_used_at_check CHECK (last_used_at IS NULL OR last_used_at >= created_at),
+    CONSTRAINT sessions_revoked_at_check CHECK (revoked_at IS NULL OR revoked_at >= created_at),
+    CONSTRAINT sessions_replacement_check CHECK (replaced_by_id IS NULL OR replaced_by_id <> id)
+);
+
+CREATE INDEX sessions_account_id_idx ON sessions (account_id);
+CREATE INDEX sessions_token_family_id_idx ON sessions (token_family_id);
 
 CREATE TABLE orders
 (

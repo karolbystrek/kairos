@@ -77,12 +77,14 @@ Browser suspension may interrupt WebSocket delivery. The application must reconc
 
 The staff panel must:
 
-* require an authenticated staff identity;
-* show only locations and orders accessible to the staff member;
-* allow authorized chain-level staff to switch between locations or view an aggregate queue;
+* require an authenticated internal account;
+* show only locations and orders accessible to the account;
+* allow tenant administrators to switch between locations or view an aggregate queue;
 * create orders for an accessible location and produce customer QR codes;
 * display and refresh active order queues by location;
-* allow only valid order transitions permitted by the staff member's role;
+* allow only valid order transitions permitted by the account's role;
+* allow tenant administrators to provision location managers and operators within their tenant;
+* allow a location manager to provision operators only for the manager's assigned location;
 * provide clear feedback for stale data, rejected transitions, expired sessions, and network failures.
 
 ### 3.4 POS API and webhooks
@@ -99,16 +101,18 @@ Spring Security is the sole authentication authority.
 
 The system supports:
 
-* Kairos-managed staff accounts with BCrypt-hashed passwords;
+* Kairos-managed accounts with normalized usernames and BCrypt-hashed passwords;
 * OAuth2/OIDC login, initially demonstrated with Google but configurable for another provider;
-* linking an external provider identity to a Kairos staff account and tenant membership;
+* linking an external provider identity to a Kairos account and its owning tenant;
 * the same application authorization model regardless of login method.
 
 After either login method, Spring issues a short-lived signed access JWT and a rotating refresh credential. Browser credentials are transported in `Secure`, `HttpOnly`, `SameSite=Lax`, host-only cookies through the staff-panel origin. Cookie-authenticated state-changing requests require CSRF protection.
 
-The authenticated principal carries the staff identity, active tenant, and tenant-level roles needed for authorization. Location assignments are resolved by the backend rather than embedded as a potentially large or stale list in the JWT. The API derives tenant and location access from authenticated memberships and never trusts a tenant or location identifier merely because it was supplied by the client.
+Accounts are provisioned rather than self-registered. Each account belongs directly to one tenant. A tenant administrator has tenant-wide access; a location manager or operator has at most one location assignment. Location operator accounts are device-oriented, and a location uses a separate account for each panel device that needs independent credentials or revocation. Tenant administrators may provision managers and operators, while location managers may provision only operators for their own location.
 
-The API provides operations for local login, session refresh, logout, and retrieving the current staff identity, together with OAuth2/OIDC initiation and callback handling. Exact URL and payload naming belongs to the later API design rather than this requirements document.
+The authenticated principal carries the account identity, owning tenant, and tenant-level role needed for authorization. The backend resolves the current location assignment rather than embedding mutable assignment data in the JWT. The API derives tenant and location access from the authenticated account and never trusts a tenant or location identifier merely because it was supplied by the client.
+
+The API provides operations for local login, session refresh, logout, and retrieving the current account identity, together with OAuth2/OIDC initiation and callback handling. Exact URL and payload naming belongs to the later API design rather than this requirements document.
 
 ### 4.2 Customer access
 
@@ -120,7 +124,7 @@ POS integrations authenticate with a bearer API key. Only a non-reversible hash 
 
 ### 4.4 Tenant isolation
 
-All tenant-owned data is protected at both application and database levels. PostgreSQL Row Level Security provides defense in depth. Every transaction accessing tenant-owned rows must establish tenant and location access from a verified staff membership or POS credential.
+All tenant-owned data is protected at both application and database levels. PostgreSQL Row Level Security provides defense in depth. Every transaction accessing tenant-owned rows must establish tenant and location access from a verified account or POS credential.
 
 Orders derive tenant ownership through their physical location rather than storing a second direct tenant relationship. RLS policies for orders and their dependent records must verify the location's tenant and, for staff or POS operations, the principal's access to that location. A location cannot be reassigned to another tenant after operational data has been created; such a change requires an explicit migration.
 
@@ -130,13 +134,12 @@ The database schema must include tables covering the following concepts. Names a
 
 * **Tenants:** stable identity, display information, and integration configuration.
 * **Locations:** physical restaurant belonging to one tenant, with display and operational information.
-* **Staff accounts:** stable identity, local credential hash when applicable, and account state.
-* **External identities:** provider and immutable provider subject linked to a staff account.
-* **Tenant memberships:** relationship between a staff account and tenant, including authorization roles.
-* **Location access:** relationship between a tenant membership and each accessible location, including location-specific roles where needed.
+* **Accounts:** stable identity, direct ownership by one tenant, normalized local login identifier and credential hash when applicable, tenant-level role, and account state.
+* **External identities:** provider and immutable provider subject linked to an account.
+* **Location assignments:** relationship between a non-admin account and its accessible location, including a manager or operator role and assignment state. The current account model permits at most one assignment per account; the relationship remains normalized so that this cardinality can be changed explicitly in a future migration.
 * **Orders:** public tracking identity, owning location, customer-facing label, current state, and lifecycle timestamps. Tenant ownership is derived through the location.
 * **Order history:** order association, resulting state, acceptance time, and the initiator category and identity when known; records are append-only and have an unambiguous order. Initiator categories distinguish users, external integrations, and system actions without coupling history to one authentication mechanism.
-* **Refresh sessions:** staff/session association, hashed rotating credential, expiry, and revocation state.
+* **Refresh sessions:** account/session association, hashed rotating credential, expiry, and revocation state.
 * **POS credentials:** tenant association, hashed API key material, and credential lifecycle state.
 * **POS location access:** relationship between a POS credential and each permitted location.
 * **Outbox events:** aggregate association, event payload or type, delivery state, and retry scheduling information. Tenant or location information may be captured in the event envelope when required for reliable delivery, but it is not the canonical ownership relationship for an order.
@@ -180,9 +183,11 @@ Docker Compose provides the local environment for both frontends, the API, Postg
 * Each frontend's handwritten request code and response types match the REST behavior covered by integration tests during the walking vertical slice.
 * REST-backed Client Components use keyed SWR state rather than effects for request orchestration, retain cached data during background revalidation, and do not apply order transitions before the Spring API accepts them.
 * Local login, invalid credentials, token expiry, refresh rotation, logout, and cookie/CSRF behavior are covered by tests.
-* OAuth2/OIDC login creates or links the correct staff identity and tenant membership.
+* OAuth2/OIDC login creates or links the correct account and tenant ownership.
 * A tenant administrator can access all locations in the tenant but none in another tenant.
-* Location staff can list, create, read, and update orders only in assigned locations; staff assigned to multiple locations can access each assignment.
+* A location manager can access and manage orders only in its assigned location and can provision operator accounts only for that location.
+* A location operator can list, create, read, and update orders only in its assigned location and cannot provision accounts.
+* Multiple panel devices at one location can use separate operator accounts with independently revocable credentials and sessions.
 * Location-scoped POS credentials cannot access an unassigned location.
 * Unauthenticated, unauthorized, cross-tenant, and cross-location REST and WebSocket access is rejected, including when accessing data directly through repositories protected by RLS.
 * Customer tracking works without an account, receives validated live updates, and reconciles correctly after reconnecting.
