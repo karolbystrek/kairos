@@ -1,15 +1,21 @@
-export type OrderStatus =
-  | "CREATED"
-  | "IN_PREPARATION"
-  | "READY"
-  | "COMPLETED"
-  | "CANCELED";
+import { z } from "zod";
 
-export interface CustomerOrder {
-  label: string;
-  status: OrderStatus;
-  updatedAt: string;
-}
+export const orderStatusSchema = z.enum([
+  "CREATED",
+  "IN_PREPARATION",
+  "READY",
+  "COMPLETED",
+  "CANCELED",
+]);
+
+export const customerOrderSchema = z.object({
+  label: z.string(),
+  status: orderStatusSchema,
+  updatedAt: z.iso.datetime({ offset: true }),
+});
+
+export type OrderStatus = z.infer<typeof orderStatusSchema>;
+export type CustomerOrder = z.infer<typeof customerOrderSchema>;
 
 export async function getTrackedOrder(
   trackingReference: string,
@@ -22,5 +28,5 @@ export async function getTrackedOrder(
     throw new Error(`The API returned ${response.status}.`);
   }
 
-  return response.json() as Promise<CustomerOrder>;
+  return customerOrderSchema.parse(await response.json());
 }
