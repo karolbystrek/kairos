@@ -1,5 +1,5 @@
 import "@/styles/globals.css";
-import { Metadata, Viewport } from "next";
+import type { Metadata, Viewport } from "next";
 
 import { Providers } from "./providers";
 
@@ -30,7 +30,6 @@ export default function RootLayout({
 }) {
   return (
     <html suppressHydrationWarning lang="en">
-      <head />
       <body className="min-h-screen bg-background text-foreground antialiased">
         <Providers themeProps={{ attribute: "class", defaultTheme: "light" }}>
           <main className="mx-auto max-w-5xl px-6 py-10">{children}</main>

@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { request } from "./api-fetch";
+
 export const orderStatusSchema = z.enum([
   "CREATED",
   "IN_PREPARATION",
@@ -32,26 +34,6 @@ const createOrderInputSchema = z.object({
 export type OrderStatus = z.infer<typeof orderStatusSchema>;
 export type Location = z.infer<typeof locationSchema>;
 export type StaffOrder = z.infer<typeof staffOrderSchema>;
-
-export class ApiError extends Error {
-  constructor(public readonly status: number) {
-    super(`The API returned ${status}.`);
-  }
-}
-
-async function request<T>(
-  url: string,
-  schema: z.ZodType<T>,
-  init?: RequestInit,
-): Promise<T> {
-  const response = await fetch(url, init);
-
-  if (!response.ok) {
-    throw new ApiError(response.status);
-  }
-
-  return schema.parse(await response.json());
-}
 
 export function listLocations(): Promise<Location[]> {
   return request("/api/locations", locationsSchema);

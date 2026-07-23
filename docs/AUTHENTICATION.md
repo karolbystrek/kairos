@@ -8,6 +8,10 @@ truth for system-wide behavior and architecture. Accepted authentication
 decisions and implementation details must be kept synchronized between both
 documents.
 
+The panel implementation, browser flows, and frontend maintenance invariants are
+documented in
+[`FRONTEND_AUTHENTICATION.md`](FRONTEND_AUTHENTICATION.md).
+
 ## 1. Scope and Ownership
 
 Kairos implements and operates its staff authentication with Spring Security.
@@ -55,6 +59,8 @@ Kairos authentication should:
 * derive tenant, location, role, and audit identity on the backend;
 * reject disabled accounts and suspended assignments consistently;
 * provide safe refresh rotation, logout, and credential-reuse handling;
+* treat one browser profile as one signed-in account without promising
+  per-tab identities;
 * expose JSON/Problem Details failures suitable for the Next.js panel.
 
 ## 3. Account and Authorization Model
@@ -183,7 +189,10 @@ On refresh, the backend:
 Reuse of a consumed refresh credential indicates theft or an unsafe replay. The
 backend revokes the entire token family. The implementation must define and test
 the handling of legitimate concurrent refresh attempts from multiple browser
-tabs so that normal concurrency does not silently weaken reuse detection.
+tabs so that normal concurrency does not silently weaken reuse detection. The
+panel serializes cooperating same-origin refresh attempts and rechecks the
+current access session after acquiring the lock. It does not support different
+accounts in different tabs of one browser profile.
 
 ### 4.4 Logout and revocation
 
@@ -226,6 +235,12 @@ The first increment uses the following initial policy:
 * personal and device-oriented accounts use the same refresh policy until a
   separate account-kind distinction is explicitly introduced;
 * no authentication credential in `localStorage` or `sessionStorage`.
+
+One browser profile on the panel origin has one active cookie identity shared by
+its tabs. Same-account tabs are supported on a best-effort basis. They are not
+kept in immediate UI synchronization, and signing in as different accounts in
+different tabs is unsupported. Use another browser profile, private browsing
+context, or device when simultaneous accounts are required.
 
 The access JWT contains only stable security inputs and protocol metadata:
 
@@ -294,9 +309,12 @@ Spring Security's SPA-specific CSRF behavior must be handled deliberately:
 * never disable CSRF for cookie-authenticated staff endpoints.
 
 An expired or missing access JWT produces `401 Unauthorized`. The panel may
-perform one deduplicated refresh attempt and retry the original request once.
-`403 Forbidden` means the account is authenticated but lacks permission and
-must not trigger a refresh loop.
+perform one refresh attempt and retry the original request once. Before
+refreshing, it acquires the authentication-cookie lock and rechecks
+`GET /api/auth/me`. If another cooperating tab already refreshed, the panel
+retries the original request without rotating again. `403 Forbidden` means the
+account is authenticated but lacks permission and must not trigger a refresh
+loop.
 
 ## 7. Authorization Enforcement
 
@@ -479,15 +497,20 @@ The first increment completes:
 5. administrator/manager provisioning and scoped account disablement with
    session revocation.
 6. panel login, current-account loading, CSRF-aware staff requests, one
-   cross-tab-deduplicated refresh and request retry, and logout.
+   lock-serialized refresh and request retry, and logout.
 
 The following increments remain:
 
-1. **Implement OIDC.** Add provider configuration,
+1. **Expose account provisioning in the panel.** Add capability-gated controls
+   for tenant administrators to provision managers and operators, and for
+   managers to provision operators for their assigned location, using the
+   existing location-scoped API. This does not add self-registration or tenant
+   registration.
+2. **Implement OIDC.** Add provider configuration,
    explicit identity linking, callbacks, and the same Kairos session issuance
    used by local login. This step begins only after the local authentication and
    authorization foundation is complete.
-2. **Add RLS and operational hardening.** Establish verified database security
+3. **Add RLS and operational hardening.** Establish verified database security
    context, add policies, move rate-limit state to shared infrastructure before
    multi-instance deployment, and extend operational security-event retention.
 
@@ -502,6 +525,24 @@ The following increments remain:
    first increment unless scope is explicitly expanded.
 
 ## 14. Decision Log
+
+### 2026-07-23 - Panel authentication contract simplified
+
+* The panel route remains a Server Component and directly renders one
+  interactive `StaffPanel` Client Component. No function-valued render prop
+  crosses the Server-to-Client boundary.
+* One browser profile represents one signed-in account. Same-account tabs are
+  best-effort, immediate cross-tab UI synchronization is not required, and
+  different accounts in different tabs are unsupported.
+* Login, refresh, logout, and logout-all serialize authentication-cookie
+  mutations with one browser Web Lock when it is available. A small in-tab
+  queue is the fallback when it is not.
+* After a protected request returns `401`, the lock holder rechecks
+  `GET /api/auth/me`. It refreshes only if the current access session is still
+  unavailable, then retries the original request once.
+* The earlier persistent `localStorage` refresh marker, storage events, and
+  cross-tab authentication event state machine were removed. Authentication
+  credentials and account data remain out of browser storage.
 
 ### 2026-07-23 - Stable local JWT signing keys moved outside Spring
 
@@ -527,6 +568,8 @@ The following increments remain:
 * Access-token recovery is serialized across tabs with the browser Web Locks
   API and a non-secret local refresh outcome marker. No access credential,
   refresh credential, password, or account data is written to browser storage.
+  This initial marker design was superseded by the simpler 2026-07-23
+  lock-and-recheck flow above.
 * A protected request is retried at most once after a successful refresh.
   Login and refresh failures cannot recursively start another refresh.
 
