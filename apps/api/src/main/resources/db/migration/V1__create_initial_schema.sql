@@ -20,7 +20,7 @@ CREATE TABLE accounts
     tenant_id     UUID                     NOT NULL REFERENCES tenants (id),
     username      VARCHAR(120)             NOT NULL UNIQUE,
     email         VARCHAR(254) UNIQUE,
-    password_hash VARCHAR(255)             NOT NULL,
+    password_hash VARCHAR(255),
     display_name  VARCHAR(120)             NOT NULL,
     tenant_role   VARCHAR(32)              NOT NULL,
     status        VARCHAR(32)              NOT NULL,
@@ -31,7 +31,9 @@ CREATE TABLE accounts
     CONSTRAINT accounts_email_check CHECK (
         email IS NULL OR (TRIM(email) <> '' AND email = LOWER(TRIM(email)))
         ),
-    CONSTRAINT accounts_password_hash_not_blank_check CHECK (TRIM(password_hash) <> ''),
+    CONSTRAINT accounts_password_hash_not_blank_check CHECK (
+        password_hash IS NULL OR TRIM(password_hash) <> ''
+        ),
     CONSTRAINT accounts_display_name_not_blank_check CHECK (TRIM(display_name) <> ''),
     CONSTRAINT accounts_id_tenant_key UNIQUE (id, tenant_id),
     CONSTRAINT accounts_tenant_role_check CHECK (tenant_role IN ('ADMIN', 'MEMBER')),
@@ -39,6 +41,23 @@ CREATE TABLE accounts
 );
 
 CREATE INDEX accounts_tenant_id_idx ON accounts (tenant_id);
+
+CREATE TABLE external_identities
+(
+    id         UUID PRIMARY KEY,
+    account_id UUID                     NOT NULL REFERENCES accounts (id),
+    provider   VARCHAR(120)             NOT NULL,
+    subject    VARCHAR(255)             NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    CONSTRAINT external_identities_provider_not_blank_check CHECK (TRIM(provider) <> ''),
+    CONSTRAINT external_identities_provider_normalized_check CHECK (provider = LOWER(TRIM(provider))),
+    CONSTRAINT external_identities_subject_not_blank_check CHECK (TRIM(subject) <> ''),
+    CONSTRAINT external_identities_provider_subject_key UNIQUE (provider, subject),
+    CONSTRAINT external_identities_account_provider_key UNIQUE (account_id, provider)
+);
+
+CREATE INDEX external_identities_account_id_idx ON external_identities (account_id);
 
 CREATE TABLE location_assignments
 (

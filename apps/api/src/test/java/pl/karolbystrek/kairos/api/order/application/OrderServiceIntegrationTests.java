@@ -6,12 +6,16 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
+import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
+import pl.karolbystrek.kairos.api.account.domain.TenantRole;
+import pl.karolbystrek.kairos.api.location.application.LocationService;
 import pl.karolbystrek.kairos.api.order.application.model.StaffOrderView;
 import pl.karolbystrek.kairos.api.order.domain.InvalidOrderTransitionException;
 import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
 import pl.karolbystrek.kairos.api.order.infrastructure.persistence.OrderHistoryRepository;
 
 import java.util.UUID;
+import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -19,56 +23,88 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @Transactional
 class OrderServiceIntegrationTests {
 
-	@Autowired
-	private OrderService orderService;
+    @Autowired
+    private OrderService orderService;
 
-	@Autowired
-	private OrderHistoryRepository historyRepository;
+    @Autowired
+    private LocationService locationService;
 
-	@Autowired
-	private JdbcTemplate jdbcTemplate;
+    @Autowired
+    private OrderHistoryRepository historyRepository;
 
-	private UUID locationId;
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
-	@BeforeEach
-	void createTestLocation() {
-		UUID tenantId = UUID.randomUUID();
-		locationId = UUID.randomUUID();
-		jdbcTemplate.update("INSERT INTO tenants (id, name) VALUES (?, ?)", tenantId, "Test tenant");
-		jdbcTemplate.update(
-			"INSERT INTO locations (id, tenant_id, name) VALUES (?, ?, ?)",
-			locationId,
-			tenantId,
-			"Test location"
-		);
-	}
+    private UUID locationId;
+    private StaffPrincipal principal;
 
-	@Test
-	void createsTransitionsAndTracksAnOrder() {
-		var created = orderService.createOrder(locationId, "A-42");
+    @BeforeEach
+    void createTestLocation() {
+        var tenantId = UUID.randomUUID();
+        var accountId = UUID.randomUUID();
+        locationId = UUID.randomUUID();
+        jdbcTemplate.update("INSERT INTO tenants (id, name) VALUES (?, ?)", tenantId, "Test tenant");
+        jdbcTemplate.update(
+            "INSERT INTO locations (id, tenant_id, name) VALUES (?, ?, ?)",
+            locationId,
+            tenantId,
+            "Test location"
+        );
+        var now = Instant.now();
+        jdbcTemplate.update(
+            """
+            INSERT INTO accounts (
+                id, tenant_id, username, display_name, tenant_role, status, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, 'ADMIN', 'ACTIVE', ?, ?)
+            """,
+            accountId,
+            tenantId,
+            "admin-" + accountId,
+            "Test administrator",
+            now,
+            now
+        );
+        principal = new StaffPrincipal(accountId, tenantId, TenantRole.ADMIN);
+    }
 
-		assertThat(created.status()).isEqualTo(OrderStatus.CREATED);
-		assertThat(created.trackingReference()).isNotNull();
-		assertThat(orderService.listOrders(locationId)).extracting(StaffOrderView::id)
-			.contains(created.id());
+    @Test
+    void createsTransitionsAndTracksAnOrder() {
+        var created = orderService.createOrder(principal, locationId, "A-42");
 
-		var inPreparation = orderService.updateStatus(created.id(), OrderStatus.IN_PREPARATION);
-		var ready = orderService.updateStatus(created.id(), OrderStatus.READY);
-		var tracked = orderService.findTrackedOrder(created.trackingReference());
+        assertThat(created.status()).isEqualTo(OrderStatus.CREATED);
+        assertThat(created.trackingReference()).isNotNull();
+        assertThat(locationService.listAccessible(principal)).extracting(location -> location.id())
+            .containsExactly(locationId);
+        assertThat(orderService.listOrders(principal, locationId)).extracting(StaffOrderView::id)
+            .contains(created.id());
 
-		assertThat(inPreparation.status()).isEqualTo(OrderStatus.IN_PREPARATION);
-		assertThat(ready.status()).isEqualTo(OrderStatus.READY);
-		assertThat(tracked.label()).isEqualTo("A-42");
-		assertThat(tracked.status()).isEqualTo(OrderStatus.READY);
-		assertThat(historyRepository.count()).isEqualTo(3);
-	}
+        var inPreparation = orderService.updateStatus(principal, created.id(), OrderStatus.IN_PREPARATION);
+        var ready = orderService.updateStatus(principal, created.id(), OrderStatus.READY);
+        var tracked = orderService.findTrackedOrder(created.trackingReference());
 
-	@Test
-	void rejectsInvalidTransitions() {
-		var created = orderService.createOrder(locationId, "B-7");
+        assertThat(inPreparation.status()).isEqualTo(OrderStatus.IN_PREPARATION);
+        assertThat(ready.status()).isEqualTo(OrderStatus.READY);
+        assertThat(tracked.label()).isEqualTo("A-42");
+        assertThat(tracked.status()).isEqualTo(OrderStatus.READY);
+        assertThat(historyRepository.count()).isEqualTo(3);
+        assertThat(jdbcTemplate.queryForList(
+            "SELECT initiator_type FROM order_history WHERE order_id = ? ORDER BY id",
+            String.class,
+            created.id()
+        )).containsOnly("USER");
+        assertThat(jdbcTemplate.queryForList(
+            "SELECT initiator_id FROM order_history WHERE order_id = ? ORDER BY id",
+            UUID.class,
+            created.id()
+        )).containsOnly(principal.accountId());
+    }
 
-		assertThatThrownBy(() -> orderService.updateStatus(created.id(), OrderStatus.COMPLETED))
-			.isInstanceOf(InvalidOrderTransitionException.class)
-			.hasMessageContaining("CREATED to COMPLETED");
-	}
+    @Test
+    void rejectsInvalidTransitions() {
+        var created = orderService.createOrder(principal, locationId, "B-7");
+
+        assertThatThrownBy(() -> orderService.updateStatus(principal, created.id(), OrderStatus.COMPLETED))
+            .isInstanceOf(InvalidOrderTransitionException.class)
+            .hasMessageContaining("CREATED to COMPLETED");
+    }
 }

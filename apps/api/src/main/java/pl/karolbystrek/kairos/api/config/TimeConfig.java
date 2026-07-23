@@ -8,8 +8,8 @@ import java.time.Clock;
 @Configuration
 class TimeConfig {
 
-	@Bean
-	Clock clock() {
-		return Clock.systemUTC();
-	}
+    @Bean
+    Clock clock() {
+        return Clock.systemUTC();
+    }
 }

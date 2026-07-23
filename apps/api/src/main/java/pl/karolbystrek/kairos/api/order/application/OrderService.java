@@ -1,98 +1,98 @@
 package pl.karolbystrek.kairos.api.order.application;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import pl.karolbystrek.kairos.api.order.application.model.LocationView;
+import pl.karolbystrek.kairos.api.account.application.StaffAccessService;
+import pl.karolbystrek.kairos.api.account.application.exception.StaffAccessDeniedException;
+import pl.karolbystrek.kairos.api.account.application.model.StaffAccessContext;
+import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
+import pl.karolbystrek.kairos.api.order.application.exception.ResourceNotFoundException;
 import pl.karolbystrek.kairos.api.order.application.model.StaffOrderView;
 import pl.karolbystrek.kairos.api.order.application.model.TrackedOrderView;
+import pl.karolbystrek.kairos.api.location.domain.Location;
+import pl.karolbystrek.kairos.api.location.infrastructure.persistence.LocationRepository;
 import pl.karolbystrek.kairos.api.order.domain.CustomerOrder;
-import pl.karolbystrek.kairos.api.order.domain.Location;
 import pl.karolbystrek.kairos.api.order.domain.OrderHistory;
 import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
 import pl.karolbystrek.kairos.api.order.infrastructure.persistence.CustomerOrderRepository;
-import pl.karolbystrek.kairos.api.order.infrastructure.persistence.LocationRepository;
 import pl.karolbystrek.kairos.api.order.infrastructure.persistence.OrderHistoryRepository;
 
 import java.time.Clock;
-import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
 @Service
+@RequiredArgsConstructor
 public class OrderService {
 
-	private final LocationRepository locationRepository;
-	private final CustomerOrderRepository orderRepository;
-	private final OrderHistoryRepository historyRepository;
-	private final Clock clock;
+    private final LocationRepository locationRepository;
+    private final CustomerOrderRepository orderRepository;
+    private final OrderHistoryRepository historyRepository;
+    private final StaffAccessService staffAccessService;
+    private final Clock clock;
 
-	public OrderService(
-		LocationRepository locationRepository,
-		CustomerOrderRepository orderRepository,
-		OrderHistoryRepository historyRepository,
-		Clock clock
-	) {
-		this.locationRepository = locationRepository;
-		this.orderRepository = orderRepository;
-		this.historyRepository = historyRepository;
-		this.clock = clock;
-	}
+    @Transactional(readOnly = true)
+    public List<StaffOrderView> listOrders(StaffPrincipal principal, UUID locationId) {
+        var access = staffAccessService.resolve(principal);
+        requireAccessibleLocation(access, locationId);
+        return orderRepository.findAllByLocationIdOrderByCreatedAtDesc(locationId).stream()
+                .map(StaffOrderView::from)
+                .toList();
+    }
 
-	@Transactional(readOnly = true)
-	public List<LocationView> listLocations() {
-		return locationRepository.findAllByOrderByNameAsc().stream()
-			.map(location -> new LocationView(location.getId(), location.getName()))
-			.toList();
-	}
+    @Transactional(readOnly = true)
+    public List<StaffOrderView> listTenantOrders(StaffPrincipal principal) {
+        var access = staffAccessService.resolve(principal);
+        if (!access.isTenantAdmin()) {
+            throw new StaffAccessDeniedException("Tenant-wide order access requires an administrator");
+        }
+        return orderRepository.findAllByLocationTenantIdOrderByCreatedAtDesc(access.tenantId()).stream()
+                .map(StaffOrderView::from)
+                .toList();
+    }
 
-	@Transactional(readOnly = true)
-	public List<StaffOrderView> listOrders(UUID locationId) {
-		requireLocation(locationId);
-		return orderRepository.findAllByLocationIdOrderByCreatedAtDesc(locationId).stream()
-			.map(this::toStaffResponse)
-			.toList();
-	}
+    @Transactional
+    public StaffOrderView createOrder(StaffPrincipal principal, UUID locationId, String label) {
+        var access = staffAccessService.resolveForUpdate(principal);
+        var location = requireAccessibleLocation(access, locationId);
+        var now = clock.instant();
+        var order = orderRepository.save(CustomerOrder.create(location, label.trim(), now));
+        historyRepository.save(OrderHistory.recordByUser(order, order.getStatus(), now, access.accountId()));
+        return StaffOrderView.from(order);
+    }
 
-	@Transactional
-	public StaffOrderView createOrder(UUID locationId, String label) {
-		Location location = requireLocation(locationId);
-		Instant now = clock.instant();
-		CustomerOrder order = orderRepository.save(CustomerOrder.create(location, label.trim(), now));
-		historyRepository.save(OrderHistory.record(order, order.getStatus(), now));
-		return toStaffResponse(order);
-	}
+    @Transactional
+    public StaffOrderView updateStatus(StaffPrincipal principal, UUID orderId, OrderStatus target) {
+        var access = staffAccessService.resolveForUpdate(principal);
+        var order = orderRepository.findForUpdateById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order was not found"));
+        access.requireLocationAccess(
+                order.getLocation().getTenantId(),
+                order.getLocation().getId()
+        );
+        var now = clock.instant();
+        order.transitionTo(target, now);
+        historyRepository.save(OrderHistory.recordByUser(order, target, now, access.accountId()));
+        return StaffOrderView.from(order);
+    }
 
-	@Transactional
-	public StaffOrderView updateStatus(UUID orderId, OrderStatus target) {
-		CustomerOrder order = orderRepository.findByIdForUpdate(orderId)
-			.orElseThrow(() -> new ResourceNotFoundException("Order was not found"));
-		Instant now = clock.instant();
-		order.transitionTo(target, now);
-		historyRepository.save(OrderHistory.record(order, target, now));
-		return toStaffResponse(order);
-	}
+    @Transactional(readOnly = true)
+    public TrackedOrderView findTrackedOrder(UUID trackingReference) {
+        var order = orderRepository.findByTrackingReference(trackingReference)
+                .orElseThrow(() -> new ResourceNotFoundException("Tracked order was not found"));
+        return TrackedOrderView.from(order);
+    }
 
-	@Transactional(readOnly = true)
-	public TrackedOrderView findTrackedOrder(UUID trackingReference) {
-		CustomerOrder order = orderRepository.findByTrackingReference(trackingReference)
-			.orElseThrow(() -> new ResourceNotFoundException("Tracked order was not found"));
-		return new TrackedOrderView(order.getLabel(), order.getStatus(), order.getUpdatedAt());
-	}
+    private Location requireLocation(UUID locationId) {
+        return locationRepository.findById(locationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Location was not found"));
+    }
 
-	private Location requireLocation(UUID locationId) {
-		return locationRepository.findById(locationId)
-			.orElseThrow(() -> new ResourceNotFoundException("Location was not found"));
-	}
+    private Location requireAccessibleLocation(StaffAccessContext access, UUID locationId) {
+        var location = requireLocation(locationId);
+        access.requireLocationAccess(location.getTenantId(), location.getId());
+        return location;
+    }
 
-	private StaffOrderView toStaffResponse(CustomerOrder order) {
-		return new StaffOrderView(
-			order.getId(),
-			order.getLocation().getId(),
-			order.getTrackingReference(),
-			order.getLabel(),
-			order.getStatus(),
-			order.getCreatedAt(),
-			order.getUpdatedAt()
-		);
-	}
 }

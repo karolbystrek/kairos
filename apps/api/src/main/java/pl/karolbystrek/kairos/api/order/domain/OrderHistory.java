@@ -12,10 +12,10 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
+import lombok.NonNull;
 import lombok.NoArgsConstructor;
 
 import java.time.Instant;
-import java.util.Objects;
 import java.util.UUID;
 
 @Entity
@@ -23,33 +23,49 @@ import java.util.UUID;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class OrderHistory {
 
-	@Id
-	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	private Long id;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
-	@ManyToOne(fetch = FetchType.LAZY, optional = false)
-	@JoinColumn(name = "order_id", nullable = false)
-	private CustomerOrder order;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "order_id", nullable = false)
+    private CustomerOrder order;
 
-	@Enumerated(EnumType.STRING)
-	@Column(nullable = false, length = 32)
-	private OrderStatus status;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 32)
+    private OrderStatus status;
 
-	@Column(name = "created_at", nullable = false)
-	private Instant createdAt;
+    @Column(name = "created_at", nullable = false)
+    private Instant createdAt;
 
-	@Enumerated(EnumType.STRING)
-	@Column(name = "initiator_type", length = 32)
-	private InitiatorType initiatorType;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "initiator_type", length = 32)
+    private InitiatorType initiatorType;
 
-	@Column(name = "initiator_id")
-	private UUID initiatorId;
+    @Column(name = "initiator_id")
+    private UUID initiatorId;
 
-	public static OrderHistory record(CustomerOrder order, OrderStatus status, Instant createdAt) {
-		OrderHistory history = new OrderHistory();
-		history.order = Objects.requireNonNull(order);
-		history.status = Objects.requireNonNull(status);
-		history.createdAt = Objects.requireNonNull(createdAt);
-		return history;
-	}
+    public static OrderHistory record(
+        @NonNull CustomerOrder order,
+        @NonNull OrderStatus status,
+        @NonNull Instant createdAt
+    ) {
+        var history = new OrderHistory();
+        history.order = order;
+        history.status = status;
+        history.createdAt = createdAt;
+        return history;
+    }
+
+    public static OrderHistory recordByUser(
+        @NonNull CustomerOrder order,
+        @NonNull OrderStatus status,
+        @NonNull Instant createdAt,
+        @NonNull UUID accountId
+    ) {
+        var history = record(order, status, createdAt);
+        history.initiatorType = InitiatorType.USER;
+        history.initiatorId = accountId;
+        return history;
+    }
 }

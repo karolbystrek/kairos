@@ -1,0 +1,38 @@
+spring:
+  application:
+    name: api
+  datasource:
+    url: "jdbc:h2:mem:kairos;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE"
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  mvc:
+    problemdetails:
+      enabled: true
+  flyway:
+    enabled: true
+  data:
+    redis:
+      repositories:
+        enabled: false
+
+server:
+  servlet:
+    context-path: /api
+
+kairos:
+  authentication:
+    jwt:
+      issuer: https://api.localhost
+      audience: kairos-panel
+      access-lifetime: 5m
+      public-key-location: "classpath:keys/test-jwt-public.pem"
+      private-key-location: "classpath:keys/test-jwt-private.pem"
+    refresh:
+      idle-lifetime: 7d
+      absolute-lifetime: 30d
+    password:
+      bcrypt-strength: 4

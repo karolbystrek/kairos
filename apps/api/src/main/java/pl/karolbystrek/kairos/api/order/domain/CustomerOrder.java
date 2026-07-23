@@ -13,10 +13,11 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
+import lombok.NonNull;
 import lombok.NoArgsConstructor;
+import pl.karolbystrek.kairos.api.location.domain.Location;
 
 import java.time.Instant;
-import java.util.Objects;
 import java.util.UUID;
 
 @Entity
@@ -25,47 +26,51 @@ import java.util.UUID;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class CustomerOrder {
 
-	@Id
-	@GeneratedValue(strategy = GenerationType.UUID)
-	private UUID id;
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
 
-	@ManyToOne(fetch = FetchType.LAZY, optional = false)
-	@JoinColumn(name = "location_id", nullable = false)
-	private Location location;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "location_id", nullable = false)
+    private Location location;
 
-	@Column(name = "tracking_reference", nullable = false, unique = true)
-	private UUID trackingReference;
+    @Column(name = "tracking_reference", nullable = false, unique = true)
+    private UUID trackingReference;
 
-	@Column(nullable = false, length = 80)
-	private String label;
+    @Column(nullable = false, length = 80)
+    private String label;
 
-	@Enumerated(EnumType.STRING)
-	@Column(nullable = false, length = 32)
-	private OrderStatus status;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 32)
+    private OrderStatus status;
 
-	@Column(name = "created_at", nullable = false)
-	private Instant createdAt;
+    @Column(name = "created_at", nullable = false)
+    private Instant createdAt;
 
-	@Column(name = "updated_at", nullable = false)
-	private Instant updatedAt;
+    @Column(name = "updated_at", nullable = false)
+    private Instant updatedAt;
 
-	public static CustomerOrder create(Location location, String label, Instant now) {
-		CustomerOrder order = new CustomerOrder();
-		order.location = Objects.requireNonNull(location);
-		order.trackingReference = UUID.randomUUID();
-		order.label = Objects.requireNonNull(label);
-		order.status = OrderStatus.CREATED;
-		order.createdAt = Objects.requireNonNull(now);
-		order.updatedAt = now;
-		return order;
-	}
+    public static CustomerOrder create(
+        @NonNull Location location,
+        @NonNull String label,
+        @NonNull Instant now
+    ) {
+        var order = new CustomerOrder();
+        order.location = location;
+        order.trackingReference = UUID.randomUUID();
+        order.label = label;
+        order.status = OrderStatus.CREATED;
+        order.createdAt = now;
+        order.updatedAt = now;
+        return order;
+    }
 
-	public void transitionTo(OrderStatus target, Instant now) {
-		if (!status.canTransitionTo(target)) {
-			throw new InvalidOrderTransitionException(status, target);
-		}
+    public void transitionTo(@NonNull OrderStatus target, @NonNull Instant now) {
+        if (!status.canTransitionTo(target)) {
+            throw new InvalidOrderTransitionException(status, target);
+        }
 
-		status = target;
-		updatedAt = now;
-	}
+        status = target;
+        updatedAt = now;
+    }
 }

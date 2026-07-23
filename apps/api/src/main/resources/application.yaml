@@ -1,0 +1,34 @@
+spring:
+  application:
+    name: api
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  mvc:
+    problemdetails:
+      enabled: true
+
+server:
+  forward-headers-strategy: framework
+  servlet:
+    context-path: /api
+
+kairos:
+  authentication:
+    jwt:
+      issuer: https://api.localhost
+      audience: kairos-panel
+      access-lifetime: 5m
+      public-key-location: "${KAIROS_AUTHENTICATION_JWT_PUBLIC_KEY_LOCATION}"
+      private-key-location: "${KAIROS_AUTHENTICATION_JWT_PRIVATE_KEY_LOCATION}"
+    refresh:
+      idle-lifetime: 7d
+      absolute-lifetime: 30d
+    password:
+      bcrypt-strength: 12
+    rate-limit:
+      login-attempts: 10
+      login-window: 5m
+      refresh-attempts: 30
+      refresh-window: 1m
