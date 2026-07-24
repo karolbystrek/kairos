@@ -12,7 +12,6 @@ public record ManagedAccountView(
     UUID locationId,
     String username,
     String email,
-    String displayName,
     AssignmentRole role,
     AccountStatus status,
     Instant createdAt,

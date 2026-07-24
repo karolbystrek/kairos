@@ -8,5 +8,5 @@ import java.util.UUID;
 
 public interface LocationRepository extends JpaRepository<Location, UUID> {
 
-    List<Location> findAllByTenantIdOrderByNameAsc(UUID tenantId);
+    List<Location> findAllByTenantId(UUID tenantId);
 }

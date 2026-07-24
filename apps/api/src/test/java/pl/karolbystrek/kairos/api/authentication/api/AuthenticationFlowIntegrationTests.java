@@ -92,46 +92,45 @@ class AuthenticationFlowIntegrationTests {
                 .cookie(login.session().access()))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.accountId").value(operator.accountId().toString()))
-            .andExpect(jsonPath("$.displayName").value(operator.displayName()))
+            .andExpect(jsonPath("$.username").value(operator.username()))
             .andExpect(jsonPath("$.tenantId").value(operator.tenantId().toString()))
             .andExpect(jsonPath("$.tenantRole").value("MEMBER"))
             .andExpect(jsonPath("$.assignment.locationId").value(operator.locationId().toString()))
-            .andExpect(jsonPath("$.assignment.locationName").value(operator.locationName()))
             .andExpect(jsonPath("$.assignment.role").value("OPERATOR"))
             .andExpect(jsonPath("$.capabilities[0]").value("MANAGE_ORDERS"));
     }
 
     @Test
     void returnsTheSamePublicFailureForUnknownWrongDisabledPasswordlessAndIneligibleAccounts() throws Exception {
-        var tenantId = insertTenant("Login failure tenant");
-        var locationId = insertLocation(tenantId, "Login failure location");
+        var tenantId = insertTenant();
+        var locationId = insertLocation(tenantId);
         var passwordHash = passwordEncoder.encode(PASSWORD);
         var suffix = UUID.randomUUID().toString();
 
         var activeUsername = "active-" + suffix;
         var activeId = insertAccount(
-            tenantId, activeUsername, passwordHash, "Active operator", TenantRole.MEMBER, AccountStatus.ACTIVE
+            tenantId, activeUsername, passwordHash, TenantRole.MEMBER, AccountStatus.ACTIVE
         );
         insertAssignment(activeId, tenantId, locationId, AssignmentRole.OPERATOR, AssignmentStatus.ACTIVE);
 
         var disabledUsername = "disabled-" + suffix;
         insertAccount(
-            tenantId, disabledUsername, passwordHash, "Disabled admin", TenantRole.ADMIN, AccountStatus.DISABLED
+            tenantId, disabledUsername, passwordHash, TenantRole.ADMIN, AccountStatus.DISABLED
         );
 
         var passwordlessUsername = "passwordless-" + suffix;
         insertAccount(
-            tenantId, passwordlessUsername, null, "Passwordless admin", TenantRole.ADMIN, AccountStatus.ACTIVE
+            tenantId, passwordlessUsername, null, TenantRole.ADMIN, AccountStatus.ACTIVE
         );
 
         var unassignedUsername = "unassigned-" + suffix;
         insertAccount(
-            tenantId, unassignedUsername, passwordHash, "Unassigned member", TenantRole.MEMBER, AccountStatus.ACTIVE
+            tenantId, unassignedUsername, passwordHash, TenantRole.MEMBER, AccountStatus.ACTIVE
         );
 
         var suspendedUsername = "suspended-" + suffix;
         var suspendedId = insertAccount(
-            tenantId, suspendedUsername, passwordHash, "Suspended member", TenantRole.MEMBER, AccountStatus.ACTIVE
+            tenantId, suspendedUsername, passwordHash, TenantRole.MEMBER, AccountStatus.ACTIVE
         );
         insertAssignment(suspendedId, tenantId, locationId, AssignmentRole.OPERATOR, AssignmentStatus.SUSPENDED);
 
@@ -309,12 +308,11 @@ class AuthenticationFlowIntegrationTests {
         ))
             .andExpect(status().isNoContent());
 
-        var trackingReference = insertTrackedOrder(operator.locationId(), "TRACK-42");
+        var trackingReference = insertTrackedOrder(operator.locationId());
         mockMvc.perform(apiGet("/tracked-orders/{trackingReference}", trackingReference)
-                .secure(true)
-                .cookie(expiredAccess))
+            .secure(true)
+            .cookie(expiredAccess))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.label").value("TRACK-42"))
             .andExpect(jsonPath("$.status").value("READY"));
 
     }
@@ -477,7 +475,7 @@ class AuthenticationFlowIntegrationTests {
         assertThat(result.getResponse().getContentType()).startsWith(MediaType.APPLICATION_JSON_VALUE);
         assertThat(result.getResponse().getContentAsString())
             .contains(operator.accountId().toString())
-            .contains(operator.displayName())
+            .contains(operator.username())
             .contains(operator.tenantId().toString())
             .contains(operator.locationId().toString())
             .contains("OPERATOR")
@@ -485,36 +483,32 @@ class AuthenticationFlowIntegrationTests {
     }
 
     private AccountFixture createActiveOperator(String prefix) {
-        var tenantId = insertTenant(prefix + " tenant");
-        var locationName = prefix + " location";
-        var locationId = insertLocation(tenantId, locationName);
+        var tenantId = insertTenant();
+        var locationId = insertLocation(tenantId);
         var username = prefix + "-operator-" + UUID.randomUUID();
-        var displayName = prefix + " operator";
         var accountId = insertAccount(
             tenantId,
             username,
             passwordEncoder.encode(PASSWORD),
-            displayName,
             TenantRole.MEMBER,
             AccountStatus.ACTIVE
         );
         insertAssignment(accountId, tenantId, locationId, AssignmentRole.OPERATOR, AssignmentStatus.ACTIVE);
-        return new AccountFixture(tenantId, locationId, locationName, accountId, username, displayName);
+        return new AccountFixture(tenantId, locationId, accountId, username);
     }
 
-    private UUID insertTenant(String name) {
+    private UUID insertTenant() {
         var tenantId = UUID.randomUUID();
-        jdbcTemplate.update("INSERT INTO tenants (id, name) VALUES (?, ?)", tenantId, name);
+        jdbcTemplate.update("INSERT INTO tenants (id) VALUES (?)", tenantId);
         return tenantId;
     }
 
-    private UUID insertLocation(UUID tenantId, String name) {
+    private UUID insertLocation(UUID tenantId) {
         var locationId = UUID.randomUUID();
         jdbcTemplate.update(
-            "INSERT INTO locations (id, tenant_id, name) VALUES (?, ?, ?)",
+            "INSERT INTO locations (id, tenant_id) VALUES (?, ?)",
             locationId,
-            tenantId,
-            name
+            tenantId
         );
         return locationId;
     }
@@ -523,7 +517,6 @@ class AuthenticationFlowIntegrationTests {
         UUID tenantId,
         String username,
         String passwordHash,
-        String displayName,
         TenantRole role,
         AccountStatus status
     ) {
@@ -532,15 +525,14 @@ class AuthenticationFlowIntegrationTests {
         jdbcTemplate.update(
             """
                 INSERT INTO accounts (
-                    id, tenant_id, username, email, password_hash, display_name,
+                    id, tenant_id, username, email, password_hash,
                     tenant_role, status, created_at, updated_at
-                ) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?)
                 """,
             accountId,
             tenantId,
             username,
             passwordHash,
-            displayName,
             role.name(),
             status.name(),
             now,
@@ -573,20 +565,19 @@ class AuthenticationFlowIntegrationTests {
         );
     }
 
-    private UUID insertTrackedOrder(UUID locationId, String label) {
+    private UUID insertTrackedOrder(UUID locationId) {
         var orderId = UUID.randomUUID();
         var trackingReference = UUID.randomUUID();
         var now = Instant.now();
         jdbcTemplate.update(
             """
                 INSERT INTO orders (
-                    id, location_id, tracking_reference, label, status, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, 'READY', ?, ?)
+                    id, location_id, tracking_reference, status, created_at, updated_at
+                ) VALUES (?, ?, ?, 'READY', ?, ?)
                 """,
             orderId,
             locationId,
             trackingReference,
-            label,
             now,
             now
         );
@@ -660,10 +651,8 @@ class AuthenticationFlowIntegrationTests {
     private record AccountFixture(
         UUID tenantId,
         UUID locationId,
-        String locationName,
         UUID accountId,
-        String username,
-        String displayName
+        String username
     ) {
     }
 

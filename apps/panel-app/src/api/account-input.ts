@@ -26,9 +26,3 @@ export const passwordInputSchema = z
     (password) => new TextEncoder().encode(password).length <= 72,
     "Password must not exceed 72 UTF-8 bytes",
   );
-
-export const displayNameInputSchema = z
-  .string()
-  .trim()
-  .min(1, "Display name is required")
-  .max(120, "Display name must not exceed 120 characters");

@@ -37,7 +37,6 @@ public class CurrentAccountService {
             }
             assignment = new CurrentAccountView.LocationAssignmentView(
                 location.getId(),
-                location.getName(),
                 access.assignmentRole()
             );
         }
@@ -55,7 +54,7 @@ public class CurrentAccountService {
 
         return new CurrentAccountView(
             account.getId(),
-            account.getDisplayName(),
+            account.getUsername(),
             account.getTenantId(),
             account.getTenantRole(),
             assignment,

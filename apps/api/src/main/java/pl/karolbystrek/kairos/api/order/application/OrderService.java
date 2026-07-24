@@ -53,11 +53,11 @@ public class OrderService {
     }
 
     @Transactional
-    public StaffOrderView createOrder(StaffPrincipal principal, UUID locationId, String label) {
+    public StaffOrderView createOrder(StaffPrincipal principal, UUID locationId) {
         var access = staffAccessService.resolveForUpdate(principal);
         var location = requireAccessibleLocation(access, locationId);
         var now = clock.instant();
-        var order = orderRepository.save(CustomerOrder.create(location, label.trim(), now));
+        var order = orderRepository.save(CustomerOrder.create(location, now));
         historyRepository.save(OrderHistory.recordByUser(order, order.getStatus(), now, access.accountId()));
         return StaffOrderView.from(order);
     }

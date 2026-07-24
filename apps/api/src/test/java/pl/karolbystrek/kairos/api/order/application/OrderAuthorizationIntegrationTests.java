@@ -48,19 +48,17 @@ class OrderAuthorizationIntegrationTests {
         var otherTenantId = UUID.randomUUID();
         locationId = UUID.randomUUID();
         otherLocationId = UUID.randomUUID();
-        jdbcTemplate.update("INSERT INTO tenants (id, name) VALUES (?, ?)", tenantId, "Tenant A");
-        jdbcTemplate.update("INSERT INTO tenants (id, name) VALUES (?, ?)", otherTenantId, "Tenant B");
+        jdbcTemplate.update("INSERT INTO tenants (id) VALUES (?)", tenantId);
+        jdbcTemplate.update("INSERT INTO tenants (id) VALUES (?)", otherTenantId);
         jdbcTemplate.update(
-            "INSERT INTO locations (id, tenant_id, name) VALUES (?, ?, ?)",
+            "INSERT INTO locations (id, tenant_id) VALUES (?, ?)",
             locationId,
-            tenantId,
-            "Location A"
+            tenantId
         );
         jdbcTemplate.update(
-            "INSERT INTO locations (id, tenant_id, name) VALUES (?, ?, ?)",
+            "INSERT INTO locations (id, tenant_id) VALUES (?, ?)",
             otherLocationId,
-            otherTenantId,
-            "Location B"
+            otherTenantId
         );
 
         admin = insertAccount(tenantId, TenantRole.ADMIN, "ACTIVE", null, null, null);
@@ -79,8 +77,8 @@ class OrderAuthorizationIntegrationTests {
 
     @Test
     void scopesLocationsAndOrdersToTheCurrentTenantAndAssignment() {
-        var ownOrder = orderService.createOrder(admin, locationId, "A-1");
-        var otherOrder = orderService.createOrder(otherAdmin, otherLocationId, "B-1");
+        var ownOrder = orderService.createOrder(admin, locationId);
+        var otherOrder = orderService.createOrder(otherAdmin, otherLocationId);
 
         assertThat(locationService.listAccessible(admin)).extracting(LocationView::id)
             .containsExactly(locationId);
@@ -92,7 +90,7 @@ class OrderAuthorizationIntegrationTests {
 
         assertThatThrownBy(() -> orderService.listOrders(manager, otherLocationId))
             .isInstanceOf(StaffAccessDeniedException.class);
-        assertThatThrownBy(() -> orderService.createOrder(operator, otherLocationId, "forbidden"))
+        assertThatThrownBy(() -> orderService.createOrder(operator, otherLocationId))
             .isInstanceOf(StaffAccessDeniedException.class);
         assertThatThrownBy(() -> orderService.listTenantOrders(manager))
             .isInstanceOf(StaffAccessDeniedException.class);
@@ -100,7 +98,7 @@ class OrderAuthorizationIntegrationTests {
 
     @Test
     void authorizesTheStoredOrderLocationAndRecordsTheAuthenticatedInitiator() {
-        var order = orderService.createOrder(admin, locationId, "A-2");
+        var order = orderService.createOrder(admin, locationId);
 
         var updated = orderService.updateStatus(operator, order.id(), OrderStatus.IN_PREPARATION);
         assertThat(updated.status()).isEqualTo(OrderStatus.IN_PREPARATION);
@@ -110,7 +108,7 @@ class OrderAuthorizationIntegrationTests {
             order.id()
         )).isEqualTo(operator.accountId());
 
-        var otherOrder = orderService.createOrder(otherAdmin, otherLocationId, "B-2");
+        var otherOrder = orderService.createOrder(otherAdmin, otherLocationId);
         assertThatThrownBy(() -> orderService.updateStatus(manager, otherOrder.id(), OrderStatus.IN_PREPARATION))
             .isInstanceOf(StaffAccessDeniedException.class);
     }
@@ -121,7 +119,7 @@ class OrderAuthorizationIntegrationTests {
             .isInstanceOf(StaffAccessDeniedException.class);
 
         jdbcTemplate.update("UPDATE accounts SET status = 'DISABLED' WHERE id = ?", operator.accountId());
-        assertThatThrownBy(() -> orderService.createOrder(operator, locationId, "forbidden"))
+        assertThatThrownBy(() -> orderService.createOrder(operator, locationId))
             .isInstanceOf(StaffAccessDeniedException.class);
     }
 
@@ -138,13 +136,12 @@ class OrderAuthorizationIntegrationTests {
         jdbcTemplate.update(
             """
             INSERT INTO accounts (
-                id, tenant_id, username, display_name, tenant_role, status, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                id, tenant_id, username, tenant_role, status, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
             accountId,
             accountTenantId,
             "account-" + accountId,
-            "Test account",
             tenantRole.name(),
             accountStatus,
             now,

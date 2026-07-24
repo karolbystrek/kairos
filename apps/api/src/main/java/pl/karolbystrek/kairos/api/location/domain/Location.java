@@ -23,17 +23,10 @@ public class Location {
     @Column(name = "tenant_id", nullable = false)
     private UUID tenantId;
 
-    @Column(nullable = false, length = 120)
-    private String name;
-
-    public static Location create(
-        @NonNull UUID tenantId,
-        @NonNull String name
-    ) {
+    public static Location create(@NonNull UUID tenantId) {
         var location = new Location();
         location.id = UUID.randomUUID();
         location.tenantId = tenantId;
-        location.name = name;
         return location;
     }
 }

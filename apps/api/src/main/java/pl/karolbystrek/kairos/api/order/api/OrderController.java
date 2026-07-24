@@ -12,7 +12,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
-import pl.karolbystrek.kairos.api.order.api.model.CreateOrderRequest;
 import pl.karolbystrek.kairos.api.order.api.model.StaffOrderResponse;
 import pl.karolbystrek.kairos.api.order.api.model.UpdateOrderStatusRequest;
 import pl.karolbystrek.kairos.api.order.application.OrderService;
@@ -49,10 +48,9 @@ class OrderController {
     @ResponseStatus(HttpStatus.CREATED)
     StaffOrderResponse createOrder(
             @AuthenticationPrincipal StaffPrincipal principal,
-            @PathVariable UUID locationId,
-            @Valid @RequestBody CreateOrderRequest request
+            @PathVariable UUID locationId
     ) {
-        var order = orderService.createOrder(principal, locationId, request.label());
+        var order = orderService.createOrder(principal, locationId);
         return StaffOrderResponse.from(order);
     }
 

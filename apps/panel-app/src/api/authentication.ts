@@ -10,13 +10,12 @@ import { withAuthCookieLock } from "./auth-coordination";
 
 const locationAssignmentSchema = z.object({
   locationId: z.uuid(),
-  locationName: z.string(),
   role: z.enum(["MANAGER", "OPERATOR"]),
 });
 
 export const currentAccountSchema = z.object({
   accountId: z.uuid(),
-  displayName: z.string(),
+  username: z.string(),
   tenantId: z.uuid(),
   tenantRole: z.enum(["ADMIN", "MEMBER"]),
   assignment: locationAssignmentSchema.nullable(),

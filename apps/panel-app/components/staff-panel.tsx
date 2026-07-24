@@ -233,9 +233,7 @@ function accountScope(account: CurrentAccount): string {
 
   const role = account.assignment?.role === "MANAGER" ? "Manager" : "Operator";
 
-  return account.assignment
-    ? `${account.assignment.locationName} · ${role}`
-    : role;
+  return role;
 }
 
 export function StaffPanel() {
@@ -349,7 +347,7 @@ export function StaffPanel() {
         <div>
           <h1 className="text-3xl font-semibold">Kairos Staff Panel</h1>
           <p className="text-muted">
-            {account.displayName} · {accountScope(account)}
+            {account.username} · {accountScope(account)}
           </p>
           {isValidating && (
             <p className="text-sm text-muted">Refreshing account…</p>

@@ -1,15 +1,4 @@
-import type { FormEvent } from "react";
-
-import {
-  Alert,
-  Button,
-  Chip,
-  Input,
-  Label,
-  Link,
-  Spinner,
-  TextField,
-} from "@heroui/react";
+import { Alert, Button, Chip, Link, Spinner } from "@heroui/react";
 import Image from "next/image";
 import QRCode from "qrcode";
 import { useState } from "react";
@@ -67,11 +56,13 @@ function shouldRetryOnError(error: Error): boolean {
   );
 }
 
-function createOrderMutation(
-  [, , , locationId]: OrderListKey,
-  { arg: label }: { arg: string },
-): Promise<StaffOrder> {
-  return createOrderRequest(locationId, label);
+function createOrderMutation([
+  ,
+  ,
+  ,
+  locationId,
+]: OrderListKey): Promise<StaffOrder> {
+  return createOrderRequest(locationId);
 }
 
 function updateOrderMutation(
@@ -107,7 +98,7 @@ function OrderQrCode({
     <section className="flex flex-col items-start gap-4">
       <div>
         <h2 className="text-2xl font-semibold">Customer QR code</h2>
-        <p className="text-muted">Order {order.label}</p>
+        <p className="text-muted">{order.id}</p>
       </div>
       {error ? (
         <Alert status="danger">
@@ -125,7 +116,7 @@ function OrderQrCode({
       ) : (
         <Image
           unoptimized
-          alt={`Tracking QR code for order ${order.label}`}
+          alt={`Tracking QR code for ${order.id}`}
           height={240}
           src={qrCode}
           width={240}
@@ -141,7 +132,6 @@ function OrderQrCode({
 export function OrderManagement({ accountId }: { accountId: string }) {
   const [selectedLocationId, setSelectedLocationId] = useState<string>();
   const [selectedOrderId, setSelectedOrderId] = useState<string>();
-  const [label, setLabel] = useState("");
 
   const {
     data: locations = [],
@@ -196,11 +186,10 @@ export function OrderManagement({ accountId }: { accountId: string }) {
   const error =
     locationsError ?? ordersError ?? createOrderError ?? updateOrderError;
 
-  async function createOrder(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!locationId || !label.trim()) return;
+  async function createOrder() {
+    if (!locationId) return;
 
-    const order = await triggerCreateOrder(label.trim());
+    const order = await triggerCreateOrder();
 
     if (!order) return;
 
@@ -212,7 +201,6 @@ export function OrderManagement({ accountId }: { accountId: string }) {
       { revalidate: false },
     );
     setSelectedOrderId(order.id);
-    setLabel("");
     void mutateOrders(undefined, { throwOnError: false });
   }
 
@@ -273,7 +261,7 @@ export function OrderManagement({ accountId }: { accountId: string }) {
                   variant={location.id === locationId ? "primary" : "secondary"}
                   onPress={() => selectLocation(location.id)}
                 >
-                  {location.name}
+                  {location.id}
                 </Button>
               ))}
             </div>
@@ -281,24 +269,14 @@ export function OrderManagement({ accountId }: { accountId: string }) {
 
           <section className="flex flex-col gap-3">
             <h2 className="text-2xl font-semibold">Create order</h2>
-            <form className="flex items-end gap-3" onSubmit={createOrder}>
-              <TextField fullWidth isRequired>
-                <Label>Order label</Label>
-                <Input
-                  maxLength={80}
-                  placeholder="A-42"
-                  value={label}
-                  onChange={(event) => setLabel(event.target.value)}
-                />
-              </TextField>
-              <Button
-                isDisabled={isCreatingOrder || !label.trim()}
-                type="submit"
-                variant="primary"
-              >
-                {isCreatingOrder ? "Creating…" : "Create"}
-              </Button>
-            </form>
+            <Button
+              className="self-start"
+              isDisabled={isCreatingOrder}
+              variant="primary"
+              onPress={createOrder}
+            >
+              {isCreatingOrder ? "Creating…" : "Create"}
+            </Button>
           </section>
 
           {selectedOrder && (
@@ -328,7 +306,7 @@ export function OrderManagement({ accountId }: { accountId: string }) {
                     className="flex flex-wrap items-center justify-between gap-3 border-t border-separator py-4"
                   >
                     <div className="flex items-center gap-3">
-                      <strong>{order.label}</strong>
+                      <strong>{order.id}</strong>
                       <Chip>{statusLabels[order.status]}</Chip>
                     </div>
                     <div className="flex flex-wrap gap-2">

@@ -10,7 +10,6 @@ public record StaffOrderView(
         UUID id,
         UUID locationId,
         UUID trackingReference,
-        String label,
         OrderStatus status,
         Instant createdAt,
         Instant updatedAt
@@ -20,7 +19,6 @@ public record StaffOrderView(
                 order.getId(),
                 order.getLocation().getId(),
                 order.getTrackingReference(),
-                order.getLabel(),
                 order.getStatus(),
                 order.getCreatedAt(),
                 order.getUpdatedAt()

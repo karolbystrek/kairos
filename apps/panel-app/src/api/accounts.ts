@@ -1,7 +1,6 @@
 import { z } from "zod";
 
 import {
-  displayNameInputSchema,
   optionalEmailInputSchema,
   passwordInputSchema,
   usernameInputSchema,
@@ -14,7 +13,6 @@ const provisionAccountInputSchema = z.object({
   username: usernameInputSchema,
   email: optionalEmailInputSchema,
   password: passwordInputSchema,
-  displayName: displayNameInputSchema,
   role: assignmentRoleSchema,
 });
 
@@ -24,7 +22,6 @@ const managedAccountSchema = z.object({
   locationId: z.uuid(),
   username: z.string(),
   email: z.string().nullable(),
-  displayName: z.string(),
   role: assignmentRoleSchema,
   status: z.enum(["ACTIVE", "DISABLED"]),
   createdAt: z.iso.datetime({ offset: true }),

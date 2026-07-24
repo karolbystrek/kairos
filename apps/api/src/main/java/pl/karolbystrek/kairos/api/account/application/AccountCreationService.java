@@ -27,15 +27,13 @@ public class AccountCreationService {
         UUID tenantId,
         String username,
         String email,
-        String password,
-        String displayName
+        String password
     ) {
         return create(
             tenantId,
             username,
             email,
             password,
-            displayName,
             true
         );
     }
@@ -45,15 +43,13 @@ public class AccountCreationService {
         UUID tenantId,
         String username,
         String email,
-        String password,
-        String displayName
+        String password
     ) {
         return create(
             tenantId,
             username,
             email,
             password,
-            displayName,
             false
         );
     }
@@ -63,14 +59,12 @@ public class AccountCreationService {
         String username,
         String email,
         String password,
-        String displayName,
         boolean administrator
     ) {
         var normalizedUsername = username.strip().toLowerCase(Locale.ROOT);
         var normalizedEmail = email == null || email.isBlank()
             ? null
             : email.strip().toLowerCase(Locale.ROOT);
-        var normalizedDisplayName = displayName.strip();
         requireAvailableIdentifiers(normalizedUsername, normalizedEmail);
 
         var now = clock.instant();
@@ -81,7 +75,6 @@ public class AccountCreationService {
                 normalizedUsername,
                 normalizedEmail,
                 passwordHash,
-                normalizedDisplayName,
                 now
             )
             : Account.provisionMember(
@@ -89,7 +82,6 @@ public class AccountCreationService {
                 normalizedUsername,
                 normalizedEmail,
                 passwordHash,
-                normalizedDisplayName,
                 now
             );
 

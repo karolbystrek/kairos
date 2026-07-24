@@ -6,11 +6,10 @@ import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
 import java.time.Instant;
 
 public record TrackedOrderView(
-        String label,
         OrderStatus status,
         Instant updatedAt
 ) {
     public static TrackedOrderView from(CustomerOrder order) {
-        return new TrackedOrderView(order.getLabel(), order.getStatus(), order.getUpdatedAt());
+        return new TrackedOrderView(order.getStatus(), order.getUpdatedAt());
     }
 }

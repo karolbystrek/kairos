@@ -116,18 +116,17 @@ by integration tests.
 ### 4.1 Tenant registration
 
 `POST /api/tenant-registrations` is the only anonymous account-creation flow. It
-requires a valid browser CSRF token and accepts a tenant name, first-location
-name, and nested administrator username, email, password, and display name.
+requires a valid browser CSRF token and accepts a nested administrator username,
+email, and password.
 
 The backend:
 
 1. applies the per-client registration rate limit before BCrypt work;
-2. trims the tenant and location names;
-3. normalizes the username and required email;
-4. validates the shared local-account input contract;
-5. creates the tenant, first location, and active `ADMIN` account in one
+2. normalizes the username and required email;
+3. validates the shared local-account input contract;
+4. creates the tenant, first location, and active `ADMIN` account in one
    transaction;
-6. returns their identifiers and the normalized username without issuing access
+5. returns their identifiers and the normalized username without issuing access
    or refresh cookies.
 
 The default local rate limit is five attempts per client per hour. Exhaustion
@@ -242,9 +241,9 @@ operation performs an additional current-account check.
 `GET /api/auth/me` returns the current authorization context needed by the
 panel:
 
-* account ID and display name;
+* account ID and username;
 * tenant ID and tenant role;
-* location assignment ID, name, and assignment role when applicable;
+* location assignment ID and assignment role when applicable;
 * capabilities that are useful for presentation, while the backend still
   authorizes every operation independently.
 
@@ -284,7 +283,7 @@ The access JWT contains only stable security inputs and protocol metadata:
 * issued-at and expiry times;
 * unique token ID.
 
-The JWT must not contain the current location assignment, display name, email,
+The JWT must not contain the current location assignment, username, email,
 or other mutable profile data. The backend resolves the current assignment from
 PostgreSQL.
 

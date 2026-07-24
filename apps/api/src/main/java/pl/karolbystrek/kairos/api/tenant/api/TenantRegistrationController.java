@@ -29,12 +29,9 @@ class TenantRegistrationController {
         rateLimiter.checkTenantRegistration(clientAddress(servletRequest));
         var administrator = request.administrator();
         var registration = tenantRegistrationService.register(
-            request.tenantName(),
-            request.locationName(),
             administrator.username(),
             administrator.email(),
-            administrator.password(),
-            administrator.displayName()
+            administrator.password()
         );
         return TenantRegistrationResponse.from(registration);
     }

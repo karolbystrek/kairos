@@ -45,8 +45,8 @@ class AccountProvisioningServiceIntegrationTests {
 
     @Test
     void administratorProvisionsNormalizedManagersAndOperatorsInsideItsTenant() {
-        var tenantId = insertTenant("Admin tenant");
-        var locationId = insertLocation(tenantId, "Main kitchen");
+        var tenantId = insertTenant();
+        var locationId = insertLocation(tenantId);
         var administratorId = insertAccount(tenantId, "admin", TenantRole.ADMIN, AccountStatus.ACTIVE);
         var administrator = principal(administratorId, tenantId, TenantRole.ADMIN);
 
@@ -56,7 +56,6 @@ class AccountProvisioningServiceIntegrationTests {
             "  Shift.Manager  ",
             "  MANAGER@EXAMPLE.COM  ",
             INITIAL_PASSWORD,
-            "  Shift Manager  ",
             AssignmentRole.MANAGER
         );
         var operator = provisioningService.provision(
@@ -65,7 +64,6 @@ class AccountProvisioningServiceIntegrationTests {
             "Counter.Device.1",
             null,
             INITIAL_PASSWORD,
-            "Counter device 1",
             AssignmentRole.OPERATOR
         );
 
@@ -73,7 +71,6 @@ class AccountProvisioningServiceIntegrationTests {
         assertThat(manager.locationId()).isEqualTo(locationId);
         assertThat(manager.username()).isEqualTo("shift.manager");
         assertThat(manager.email()).isEqualTo("manager@example.com");
-        assertThat(manager.displayName()).isEqualTo("Shift Manager");
         assertThat(manager.role()).isEqualTo(AssignmentRole.MANAGER);
         assertThat(operator.role()).isEqualTo(AssignmentRole.OPERATOR);
 
@@ -88,9 +85,9 @@ class AccountProvisioningServiceIntegrationTests {
 
     @Test
     void managerProvisionsOnlyOperatorsForItsOwnActiveLocation() {
-        var tenantId = insertTenant("Manager tenant");
-        var assignedLocationId = insertLocation(tenantId, "Assigned location");
-        var otherLocationId = insertLocation(tenantId, "Other location");
+        var tenantId = insertTenant();
+        var assignedLocationId = insertLocation(tenantId);
+        var otherLocationId = insertLocation(tenantId);
         var managerId = insertAccount(tenantId, "manager", TenantRole.MEMBER, AccountStatus.ACTIVE);
         insertAssignment(managerId, tenantId, assignedLocationId, AssignmentRole.MANAGER, "ACTIVE");
         var manager = principal(managerId, tenantId, TenantRole.MEMBER);
@@ -101,7 +98,6 @@ class AccountProvisioningServiceIntegrationTests {
             "device.one",
             null,
             INITIAL_PASSWORD,
-            "Device one",
             AssignmentRole.OPERATOR
         );
 
@@ -113,7 +109,6 @@ class AccountProvisioningServiceIntegrationTests {
             "another.manager",
             null,
             INITIAL_PASSWORD,
-            "Another manager",
             AssignmentRole.MANAGER
         )).isInstanceOf(StaffAccessDeniedException.class);
         assertThatThrownBy(() -> provisioningService.provision(
@@ -122,20 +117,19 @@ class AccountProvisioningServiceIntegrationTests {
             "other.device",
             null,
             INITIAL_PASSWORD,
-            "Other device",
             AssignmentRole.OPERATOR
         )).isInstanceOf(StaffAccessDeniedException.class);
     }
 
     @Test
     void operatorAndCrossTenantAdministratorCannotProvisionAccounts() {
-        var tenantId = insertTenant("First tenant");
-        var locationId = insertLocation(tenantId, "First location");
+        var tenantId = insertTenant();
+        var locationId = insertLocation(tenantId);
         var operatorId = insertAccount(tenantId, "operator", TenantRole.MEMBER, AccountStatus.ACTIVE);
         insertAssignment(operatorId, tenantId, locationId, AssignmentRole.OPERATOR, "ACTIVE");
 
-        var otherTenantId = insertTenant("Other tenant");
-        var otherLocationId = insertLocation(otherTenantId, "Other location");
+        var otherTenantId = insertTenant();
+        var otherLocationId = insertLocation(otherTenantId);
         var administratorId = insertAccount(tenantId, "admin", TenantRole.ADMIN, AccountStatus.ACTIVE);
 
         assertThatThrownBy(() -> provisioningService.provision(
@@ -144,7 +138,6 @@ class AccountProvisioningServiceIntegrationTests {
             "operator.created",
             null,
             INITIAL_PASSWORD,
-            "Operator created",
             AssignmentRole.OPERATOR
         )).isInstanceOf(StaffAccessDeniedException.class);
         assertThatThrownBy(() -> provisioningService.provision(
@@ -153,15 +146,14 @@ class AccountProvisioningServiceIntegrationTests {
             "cross.tenant",
             null,
             INITIAL_PASSWORD,
-            "Cross tenant",
             AssignmentRole.OPERATOR
         )).isInstanceOf(StaffAccessDeniedException.class);
     }
 
     @Test
     void suspendedManagerCannotProvisionAccounts() {
-        var tenantId = insertTenant("Validation tenant");
-        var locationId = insertLocation(tenantId, "Validation location");
+        var tenantId = insertTenant();
+        var locationId = insertLocation(tenantId);
         var managerId = insertAccount(tenantId, "suspended.manager", TenantRole.MEMBER, AccountStatus.ACTIVE);
         insertAssignment(managerId, tenantId, locationId, AssignmentRole.MANAGER, "SUSPENDED");
 
@@ -171,15 +163,14 @@ class AccountProvisioningServiceIntegrationTests {
             "suspended.created",
             null,
             INITIAL_PASSWORD,
-            "Suspended created",
             AssignmentRole.OPERATOR
         )).isInstanceOf(StaffAccessDeniedException.class);
     }
 
     @Test
     void disablingManagedAccountRevokesItsRefreshSessions() {
-        var tenantId = insertTenant("Revocation tenant");
-        var locationId = insertLocation(tenantId, "Revocation location");
+        var tenantId = insertTenant();
+        var locationId = insertLocation(tenantId);
         var administratorId = insertAccount(tenantId, "admin.revoke", TenantRole.ADMIN, AccountStatus.ACTIVE);
         var operatorId = insertAccount(tenantId, "device.revoke", TenantRole.MEMBER, AccountStatus.ACTIVE);
         insertAssignment(operatorId, tenantId, locationId, AssignmentRole.OPERATOR, "ACTIVE");
@@ -203,9 +194,9 @@ class AccountProvisioningServiceIntegrationTests {
 
     @Test
     void managerChangesStatusOnlyForOperatorsAtItsOwnLocation() {
-        var tenantId = insertTenant("Manager status tenant");
-        var locationId = insertLocation(tenantId, "Manager location");
-        var otherLocationId = insertLocation(tenantId, "Other manager location");
+        var tenantId = insertTenant();
+        var locationId = insertLocation(tenantId);
+        var otherLocationId = insertLocation(tenantId);
         var managerId = insertAccount(tenantId, "status.manager", TenantRole.MEMBER, AccountStatus.ACTIVE);
         insertAssignment(managerId, tenantId, locationId, AssignmentRole.MANAGER, "ACTIVE");
         var ownOperatorId = insertAccount(tenantId, "own.operator", TenantRole.MEMBER, AccountStatus.ACTIVE);
@@ -226,19 +217,18 @@ class AccountProvisioningServiceIntegrationTests {
         )).isInstanceOf(StaffAccessDeniedException.class);
     }
 
-    private UUID insertTenant(String name) {
+    private UUID insertTenant() {
         var tenantId = UUID.randomUUID();
-        jdbcTemplate.update("INSERT INTO tenants (id, name) VALUES (?, ?)", tenantId, name);
+        jdbcTemplate.update("INSERT INTO tenants (id) VALUES (?)", tenantId);
         return tenantId;
     }
 
-    private UUID insertLocation(UUID tenantId, String name) {
+    private UUID insertLocation(UUID tenantId) {
         var locationId = UUID.randomUUID();
         jdbcTemplate.update(
-            "INSERT INTO locations (id, tenant_id, name) VALUES (?, ?, ?)",
+            "INSERT INTO locations (id, tenant_id) VALUES (?, ?)",
             locationId,
-            tenantId,
-            name
+            tenantId
         );
         return locationId;
     }
@@ -253,15 +243,14 @@ class AccountProvisioningServiceIntegrationTests {
         jdbcTemplate.update(
             """
                 INSERT INTO accounts (
-                    id, tenant_id, username, email, password_hash, display_name,
+                    id, tenant_id, username, email, password_hash,
                     tenant_role, status, created_at, updated_at
-                ) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?)
                 """,
             accountId,
             tenantId,
             username,
             "fixture-password-hash",
-            username,
             tenantRole.name(),
             status.name(),
             FIXTURE_TIME,

@@ -81,7 +81,7 @@ export function OrderTracker({
         </Alert>
       )}
       <div>
-        <h1 className="text-3xl font-semibold">Order {order.label}</h1>
+        <h1 className="text-3xl font-semibold">Order status</h1>
         <p className="text-muted">Current order status</p>
       </div>
       <Chip color={order.status === "READY" ? "success" : "default"} size="lg">

@@ -35,9 +35,6 @@ public class Account {
     @Column(name = "password_hash", length = 255)
     private String passwordHash;
 
-    @Column(name = "display_name", nullable = false, length = 120)
-    private String displayName;
-
     @Enumerated(EnumType.STRING)
     @Column(name = "tenant_role", nullable = false, length = 32)
     private TenantRole tenantRole;
@@ -57,7 +54,6 @@ public class Account {
         @NonNull String username,
         String email,
         @NonNull String passwordHash,
-        @NonNull String displayName,
         @NonNull Instant now
     ) {
         return provision(
@@ -65,7 +61,6 @@ public class Account {
             username,
             email,
             passwordHash,
-            displayName,
             TenantRole.MEMBER,
             now
         );
@@ -76,7 +71,6 @@ public class Account {
         @NonNull String username,
         @NonNull String email,
         @NonNull String passwordHash,
-        @NonNull String displayName,
         @NonNull Instant now
     ) {
         return provision(
@@ -84,7 +78,6 @@ public class Account {
             username,
             email,
             passwordHash,
-            displayName,
             TenantRole.ADMIN,
             now
         );
@@ -95,7 +88,6 @@ public class Account {
         String username,
         String email,
         String passwordHash,
-        String displayName,
         TenantRole tenantRole,
         Instant now
     ) {
@@ -105,7 +97,6 @@ public class Account {
         account.username = username;
         account.email = email;
         account.passwordHash = passwordHash;
-        account.displayName = displayName;
         account.tenantRole = tenantRole;
         account.status = AccountStatus.ACTIVE;
         account.createdAt = now;

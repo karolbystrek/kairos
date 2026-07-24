@@ -17,6 +17,6 @@ class JpaStaffLocationDirectory implements StaffLocationDirectory {
     @Override
     public Optional<StaffLocation> findById(UUID locationId) {
         return locationRepository.findById(locationId)
-            .map(location -> new StaffLocation(location.getId(), location.getTenantId(), location.getName()));
+            .map(location -> new StaffLocation(location.getId(), location.getTenantId()));
     }
 }

@@ -9,7 +9,6 @@ export const orderStatusSchema = z.enum([
 ]);
 
 export const customerOrderSchema = z.object({
-  label: z.string(),
   status: orderStatusSchema,
   updatedAt: z.iso.datetime({ offset: true }),
 });

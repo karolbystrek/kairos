@@ -21,10 +21,6 @@ public record ProvisionAccountRequest(
     @Utf8Size(max = 72, message = "Password must not exceed 72 UTF-8 bytes")
     String password,
 
-    @NotBlank(message = "Display name is required")
-    @Size(max = 120, message = "Display name must not exceed 120 characters")
-    String displayName,
-
     @NotNull(message = "Assignment role is required")
     AssignmentRole role
 ) {

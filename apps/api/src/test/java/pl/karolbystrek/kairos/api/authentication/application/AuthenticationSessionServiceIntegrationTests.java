@@ -48,17 +48,16 @@ class AuthenticationSessionServiceIntegrationTests {
         var tenantId = UUID.randomUUID();
         var accountId = UUID.randomUUID();
         var now = Instant.now();
-        jdbcTemplate.update("INSERT INTO tenants (id, name) VALUES (?, ?)", tenantId, "Session tenant");
+        jdbcTemplate.update("INSERT INTO tenants (id) VALUES (?)", tenantId);
         jdbcTemplate.update(
             """
             INSERT INTO accounts (
-                id, tenant_id, username, display_name, tenant_role, status, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, 'ADMIN', 'ACTIVE', ?, ?)
+                id, tenant_id, username, tenant_role, status, created_at, updated_at
+            ) VALUES (?, ?, ?, 'ADMIN', 'ACTIVE', ?, ?)
             """,
             accountId,
             tenantId,
             "session-" + accountId,
-            "Session administrator",
             now,
             now
         );
@@ -134,23 +133,21 @@ class AuthenticationSessionServiceIntegrationTests {
         var operatorId = UUID.randomUUID();
         var now = Instant.now();
         jdbcTemplate.update(
-            "INSERT INTO locations (id, tenant_id, name) VALUES (?, ?, ?)",
+            "INSERT INTO locations (id, tenant_id) VALUES (?, ?)",
             locationId,
-            principal.tenantId(),
-            "Race location"
+            principal.tenantId()
         );
         jdbcTemplate.update(
             """
             INSERT INTO accounts (
-                id, tenant_id, username, password_hash, display_name,
+                id, tenant_id, username, password_hash,
                 tenant_role, status, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, 'MEMBER', 'ACTIVE', ?, ?)
+            ) VALUES (?, ?, ?, ?, 'MEMBER', 'ACTIVE', ?, ?)
             """,
             operatorId,
             principal.tenantId(),
             "race-operator-" + operatorId,
             "fixture-password-hash",
-            "Race operator",
             now,
             now
         );

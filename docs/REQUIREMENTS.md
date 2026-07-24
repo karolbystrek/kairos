@@ -81,7 +81,7 @@ The staff panel must:
 * require an authenticated internal account;
 * show only locations and orders accessible to the account;
 * allow tenant administrators to switch between locations or view an aggregate queue;
-* create orders for an accessible location and produce customer QR codes;
+* create unnamed orders for an accessible location and produce customer QR codes;
 * display and refresh active order queues by location;
 * allow only valid order transitions permitted by the account's role;
 * allow tenant administrators to provision location managers and operators within their tenant;
@@ -109,7 +109,7 @@ The system supports:
 
 After either login method, Spring issues a short-lived signed access JWT and a rotating refresh credential. Browser credentials are transported in `Secure`, `HttpOnly`, `SameSite=Lax`, host-only cookies through the staff-panel origin. Cookie-authenticated state-changing requests require CSRF protection.
 
-Public tenant onboarding is the only anonymous account-creation flow. It atomically creates one tenant, its first location, and its first active administrator. The administrator requires a normalized, globally unique email address in addition to its normalized username and BCrypt-hashed password. Registration does not issue authentication cookies or sign the administrator in. Tenant and location display names are trimmed but are not unique.
+Public tenant onboarding is the only anonymous account-creation flow. It atomically creates one tenant, its first location, and its first active administrator. The administrator requires a normalized, globally unique email address in addition to its normalized username and BCrypt-hashed password. Registration does not issue authentication cookies or sign the administrator in. During rapid development, tenants, locations, accounts, and orders have no separate display-name fields; accounts are presented by username and the other concepts by their full stable identifiers.
 
 Standalone accounts are provisioned rather than self-registered. Each account belongs directly to one tenant. A tenant administrator has tenant-wide access; a location manager or operator has at most one location assignment. Location operator accounts are device-oriented, and a location uses a separate account for each panel device that needs independent credentials or revocation. Tenant administrators may provision managers and operators, while location managers may provision only operators for their own location.
 
@@ -139,12 +139,12 @@ Orders derive tenant ownership through their physical location rather than stori
 
 The database schema must include tables covering the following concepts. Names and nonessential columns are implementation decisions.
 
-* **Tenants:** stable identity, display information, and integration configuration.
-* **Locations:** physical restaurant belonging to one tenant, with display and operational information.
+* **Tenants:** stable identity and integration configuration.
+* **Locations:** physical restaurant belonging to one tenant, with operational information.
 * **Accounts:** stable identity, direct ownership by one tenant, normalized local login identifier and credential hash when applicable, optional normalized globally unique email except where the onboarding contract requires it, tenant-level role, and account state.
 * **External identities:** provider and immutable provider subject linked to an account.
 * **Location assignments:** relationship between a non-admin account and its accessible location, including a manager or operator role and assignment state. The current account model permits at most one assignment per account; the relationship remains normalized so that this cardinality can be changed explicitly in a future migration.
-* **Orders:** public tracking identity, owning location, customer-facing label, current state, and lifecycle timestamps. Tenant ownership is derived through the location.
+* **Orders:** public tracking identity, owning location, current state, and lifecycle timestamps. Tenant ownership is derived through the location.
 * **Order history:** order association, resulting state, acceptance time, and the initiator category and identity when known; records are append-only and have an unambiguous order. Initiator categories distinguish users, external integrations, and system actions without coupling history to one authentication mechanism.
 * **Refresh sessions:** account/session association, hashed rotating credential, expiry, and revocation state.
 * **POS credentials:** tenant association, hashed API key material, and credential lifecycle state.
@@ -206,7 +206,7 @@ Docker Compose provides the local environment for both frontends, the API, Postg
 
 ## 10. Incremental Delivery
 
-The first walking vertical slice is intentionally limited to local development. It provides persisted order creation and transitions in the staff panel, QR-code generation, and anonymous customer state retrieval through REST. The database starts empty; tenants and locations are not seeded by production migrations.
+The first walking vertical slice is intentionally limited to local development. It provides persisted unnamed-order creation and transitions in the staff panel, QR-code generation, and anonymous customer state retrieval through REST. The database starts empty; tenants and locations are not seeded by production migrations.
 
 The original walking slice temporarily exposed unauthenticated order-management endpoints. The backend authentication increment now protects staff operations with provisioned local accounts, tenant/location authorization, CSRF, and trusted authenticated audit identity. The panel frontend now provides local login, current-account loading, logout, automatic CSRF headers, and one refresh plus request retry after an expired access credential. Cooperating same-origin tabs serialize refresh through a browser Web Lock and recheck the current session after acquiring it, avoiding a duplicate rotation without maintaining a persistent cross-tab state machine. Authentication credentials remain in secure `HttpOnly` cookies and are not stored by the frontend. Customer updates still use manual plus focus/reconnect REST revalidation, and SWR calls handwritten native `fetch` request modules rather than OpenAPI tooling or generated clients. PostgreSQL RLS enforcement, WebSocket/STOMP delivery, and reconnect reconciliation remain required before deployment. Formal API documentation is deferred until the contract is prepared for external integrations.
 

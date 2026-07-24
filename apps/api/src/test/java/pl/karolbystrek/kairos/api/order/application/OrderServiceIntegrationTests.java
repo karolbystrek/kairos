@@ -43,24 +43,22 @@ class OrderServiceIntegrationTests {
         var tenantId = UUID.randomUUID();
         var accountId = UUID.randomUUID();
         locationId = UUID.randomUUID();
-        jdbcTemplate.update("INSERT INTO tenants (id, name) VALUES (?, ?)", tenantId, "Test tenant");
+        jdbcTemplate.update("INSERT INTO tenants (id) VALUES (?)", tenantId);
         jdbcTemplate.update(
-            "INSERT INTO locations (id, tenant_id, name) VALUES (?, ?, ?)",
+            "INSERT INTO locations (id, tenant_id) VALUES (?, ?)",
             locationId,
-            tenantId,
-            "Test location"
+            tenantId
         );
         var now = Instant.now();
         jdbcTemplate.update(
             """
             INSERT INTO accounts (
-                id, tenant_id, username, display_name, tenant_role, status, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, 'ADMIN', 'ACTIVE', ?, ?)
+                id, tenant_id, username, tenant_role, status, created_at, updated_at
+            ) VALUES (?, ?, ?, 'ADMIN', 'ACTIVE', ?, ?)
             """,
             accountId,
             tenantId,
             "admin-" + accountId,
-            "Test administrator",
             now,
             now
         );
@@ -69,7 +67,7 @@ class OrderServiceIntegrationTests {
 
     @Test
     void createsTransitionsAndTracksAnOrder() {
-        var created = orderService.createOrder(principal, locationId, "A-42");
+        var created = orderService.createOrder(principal, locationId);
 
         assertThat(created.status()).isEqualTo(OrderStatus.CREATED);
         assertThat(created.trackingReference()).isNotNull();
@@ -84,7 +82,6 @@ class OrderServiceIntegrationTests {
 
         assertThat(inPreparation.status()).isEqualTo(OrderStatus.IN_PREPARATION);
         assertThat(ready.status()).isEqualTo(OrderStatus.READY);
-        assertThat(tracked.label()).isEqualTo("A-42");
         assertThat(tracked.status()).isEqualTo(OrderStatus.READY);
         assertThat(historyRepository.count()).isEqualTo(3);
         assertThat(jdbcTemplate.queryForList(
@@ -101,7 +98,7 @@ class OrderServiceIntegrationTests {
 
     @Test
     void rejectsInvalidTransitions() {
-        var created = orderService.createOrder(principal, locationId, "B-7");
+        var created = orderService.createOrder(principal, locationId);
 
         assertThatThrownBy(() -> orderService.updateStatus(principal, created.id(), OrderStatus.COMPLETED))
             .isInstanceOf(InvalidOrderTransitionException.class)

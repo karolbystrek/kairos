@@ -24,7 +24,7 @@ public class LocationService {
     public List<LocationView> listAccessible(StaffPrincipal principal) {
         var access = staffAccessService.resolve(principal);
         var locations = access.isTenantAdmin()
-                ? locationRepository.findAllByTenantIdOrderByNameAsc(access.tenantId())
+                ? locationRepository.findAllByTenantId(access.tenantId())
                 : List.of(requireAssignedLocation(access));
 
         return locations.stream()

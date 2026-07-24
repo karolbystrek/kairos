@@ -6,7 +6,6 @@ import java.util.UUID;
 
 public record StaffLocation(
     @NonNull UUID id,
-    @NonNull UUID tenantId,
-    @NonNull String name
+    @NonNull UUID tenantId
 ) {
 }

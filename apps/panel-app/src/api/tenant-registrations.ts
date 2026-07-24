@@ -1,7 +1,6 @@
 import { z } from "zod";
 
 import {
-  displayNameInputSchema,
   passwordInputSchema,
   requiredEmailInputSchema,
   usernameInputSchema,
@@ -10,17 +9,6 @@ import { request } from "./api-fetch";
 
 const tenantRegistrationInputSchema = z
   .object({
-    tenantName: z
-      .string()
-      .trim()
-      .min(1, "Tenant name is required")
-      .max(120, "Tenant name must not exceed 120 characters"),
-    locationName: z
-      .string()
-      .trim()
-      .min(1, "Location name is required")
-      .max(120, "Location name must not exceed 120 characters"),
-    displayName: displayNameInputSchema,
     username: usernameInputSchema,
     email: requiredEmailInputSchema,
     password: passwordInputSchema,
@@ -33,18 +21,13 @@ const tenantRegistrationInputSchema = z
       path: ["passwordConfirmation"],
     },
   )
-  .transform(
-    ({ tenantName, locationName, displayName, username, email, password }) => ({
-      tenantName,
-      locationName,
-      administrator: {
-        displayName,
-        username,
-        email,
-        password,
-      },
-    }),
-  );
+  .transform(({ username, email, password }) => ({
+    administrator: {
+      username,
+      email,
+      password,
+    },
+  }));
 
 const tenantRegistrationSchema = z.object({
   tenantId: z.uuid(),

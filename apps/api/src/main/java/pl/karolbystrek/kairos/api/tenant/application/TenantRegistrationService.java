@@ -22,18 +22,12 @@ public class TenantRegistrationService {
 
     @Transactional
     public TenantRegistrationView register(
-        String tenantName,
-        String locationName,
         String administratorUsername,
         String administratorEmail,
-        String administratorPassword,
-        String administratorDisplayName
+        String administratorPassword
     ) {
-        var tenant = Tenant.create(tenantName.strip());
-        var location = Location.create(
-            tenant.getId(),
-            locationName.strip()
-        );
+        var tenant = Tenant.create();
+        var location = Location.create(tenant.getId());
 
         tenantRepository.save(tenant);
         locationRepository.save(location);
@@ -41,8 +35,7 @@ public class TenantRegistrationService {
             tenant.getId(),
             administratorUsername,
             administratorEmail,
-            administratorPassword,
-            administratorDisplayName
+            administratorPassword
         );
 
         log.info(

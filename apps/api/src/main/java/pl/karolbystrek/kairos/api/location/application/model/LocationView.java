@@ -5,10 +5,9 @@ import pl.karolbystrek.kairos.api.location.domain.Location;
 import java.util.UUID;
 
 public record LocationView(
-        UUID id,
-        String name
+        UUID id
 ) {
     public static LocationView from(Location location) {
-        return new LocationView(location.getId(), location.getName());
+        return new LocationView(location.getId());
     }
 }

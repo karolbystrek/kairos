@@ -45,7 +45,6 @@ public class AccountProvisioningService {
         String username,
         String email,
         String password,
-        String displayName,
         AssignmentRole role
     ) {
         var access = staffAccessService.resolveForUpdate(actor);
@@ -58,8 +57,7 @@ public class AccountProvisioningService {
             access.tenantId(),
             username,
             email,
-            password,
-            displayName
+            password
         );
         var assignment = LocationAssignment.active(
             account.getId(),
@@ -156,7 +154,6 @@ public class AccountProvisioningService {
             assignment.getLocationId(),
             account.getUsername(),
             account.getEmail(),
-            account.getDisplayName(),
             assignment.getRole(),
             account.getStatus(),
             account.getCreatedAt(),

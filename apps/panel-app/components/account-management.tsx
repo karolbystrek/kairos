@@ -62,7 +62,6 @@ export function AccountManagement({ account }: { account: CurrentAccount }) {
   const isAdministrator = account.tenantRole === "ADMIN";
   const [selectedLocationId, setSelectedLocationId] = useState<string>();
   const [role, setRole] = useState<AssignmentRole>("OPERATOR");
-  const [displayName, setDisplayName] = useState("");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -95,9 +94,6 @@ export function AccountManagement({ account }: { account: CurrentAccount }) {
       : locations[0]?.id
     : assignedLocationId;
   const selectedRole = isAdministrator ? role : "OPERATOR";
-  const currentLocation = locations.find(
-    (location) => location.id === locationId,
-  );
   const error = locationsError ?? provisioningError;
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -109,7 +105,6 @@ export function AccountManagement({ account }: { account: CurrentAccount }) {
     const result = await triggerProvisioning({
       locationId,
       account: {
-        displayName,
         username,
         email,
         password,
@@ -120,7 +115,6 @@ export function AccountManagement({ account }: { account: CurrentAccount }) {
     if (!result) return;
 
     setCreatedAccount(result);
-    setDisplayName("");
     setUsername("");
     setEmail("");
     setPassword("");
@@ -151,7 +145,7 @@ export function AccountManagement({ account }: { account: CurrentAccount }) {
           <Alert.Content>
             <Alert.Title>Account created</Alert.Title>
             <Alert.Description>
-              {createdAccount.displayName} · {createdAccount.username} ·{" "}
+              {createdAccount.username} ·{" "}
               {createdAccount.role === "MANAGER" ? "Manager" : "Operator"}
               {createdAccount.email ? ` · ${createdAccount.email}` : ""}
             </Alert.Description>
@@ -185,14 +179,12 @@ export function AccountManagement({ account }: { account: CurrentAccount }) {
                     }
                     onPress={() => setSelectedLocationId(location.id)}
                   >
-                    {location.name}
+                    {location.id}
                   </Button>
                 ))}
               </div>
             ) : (
-              <Chip>
-                {currentLocation?.name ?? account.assignment?.locationName}
-              </Chip>
+              <Chip>{locationId}</Chip>
             )}
           </section>
 
@@ -218,19 +210,6 @@ export function AccountManagement({ account }: { account: CurrentAccount }) {
           </section>
 
           <form className="flex max-w-xl flex-col gap-4" onSubmit={submit}>
-            <TextField
-              fullWidth
-              isRequired
-              isDisabled={isMutating}
-              maxLength={120}
-              name="displayName"
-              value={displayName}
-              onChange={setDisplayName}
-            >
-              <Label>Display name</Label>
-              <Input autoComplete="off" />
-            </TextField>
-
             <TextField
               fullWidth
               isRequired

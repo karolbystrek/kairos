@@ -37,7 +37,6 @@ class AccountController {
             request.username(),
             request.email(),
             request.password(),
-            request.displayName(),
             request.role()
         );
         return ManagedAccountResponse.from(account);

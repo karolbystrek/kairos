@@ -12,14 +12,12 @@ export const orderStatusSchema = z.enum([
 
 export const locationSchema = z.object({
   id: z.uuid(),
-  name: z.string(),
 });
 
 export const staffOrderSchema = z.object({
   id: z.uuid(),
   locationId: z.uuid(),
   trackingReference: z.uuid(),
-  label: z.string(),
   status: orderStatusSchema,
   createdAt: z.iso.datetime({ offset: true }),
   updatedAt: z.iso.datetime({ offset: true }),
@@ -27,9 +25,6 @@ export const staffOrderSchema = z.object({
 
 const locationsSchema = z.array(locationSchema);
 const staffOrdersSchema = z.array(staffOrderSchema);
-const createOrderInputSchema = z.object({
-  label: z.string().trim().min(1, "Order label is required").max(80),
-});
 
 export type OrderStatus = z.infer<typeof orderStatusSchema>;
 export type Location = z.infer<typeof locationSchema>;
@@ -46,19 +41,12 @@ export function listOrders(locationId: string): Promise<StaffOrder[]> {
   );
 }
 
-export function createOrder(
-  locationId: string,
-  label: string,
-): Promise<StaffOrder> {
-  const input = createOrderInputSchema.parse({ label });
-
+export function createOrder(locationId: string): Promise<StaffOrder> {
   return request(
     `/api/locations/${encodeURIComponent(locationId)}/orders`,
     staffOrderSchema,
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input),
     },
   );
 }

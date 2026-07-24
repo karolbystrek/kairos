@@ -57,12 +57,9 @@ class TenantRegistrationFlowIntegrationTests {
 
         var result = register(
             registrationJson(
-                "  First tenant  ",
-                "  Main location  ",
                 "  ADMIN." + suffix.toUpperCase() + "  ",
                 "ADMIN." + suffix + "@EXAMPLE.COM",
-                PASSWORD,
-                "  First Administrator  "
+                PASSWORD
             ),
             csrf,
             "192.0.2.101"
@@ -76,21 +73,13 @@ class TenantRegistrationFlowIntegrationTests {
         var locationId = UUID.fromString(response.get("locationId").asText());
         var administratorId = UUID.fromString(response.get("administratorAccountId").asText());
 
-        assertThat(jdbcTemplate.queryForObject(
-            "SELECT name FROM tenants WHERE id = ?",
-            String.class,
-            tenantId
-        )).isEqualTo("First tenant");
-        assertThat(jdbcTemplate.queryForObject(
-            "SELECT name FROM locations WHERE id = ? AND tenant_id = ?",
-            String.class,
-            locationId,
-            tenantId
-        )).isEqualTo("Main location");
+        assertThat(count("tenants", "id", tenantId)).isOne();
+        assertThat(count("locations", "id", locationId)).isOne();
+        assertThat(count("locations", "tenant_id", tenantId)).isOne();
 
         var account = jdbcTemplate.queryForMap(
             """
-                SELECT tenant_id, username, email, password_hash, display_name, tenant_role, status
+                SELECT tenant_id, username, email, password_hash, tenant_role, status
                 FROM accounts
                 WHERE id = ?
                 """,
@@ -99,7 +88,6 @@ class TenantRegistrationFlowIntegrationTests {
         assertThat(account.get("tenant_id")).isEqualTo(tenantId);
         assertThat(account.get("username")).isEqualTo("admin." + suffix);
         assertThat(account.get("email")).isEqualTo("admin." + suffix + "@example.com");
-        assertThat(account.get("display_name")).isEqualTo("First Administrator");
         assertThat(account.get("tenant_role")).isEqualTo("ADMIN");
         assertThat(account.get("status")).isEqualTo("ACTIVE");
         assertThat(passwordEncoder.matches(PASSWORD, (String) account.get("password_hash"))).isTrue();
@@ -128,12 +116,9 @@ class TenantRegistrationFlowIntegrationTests {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""
                         {
-                          "tenantName": "Missing email tenant",
-                          "locationName": "Location",
                           "administrator": {
                             "username": "missing.email.%s",
-                            "password": "%s",
-                            "displayName": "Administrator"
+                            "password": "%s"
                           }
                         }
                         """.formatted(suffix, PASSWORD)),
@@ -145,12 +130,9 @@ class TenantRegistrationFlowIntegrationTests {
         for (var index = 0; index < invalidEmails.size(); index++) {
             register(
                 registrationJson(
-                    "Invalid email tenant " + index,
-                    "Location",
                     "invalid.email." + index + "." + suffix,
                     invalidEmails.get(index),
-                    PASSWORD,
-                    "Administrator"
+                    PASSWORD
                 ),
                 csrf,
                 "192.0.2." + (103 + index)
@@ -160,12 +142,9 @@ class TenantRegistrationFlowIntegrationTests {
         var duplicateEmail = "duplicate." + suffix + "@example.com";
         register(
             registrationJson(
-                "Original tenant",
-                "Location",
                 "original." + suffix,
                 duplicateEmail,
-                PASSWORD,
-                "Administrator"
+                PASSWORD
             ),
             csrf,
             "192.0.2.106"
@@ -173,12 +152,9 @@ class TenantRegistrationFlowIntegrationTests {
 
         register(
             registrationJson(
-                "Duplicate email tenant",
-                "Location",
                 "different." + suffix,
                 duplicateEmail.toUpperCase(),
-                PASSWORD,
-                "Administrator"
+                PASSWORD
             ),
             csrf,
             "192.0.2.107"
@@ -195,12 +171,9 @@ class TenantRegistrationFlowIntegrationTests {
                 .secure(true)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(registrationJson(
-                    "No CSRF tenant",
-                    "Location",
                     "no.csrf." + suffix,
                     "no.csrf." + suffix + "@example.com",
-                    PASSWORD,
-                    "Administrator"
+                    PASSWORD
                 )))
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.type").value("urn:kairos:problem:csrf-token-missing"));
@@ -208,12 +181,9 @@ class TenantRegistrationFlowIntegrationTests {
         var csrf = bootstrapCsrf("192.0.2.108");
         register(
             registrationJson(
-                "Short password tenant",
-                "Location",
                 "short.password." + suffix,
                 "short." + suffix + "@example.com",
-                "short",
-                "Administrator"
+                "short"
             ),
             csrf,
             "192.0.2.108"
@@ -221,12 +191,9 @@ class TenantRegistrationFlowIntegrationTests {
 
         register(
             registrationJson(
-                "Long password tenant",
-                "Location",
                 "long.password." + suffix,
                 "long." + suffix + "@example.com",
-                "ą".repeat(37),
-                "Administrator"
+                "ą".repeat(37)
             ),
             csrf,
             "192.0.2.109"
@@ -241,12 +208,9 @@ class TenantRegistrationFlowIntegrationTests {
 
         register(
             registrationJson(
-                "Existing tenant",
-                "Existing location",
                 username,
                 "existing." + suffix + "@example.com",
-                PASSWORD,
-                "Administrator"
+                PASSWORD
             ),
             csrf,
             "192.0.2.110"
@@ -257,12 +221,9 @@ class TenantRegistrationFlowIntegrationTests {
 
         register(
             registrationJson(
-                "Rolled back tenant",
-                "Rolled back location",
                 username.toUpperCase(),
                 "other." + suffix + "@example.com",
-                PASSWORD,
-                "Administrator"
+                PASSWORD
             ),
             csrf,
             "192.0.2.111"
@@ -270,10 +231,6 @@ class TenantRegistrationFlowIntegrationTests {
 
         assertThat(countAll("tenants")).isEqualTo(tenantCount);
         assertThat(countAll("locations")).isEqualTo(locationCount);
-        assertThat(jdbcTemplate.queryForObject(
-            "SELECT COUNT(*) FROM tenants WHERE name = 'Rolled back tenant'",
-            Integer.class
-        )).isZero();
     }
 
     @Test
@@ -284,12 +241,9 @@ class TenantRegistrationFlowIntegrationTests {
         for (var index = 0; index < 5; index++) {
             register(
                 registrationJson(
-                    "Rate limit tenant " + index,
-                    "Location",
                     "rate.limit." + index + "." + suffix,
                     "rate.limit." + index + "." + suffix + "@example.com",
-                    PASSWORD,
-                    "Administrator"
+                    PASSWORD
                 ),
                 csrf,
                 "198.51.100.20"
@@ -299,12 +253,9 @@ class TenantRegistrationFlowIntegrationTests {
         var accountCount = countAll("accounts");
         register(
             registrationJson(
-                "Rejected rate limit tenant",
-                "Location",
                 "rate.limit.rejected." + suffix,
                 "rate.limit.rejected." + suffix + "@example.com",
-                PASSWORD,
-                "Administrator"
+                PASSWORD
             ),
             csrf,
             "198.51.100.20"
@@ -321,12 +272,9 @@ class TenantRegistrationFlowIntegrationTests {
         var csrf = bootstrapCsrf("192.0.2.112");
         var registration = register(
             registrationJson(
-                "Usable tenant",
-                "First location",
                 username,
                 "usable." + suffix + "@example.com",
-                PASSWORD,
-                "Usable Administrator"
+                PASSWORD
             ),
             csrf,
             "192.0.2.112"
@@ -371,14 +319,12 @@ class TenantRegistrationFlowIntegrationTests {
                               "username": "%s.%s",
                               "email": null,
                               "password": "%s",
-                              "displayName": "%s",
                               "role": "%s"
                             }
                             """.formatted(
                                 role.toLowerCase(),
                                 suffix,
                                 PASSWORD,
-                                role,
                                 role
                             )),
                     rotatedCsrf,
@@ -454,25 +400,19 @@ class TenantRegistrationFlowIntegrationTests {
     }
 
     private static String registrationJson(
-        String tenantName,
-        String locationName,
         String username,
         String email,
-        String password,
-        String displayName
+        String password
     ) {
         return """
             {
-              "tenantName": "%s",
-              "locationName": "%s",
               "administrator": {
                 "username": "%s",
                 "email": "%s",
-                "password": "%s",
-                "displayName": "%s"
+                "password": "%s"
               }
             }
-            """.formatted(tenantName, locationName, username, email, password, displayName);
+            """.formatted(username, email, password);
     }
 
     private static MockCookie activeResponseCookie(MvcResult result, String name) {

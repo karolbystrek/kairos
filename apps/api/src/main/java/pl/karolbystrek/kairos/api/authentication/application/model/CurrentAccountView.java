@@ -8,7 +8,7 @@ import java.util.UUID;
 
 public record CurrentAccountView(
     UUID accountId,
-    String displayName,
+    String username,
     UUID tenantId,
     TenantRole tenantRole,
     LocationAssignmentView assignment,
@@ -17,7 +17,6 @@ public record CurrentAccountView(
 
     public record LocationAssignmentView(
         UUID locationId,
-        String locationName,
         AssignmentRole role
     ) {
     }

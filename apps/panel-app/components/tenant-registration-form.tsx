@@ -35,9 +35,6 @@ export function TenantRegistrationForm({
 }: {
   onRegistered: (registration: TenantRegistration) => void;
 }) {
-  const [tenantName, setTenantName] = useState("");
-  const [locationName, setLocationName] = useState("");
-  const [displayName, setDisplayName] = useState("");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -58,9 +55,6 @@ export function TenantRegistrationForm({
 
     reset();
     const registration = await triggerRegistration({
-      tenantName,
-      locationName,
-      displayName,
       username,
       email,
       password,
@@ -94,45 +88,6 @@ export function TenantRegistrationForm({
       )}
 
       <form className="flex flex-col gap-4" onSubmit={submit}>
-        <TextField
-          fullWidth
-          isRequired
-          isDisabled={isMutating}
-          maxLength={120}
-          name="tenantName"
-          value={tenantName}
-          onChange={setTenantName}
-        >
-          <Label>Tenant name</Label>
-          <Input autoComplete="organization" />
-        </TextField>
-
-        <TextField
-          fullWidth
-          isRequired
-          isDisabled={isMutating}
-          maxLength={120}
-          name="locationName"
-          value={locationName}
-          onChange={setLocationName}
-        >
-          <Label>First location</Label>
-          <Input />
-        </TextField>
-
-        <TextField
-          fullWidth
-          isRequired
-          isDisabled={isMutating}
-          maxLength={120}
-          name="displayName"
-          value={displayName}
-          onChange={setDisplayName}
-        >
-          <Label>Administrator display name</Label>
-          <Input autoComplete="name" />
-        </TextField>
-
         <TextField
           fullWidth
           isRequired

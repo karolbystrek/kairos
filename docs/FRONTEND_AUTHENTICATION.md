@@ -144,10 +144,10 @@ validation and remains authoritative.
 ## 7. Tenant Registration
 
 The signed-out surface provides Sign in and Register tenant tabs. Registration
-collects the tenant name, first location, administrator display name, username,
-required email, password, and frontend-only password confirmation.
+collects the administrator username, required email, password, and frontend-only
+password confirmation.
 
-Zod trims names, lowercases the username and email, validates the email, and
+Zod trims and lowercases the username and email, validates the email, and
 enforces the 12-character and 72-UTF-8-byte BCrypt password contract. On
 success, the form clears both password values, switches to Sign in, prefills the
 normalized username returned by Spring, and shows confirmation. It does not
@@ -218,7 +218,7 @@ terminal `401` purge staff entries in the current tab.
 
 `OrderManagement` is also keyed by account ID when rendered. A different
 account therefore receives a fresh component instance instead of inheriting the
-previous account's draft label, selected order, or mutation state.
+previous account's selected order or mutation state.
 
 Operators render the Orders workspace directly. Administrators and managers
 receive HeroUI Orders and Accounts tabs according to the capabilities returned
@@ -228,8 +228,8 @@ assignment and the fixed Operator role.
 
 Order and account views use the same `staff/<accountId>/locations` SWR key, so
 location reads are deduplicated and remain account-scoped. Successful
-provisioning shows the created account summary, clears display name, username,
-email, and password fields, and retains the selected location and role.
+provisioning shows the created account summary, clears username, email, and
+password fields, and retains the selected location and role.
 
 These measures prevent normal React and SWR carryover of locations, orders, QR
 codes, and frontend-owned interaction state after the current tab observes an

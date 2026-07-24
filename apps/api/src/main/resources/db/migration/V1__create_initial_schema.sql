@@ -1,14 +1,12 @@
 CREATE TABLE tenants
 (
-    id   UUID PRIMARY KEY,
-    name VARCHAR(120) NOT NULL
+    id UUID PRIMARY KEY
 );
 
 CREATE TABLE locations
 (
     id        UUID PRIMARY KEY,
     tenant_id UUID         NOT NULL REFERENCES tenants (id),
-    name      VARCHAR(120) NOT NULL,
     CONSTRAINT locations_id_tenant_key UNIQUE (id, tenant_id)
 );
 
@@ -21,7 +19,6 @@ CREATE TABLE accounts
     username      VARCHAR(120)             NOT NULL UNIQUE,
     email         VARCHAR(254) UNIQUE,
     password_hash VARCHAR(255),
-    display_name  VARCHAR(120)             NOT NULL,
     tenant_role   VARCHAR(32)              NOT NULL,
     status        VARCHAR(32)              NOT NULL,
     created_at    TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -34,7 +31,6 @@ CREATE TABLE accounts
     CONSTRAINT accounts_password_hash_not_blank_check CHECK (
         password_hash IS NULL OR TRIM(password_hash) <> ''
         ),
-    CONSTRAINT accounts_display_name_not_blank_check CHECK (TRIM(display_name) <> ''),
     CONSTRAINT accounts_id_tenant_key UNIQUE (id, tenant_id),
     CONSTRAINT accounts_tenant_role_check CHECK (tenant_role IN ('ADMIN', 'MEMBER')),
     CONSTRAINT accounts_status_check CHECK (status IN ('ACTIVE', 'DISABLED'))
@@ -109,7 +105,6 @@ CREATE TABLE orders
     id                 UUID PRIMARY KEY,
     location_id        UUID                     NOT NULL REFERENCES locations (id),
     tracking_reference UUID                     NOT NULL UNIQUE,
-    label              VARCHAR(80)              NOT NULL,
     status             VARCHAR(32)              NOT NULL,
     created_at         TIMESTAMP WITH TIME ZONE NOT NULL,
     updated_at         TIMESTAMP WITH TIME ZONE NOT NULL

@@ -9,7 +9,7 @@ import java.util.UUID;
 
 public record CurrentAccountResponse(
     UUID accountId,
-    String displayName,
+    String username,
     UUID tenantId,
     TenantRole tenantRole,
     LocationAssignmentResponse assignment,
@@ -21,7 +21,7 @@ public record CurrentAccountResponse(
             : LocationAssignmentResponse.from(account.assignment());
         return new CurrentAccountResponse(
             account.accountId(),
-            account.displayName(),
+            account.username(),
             account.tenantId(),
             account.tenantRole(),
             assignment,
@@ -31,13 +31,11 @@ public record CurrentAccountResponse(
 
     public record LocationAssignmentResponse(
         UUID locationId,
-        String locationName,
         AssignmentRole role
     ) {
         private static LocationAssignmentResponse from(CurrentAccountView.LocationAssignmentView assignment) {
             return new LocationAssignmentResponse(
                 assignment.locationId(),
-                assignment.locationName(),
                 assignment.role()
             );
         }
