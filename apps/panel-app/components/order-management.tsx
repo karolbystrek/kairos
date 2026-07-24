@@ -1,4 +1,14 @@
-import { Alert, Button, Chip, Link, Spinner } from "@heroui/react";
+import {
+  Alert,
+  Button,
+  Chip,
+  Input,
+  Label,
+  Radio,
+  RadioGroup,
+  Spinner,
+  TextField,
+} from "@heroui/react";
 import Image from "next/image";
 import QRCode from "qrcode";
 import { useState } from "react";
@@ -9,11 +19,13 @@ import { ApiError } from "@/src/api/api-fetch";
 import { staffCachePrefix, staffLocationsKey } from "@/src/api/cache-keys";
 import {
   createOrder as createOrderRequest,
+  createOrderInputSchema,
   listLocations,
   listOrders,
   updateOrderStatus,
   type OrderStatus,
   type StaffOrder,
+  type CreateOrderInput,
 } from "@/src/api/orders";
 
 const customerAppUrl =
@@ -23,7 +35,6 @@ const ordersKey = (accountId: string, locationId: string) =>
   [staffCachePrefix, accountId, "orders", locationId] as const;
 
 const statusLabels: Record<OrderStatus, string> = {
-  CREATED: "Created",
   IN_PREPARATION: "In preparation",
   READY: "Ready",
   COMPLETED: "Completed",
@@ -31,7 +42,6 @@ const statusLabels: Record<OrderStatus, string> = {
 };
 
 const nextStatuses: Partial<Record<OrderStatus, OrderStatus>> = {
-  CREATED: "IN_PREPARATION",
   IN_PREPARATION: "READY",
   READY: "COMPLETED",
 };
@@ -56,13 +66,11 @@ function shouldRetryOnError(error: Error): boolean {
   );
 }
 
-function createOrderMutation([
-  ,
-  ,
-  ,
-  locationId,
-]: OrderListKey): Promise<StaffOrder> {
-  return createOrderRequest(locationId);
+function createOrderMutation(
+  [, , , locationId]: OrderListKey,
+  { arg }: { arg: CreateOrderInput },
+): Promise<StaffOrder> {
+  return createOrderRequest(locationId, arg);
 }
 
 function updateOrderMutation(
@@ -98,7 +106,7 @@ function OrderQrCode({
     <section className="flex flex-col items-start gap-4">
       <div>
         <h2 className="text-2xl font-semibold">Customer QR code</h2>
-        <p className="text-muted">{order.id}</p>
+        <p className="text-muted">Order {order.label}</p>
       </div>
       {error ? (
         <Alert status="danger">
@@ -106,8 +114,7 @@ function OrderQrCode({
           <Alert.Content>
             <Alert.Title>QR code unavailable</Alert.Title>
             <Alert.Description>
-              The tracking link is available below, but its QR code could not be
-              generated.
+              The customer QR code could not be generated. Try showing it again.
             </Alert.Description>
           </Alert.Content>
         </Alert>
@@ -116,15 +123,12 @@ function OrderQrCode({
       ) : (
         <Image
           unoptimized
-          alt={`Tracking QR code for ${order.id}`}
+          alt={`Tracking QR code for order ${order.label}`}
           height={240}
           src={qrCode}
           width={240}
         />
       )}
-      <Link href={trackingUrl} target="_blank">
-        Open customer tracking page
-      </Link>
     </section>
   );
 }
@@ -132,6 +136,9 @@ function OrderQrCode({
 export function OrderManagement({ accountId }: { accountId: string }) {
   const [selectedLocationId, setSelectedLocationId] = useState<string>();
   const [selectedOrderId, setSelectedOrderId] = useState<string>();
+  const [labelMode, setLabelMode] = useState<"AUTO" | "CUSTOM">("AUTO");
+  const [customLabel, setCustomLabel] = useState("");
+  const [customLabelError, setCustomLabelError] = useState<string>();
 
   const {
     data: locations = [],
@@ -189,7 +196,20 @@ export function OrderManagement({ accountId }: { accountId: string }) {
   async function createOrder() {
     if (!locationId) return;
 
-    const order = await triggerCreateOrder();
+    const input =
+      labelMode === "AUTO"
+        ? ({ mode: "AUTO" } as const)
+        : ({ mode: "CUSTOM", label: customLabel } as const);
+    const validation = createOrderInputSchema.safeParse(input);
+
+    if (!validation.success) {
+      setCustomLabelError(validation.error.issues[0]?.message);
+
+      return;
+    }
+
+    setCustomLabelError(undefined);
+    const order = await triggerCreateOrder(validation.data);
 
     if (!order) return;
 
@@ -209,13 +229,21 @@ export function OrderManagement({ accountId }: { accountId: string }) {
 
     if (!updated) return;
 
+    const isTerminal =
+      updated.status === "COMPLETED" || updated.status === "CANCELED";
+
     await mutateOrders(
       (current) =>
-        (current ?? [updated]).map((item) =>
-          item.id === updated.id ? updated : item,
-        ),
+        isTerminal
+          ? (current ?? []).filter((item) => item.id !== updated.id)
+          : (current ?? [updated]).map((item) =>
+              item.id === updated.id ? updated : item,
+            ),
       { revalidate: false },
     );
+    if (isTerminal && selectedOrderId === updated.id) {
+      setSelectedOrderId(undefined);
+    }
     void mutateOrders(undefined, { throwOnError: false });
   }
 
@@ -269,6 +297,55 @@ export function OrderManagement({ accountId }: { accountId: string }) {
 
           <section className="flex flex-col gap-3">
             <h2 className="text-2xl font-semibold">Create order</h2>
+            <RadioGroup
+              isDisabled={isCreatingOrder}
+              name="order-label-mode"
+              orientation="horizontal"
+              value={labelMode}
+              onChange={(value) => {
+                setLabelMode(value === "CUSTOM" ? "CUSTOM" : "AUTO");
+                setCustomLabelError(undefined);
+              }}
+            >
+              <Label>Label</Label>
+              <Radio value="AUTO">
+                <Radio.Content>
+                  <Radio.Control>
+                    <Radio.Indicator />
+                  </Radio.Control>
+                  Auto
+                </Radio.Content>
+              </Radio>
+              <Radio value="CUSTOM">
+                <Radio.Content>
+                  <Radio.Control>
+                    <Radio.Indicator />
+                  </Radio.Control>
+                  Custom
+                </Radio.Content>
+              </Radio>
+            </RadioGroup>
+            {labelMode === "CUSTOM" && (
+              <TextField
+                fullWidth
+                className="max-w-sm"
+                isDisabled={isCreatingOrder}
+                isInvalid={Boolean(customLabelError)}
+                maxLength={64}
+                name="custom-order-label"
+                value={customLabel}
+                onChange={(value) => {
+                  setCustomLabel(value);
+                  setCustomLabelError(undefined);
+                }}
+              >
+                <Label>Custom label</Label>
+                <Input placeholder="Table 4" />
+              </TextField>
+            )}
+            {customLabelError && (
+              <p className="text-sm text-danger">{customLabelError}</p>
+            )}
             <Button
               className="self-start"
               isDisabled={isCreatingOrder}
@@ -297,8 +374,6 @@ export function OrderManagement({ accountId }: { accountId: string }) {
             ) : (
               orders.map((order) => {
                 const nextStatus = nextStatuses[order.status];
-                const isTerminal =
-                  order.status === "COMPLETED" || order.status === "CANCELED";
 
                 return (
                   <article
@@ -306,7 +381,7 @@ export function OrderManagement({ accountId }: { accountId: string }) {
                     className="flex flex-wrap items-center justify-between gap-3 border-t border-separator py-4"
                   >
                     <div className="flex items-center gap-3">
-                      <strong>{order.id}</strong>
+                      <strong>{order.label}</strong>
                       <Chip>{statusLabels[order.status]}</Chip>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -325,15 +400,13 @@ export function OrderManagement({ accountId }: { accountId: string }) {
                           Mark {statusLabels[nextStatus].toLowerCase()}
                         </Button>
                       )}
-                      {!isTerminal && (
-                        <Button
-                          isDisabled={isUpdatingOrder}
-                          variant="danger"
-                          onPress={() => updateStatus(order, "CANCELED")}
-                        >
-                          Cancel
-                        </Button>
-                      )}
+                      <Button
+                        isDisabled={isUpdatingOrder}
+                        variant="danger"
+                        onPress={() => updateStatus(order, "CANCELED")}
+                      >
+                        Cancel
+                      </Button>
                     </div>
                   </article>
                 );

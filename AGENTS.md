@@ -1,7 +1,7 @@
 # Kairos
 
 ## Overview
-Virtual pager system for restaurants. Customer scans a QR code assigned to their order to open a web app that tracks order status in real-time (WebSocket). Staff manage the order queue via an admin panel. External POS systems can integrate via a REST/webhook API.
+Virtual pager system for restaurants. Customer scans a QR code assigned to their order to open a web app that tracks order status through REST plus Server-Sent Events. Staff manage the order queue via an admin panel. External POS systems can integrate via a REST/webhook API.
 
 Full problem description: `docs/PROBLEM_DESCRIPTION.md`.
 Full architecture and requirements: `docs/REQUIREMENTS.md`.
@@ -11,17 +11,17 @@ Full architecture and requirements: `docs/REQUIREMENTS.md`.
 ## Tech Stack
 * **customer-app** (`apps/customer-app`): Next.js 16, React 19, TypeScript, Tailwind CSS 4, HeroUI 3, Zod, SWR for client-side server state.
 * **panel-app** (`apps/panel-app`): Next.js 16, React 19, TypeScript, Tailwind CSS 4, HeroUI 3, Zod, SWR where client-side synchronization is useful.
-* **api** (`apps/api`): Java 25, Spring Boot 4, Spring Security, Spring WebSocket/STOMP.
+* **api** (`apps/api`): Java 25, Spring Boot 4, Spring Security, Spring MVC with Server-Sent Events.
 * **Database:** PostgreSQL. Shared database/shared schema, tenant isolation via Row Level Security using direct or relationship-derived ownership as defined in `docs/REQUIREMENTS.md`.
-* **Cache & real-time:** Redis (WebSocket session store, pub/sub for notifications).
+* **Cache & real-time:** Redis Pub/Sub for cross-instance customer event fan-out; PostgreSQL remains authoritative.
 * **Infra:** Docker Compose, Caddy (reverse proxy/TLS).
 
 ## Architecture Boundaries
 * Keep `customer-app`, `panel-app`, and `api` independently deployable.
-* Spring Boot is the system of record and the sole owner of business rules, authentication, authorization, tenant isolation, persistence, WebSockets, POS integration, webhooks, and outbox processing.
-* Browser-facing `/api`, WebSocket, and OAuth paths are exposed through Caddy on the relevant frontend origin. Keep the dedicated API origin for external POS integrations.
+* Spring Boot is the system of record and the sole owner of business rules, authentication, authorization, tenant isolation, persistence, SSE delivery, POS integration, webhooks, and outbox processing.
+* Browser-facing REST, SSE, and OAuth paths are exposed through Caddy on the relevant frontend origin. Keep the dedicated API origin for external POS integrations.
 * Keep REST as the boundary between the frontends, external POS integrations, and the API. The first walking vertical slice uses small handwritten TypeScript types and native `fetch`; formal API documentation and client generation are deferred until the contract needs to support external integrations.
-* Use STOMP over WebSocket for order events. Validate incoming WebSocket payloads with Zod before using them in the customer app.
+* Use customer-only Server-Sent Events for order-change invalidation. Validate every event with Zod, then revalidate the authoritative REST state through SWR. Publish after commit through Redis Pub/Sub so every API instance can notify its locally connected customers. Keep staff and POS commands on REST.
 * Use native `fetch` inside the handwritten REST request modules. Use SWR in Client Components to manage REST-backed server state, including caching, request deduplication, mutations, focus revalidation, and reconnect revalidation. Do not add Next.js Server Actions or proxy route handlers as an API layer in front of Spring.
 
 ## Repository Structure
@@ -29,7 +29,7 @@ Full architecture and requirements: `docs/REQUIREMENTS.md`.
 apps/
   customer-app/   Next.js client PWA (order tracking screen)
   panel-app/      Next.js staff admin panel (order queue, QR generation)
-  api/            Spring Boot backend (REST API, WebSocket, POS webhooks)
+  api/            Spring Boot backend (REST API, SSE, POS webhooks)
 docs/             Problem description and architecture/requirements docs
 compose.yaml      Local dev orchestration (postgres, redis, api, apps, caddy)
 Caddyfile         Reverse proxy config for local HTTPS
@@ -38,7 +38,7 @@ Caddyfile         Reverse proxy config for local HTTPS
 ## Conventions
 * **Always use HeroUI** (`@heroui/react`) for UI components in `apps/customer-app` and `apps/panel-app`.
 * Use Zod for frontend-owned input and event validation. During the walking vertical slice, keep REST request functions and response types small and handwritten in each frontend.
-* Do not use React effects to orchestrate routine REST request state. Reserve effects for synchronization with external systems, such as error reporting or future WebSocket/browser API subscriptions. Keep the official `eslint-plugin-react-hooks` recommended rules enabled, including exhaustive dependency validation; use local state hooks normally for frontend-owned interaction state.
+* Do not use React effects to orchestrate routine REST request state. Reserve effects for synchronization with external systems, such as error reporting, EventSource, or other browser API subscriptions. Keep the official `eslint-plugin-react-hooks` recommended rules enabled, including exhaustive dependency validation; use local state hooks normally for frontend-owned interaction state.
 * Organize backend code first by business feature and then by `api`, `application`, `domain`, and `infrastructure` layers. Add cohesive subpackages such as `model`, `exception`, `port`, `config`, `jwt`, `web`, or `persistence` when a layer contains distinct concerns; do not use broad catch-all packages or create one-class packages without a conceptual boundary.
 * Configure the application-wide `/api` base path through `server.servlet.context-path` in `application.yaml`. Controller mappings declare only resource-relative paths and must not repeat `/api`; Actuator shares the same context path.
 * Map application or domain projections to API response records through a static `from(...)` factory on the response type. Do not keep response-mapping helpers in controllers, and assign a service result to a clearly named local variable before passing it to `from(...)`.
@@ -57,7 +57,7 @@ Caddyfile         Reverse proxy config for local HTTPS
 * Each app (`customer-app`, `panel-app`, `api`) is independent: separate dependency manifests, separate Dockerfiles.
 
 ## Current Development Stage
-The walking vertical slice is local-only. The Spring API contains provisioned local username/password accounts, signed access and rotating refresh credentials in secure cookies, CSRF protection, logout and revocation, current-account retrieval, account provisioning, tenant/location application authorization, and authenticated order audit identity. It also exposes anonymous but CSRF-protected tenant registration, which rate-limits attempts before BCrypt and atomically creates one tenant, its first location, and its first active administrator with a required normalized email; registration creates no session. For rapid development, tenants, locations, accounts, and orders have no separate display-name fields; the panel presents accounts by username and locations/orders by their full stable identifiers. The panel route remains a Server Component and renders one interactive staff-panel boundary. Its signed-out surface provides Sign in and Register tenant tabs, while its authenticated Orders/Accounts workspace exposes capability-gated manager/operator provisioning. The SWR current-account gate and shared native-`fetch` client add CSRF headers to unsafe requests, serialize authentication-cookie mutations with a browser Web Lock when available, recheck the current session after acquiring that lock, and perform at most one refresh and request retry after `401`. Tenant registration uses the shared CSRF client but never acquires the authentication-cookie lock or starts session recovery. Authentication credentials remain unavailable to JavaScript. Treat one browser profile as one signed-in account: same-account tabs are best-effort, immediate cross-tab UI synchronization is not required, and different accounts in different tabs are unsupported. Standalone account self-registration, additional tenant administrators, later location creation, email verification, recovery, invitations, and CAPTCHA remain excluded. OAuth2/OIDC login, PostgreSQL RLS, WebSocket delivery, an OpenAPI endpoint, and generated REST clients remain deferred. Anonymous customer REST tracking remains available through SWR-managed client state backed by handwritten native `fetch` requests. Production migrations must still create an empty, deployable schema rather than demo data.
+The walking vertical slice is local-only. The Spring API contains provisioned local username/password accounts, signed access and rotating refresh credentials in secure cookies, CSRF protection, logout and revocation, current-account retrieval, account provisioning, tenant/location application authorization, and authenticated order audit identity. It also exposes anonymous but CSRF-protected tenant registration, which rate-limits attempts before BCrypt and atomically creates one tenant, its first location, and its first active administrator with a required normalized email; registration creates no session. For rapid development, tenants, locations, accounts, and orders have no separate display-name fields; the panel presents accounts by username and locations/orders by their full stable identifiers. The panel route remains a Server Component and renders one interactive staff-panel boundary. Its signed-out surface provides Sign in and Register tenant tabs, while its authenticated Orders/Accounts workspace exposes capability-gated manager/operator provisioning. The SWR current-account gate and shared native-`fetch` client add CSRF headers to unsafe requests, serialize authentication-cookie mutations with a browser Web Lock when available, recheck the current session after acquiring that lock, and perform at most one refresh and request retry after `401`. Tenant registration uses the shared CSRF client but never acquires the authentication-cookie lock or starts session recovery. Authentication credentials remain unavailable to JavaScript. Treat one browser profile as one signed-in account: same-account tabs are best-effort, immediate cross-tab UI synchronization is not required, and different accounts in different tabs are unsupported. Standalone account self-registration, additional tenant administrators, later location creation, email verification, recovery, invitations, and CAPTCHA remain excluded. OAuth2/OIDC login, PostgreSQL RLS, an OpenAPI endpoint, and generated REST clients remain deferred in the current code. Anonymous customer REST tracking remains available through SWR-managed client state backed by handwritten native `fetch` requests. Production migrations must still create an empty, deployable schema rather than demo data.
 
 Frontend authentication implementation notes and maintenance invariants are in [`docs/FRONTEND_AUTHENTICATION.md`](docs/FRONTEND_AUTHENTICATION.md).
 

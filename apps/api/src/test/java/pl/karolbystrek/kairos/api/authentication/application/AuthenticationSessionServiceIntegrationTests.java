@@ -13,6 +13,7 @@ import pl.karolbystrek.kairos.api.account.domain.TenantRole;
 import pl.karolbystrek.kairos.api.authentication.application.exception.InvalidRefreshCredentialException;
 import pl.karolbystrek.kairos.api.authentication.application.exception.RefreshCredentialReuseException;
 import pl.karolbystrek.kairos.api.authentication.infrastructure.persistence.RefreshSessionRepository;
+import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -24,7 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
-class AuthenticationSessionServiceIntegrationTests {
+class AuthenticationSessionServiceIntegrationTests extends RedisListenerIsolatedIntegrationTest {
 
     @Autowired
     private AuthenticationSessionService sessionService;

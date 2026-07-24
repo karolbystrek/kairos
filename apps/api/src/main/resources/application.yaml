@@ -5,6 +5,19 @@ spring:
     hibernate:
       ddl-auto: validate
     open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  jackson:
+    time-zone: UTC
+  datasource:
+    hikari:
+      connection-init-sql: SET TIME ZONE 'UTC'
+  data:
+    redis:
+      repositories:
+        enabled: false
   mvc:
     problemdetails:
       enabled: true

@@ -1,7 +1,6 @@
 import { z } from "zod";
 
 export const orderStatusSchema = z.enum([
-  "CREATED",
   "IN_PREPARATION",
   "READY",
   "COMPLETED",
@@ -9,6 +8,13 @@ export const orderStatusSchema = z.enum([
 ]);
 
 export const customerOrderSchema = z.object({
+  label: z.string(),
+  status: orderStatusSchema,
+  updatedAt: z.iso.datetime({ offset: true }),
+});
+
+export const orderStatusChangedEventSchema = z.object({
+  trackingReference: z.uuid(),
   status: orderStatusSchema,
   updatedAt: z.iso.datetime({ offset: true }),
 });
@@ -26,7 +32,7 @@ export async function getTrackedOrder(
   trackingReference: string,
 ): Promise<CustomerOrder> {
   const response = await fetch(
-    `/api/order-tracking/${encodeURIComponent(trackingReference)}`,
+    `/api/tracked-orders/${encodeURIComponent(trackingReference)}`,
   );
 
   if (!response.ok) {

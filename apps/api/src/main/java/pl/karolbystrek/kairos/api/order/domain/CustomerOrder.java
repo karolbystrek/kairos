@@ -37,6 +37,9 @@ public class CustomerOrder {
     @Column(name = "tracking_reference", nullable = false, unique = true)
     private UUID trackingReference;
 
+    @Column(nullable = false, length = 32)
+    private String label;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 32)
     private OrderStatus status;
@@ -48,13 +51,15 @@ public class CustomerOrder {
     private Instant updatedAt;
 
     public static CustomerOrder create(
-        @NonNull Location location,
-        @NonNull Instant now
+            @NonNull Location location,
+            @NonNull String label,
+            @NonNull Instant now
     ) {
         var order = new CustomerOrder();
         order.location = location;
         order.trackingReference = UUID.randomUUID();
-        order.status = OrderStatus.CREATED;
+        order.label = label;
+        order.status = OrderStatus.IN_PREPARATION;
         order.createdAt = now;
         order.updatedAt = now;
         return order;

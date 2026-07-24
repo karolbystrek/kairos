@@ -13,6 +13,7 @@ import pl.karolbystrek.kairos.api.location.application.LocationService;
 import pl.karolbystrek.kairos.api.location.application.model.LocationView;
 import pl.karolbystrek.kairos.api.order.application.model.StaffOrderView;
 import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
+import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -22,7 +23,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
 @Transactional
-class OrderAuthorizationIntegrationTests {
+class OrderAuthorizationIntegrationTests extends RedisListenerIsolatedIntegrationTest {
 
     @Autowired
     private OrderService orderService;
@@ -77,8 +78,8 @@ class OrderAuthorizationIntegrationTests {
 
     @Test
     void scopesLocationsAndOrdersToTheCurrentTenantAndAssignment() {
-        var ownOrder = orderService.createOrder(admin, locationId);
-        var otherOrder = orderService.createOrder(otherAdmin, otherLocationId);
+        var ownOrder = orderService.createOrder(admin, locationId, null);
+        var otherOrder = orderService.createOrder(otherAdmin, otherLocationId, null);
 
         assertThat(locationService.listAccessible(admin)).extracting(LocationView::id)
             .containsExactly(locationId);
@@ -90,7 +91,7 @@ class OrderAuthorizationIntegrationTests {
 
         assertThatThrownBy(() -> orderService.listOrders(manager, otherLocationId))
             .isInstanceOf(StaffAccessDeniedException.class);
-        assertThatThrownBy(() -> orderService.createOrder(operator, otherLocationId))
+        assertThatThrownBy(() -> orderService.createOrder(operator, otherLocationId, null))
             .isInstanceOf(StaffAccessDeniedException.class);
         assertThatThrownBy(() -> orderService.listTenantOrders(manager))
             .isInstanceOf(StaffAccessDeniedException.class);
@@ -98,18 +99,18 @@ class OrderAuthorizationIntegrationTests {
 
     @Test
     void authorizesTheStoredOrderLocationAndRecordsTheAuthenticatedInitiator() {
-        var order = orderService.createOrder(admin, locationId);
+        var order = orderService.createOrder(admin, locationId, null);
 
-        var updated = orderService.updateStatus(operator, order.id(), OrderStatus.IN_PREPARATION);
-        assertThat(updated.status()).isEqualTo(OrderStatus.IN_PREPARATION);
+        var updated = orderService.updateStatus(operator, order.id(), OrderStatus.READY);
+        assertThat(updated.status()).isEqualTo(OrderStatus.READY);
         assertThat(jdbcTemplate.queryForObject(
             "SELECT initiator_id FROM order_history WHERE order_id = ? ORDER BY id DESC LIMIT 1",
             UUID.class,
             order.id()
         )).isEqualTo(operator.accountId());
 
-        var otherOrder = orderService.createOrder(otherAdmin, otherLocationId);
-        assertThatThrownBy(() -> orderService.updateStatus(manager, otherOrder.id(), OrderStatus.IN_PREPARATION))
+        var otherOrder = orderService.createOrder(otherAdmin, otherLocationId, null);
+        assertThatThrownBy(() -> orderService.updateStatus(manager, otherOrder.id(), OrderStatus.READY))
             .isInstanceOf(StaffAccessDeniedException.class);
     }
 
@@ -119,7 +120,7 @@ class OrderAuthorizationIntegrationTests {
             .isInstanceOf(StaffAccessDeniedException.class);
 
         jdbcTemplate.update("UPDATE accounts SET status = 'DISABLED' WHERE id = ?", operator.accountId());
-        assertThatThrownBy(() -> orderService.createOrder(operator, locationId))
+        assertThatThrownBy(() -> orderService.createOrder(operator, locationId, null))
             .isInstanceOf(StaffAccessDeniedException.class);
     }
 

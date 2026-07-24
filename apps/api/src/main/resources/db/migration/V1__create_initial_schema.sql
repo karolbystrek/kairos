@@ -6,7 +6,9 @@ CREATE TABLE tenants
 CREATE TABLE locations
 (
     id        UUID PRIMARY KEY,
-    tenant_id UUID         NOT NULL REFERENCES tenants (id),
+    tenant_id UUID        NOT NULL REFERENCES tenants (id),
+    time_zone VARCHAR(64) NOT NULL DEFAULT 'UTC',
+    CONSTRAINT locations_time_zone_not_blank_check CHECK (TRIM(time_zone) <> ''),
     CONSTRAINT locations_id_tenant_key UNIQUE (id, tenant_id)
 );
 
@@ -105,9 +107,15 @@ CREATE TABLE orders
     id                 UUID PRIMARY KEY,
     location_id        UUID                     NOT NULL REFERENCES locations (id),
     tracking_reference UUID                     NOT NULL UNIQUE,
+    label              VARCHAR(32)              NOT NULL,
     status             VARCHAR(32)              NOT NULL,
     created_at         TIMESTAMP WITH TIME ZONE NOT NULL,
-    updated_at         TIMESTAMP WITH TIME ZONE NOT NULL
+    updated_at         TIMESTAMP WITH TIME ZONE NOT NULL,
+    CONSTRAINT orders_label_not_blank_check CHECK (TRIM(label) <> ''),
+    CONSTRAINT orders_label_stripped_check CHECK (label = TRIM(label)),
+    CONSTRAINT orders_status_check CHECK (
+        status IN ('IN_PREPARATION', 'READY', 'COMPLETED', 'CANCELED')
+        )
 );
 
 CREATE INDEX orders_location_created_at_idx ON orders (location_id, created_at DESC);

@@ -1,6 +1,8 @@
 # Stage 1: Resolve build dependencies
 FROM eclipse-temurin:25-jdk-alpine AS dependencies
 WORKDIR /app
+ENV TZ=UTC
+ENV JAVA_TOOL_OPTIONS="-Duser.timezone=UTC"
 
 # Copy maven wrapper and dependencies descriptor
 COPY mvnw pom.xml ./
@@ -27,6 +29,8 @@ RUN ./mvnw package -DskipTests
 # Stage 4: Production runner
 FROM eclipse-temurin:25-jre-alpine AS runner
 WORKDIR /app
+ENV TZ=UTC
+ENV JAVA_TOOL_OPTIONS="-Duser.timezone=UTC"
 
 COPY --from=builder /app/target/*.jar app.jar
 

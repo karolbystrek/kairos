@@ -13,6 +13,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.Arrays;
@@ -29,7 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
-class TenantRegistrationFlowIntegrationTests {
+class TenantRegistrationFlowIntegrationTests extends RedisListenerIsolatedIntegrationTest {
 
     private static final String API_CONTEXT_PATH = "/api";
     private static final String ACCESS_COOKIE = "__Host-access-token";

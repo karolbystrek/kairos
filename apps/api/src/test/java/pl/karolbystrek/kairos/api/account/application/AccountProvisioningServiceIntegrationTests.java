@@ -13,6 +13,7 @@ import pl.karolbystrek.kairos.api.account.domain.assignment.AssignmentRole;
 import pl.karolbystrek.kairos.api.account.domain.TenantRole;
 import pl.karolbystrek.kairos.api.account.infrastructure.persistence.AccountRepository;
 import pl.karolbystrek.kairos.api.account.infrastructure.persistence.LocationAssignmentRepository;
+import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -23,7 +24,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
 @Transactional
-class AccountProvisioningServiceIntegrationTests {
+class AccountProvisioningServiceIntegrationTests extends RedisListenerIsolatedIntegrationTest {
 
     private static final Instant FIXTURE_TIME = Instant.parse("2026-07-20T12:00:00Z");
     private static final String INITIAL_PASSWORD = "SecurePass-12";

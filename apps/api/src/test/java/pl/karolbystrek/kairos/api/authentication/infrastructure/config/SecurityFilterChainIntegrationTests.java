@@ -1,5 +1,6 @@
 package pl.karolbystrek.kairos.api.authentication.infrastructure.config;
 
+import jakarta.servlet.DispatcherType;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -7,10 +8,12 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -20,7 +23,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
-class SecurityFilterChainIntegrationTests {
+class SecurityFilterChainIntegrationTests extends RedisListenerIsolatedIntegrationTest {
 
     private static final String API_CONTEXT_PATH = "/api";
     private static final String CSRF_COOKIE = "__Host-XSRF-TOKEN";
@@ -104,6 +107,16 @@ class SecurityFilterChainIntegrationTests {
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.type").value("urn:kairos:problem:csrf-token-invalid"))
                 .andExpect(jsonPath("$.status").value(403));
+    }
+
+    @Test
+    void permitsInternalAsyncDispatchesWithoutReauthorizingTheOriginalRequest() throws Exception {
+        mockMvc.perform(apiGet("/error").with(request -> {
+                    request.setDispatcherType(DispatcherType.ASYNC);
+                    return request;
+                }))
+                .andExpect(result -> assertThat(result.getResponse().getStatus())
+                        .isNotIn(401, 403));
     }
 
     private static MockHttpServletRequestBuilder apiGet(String path) {

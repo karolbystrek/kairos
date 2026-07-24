@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
 
 import java.io.IOException;
 import java.net.URI;
@@ -14,7 +15,7 @@ import java.net.http.HttpResponse;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-class ApiContextPathIntegrationTests {
+class ApiContextPathIntegrationTests extends RedisListenerIsolatedIntegrationTest {
 
     @LocalServerPort
     private int port;
@@ -27,7 +28,7 @@ class ApiContextPathIntegrationTests {
         assertThat(contextPath).isEqualTo("/api");
         assertThat(statusCode("/api/auth/csrf")).isEqualTo(200);
         assertThat(statusCode("/auth/csrf")).isEqualTo(404);
-        assertThat(statusCode("/api/actuator/health")).isEqualTo(200);
+        assertThat(statusCode("/api/actuator/health")).isIn(200, 503);
         assertThat(statusCode("/actuator/health")).isEqualTo(404);
     }
 

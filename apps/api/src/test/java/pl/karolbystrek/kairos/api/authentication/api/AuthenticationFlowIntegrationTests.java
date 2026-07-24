@@ -24,6 +24,7 @@ import pl.karolbystrek.kairos.api.account.domain.assignment.AssignmentStatus;
 import pl.karolbystrek.kairos.api.account.domain.TenantRole;
 import pl.karolbystrek.kairos.api.authentication.application.RefreshCredentialService;
 import pl.karolbystrek.kairos.api.authentication.infrastructure.config.AuthenticationProperties;
+import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -40,7 +41,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
-class AuthenticationFlowIntegrationTests {
+class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegrationTest {
 
     private static final String API_CONTEXT_PATH = "/api";
     private static final String PASSWORD = "Correct-Horse-12";
@@ -572,8 +573,8 @@ class AuthenticationFlowIntegrationTests {
         jdbcTemplate.update(
             """
                 INSERT INTO orders (
-                    id, location_id, tracking_reference, status, created_at, updated_at
-                ) VALUES (?, ?, ?, 'READY', ?, ?)
+                    id, location_id, tracking_reference, label, status, created_at, updated_at
+                ) VALUES (?, ?, ?, '42', 'READY', ?, ?)
                 """,
             orderId,
             locationId,

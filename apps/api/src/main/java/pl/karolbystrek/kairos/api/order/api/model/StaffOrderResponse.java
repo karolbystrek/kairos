@@ -10,6 +10,7 @@ public record StaffOrderResponse(
         UUID id,
         UUID locationId,
         UUID trackingReference,
+        String label,
         OrderStatus status,
         Instant createdAt,
         Instant updatedAt
@@ -19,6 +20,7 @@ public record StaffOrderResponse(
                 order.id(),
                 order.locationId(),
                 order.trackingReference(),
+                order.label(),
                 order.status(),
                 order.createdAt(),
                 order.updatedAt()
