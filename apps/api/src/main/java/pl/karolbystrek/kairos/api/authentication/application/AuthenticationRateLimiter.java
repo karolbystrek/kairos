@@ -27,6 +27,8 @@ public class AuthenticationRateLimiter {
     private final Duration loginWindow;
     private final int refreshAttempts;
     private final Duration refreshWindow;
+    private final int tenantRegistrationAttempts;
+    private final Duration tenantRegistrationWindow;
     private final Map<String, Window> windows = new HashMap<>();
     private final NavigableSet<WindowExpiry> expiries = new TreeSet<>(
         Comparator.comparing(WindowExpiry::resetAt).thenComparing(WindowExpiry::key)
@@ -37,13 +39,18 @@ public class AuthenticationRateLimiter {
         @Value("${kairos.authentication.rate-limit.login-attempts:10}") int loginAttempts,
         @Value("${kairos.authentication.rate-limit.login-window:PT5M}") Duration loginWindow,
         @Value("${kairos.authentication.rate-limit.refresh-attempts:30}") int refreshAttempts,
-        @Value("${kairos.authentication.rate-limit.refresh-window:PT1M}") Duration refreshWindow
+        @Value("${kairos.authentication.rate-limit.refresh-window:PT1M}") Duration refreshWindow,
+        @Value("${kairos.authentication.rate-limit.tenant-registration-attempts:5}")
+        int tenantRegistrationAttempts,
+        @Value("${kairos.authentication.rate-limit.tenant-registration-window:PT1H}")
+        Duration tenantRegistrationWindow
     ) {
-        if (loginAttempts < 1 || refreshAttempts < 1) {
+        if (loginAttempts < 1 || refreshAttempts < 1 || tenantRegistrationAttempts < 1) {
             throw new IllegalArgumentException("Authentication rate limits must be positive");
         }
         if (loginWindow == null || !loginWindow.isPositive()
-            || refreshWindow == null || !refreshWindow.isPositive()) {
+            || refreshWindow == null || !refreshWindow.isPositive()
+            || tenantRegistrationWindow == null || !tenantRegistrationWindow.isPositive()) {
             throw new IllegalArgumentException("Authentication rate-limit windows must be positive");
         }
         this.clock = clock;
@@ -51,6 +58,8 @@ public class AuthenticationRateLimiter {
         this.loginWindow = loginWindow;
         this.refreshAttempts = refreshAttempts;
         this.refreshWindow = refreshWindow;
+        this.tenantRegistrationAttempts = tenantRegistrationAttempts;
+        this.tenantRegistrationWindow = tenantRegistrationWindow;
     }
 
     public void checkLogin(String clientAddress, String normalizedUsername) {
@@ -84,6 +93,14 @@ public class AuthenticationRateLimiter {
             "refresh-credential:" + fingerprint(refreshCredential == null ? "" : refreshCredential),
             refreshAttempts,
             refreshWindow
+        );
+    }
+
+    public void checkTenantRegistration(String clientAddress) {
+        check(
+            "tenant-registration-client:" + fingerprint(clientAddress),
+            tenantRegistrationAttempts,
+            tenantRegistrationWindow
         );
     }
 

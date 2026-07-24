@@ -6,6 +6,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
+import lombok.NonNull;
 import lombok.NoArgsConstructor;
 
 import java.util.UUID;
@@ -25,4 +26,14 @@ public class Location {
     @Column(nullable = false, length = 120)
     private String name;
 
+    public static Location create(
+        @NonNull UUID tenantId,
+        @NonNull String name
+    ) {
+        var location = new Location();
+        location.id = UUID.randomUUID();
+        location.tenantId = tenantId;
+        location.name = name;
+        return location;
+    }
 }

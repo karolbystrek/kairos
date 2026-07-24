@@ -17,7 +17,9 @@ class AuthenticationRateLimiterTests {
         2,
         Duration.ofMinutes(5),
         2,
-        Duration.ofMinutes(1)
+        Duration.ofMinutes(1),
+        2,
+        Duration.ofHours(1)
     );
 
     @Test
@@ -45,6 +47,15 @@ class AuthenticationRateLimiterTests {
         limiter.checkRefresh("192.0.2.3", "refresh-credential");
 
         assertThatThrownBy(() -> limiter.checkRefresh("192.0.2.3", "refresh-credential"))
+            .isInstanceOf(RateLimitExceededException.class);
+    }
+
+    @Test
+    void limitsTenantRegistrationAttemptsByClient() {
+        limiter.checkTenantRegistration("192.0.2.5");
+        limiter.checkTenantRegistration("192.0.2.5");
+
+        assertThatThrownBy(() -> limiter.checkTenantRegistration("192.0.2.5"))
             .isInstanceOf(RateLimitExceededException.class);
     }
 

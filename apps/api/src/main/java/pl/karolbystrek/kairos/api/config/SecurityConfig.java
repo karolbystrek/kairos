@@ -80,7 +80,8 @@ public class SecurityConfig {
                         ).permitAll()
                         .requestMatchers(HttpMethod.POST,
                                 "/auth/login",
-                                "/auth/refresh"
+                                "/auth/refresh",
+                                "/tenant-registrations"
                         ).permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(exceptions -> exceptions

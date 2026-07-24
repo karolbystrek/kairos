@@ -60,6 +60,45 @@ public class Account {
         @NonNull String displayName,
         @NonNull Instant now
     ) {
+        return provision(
+            tenantId,
+            username,
+            email,
+            passwordHash,
+            displayName,
+            TenantRole.MEMBER,
+            now
+        );
+    }
+
+    public static Account provisionAdministrator(
+        @NonNull UUID tenantId,
+        @NonNull String username,
+        @NonNull String email,
+        @NonNull String passwordHash,
+        @NonNull String displayName,
+        @NonNull Instant now
+    ) {
+        return provision(
+            tenantId,
+            username,
+            email,
+            passwordHash,
+            displayName,
+            TenantRole.ADMIN,
+            now
+        );
+    }
+
+    private static Account provision(
+        UUID tenantId,
+        String username,
+        String email,
+        String passwordHash,
+        String displayName,
+        TenantRole tenantRole,
+        Instant now
+    ) {
         var account = new Account();
         account.id = UUID.randomUUID();
         account.tenantId = tenantId;
@@ -67,7 +106,7 @@ public class Account {
         account.email = email;
         account.passwordHash = passwordHash;
         account.displayName = displayName;
-        account.tenantRole = TenantRole.MEMBER;
+        account.tenantRole = tenantRole;
         account.status = AccountStatus.ACTIVE;
         account.createdAt = now;
         account.updatedAt = now;

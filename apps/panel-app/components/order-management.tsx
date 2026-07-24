@@ -17,7 +17,7 @@ import useSWR from "swr";
 import useSWRMutation from "swr/mutation";
 
 import { ApiError } from "@/src/api/api-fetch";
-import { staffCachePrefix } from "@/src/api/cache-keys";
+import { staffCachePrefix, staffLocationsKey } from "@/src/api/cache-keys";
 import {
   createOrder as createOrderRequest,
   listLocations,
@@ -30,8 +30,6 @@ import {
 const customerAppUrl =
   process.env.NEXT_PUBLIC_CUSTOMER_APP_URL ?? "https://app.localhost";
 
-const locationsKey = (accountId: string) =>
-  [staffCachePrefix, accountId, "locations"] as const;
 const ordersKey = (accountId: string, locationId: string) =>
   [staffCachePrefix, accountId, "orders", locationId] as const;
 
@@ -149,7 +147,7 @@ export function OrderManagement({ accountId }: { accountId: string }) {
     data: locations = [],
     error: locationsError,
     isLoading: areLocationsLoading,
-  } = useSWR(locationsKey(accountId), () => listLocations(), {
+  } = useSWR(staffLocationsKey(accountId), () => listLocations(), {
     errorRetryCount: 3,
     shouldRetryOnError,
   });

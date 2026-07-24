@@ -1,6 +1,7 @@
 "use client";
 
 import type { FormEvent } from "react";
+import type { TenantRegistration } from "@/src/api/tenant-registrations";
 
 import {
   Alert,
@@ -9,6 +10,7 @@ import {
   Label,
   Spinner,
   Surface,
+  Tabs,
   TextField,
 } from "@heroui/react";
 import { useEffect, useState } from "react";
@@ -17,6 +19,8 @@ import useSWRMutation from "swr/mutation";
 import { ZodError } from "zod";
 
 import { OrderManagement } from "@/components/order-management";
+import { AccountManagement } from "@/components/account-management";
+import { TenantRegistrationForm } from "@/components/tenant-registration-form";
 import { subscribeToAuthenticationRequired } from "@/src/api/auth-coordination";
 import { ApiError } from "@/src/api/api-fetch";
 import {
@@ -61,15 +65,19 @@ function getErrorMessage(error: unknown): string {
 }
 
 function LoginForm({
+  confirmation,
   error,
+  initialUsername,
   isPending,
   onSubmit,
 }: {
+  confirmation?: string;
   error?: Error;
+  initialUsername?: string;
   isPending: boolean;
   onSubmit: (credentials: LoginCredentials) => Promise<void>;
 }) {
-  const [username, setUsername] = useState("");
+  const [username, setUsername] = useState(initialUsername ?? "");
   const [password, setPassword] = useState("");
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -81,62 +89,140 @@ function LoginForm({
   }
 
   return (
+    <div className="flex flex-col gap-5">
+      <div>
+        <h2 className="text-xl font-semibold">Sign in</h2>
+        <p className="text-sm text-muted">
+          Use an account registered for this panel.
+        </p>
+      </div>
+
+      {confirmation && (
+        <Alert status="success">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Title>Tenant registered</Alert.Title>
+            <Alert.Description>{confirmation}</Alert.Description>
+          </Alert.Content>
+        </Alert>
+      )}
+
+      {error && (
+        <Alert status="danger">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Title>Sign-in failed</Alert.Title>
+            <Alert.Description>{getErrorMessage(error)}</Alert.Description>
+          </Alert.Content>
+        </Alert>
+      )}
+
+      <form className="flex flex-col gap-4" onSubmit={submit}>
+        <TextField
+          fullWidth
+          isRequired
+          isDisabled={isPending}
+          maxLength={120}
+          name="username"
+          value={username}
+          onChange={setUsername}
+        >
+          <Label>Username</Label>
+          <Input
+            autoCapitalize="none"
+            autoComplete="username"
+            placeholder="panel.username"
+            spellCheck={false}
+          />
+        </TextField>
+
+        <TextField
+          fullWidth
+          isRequired
+          isDisabled={isPending}
+          maxLength={256}
+          name="password"
+          type="password"
+          value={password}
+          onChange={setPassword}
+        >
+          <Label>Password</Label>
+          <Input autoComplete="current-password" />
+        </TextField>
+
+        <Button fullWidth isPending={isPending} type="submit">
+          {isPending ? "Signing in…" : "Sign in"}
+        </Button>
+      </form>
+    </div>
+  );
+}
+
+function SignedOutPanel({
+  loginError,
+  isLoggingIn,
+  onSignIn,
+}: {
+  loginError?: Error;
+  isLoggingIn: boolean;
+  onSignIn: (credentials: LoginCredentials) => Promise<void>;
+}) {
+  const [selectedView, setSelectedView] = useState<"login" | "register">(
+    "login",
+  );
+  const [registration, setRegistration] = useState<TenantRegistration>();
+
+  function registered(result: TenantRegistration) {
+    setRegistration(result);
+    setSelectedView("login");
+  }
+
+  return (
     <div className="flex min-h-[60vh] items-center justify-center">
-      <Surface className="flex w-full max-w-md flex-col gap-6 rounded-3xl p-6 sm:p-8">
+      <Surface className="flex w-full max-w-xl flex-col gap-6 rounded-3xl p-6 sm:p-8">
         <div className="flex flex-col gap-2">
           <h1 className="text-3xl font-semibold">Kairos Staff Panel</h1>
           <p className="text-muted">
-            Sign in with the account provisioned for this panel.
+            Sign in to an existing account or register a new tenant.
           </p>
         </div>
 
-        {error && (
-          <Alert status="danger">
-            <Alert.Indicator />
-            <Alert.Content>
-              <Alert.Title>Sign-in failed</Alert.Title>
-              <Alert.Description>{getErrorMessage(error)}</Alert.Description>
-            </Alert.Content>
-          </Alert>
-        )}
-
-        <form className="flex flex-col gap-4" onSubmit={submit}>
-          <TextField
-            fullWidth
-            isRequired
-            isDisabled={isPending}
-            maxLength={120}
-            name="username"
-            value={username}
-            onChange={setUsername}
-          >
-            <Label>Username</Label>
-            <Input
-              autoCapitalize="none"
-              autoComplete="username"
-              placeholder="panel.username"
-              spellCheck={false}
+        <Tabs
+          selectedKey={selectedView}
+          onSelectionChange={(key) =>
+            setSelectedView(key === "register" ? "register" : "login")
+          }
+        >
+          <Tabs.ListContainer>
+            <Tabs.List aria-label="Authentication">
+              <Tabs.Tab id="login">
+                Sign in
+                <Tabs.Indicator />
+              </Tabs.Tab>
+              <Tabs.Tab id="register">
+                Register tenant
+                <Tabs.Indicator />
+              </Tabs.Tab>
+            </Tabs.List>
+          </Tabs.ListContainer>
+          <Tabs.Panel className="pt-5" id="login">
+            <LoginForm
+              key={registration?.username ?? "login"}
+              confirmation={
+                registration
+                  ? "Sign in with the administrator account below."
+                  : undefined
+              }
+              error={loginError}
+              initialUsername={registration?.username}
+              isPending={isLoggingIn}
+              onSubmit={onSignIn}
             />
-          </TextField>
-
-          <TextField
-            fullWidth
-            isRequired
-            isDisabled={isPending}
-            maxLength={256}
-            name="password"
-            type="password"
-            value={password}
-            onChange={setPassword}
-          >
-            <Label>Password</Label>
-            <Input autoComplete="current-password" />
-          </TextField>
-
-          <Button fullWidth isPending={isPending} type="submit">
-            {isPending ? "Signing in…" : "Sign in"}
-          </Button>
-        </form>
+          </Tabs.Panel>
+          <Tabs.Panel className="pt-5" id="register">
+            <TenantRegistrationForm onRegistered={registered} />
+          </Tabs.Panel>
+        </Tabs>
       </Surface>
     </div>
   );
@@ -216,7 +302,11 @@ export function StaffPanel() {
 
   if (isUnauthorized || isSignedOut) {
     return (
-      <LoginForm error={loginError} isPending={isLoggingIn} onSubmit={signIn} />
+      <SignedOutPanel
+        isLoggingIn={isLoggingIn}
+        loginError={loginError}
+        onSignIn={signIn}
+      />
     );
   }
 
@@ -294,7 +384,39 @@ export function StaffPanel() {
         </Alert>
       )}
 
-      <OrderManagement key={account.accountId} accountId={account.accountId} />
+      {account.capabilities.includes("PROVISION_OPERATORS") ? (
+        <Tabs>
+          <Tabs.ListContainer>
+            <Tabs.List aria-label="Staff workspace">
+              <Tabs.Tab id="orders">
+                Orders
+                <Tabs.Indicator />
+              </Tabs.Tab>
+              <Tabs.Tab id="accounts">
+                Accounts
+                <Tabs.Indicator />
+              </Tabs.Tab>
+            </Tabs.List>
+          </Tabs.ListContainer>
+          <Tabs.Panel className="pt-6" id="orders">
+            <OrderManagement
+              key={`orders-${account.accountId}`}
+              accountId={account.accountId}
+            />
+          </Tabs.Panel>
+          <Tabs.Panel className="pt-6" id="accounts">
+            <AccountManagement
+              key={`accounts-${account.accountId}`}
+              account={account}
+            />
+          </Tabs.Panel>
+        </Tabs>
+      ) : (
+        <OrderManagement
+          key={account.accountId}
+          accountId={account.accountId}
+        />
+      )}
     </div>
   );
 }

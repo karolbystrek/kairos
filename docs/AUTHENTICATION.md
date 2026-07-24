@@ -1,6 +1,7 @@
 # Kairos Staff Authentication
 
-Status: first local-authentication API and panel integration implemented.
+Status: local authentication, public tenant onboarding, and scoped panel account
+provisioning implemented.
 
 This document refines the staff-authentication requirements in
 [`REQUIREMENTS.md`](REQUIREMENTS.md). `REQUIREMENTS.md` remains the source of
@@ -21,9 +22,10 @@ framework and protocol implementations must be used; Kairos must not implement
 password hashing, cryptographic signing, CSRF primitives, or OAuth2/OIDC
 protocols from scratch.
 
-The first authentication increment includes:
+The implemented authentication and onboarding scope includes:
 
-* provisioned internal accounts with no public self-registration;
+* public tenant registration that creates only the first administrator;
+* provisioned manager and operator accounts with no standalone self-registration;
 * normalized username and BCrypt password login;
 * short-lived signed access JWTs and rotating refresh credentials;
 * secure cookie transport and CSRF protection;
@@ -79,6 +81,10 @@ A tenant administrator:
 * may provision managers and operators within the tenant;
 * should use a personal account, preferably with OIDC when configured.
 
+The first administrator is created only by public tenant onboarding. It requires
+a normalized, globally unique email address and has no location assignment.
+Creating additional administrators remains out of scope.
+
 ### 3.2 Location manager
 
 A location manager:
@@ -107,7 +113,34 @@ by integration tests.
 
 ## 4. Authentication Flows
 
-### 4.1 Local login
+### 4.1 Tenant registration
+
+`POST /api/tenant-registrations` is the only anonymous account-creation flow. It
+requires a valid browser CSRF token and accepts a tenant name, first-location
+name, and nested administrator username, email, password, and display name.
+
+The backend:
+
+1. applies the per-client registration rate limit before BCrypt work;
+2. trims the tenant and location names;
+3. normalizes the username and required email;
+4. validates the shared local-account input contract;
+5. creates the tenant, first location, and active `ADMIN` account in one
+   transaction;
+6. returns their identifiers and the normalized username without issuing access
+   or refresh cookies.
+
+The default local rate limit is five attempts per client per hour. Exhaustion
+returns `429 Too Many Requests` with `Retry-After`. The in-memory limiter is
+bounded and suitable only for the current single-instance local slice;
+distributed enforcement remains required before multi-instance deployment.
+
+Registration does not sign the administrator in. The panel returns to the local
+login form and the administrator authenticates through the normal login flow.
+Email verification, invitations, recovery, CAPTCHA, and automated abuse
+reputation are outside this increment.
+
+### 4.2 Local login
 
 1. The panel obtains a CSRF token.
 2. The user submits a normalized username and password over HTTPS.
@@ -127,7 +160,7 @@ performing an equivalent password-hash verification for unknown usernames. The
 fallback candidate is generated randomly and hashed once at application startup;
 no dummy credential is embedded in source code or generated per request.
 
-### 4.2 Future OAuth2/OIDC login
+### 4.3 Future OAuth2/OIDC login
 
 This subsection is a forward-design constraint, not part of the first
 authentication implementation scope.
@@ -169,7 +202,7 @@ To avoid coupling the first implementation to password login, it must:
 * avoid placing login-method-specific data in authorization services or access
   JWT claims.
 
-### 4.3 Refresh
+### 4.4 Refresh
 
 The refresh credential is an opaque, cryptographically random value. Only a
 cryptographic hash is stored in PostgreSQL.
@@ -194,7 +227,7 @@ panel serializes cooperating same-origin refresh attempts and rechecks the
 current access session after acquiring the lock. It does not support different
 accounts in different tabs of one browser profile.
 
-### 4.4 Logout and revocation
+### 4.5 Logout and revocation
 
 `POST /api/auth/logout` revokes the current refresh session and clears both
 authentication cookies. `POST /api/auth/logout-all` revokes every refresh
@@ -204,7 +237,7 @@ Disabling an account prevents new login and refresh immediately. Already-issued
 access JWTs remain usable only until their short expiry unless a high-risk
 operation performs an additional current-account check.
 
-### 4.5 Current account
+### 4.6 Current account
 
 `GET /api/auth/me` returns the current authorization context needed by the
 panel:
@@ -282,17 +315,18 @@ Because access JWTs live for only five minutes, this cutover has a bounded
 impact. A future multi-key decoder with explicit key IDs is required before a
 zero-interruption overlapping-key rotation is promised.
 
-The first tenant, location, and administrator are bootstrapped out of band with
-manual SQL. The administrator row contains a normalized username and a BCrypt
-hash produced by trusted tooling, has `tenant_role = ADMIN` and `status =
-ACTIVE`, and has no location assignment. Production migrations remain empty of
+The first tenant, location, and administrator are created through public tenant
+registration rather than manual SQL. The administrator has a normalized
+username and email, a BCrypt hash, `tenant_role = ADMIN`, `status = ACTIVE`, and
+no location assignment. Production migrations remain empty of
 environment-specific tenants, locations, accounts, or credentials, and no API
-endpoint can create another tenant administrator in this increment.
+endpoint creates another tenant administrator in this increment.
 
 ## 6. CSRF and Browser Request Behavior
 
-Cookie-authenticated unsafe requests require CSRF protection, including login,
-refresh, logout, account linking, account provisioning, and order mutations.
+Browser-origin unsafe requests require CSRF protection, including anonymous
+tenant registration, login, refresh, logout, account linking, account
+provisioning, and order mutations.
 
 The panel obtains a readable CSRF token from the API's secure, host-only
 `__Host-XSRF-TOKEN` cookie and copies it into the configured `X-XSRF-TOKEN`
@@ -351,6 +385,8 @@ The first authentication scope contains:
 
 * `GET /api/auth/csrf` - issue or refresh the readable CSRF cookie and return its
   cookie and header names; the panel copies the cookie value into that header;
+* `POST /api/tenant-registrations` - anonymously create one tenant, its first
+  location, and its first active administrator without creating a session;
 * `POST /api/auth/login` - accept `username` and `password`, then issue cookies
   and return the current authorization context;
 * `POST /api/auth/refresh` - rotate the refresh credential and issue replacement
@@ -385,6 +421,7 @@ Anonymous access is limited to:
 * customer order tracking;
 * explicitly selected health endpoints;
 * CSRF bootstrap;
+* tenant registration;
 * local login and refresh.
 
 OIDC initiation and callback join this allow-list only when the later OIDC
@@ -413,6 +450,11 @@ The migration now also provides the first increment's OIDC-ready boundary:
 * `accounts.password_hash` is nullable for a future externally authenticated
   account while remaining non-blank when present;
 
+The first administrator's email is required by the onboarding request contract.
+The column remains nullable because later
+manager/operator provisioning keeps email optional and future external-only
+accounts may not use a local email contract.
+
 The following constraints remain application-level or deferred:
 
 * the administrator-versus-location-assignment invariant is enforced only by
@@ -435,7 +477,8 @@ The implementation must include:
 
 * adaptive BCrypt password hashing using Spring Security;
 * generic login and account-recovery failures that prevent enumeration;
-* rate limiting for login, refresh, linking, and future recovery endpoints;
+* rate limiting for tenant registration, login, refresh, linking, and future
+  recovery endpoints;
 * validation limits on usernames and passwords, including a generous maximum
   password length to prevent denial-of-service through hashing;
 * session-family revocation on refresh-credential reuse;
@@ -452,6 +495,11 @@ The implementation must include:
 
 Backend integration tests must cover at least:
 
+* valid anonymous tenant registration with CSRF, normalized identifiers, hashed
+  credentials, no assignment, no session, and no authentication cookies;
+* tenant-registration validation, username and email conflicts, transactional
+  rollback, and rate-limit exhaustion with `Retry-After`;
+* login and manager/operator provisioning by the newly registered administrator;
 * successful and failed local login;
 * unknown username, wrong password, and disabled account with equivalent public
   failures;
@@ -480,12 +528,15 @@ When OIDC is implemented, extend the integration tests to cover:
 * the same Kairos principal, access JWT, refresh session, and authorization
   behavior as local login.
 
-Run `./mvnw test` from `apps/api` and `git diff --check` before handoff. Shared
-REST contract changes also require `check` in every consuming frontend.
+Always run `git diff --check` before handoff. Prefer compilation and focused
+tests during rapid development; run the full backend suite when the change is
+high risk, focused coverage is insufficient, or it is explicitly requested.
+Statically validate every consumer of a shared REST contract and run its
+frontend `check` when practical.
 
 ## 12. Delivery Plan
 
-The first increment completes:
+The implemented increments complete:
 
 1. the username-only login, initial-password, access-token, and refresh-session
    policy;
@@ -498,19 +549,19 @@ The first increment completes:
    session revocation.
 6. panel login, current-account loading, CSRF-aware staff requests, one
    lock-serialized refresh and request retry, and logout.
+7. anonymous CSRF-protected tenant registration with a required first-
+   administrator email, transactional tenant/location/account creation, and a
+   bounded per-client rate limit;
+8. panel registration plus capability-gated administrator/manager account
+   provisioning using the existing location-scoped API.
 
 The following increments remain:
 
-1. **Expose account provisioning in the panel.** Add capability-gated controls
-   for tenant administrators to provision managers and operators, and for
-   managers to provision operators for their assigned location, using the
-   existing location-scoped API. This does not add self-registration or tenant
-   registration.
-2. **Implement OIDC.** Add provider configuration,
+1. **Implement OIDC.** Add provider configuration,
    explicit identity linking, callbacks, and the same Kairos session issuance
    used by local login. This step begins only after the local authentication and
    authorization foundation is complete.
-3. **Add RLS and operational hardening.** Establish verified database security
+2. **Add RLS and operational hardening.** Establish verified database security
    context, add policies, move rate-limit state to shared infrastructure before
    multi-instance deployment, and extend operational security-event retention.
 
@@ -525,6 +576,22 @@ The following increments remain:
    first increment unless scope is explicitly expanded.
 
 ## 14. Decision Log
+
+### 2026-07-24 - Public tenant onboarding and panel provisioning implemented
+
+* Public tenant registration is the only anonymous account-creation flow. It
+  atomically creates a tenant, first location, and first active administrator.
+* The first administrator requires a normalized globally unique email, but
+  later manager/operator emails remain optional.
+* Registration requires CSRF, is limited to five attempts per client per hour
+  by default, creates no session, and returns the user to sign-in.
+* The panel exposes Orders and Accounts workspaces according to current-account
+  capabilities. Administrators select location and role; managers are fixed to
+  their assigned location and the operator role; operators have no Accounts
+  workspace.
+* Standalone account self-registration, additional administrators, later
+  location creation, email verification, recovery, invitations, and CAPTCHA
+  remain excluded.
 
 ### 2026-07-23 - Panel authentication contract simplified
 

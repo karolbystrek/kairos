@@ -77,6 +77,7 @@ Browser suspension may interrupt WebSocket delivery. The application must reconc
 
 The staff panel must:
 
+* allow an anonymous visitor to register a tenant, its first location, and its first administrator through the dedicated onboarding flow;
 * require an authenticated internal account;
 * show only locations and orders accessible to the account;
 * allow tenant administrators to switch between locations or view an aggregate queue;
@@ -108,7 +109,11 @@ The system supports:
 
 After either login method, Spring issues a short-lived signed access JWT and a rotating refresh credential. Browser credentials are transported in `Secure`, `HttpOnly`, `SameSite=Lax`, host-only cookies through the staff-panel origin. Cookie-authenticated state-changing requests require CSRF protection.
 
-Accounts are provisioned rather than self-registered. Each account belongs directly to one tenant. A tenant administrator has tenant-wide access; a location manager or operator has at most one location assignment. Location operator accounts are device-oriented, and a location uses a separate account for each panel device that needs independent credentials or revocation. Tenant administrators may provision managers and operators, while location managers may provision only operators for their own location.
+Public tenant onboarding is the only anonymous account-creation flow. It atomically creates one tenant, its first location, and its first active administrator. The administrator requires a normalized, globally unique email address in addition to its normalized username and BCrypt-hashed password. Registration does not issue authentication cookies or sign the administrator in. Tenant and location display names are trimmed but are not unique.
+
+Standalone accounts are provisioned rather than self-registered. Each account belongs directly to one tenant. A tenant administrator has tenant-wide access; a location manager or operator has at most one location assignment. Location operator accounts are device-oriented, and a location uses a separate account for each panel device that needs independent credentials or revocation. Tenant administrators may provision managers and operators, while location managers may provision only operators for their own location.
+
+The tenant-registration endpoint is anonymous but retains normal CSRF protection because it is invoked from the browser panel origin. A bounded per-client rate limit is applied before password hashing. The local single-instance default permits five attempts per hour and returns `429 Too Many Requests` with `Retry-After` when exhausted. Distributed enforcement is required before multi-instance production deployment.
 
 One browser profile on the staff-panel origin represents one signed-in account because its tabs share the same authentication cookies. Same-account tabs may be used on a best-effort basis, but the panel does not promise immediate cross-tab interface synchronization. Different accounts in different tabs of one browser profile are unsupported; simultaneous accounts require separate browser profiles, private browsing contexts, or devices. The panel provides one primary operational workspace, including administrator location switching and aggregate views, rather than depending on browser tabs for core workflows.
 
@@ -136,7 +141,7 @@ The database schema must include tables covering the following concepts. Names a
 
 * **Tenants:** stable identity, display information, and integration configuration.
 * **Locations:** physical restaurant belonging to one tenant, with display and operational information.
-* **Accounts:** stable identity, direct ownership by one tenant, normalized local login identifier and credential hash when applicable, tenant-level role, and account state.
+* **Accounts:** stable identity, direct ownership by one tenant, normalized local login identifier and credential hash when applicable, optional normalized globally unique email except where the onboarding contract requires it, tenant-level role, and account state.
 * **External identities:** provider and immutable provider subject linked to an account.
 * **Location assignments:** relationship between a non-admin account and its accessible location, including a manager or operator role and assignment state. The current account model permits at most one assignment per account; the relationship remains normalized so that this cardinality can be changed explicitly in a future migration.
 * **Orders:** public tracking identity, owning location, customer-facing label, current state, and lifecycle timestamps. Tenant ownership is derived through the location.
@@ -185,6 +190,8 @@ Docker Compose provides the local environment for both frontends, the API, Postg
 * Each frontend's handwritten request code and response types match the REST behavior covered by integration tests during the walking vertical slice.
 * REST-backed Client Components use keyed SWR state rather than effects for request orchestration, retain cached data during background revalidation, and do not apply order transitions before the Spring API accepts them.
 * Local login, invalid credentials, token expiry, refresh rotation, logout, and cookie/CSRF behavior are covered by tests.
+* Anonymous tenant registration requires CSRF, rate-limits repeated attempts, creates exactly one related tenant, location, and active administrator in one transaction, requires and normalizes the administrator email, and creates no session.
+* Registration conflicts roll back the tenant and location, and successful registration returns to sign-in without automatic authentication.
 * OAuth2/OIDC login creates or links the correct account and tenant ownership.
 * A tenant administrator can access all locations in the tenant but none in another tenant.
 * A location manager can access and manage orders only in its assigned location and can provision operator accounts only for that location.
@@ -203,6 +210,6 @@ The first walking vertical slice is intentionally limited to local development. 
 
 The original walking slice temporarily exposed unauthenticated order-management endpoints. The backend authentication increment now protects staff operations with provisioned local accounts, tenant/location authorization, CSRF, and trusted authenticated audit identity. The panel frontend now provides local login, current-account loading, logout, automatic CSRF headers, and one refresh plus request retry after an expired access credential. Cooperating same-origin tabs serialize refresh through a browser Web Lock and recheck the current session after acquiring it, avoiding a duplicate rotation without maintaining a persistent cross-tab state machine. Authentication credentials remain in secure `HttpOnly` cookies and are not stored by the frontend. Customer updates still use manual plus focus/reconnect REST revalidation, and SWR calls handwritten native `fetch` request modules rather than OpenAPI tooling or generated clients. PostgreSQL RLS enforcement, WebSocket/STOMP delivery, and reconnect reconciliation remain required before deployment. Formal API documentation is deferred until the contract is prepared for external integrations.
 
-The first staff-authentication increment implements provisioned local username/password accounts, Kairos-issued access and refresh credentials, secure cookies, CSRF protection, logout, account and session revocation, tenant/location authorization, provisioning rules, and authenticated audit identity. OAuth2/OIDC login is delivered in a later increment after that local authentication and authorization foundation is complete. The earlier increment must nevertheless keep the account schema, external-identity boundary, authenticated principal, and session-issuance services compatible with the later OIDC method so that both login methods resolve to the same Kairos account and authorization model.
+The staff-authentication increment implements provisioned local username/password accounts, Kairos-issued access and refresh credentials, secure cookies, CSRF protection, logout, account and session revocation, tenant/location authorization, provisioning rules, and authenticated audit identity. OAuth2/OIDC login is delivered in a later increment after that local authentication and authorization foundation is complete. The earlier increment must nevertheless keep the account schema, external-identity boundary, authenticated principal, and session-issuance services compatible with the later OIDC method so that both login methods resolve to the same Kairos account and authorization model.
 
-The next panel increment adds capability-gated account provisioning for existing tenants and locations through the implemented Spring API. It does not add public self-registration or tenant registration. The first tenant, location, and tenant administrator continue to be bootstrapped out of band until a separate platform-level tenant-onboarding model and API are explicitly designed.
+The panel now exposes public tenant onboarding and capability-gated account provisioning. Onboarding creates the first tenant administrator only; it is not general account self-registration. Authenticated administrators can provision managers and operators for accessible locations, while managers can provision only operators for their fixed location. Additional administrators, later location creation, account listing or status management, invitations, password setup links, email verification, recovery, and CAPTCHA remain outside this increment.

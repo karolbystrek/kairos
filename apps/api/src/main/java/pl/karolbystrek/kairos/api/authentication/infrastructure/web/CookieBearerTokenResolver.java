@@ -34,6 +34,7 @@ public class CookieBearerTokenResolver implements BearerTokenResolver {
         return path.equals("/auth/csrf")
                 || path.equals("/auth/login")
                 || path.equals("/auth/refresh")
+                || path.equals("/tenant-registrations")
                 || path.equals("/tracked-orders")
                 || path.startsWith("/tracked-orders/")
                 || path.equals("/actuator/health")

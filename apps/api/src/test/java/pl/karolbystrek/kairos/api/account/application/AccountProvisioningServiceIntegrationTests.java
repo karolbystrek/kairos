@@ -6,7 +6,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
-import pl.karolbystrek.kairos.api.account.application.exception.InvalidAccountRequestException;
 import pl.karolbystrek.kairos.api.account.application.exception.StaffAccessDeniedException;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
 import pl.karolbystrek.kairos.api.account.domain.AccountStatus;
@@ -160,10 +159,9 @@ class AccountProvisioningServiceIntegrationTests {
     }
 
     @Test
-    void suspendedManagerAndPasswordsOutsideBcryptBoundsAreRejected() {
+    void suspendedManagerCannotProvisionAccounts() {
         var tenantId = insertTenant("Validation tenant");
         var locationId = insertLocation(tenantId, "Validation location");
-        var administratorId = insertAccount(tenantId, "validation.admin", TenantRole.ADMIN, AccountStatus.ACTIVE);
         var managerId = insertAccount(tenantId, "suspended.manager", TenantRole.MEMBER, AccountStatus.ACTIVE);
         insertAssignment(managerId, tenantId, locationId, AssignmentRole.MANAGER, "SUSPENDED");
 
@@ -176,28 +174,6 @@ class AccountProvisioningServiceIntegrationTests {
             "Suspended created",
             AssignmentRole.OPERATOR
         )).isInstanceOf(StaffAccessDeniedException.class);
-
-        var administrator = principal(administratorId, tenantId, TenantRole.ADMIN);
-        assertThatThrownBy(() -> provisioningService.provision(
-            administrator,
-            locationId,
-            "short.password",
-            null,
-            "short-pass",
-            "Short password",
-            AssignmentRole.OPERATOR
-        )).isInstanceOf(InvalidAccountRequestException.class)
-            .hasMessageContaining("at least 12 characters");
-        assertThatThrownBy(() -> provisioningService.provision(
-            administrator,
-            locationId,
-            "long.password",
-            null,
-            "ą".repeat(37),
-            "Long password",
-            AssignmentRole.OPERATOR
-        )).isInstanceOf(InvalidAccountRequestException.class)
-            .hasMessageContaining("72 UTF-8 bytes");
     }
 
     @Test

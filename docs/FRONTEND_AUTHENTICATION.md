@@ -1,6 +1,7 @@
 # Panel Frontend Authentication
 
-Status: implemented for the first local-authentication increment.
+Status: implemented for local authentication, public tenant onboarding, and
+scoped account provisioning.
 
 This document explains the authentication integration in `apps/panel-app`: what
 the frontend owns, how session recovery works, and which invariants future
@@ -12,6 +13,8 @@ contract remains in [`AUTHENTICATION.md`](AUTHENTICATION.md).
 
 The panel frontend implements:
 
+* signed-out Sign in and Register tenant tabs;
+* public tenant registration without automatic authentication;
 * a local username/password login form;
 * CSRF bootstrap and headers for cookie-authenticated unsafe requests;
 * current-account loading through `GET /api/auth/me`;
@@ -21,17 +24,21 @@ The panel frontend implements:
 * logout and a request helper for logout-all;
 * serialization of authentication-cookie mutations;
 * account-scoped SWR data and cache cleanup when authentication changes in the
-  current tab.
+  current tab;
+* capability-gated Orders and Accounts workspaces;
+* administrator and manager account-provisioning forms.
 
 Spring Security remains the authentication and authorization authority. The
 frontend gate is a user-experience boundary, not a security boundary. Any
 current or future capability-driven controls and redirects are presentation
 only and never authorize an operation.
 
-The frontend does not implement tenant registration, public self-registration,
-account-provisioning UI, OIDC, account linking, MFA, password recovery, or
-passkeys. `logoutAll()` exists in the request layer, but the current UI exposes
-only ordinary logout.
+Tenant onboarding is not standalone account self-registration. It creates only
+the tenant's first administrator through the dedicated Spring endpoint.
+Additional administrators, later locations, account listing and status UI,
+OIDC, account linking, MFA, password recovery, email verification, invitations,
+CAPTCHA, and passkeys remain excluded. `logoutAll()` exists in the request
+layer, but the current UI exposes only ordinary logout.
 
 ## 2. Browser Session and Panel Model
 
@@ -57,8 +64,13 @@ benefits from them without changing this browser-session model.
 | File | Responsibility |
 | --- | --- |
 | `apps/panel-app/app/page.tsx` | Server Component route that renders the client panel boundary. |
-| `apps/panel-app/components/staff-panel.tsx` | Login UI, current-account SWR state, logout UI, terminal-`401` subscription, and the authenticated-content gate. |
+| `apps/panel-app/components/staff-panel.tsx` | Signed-out tabs, login UI, current-account SWR state, logout UI, terminal-`401` subscription, and the authenticated workspace gate. |
+| `apps/panel-app/components/tenant-registration-form.tsx` | Public tenant-registration form and mutation state. |
 | `apps/panel-app/components/order-management.tsx` | Authenticated panel content with account-scoped SWR keys. |
+| `apps/panel-app/components/account-management.tsx` | Capability-gated manager/operator provisioning UI. |
+| `apps/panel-app/src/api/account-input.ts` | Shared Zod username, email, display-name, and BCrypt password input rules. |
+| `apps/panel-app/src/api/tenant-registrations.ts` | Zod contracts and anonymous tenant-registration request. |
+| `apps/panel-app/src/api/accounts.ts` | Zod contracts and authenticated account-provisioning request. |
 | `apps/panel-app/src/api/authentication.ts` | Zod contracts and the `/me`, login, logout, and logout-all operations. |
 | `apps/panel-app/src/api/api-fetch.ts` | Shared same-origin `fetch`, Problem Details errors, CSRF behavior, session recovery, and bounded retries. |
 | `apps/panel-app/src/api/auth-coordination.ts` | Authentication-cookie locking and a same-tab notification when authentication is required. |
@@ -88,7 +100,9 @@ frontend ensures that this cookie exists, reads its latest value, and sends it
 in the `X-XSRF-TOKEN` header. Safe requests such as `GET /api/auth/me` do not
 bootstrap CSRF unnecessarily.
 
-CSRF bootstrap is deduplicated within one tab. When Spring returns a recognized
+CSRF bootstrap is deduplicated within one tab. Public tenant registration uses
+the same CSRF-aware client, but it does not acquire the authentication-cookie
+lock because it neither reads nor mutates authentication state. When Spring returns a recognized
 missing- or invalid-CSRF Problem Details response, the client obtains a new
 token and retries that request once. Other `403 Forbidden` responses mean the
 authenticated account lacks permission and never start session refresh.
@@ -127,7 +141,23 @@ The login flow is:
 Frontend validation provides prompt feedback only. Spring repeats all security
 validation and remains authoritative.
 
-## 7. Protected Requests and Session Recovery
+## 7. Tenant Registration
+
+The signed-out surface provides Sign in and Register tenant tabs. Registration
+collects the tenant name, first location, administrator display name, username,
+required email, password, and frontend-only password confirmation.
+
+Zod trims names, lowercases the username and email, validates the email, and
+enforces the 12-character and 72-UTF-8-byte BCrypt password contract. On
+success, the form clears both password values, switches to Sign in, prefills the
+normalized username returned by Spring, and shows confirmation. It does not
+mutate `/me`, authentication cookies, or staff-owned SWR state.
+
+The shared request client still initializes and recovers CSRF for registration.
+Automatic `401` recovery is disabled because registration is anonymous and must
+never start a refresh attempt.
+
+## 8. Protected Requests and Session Recovery
 
 All staff request modules use `request()` or `apiFetch()` from the shared client
 instead of calling `fetch` directly. JSON responses are validated by their Zod
@@ -162,7 +192,7 @@ a later retry first checks `/me`: it reuses replacement cookies if the browser
 received them, or lets the backend reject or recover the presented credential
 otherwise. Network and server failures remain visible so the user can retry.
 
-## 8. Logout
+## 9. Logout
 
 Ordinary logout:
 
@@ -180,7 +210,7 @@ Other tabs reconcile on their next request, focus revalidation, or reconnect
 revalidation. Immediate cross-tab logout animation or cache clearing is not a
 requirement.
 
-## 9. SWR and Account Isolation
+## 10. Authenticated Workspace and SWR Isolation
 
 `/api/auth/me` is the frontend authentication gate. Staff-data cache keys begin
 with `staff` and include the current account ID. Explicit login, logout, and a
@@ -190,11 +220,22 @@ terminal `401` purge staff entries in the current tab.
 account therefore receives a fresh component instance instead of inheriting the
 previous account's draft label, selected order, or mutation state.
 
+Operators render the Orders workspace directly. Administrators and managers
+receive HeroUI Orders and Accounts tabs according to the capabilities returned
+by `/api/auth/me`; visibility is presentation only. Administrators select an
+accessible location and either Manager or Operator. Managers use their fixed
+assignment and the fixed Operator role.
+
+Order and account views use the same `staff/<accountId>/locations` SWR key, so
+location reads are deduplicated and remain account-scoped. Successful
+provisioning shows the created account summary, clears display name, username,
+email, and password fields, and retains the selected location and role.
+
 These measures prevent normal React and SWR carryover of locations, orders, QR
 codes, and frontend-owned interaction state after the current tab observes an
 account change. They complement backend authorization; they do not replace it.
 
-## 10. Failure and Retry Rules
+## 11. Failure and Retry Rules
 
 These rules are intentional:
 
@@ -210,7 +251,7 @@ These rules are intentional:
 * Automatically retried request bodies must be replayable. Current callers use
   JSON strings or no body; do not use this retry path with a consumed stream.
 
-## 11. Invariants for Future Changes
+## 12. Invariants for Future Changes
 
 Preserve all of the following:
 
@@ -229,6 +270,11 @@ Preserve all of the following:
 * Reset frontend-owned state when the authenticated account changes.
 * Keep backend authorization independent of frontend routing, capabilities, and
   visibility.
+* Keep tenant registration outside the authentication-cookie lock and disable
+  automatic session recovery for its request.
+* Keep account-input Zod rules shared by registration and provisioning.
+* Keep the location SWR key shared and account-scoped between Orders and
+  Accounts.
 * Keep `page.tsx` server-side unless the route itself genuinely needs client
   APIs.
 * Update this document when the browser flow or its invariants change.
@@ -237,24 +283,19 @@ If the backend stops using a rotating single-use refresh credential or changes
 its credential-reuse policy, review the lock design instead of assuming it is
 still required.
 
-## 12. Deferred Work
-
-The next panel authentication-related feature is capability-gated
-manager/operator account provisioning for existing tenants and locations.
-
-Tenant onboarding remains separate. No tenant-registration UI should be added
-until a platform-level API, authorization model, bootstrap policy, tests, and
-documentation are approved.
+## 13. Deferred Work
 
 Other deferred work includes:
 
 * a visible logout-all or session-management UI;
 * account listing and status-management UI;
+* additional administrator and location creation;
+* invitations, email verification, recovery, and CAPTCHA;
 * OIDC and external-identity linking;
 * MFA, password recovery, passkeys, and improved initial-password delivery;
 * PostgreSQL RLS and production operational hardening.
 
-## 13. Verification After Changes
+## 14. Verification After Changes
 
 For a frontend-only authentication change, run:
 
@@ -263,10 +304,11 @@ npm --prefix apps/panel-app run check
 git diff --check
 ```
 
-If the Spring contract changes, also run `./mvnw test` from `apps/api` and
-validate every consuming frontend.
+If the Spring contract changes, statically validate every consumer and run the
+relevant backend and frontend checks when practical. Use the full backend suite
+when focused coverage is insufficient or explicitly requested.
 
-When session recovery changes, manually verify at least:
+When runtime verification is explicitly requested for session recovery, verify:
 
 1. startup with and without a valid session;
 2. successful and failed login;
@@ -279,7 +321,18 @@ When session recovery changes, manually verify at least:
 7. different accounts requiring separate profiles, private contexts, or
    devices.
 
-## 14. Browser References
+When runtime verification is explicitly requested for registration or
+provisioning, verify:
+
+1. invalid email and password confirmation stay client-side;
+2. successful registration returns to sign-in with the normalized username and
+   does not authenticate automatically;
+3. a registered administrator can provision managers and operators;
+4. a manager can provision only operators for the assigned location;
+5. an operator has no Accounts tab and direct unauthorized requests still fail;
+6. conflict, rate-limit, CSRF-recovery, and API errors remain visible.
+
+## 15. Browser References
 
 * [Next.js Server and Client Components](https://nextjs.org/docs/app/getting-started/server-and-client-components)
 * [Next.js `use client` directive](https://nextjs.org/docs/app/api-reference/directives/use-client)

@@ -3,7 +3,6 @@ package pl.karolbystrek.kairos.api.account.application;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pl.karolbystrek.kairos.api.account.application.exception.AccountConflictException;
@@ -23,9 +22,7 @@ import pl.karolbystrek.kairos.api.account.domain.assignment.LocationAssignment;
 import pl.karolbystrek.kairos.api.account.infrastructure.persistence.AccountRepository;
 import pl.karolbystrek.kairos.api.account.infrastructure.persistence.LocationAssignmentRepository;
 
-import java.nio.charset.StandardCharsets;
 import java.time.Clock;
-import java.util.Locale;
 import java.util.UUID;
 
 @Service
@@ -33,15 +30,12 @@ import java.util.UUID;
 @Slf4j
 public class AccountProvisioningService {
 
-    private static final int MINIMUM_PASSWORD_LENGTH = 12;
-    private static final int MAXIMUM_BCRYPT_PASSWORD_BYTES = 72;
-
     private final AccountRepository accountRepository;
     private final LocationAssignmentRepository assignmentRepository;
     private final StaffLocationDirectory locationDirectory;
     private final StaffAccessService staffAccessService;
+    private final AccountCreationService accountCreationService;
     private final AccountSessionRevoker sessionRevoker;
-    private final PasswordEncoder passwordEncoder;
     private final Clock clock;
 
     @Transactional
@@ -60,27 +54,22 @@ public class AccountProvisioningService {
         access.requireLocationAccess(location.tenantId(), location.id());
         requireProvisioningPermission(access, role);
 
-        var normalizedUsername = normalizeLowercase(username, 120, "Username");
-        var normalizedEmail = normalizeEmail(email);
-        var normalizedDisplayName = normalizeRequired(displayName, 120, "Display name");
-        validatePassword(password);
-        requireAvailableIdentifiers(normalizedUsername, normalizedEmail);
-
-        var now = clock.instant();
-        var account = Account.provisionMember(
+        var account = accountCreationService.createMember(
             access.tenantId(),
-            normalizedUsername,
-            normalizedEmail,
-            passwordEncoder.encode(password),
-            normalizedDisplayName,
-            now
+            username,
+            email,
+            password,
+            displayName
         );
         var assignment = LocationAssignment.active(
-            account.getId(), location.id(), access.tenantId(), role, now
+            account.getId(),
+            location.id(),
+            access.tenantId(),
+            role,
+            account.getCreatedAt()
         );
 
         try {
-            accountRepository.saveAndFlush(account);
             assignmentRepository.saveAndFlush(assignment);
         } catch (DataIntegrityViolationException exception) {
             throw new AccountConflictException("An account with the supplied identity already exists", exception);
@@ -157,55 +146,6 @@ public class AccountProvisioningService {
             || assignment.getRole() != AssignmentRole.OPERATOR
             || !access.locationId().equals(assignment.getLocationId())) {
             throw new StaffAccessDeniedException("The target account cannot be managed");
-        }
-    }
-
-    private void requireAvailableIdentifiers(String username, String email) {
-        if (accountRepository.existsByUsername(username)
-            || (email != null && accountRepository.existsByEmail(email))) {
-            throw new AccountConflictException("An account with the supplied identity already exists");
-        }
-    }
-
-    private static String normalizeRequired(String value, int maximumLength, String fieldName) {
-        if (value == null) {
-            throw new InvalidAccountRequestException(fieldName + " is required");
-        }
-        var normalized = value.strip();
-        if (normalized.isEmpty()) {
-            throw new InvalidAccountRequestException(fieldName + " is required");
-        }
-        if (normalized.length() > maximumLength) {
-            throw new InvalidAccountRequestException(fieldName + " is too long");
-        }
-        return normalized;
-    }
-
-    private static String normalizeEmail(String email) {
-        if (email == null || email.isBlank()) {
-            return null;
-        }
-        return normalizeLowercase(email, 254, "Email");
-    }
-
-    private static String normalizeLowercase(String value, int maximumLength, String fieldName) {
-        var normalized = normalizeRequired(value, Integer.MAX_VALUE, fieldName).toLowerCase(Locale.ROOT);
-        if (normalized.length() > maximumLength) {
-            throw new InvalidAccountRequestException(fieldName + " is too long");
-        }
-        return normalized;
-    }
-
-    private static void validatePassword(String password) {
-        if (password == null || password.length() < MINIMUM_PASSWORD_LENGTH) {
-            throw new InvalidAccountRequestException(
-                "Password must contain at least %d characters".formatted(MINIMUM_PASSWORD_LENGTH)
-            );
-        }
-        if (password.getBytes(StandardCharsets.UTF_8).length > MAXIMUM_BCRYPT_PASSWORD_BYTES) {
-            throw new InvalidAccountRequestException(
-                "Password must not exceed %d UTF-8 bytes".formatted(MAXIMUM_BCRYPT_PASSWORD_BYTES)
-            );
         }
     }
 

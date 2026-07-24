@@ -32,3 +32,5 @@ kairos:
       login-window: 5m
       refresh-attempts: 30
       refresh-window: 1m
+      tenant-registration-attempts: 5
+      tenant-registration-window: 1h
