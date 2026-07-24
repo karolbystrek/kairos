@@ -1,11 +1,3 @@
-# Local Compose signing-key initializer
-FROM eclipse-temurin:25-jdk-alpine AS jwt-key-initializer
-
-COPY docker/init-jwt-keys.sh /usr/local/bin/init-jwt-keys
-RUN chmod +x /usr/local/bin/init-jwt-keys
-
-ENTRYPOINT ["/usr/local/bin/init-jwt-keys"]
-
 # Stage 1: Resolve build dependencies
 FROM eclipse-temurin:25-jdk-alpine AS dependencies
 WORKDIR /app
@@ -21,9 +13,12 @@ RUN chmod +x mvnw && ./mvnw dependency:go-offline -B
 FROM dependencies AS development
 
 COPY src ./src
+COPY docker/init-jwt-keys.sh /usr/local/bin/init-jwt-keys
+RUN chmod +x /usr/local/bin/init-jwt-keys
 
 EXPOSE 8080
 
+ENTRYPOINT ["/usr/local/bin/init-jwt-keys"]
 CMD ["./mvnw", "spring-boot:run"]
 
 # Stage 3: Build the application

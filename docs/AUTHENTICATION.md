@@ -295,13 +295,13 @@ are configured. Production requires a documented signing key rotation
 procedure.
 
 The API accepts X.509 public-key and PKCS#8 private-key resource locations.
-Production must configure both locations from externally managed secrets. Local
-Compose runs an idempotent initialization service that generates a 3072-bit RSA
-key pair only when the `jwt_signing_keys` named volume is empty. The API mounts
-that volume read-only and therefore reuses the same key across container
+Production must configure both locations from externally managed secrets. The
+local development API image has an idempotent entrypoint that generates a
+3072-bit RSA key pair only when the writable `jwt_signing_keys` named volume is
+empty, then starts Spring. It reuses and validates that pair across container
 restarts and rebuilds. `docker compose down` preserves the volume and keys;
 explicitly deleting Compose volumes also deletes the local key pair and causes
-the initializer to create a new one on the next startup.
+the development entrypoint to create a new one on the next startup.
 
 The initial production rotation procedure is a coordinated cutover:
 
@@ -615,11 +615,11 @@ The following increments remain:
 
 * The Spring API no longer has an ephemeral-key mode and always requires
   explicit public- and private-key resource locations.
-* Local Compose generates a 3072-bit RSA key pair only when its dedicated named
-  volume is empty, validates and reuses the pair on later starts, and mounts it
-  read-only into the API container.
-* Production deployments do not use the local initializer and must provide
-  externally managed signing keys.
+* The local development API container entrypoint generates a 3072-bit RSA key
+  pair only when its dedicated named volume is empty, then validates and reuses
+  the pair on later starts before executing Spring.
+* The production image does not contain or run the local initializer and
+  requires externally managed signing keys.
 * Backend tests generate an ephemeral, explicitly test-only RSA key pair in the
   build output before the test suite starts. No test private key is stored in
   the source tree or committed to the repository.

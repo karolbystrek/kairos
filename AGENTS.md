@@ -61,7 +61,7 @@ The walking vertical slice is local-only. The Spring API contains provisioned lo
 
 Frontend authentication implementation notes and maintenance invariants are in [`docs/FRONTEND_AUTHENTICATION.md`](docs/FRONTEND_AUTHENTICATION.md).
 
-The Spring API never generates JWT signing keys. Local Compose provisions a stable development key pair through the one-shot `jwt-key-init` service and persists it in the `jwt_signing_keys` named volume, which the API mounts read-only. Production deployments must provide externally managed key resources.
+The Spring application never generates JWT signing keys. The local development API container entrypoint idempotently prepares a stable development key pair in the writable `jwt_signing_keys` named volume before starting Spring. The production image does not contain or run this initializer and requires externally managed key resources.
 
 ## Documentation Synchronization
 * Do not leave accepted project decisions only in the conversation. When discussion with the user changes or clarifies architecture, requirements, scope, security, data ownership, technology choices, or development conventions, update the relevant documentation in the same task.

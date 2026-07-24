@@ -21,16 +21,6 @@ services:
       - redisdata:/data
     restart: unless-stopped
 
-  jwt-key-init:
-    container_name: kairos-jwt-key-init
-    build:
-      context: ./apps/api
-      dockerfile: Dockerfile
-      target: jwt-key-initializer
-    volumes:
-      - jwt_signing_keys:/keys
-    restart: "no"
-
   api:
     container_name: kairos-api
     build:
@@ -48,14 +38,12 @@ services:
       KAIROS_AUTHENTICATION_JWT_PUBLIC_KEY_LOCATION: file:/run/secrets/kairos-jwt/jwt-public.pem
       KAIROS_AUTHENTICATION_JWT_PRIVATE_KEY_LOCATION: file:/run/secrets/kairos-jwt/jwt-private.pem
     volumes:
-      - jwt_signing_keys:/run/secrets/kairos-jwt:ro
+      - jwt_signing_keys:/run/secrets/kairos-jwt
     depends_on:
       postgres:
         condition: service_started
       redis:
         condition: service_started
-      jwt-key-init:
-        condition: service_completed_successfully
     develop:
       watch:
         - action: sync+exec
