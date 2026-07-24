@@ -35,10 +35,15 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       SPRING_DATA_REDIS_HOST: ${REDIS_HOST}
       SPRING_DATA_REDIS_PORT: ${REDIS_PORT}
-      KAIROS_AUTHENTICATION_JWT_PUBLIC_KEY_LOCATION: file:/run/secrets/kairos-jwt/jwt-public.pem
-      KAIROS_AUTHENTICATION_JWT_PRIVATE_KEY_LOCATION: file:/run/secrets/kairos-jwt/jwt-private.pem
+      KAIROS_AUTHENTICATION_JWT_PUBLIC_KEY_LOCATION: file:/run/secrets/jwt-public.pem
+      KAIROS_AUTHENTICATION_JWT_PRIVATE_KEY_LOCATION: file:/run/secrets/jwt-private.pem
     volumes:
-      - jwt_signing_keys:/run/secrets/kairos-jwt
+      - type: bind
+        source: ./secrets
+        target: /run/secrets
+        read_only: true
+        bind:
+          create_host_path: false
     depends_on:
       postgres:
         condition: service_started
@@ -126,6 +131,5 @@ services:
 volumes:
   pgdata:
   redisdata:
-  jwt_signing_keys:
   caddy_data:
   caddy_config:

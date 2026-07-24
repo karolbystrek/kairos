@@ -4,6 +4,7 @@
 .env.*.local
 
 # Private key material
+/secrets/
 **/*private*.pem
 **/*.key
 **/*.pk8

@@ -61,7 +61,7 @@ The walking vertical slice is local-only. The Spring API contains provisioned lo
 
 Frontend authentication implementation notes and maintenance invariants are in [`docs/FRONTEND_AUTHENTICATION.md`](docs/FRONTEND_AUTHENTICATION.md).
 
-The Spring application never generates JWT signing keys. The local development API container entrypoint idempotently prepares a stable development key pair in the writable `jwt_signing_keys` named volume before starting Spring. The production image does not contain or run this initializer and requires externally managed key resources.
+The Spring application and Docker images never generate JWT signing keys. Before starting local Compose, run `./scripts/init-jwt-keys.sh` to idempotently prepare the ignored `secrets/jwt-private.pem` and `secrets/jwt-public.pem` files. Compose bind-mounts `secrets/` read-only into the API container. Production deployments require externally managed key resources.
 
 ## Documentation Synchronization
 * Do not leave accepted project decisions only in the conversation. When discussion with the user changes or clarifies architecture, requirements, scope, security, data ownership, technology choices, or development conventions, update the relevant documentation in the same task.
@@ -94,6 +94,7 @@ The Spring application never generates JWT signing keys. The local development A
 ## Local Development
 ```bash
 cp .env.example .env
+./scripts/init-jwt-keys.sh
 docker compose up --build --watch
 ```
 * Customer app: https://app.localhost

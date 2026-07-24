@@ -295,13 +295,13 @@ are configured. Production requires a documented signing key rotation
 procedure.
 
 The API accepts X.509 public-key and PKCS#8 private-key resource locations.
-Production must configure both locations from externally managed secrets. The
-local development API image has an idempotent entrypoint that generates a
-3072-bit RSA key pair only when the writable `jwt_signing_keys` named volume is
-empty, then starts Spring. It reuses and validates that pair across container
-restarts and rebuilds. `docker compose down` preserves the volume and keys;
-explicitly deleting Compose volumes also deletes the local key pair and causes
-the development entrypoint to create a new one on the next startup.
+Production must configure both locations from externally managed secrets. For
+local development, `./scripts/init-jwt-keys.sh` idempotently generates or
+validates a 3072-bit RSA key pair in the ignored repository-local `secrets/`
+directory. Compose bind-mounts that directory read-only into the API container.
+The key pair therefore survives container rebuilds and Compose volume changes.
+Deleting the two PEM files explicitly rotates the local pair the next time the
+script runs.
 
 The initial production rotation procedure is a coordinated cutover:
 
@@ -611,15 +611,20 @@ The following increments remain:
   cross-tab authentication event state machine were removed. Authentication
   credentials and account data remain out of browser storage.
 
+### 2026-07-24 - Local JWT generation moved outside Docker
+
+* Local signing keys are created explicitly with
+  `./scripts/init-jwt-keys.sh` and stored in the ignored `secrets/` directory.
+* Compose bind-mounts the directory read-only into the API container.
+* Neither Spring nor any Docker image generates or mutates signing keys.
+
 ### 2026-07-23 - Stable local JWT signing keys moved outside Spring
 
 * The Spring API no longer has an ephemeral-key mode and always requires
   explicit public- and private-key resource locations.
-* The local development API container entrypoint generates a 3072-bit RSA key
-  pair only when its dedicated named volume is empty, then validates and reuses
-  the pair on later starts before executing Spring.
-* The production image does not contain or run the local initializer and
-  requires externally managed signing keys.
+* Local development reuses a stable external key pair across API container
+  restarts and rebuilds.
+* Production requires externally managed signing keys.
 * Backend tests generate an ephemeral, explicitly test-only RSA key pair in the
   build output before the test suite starts. No test private key is stored in
   the source tree or committed to the repository.
