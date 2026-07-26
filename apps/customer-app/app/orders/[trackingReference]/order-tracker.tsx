@@ -1,7 +1,8 @@
 "use client";
 
 import { Alert, Button, Chip, Spinner } from "@heroui/react";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import useSWR from "swr";
 import useSWRSubscription from "swr/subscription";
 
@@ -10,15 +11,12 @@ import {
   getTrackedOrder,
   orderStatusChangedEventSchema,
   type CustomerOrder,
-  type OrderStatus,
 } from "@/src/api/orders";
-
-const statusLabels: Record<OrderStatus, string> = {
-  IN_PREPARATION: "In preparation",
-  READY: "Ready for pickup",
-  COMPLETED: "Completed",
-  CANCELED: "Canceled",
-};
+import {
+  isActiveOrderStatus,
+  orderStatusLabels,
+} from "@/src/orders/order-status";
+import { rememberTrackedOrder } from "@/src/pwa/recently-tracked-orders";
 
 function shouldRetryOnError(error: Error): boolean {
   return !(
@@ -37,7 +35,7 @@ function getTrackingErrorMessage(error: unknown): string {
 }
 
 function isActive(order: CustomerOrder | undefined): boolean {
-  return order?.status === "IN_PREPARATION" || order?.status === "READY";
+  return isActiveOrderStatus(order?.status);
 }
 
 function useOrderEventStream({
@@ -94,6 +92,7 @@ export function OrderTracker({
 }: {
   trackingReference: string;
 }) {
+  const router = useRouter();
   const [isStreamConnected, setIsStreamConnected] = useState(false);
   const {
     data: order,
@@ -115,6 +114,19 @@ export function OrderTracker({
     },
   );
   const isOrderActive = isActive(order);
+
+  useEffect(() => {
+    if (!order) {
+      return;
+    }
+
+    rememberTrackedOrder({
+      trackingReference,
+      label: order.label,
+      status: order.status,
+      updatedAt: order.updatedAt,
+    });
+  }, [order, trackingReference]);
 
   useOrderEventStream({
     enabled: isOrderActive,
@@ -154,12 +166,40 @@ export function OrderTracker({
           </Alert.Content>
         </Alert>
       )}
-      <div>
-        <h1 className="text-3xl font-semibold">Order {order.label}</h1>
-        <p className="text-muted">Current order status</p>
+      <div className="flex w-full items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-semibold">Order {order.label}</h1>
+          <p className="text-muted">Current order status</p>
+        </div>
+        {!isOrderActive && (
+          <Button
+            isIconOnly
+            aria-label="Go to recently tracked orders"
+            variant="secondary"
+            onPress={() => {
+              router.push("/");
+            }}
+          >
+            <svg
+              aria-hidden="true"
+              fill="none"
+              height="20"
+              viewBox="0 0 24 24"
+              width="20"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M3 10.75 12 3l9 7.75V21a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1V10.75Z"
+                stroke="currentColor"
+                strokeLinejoin="round"
+                strokeWidth="1.75"
+              />
+            </svg>
+          </Button>
+        )}
       </div>
       <Chip color={order.status === "READY" ? "success" : "default"} size="lg">
-        {statusLabels[order.status]}
+        {orderStatusLabels[order.status]}
       </Chip>
       <p className="text-sm text-muted">
         Updated {new Date(order.updatedAt).toLocaleString()}

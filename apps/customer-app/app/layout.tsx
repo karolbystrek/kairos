@@ -4,6 +4,7 @@ import { Metadata, Viewport } from "next";
 import { Providers } from "./providers";
 
 import { siteConfig } from "@/config/site";
+import { PWA_THEME_COLOR } from "@/src/pwa/manifest";
 
 export const metadata: Metadata = {
   title: {
@@ -13,14 +14,24 @@ export const metadata: Metadata = {
   description: siteConfig.description,
   icons: {
     icon: "/favicon.ico",
+    apple: [
+      {
+        url: "/apple-touch-icon.png",
+        sizes: "180x180",
+        type: "image/png",
+      },
+    ],
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Kairos",
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "white" },
-    { media: "(prefers-color-scheme: dark)", color: "black" },
-  ],
+  colorScheme: "light",
+  themeColor: PWA_THEME_COLOR,
 };
 
 export default function RootLayout({
@@ -32,7 +43,14 @@ export default function RootLayout({
     <html suppressHydrationWarning lang="en">
       <head />
       <body className="min-h-screen bg-background text-foreground antialiased">
-        <Providers themeProps={{ attribute: "class", defaultTheme: "light" }}>
+        <Providers
+          themeProps={{
+            attribute: "class",
+            defaultTheme: "light",
+            enableSystem: false,
+            forcedTheme: "light",
+          }}
+        >
           <main className="mx-auto max-w-xl px-6 py-10">{children}</main>
         </Providers>
       </body>

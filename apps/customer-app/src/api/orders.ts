@@ -1,11 +1,6 @@
 import { z } from "zod";
 
-export const orderStatusSchema = z.enum([
-  "IN_PREPARATION",
-  "READY",
-  "COMPLETED",
-  "CANCELED",
-]);
+import { orderStatusSchema } from "@/src/orders/order-status";
 
 export const customerOrderSchema = z.object({
   label: z.string(),
@@ -19,7 +14,7 @@ export const orderStatusChangedEventSchema = z.object({
   updatedAt: z.iso.datetime({ offset: true }),
 });
 
-export type OrderStatus = z.infer<typeof orderStatusSchema>;
+export type { OrderStatus } from "@/src/orders/order-status";
 export type CustomerOrder = z.infer<typeof customerOrderSchema>;
 
 export class ApiError extends Error {
