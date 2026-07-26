@@ -17,7 +17,6 @@ import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
 import pl.karolbystrek.kairos.api.authentication.api.model.CsrfTokenResponse;
 import pl.karolbystrek.kairos.api.authentication.api.model.CurrentAccountResponse;
 import pl.karolbystrek.kairos.api.authentication.api.model.LoginRequest;
-import pl.karolbystrek.kairos.api.authentication.application.AuthenticationRateLimiter;
 import pl.karolbystrek.kairos.api.authentication.application.AuthenticationSessionService;
 import pl.karolbystrek.kairos.api.authentication.application.CurrentAccountService;
 import pl.karolbystrek.kairos.api.authentication.application.LocalAuthenticationService;
@@ -36,7 +35,6 @@ class AuthenticationController {
     private final LocalAuthenticationService localAuthenticationService;
     private final AuthenticationSessionService sessionService;
     private final CurrentAccountService currentAccountService;
-    private final AuthenticationRateLimiter rateLimiter;
     private final AuthenticationCookieService cookieService;
     private final CsrfTokenService csrfTokenService;
 
@@ -57,8 +55,7 @@ class AuthenticationController {
     ) {
         var session = localAuthenticationService.authenticate(
             request.username(),
-            request.password(),
-            clientAddress(servletRequest)
+            request.password()
         );
         var account = currentAccountService.get(session.principal());
         var currentAccount = CurrentAccountResponse.from(account);
@@ -71,7 +68,6 @@ class AuthenticationController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     void refresh(HttpServletRequest request, HttpServletResponse response) {
         var refreshCredential = cookieService.readRefreshCredential(request);
-        rateLimiter.checkRefresh(clientAddress(request), refreshCredential);
         try {
             var session = sessionService.rotate(refreshCredential);
             cookieService.write(response, session);
@@ -110,9 +106,5 @@ class AuthenticationController {
     CurrentAccountResponse me(@AuthenticationPrincipal StaffPrincipal principal) {
         var account = currentAccountService.get(principal);
         return CurrentAccountResponse.from(account);
-    }
-
-    private static String clientAddress(HttpServletRequest request) {
-        return request.getRemoteAddr() == null ? "unknown" : request.getRemoteAddr();
     }
 }

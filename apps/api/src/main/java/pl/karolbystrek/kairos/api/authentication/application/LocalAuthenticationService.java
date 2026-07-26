@@ -24,12 +24,10 @@ public class LocalAuthenticationService {
     private final AccountRepository accountRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationSessionService sessionService;
-    private final AuthenticationRateLimiter rateLimiter;
     private final PasswordVerificationFallback passwordVerificationFallback;
 
-    public IssuedSession authenticate(String username, String password, String clientAddress) {
+    public IssuedSession authenticate(String username, String password) {
         var normalizedUsername = normalizeUsername(username);
-        rateLimiter.checkLogin(clientAddress, normalizedUsername);
 
         var account = accountRepository.findByUsername(normalizedUsername).orElse(null);
         var storedHash = account != null && account.getPasswordHash() != null
@@ -52,7 +50,6 @@ public class LocalAuthenticationService {
         );
         try {
             var session = sessionService.start(principal);
-            rateLimiter.loginSucceeded(clientAddress, normalizedUsername);
             log.info("Authenticated local account {}", account.getId());
             return session;
         }

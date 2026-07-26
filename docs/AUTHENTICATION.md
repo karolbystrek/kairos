@@ -121,18 +121,18 @@ email, and password.
 
 The backend:
 
-1. applies the per-client registration rate limit before BCrypt work;
-2. normalizes the username and required email;
-3. validates the shared local-account input contract;
-4. creates the tenant, first location, and active `ADMIN` account in one
+1. normalizes the username and required email;
+2. validates the shared local-account input contract;
+3. creates the tenant, first location, and active `ADMIN` account in one
    transaction;
-5. returns their identifiers and the normalized username without issuing access
+4. returns their identifiers and the normalized username without issuing access
    or refresh cookies.
 
-The default local rate limit is five attempts per client per hour. Exhaustion
-returns `429 Too Many Requests` with `Retry-After`. The in-memory limiter is
-bounded and suitable only for the current single-instance local slice;
-distributed enforcement remains required before multi-instance deployment.
+The current local slice deliberately has no application-level rate limiter for
+tenant registration, login, or refresh. Before public deployment, a dedicated
+API gateway must enforce request throttling for those routes and must be the
+non-bypassable ingress to Spring. Spring continues to own authentication
+semantics but does not maintain duplicate request-rate counters.
 
 Registration does not sign the administrator in. The panel returns to the local
 login form and the administrator authenticates through the normal login flow.
@@ -476,8 +476,8 @@ The implementation must include:
 
 * adaptive BCrypt password hashing using Spring Security;
 * generic login and account-recovery failures that prevent enumeration;
-* rate limiting for tenant registration, login, refresh, linking, and future
-  recovery endpoints;
+* gateway-enforced request throttling for tenant registration, login, refresh,
+  linking, and future recovery endpoints before public deployment;
 * validation limits on usernames and passwords, including a generous maximum
   password length to prevent denial-of-service through hashing;
 * session-family revocation on refresh-credential reuse;
@@ -496,8 +496,8 @@ Backend integration tests must cover at least:
 
 * valid anonymous tenant registration with CSRF, normalized identifiers, hashed
   credentials, no assignment, no session, and no authentication cookies;
-* tenant-registration validation, username and email conflicts, transactional
-  rollback, and rate-limit exhaustion with `Retry-After`;
+* tenant-registration validation, username and email conflicts, and
+  transactional rollback;
 * login and manager/operator provisioning by the newly registered administrator;
 * successful and failed local login;
 * unknown username, wrong password, and disabled account with equivalent public
@@ -549,8 +549,7 @@ The implemented increments complete:
 6. panel login, current-account loading, CSRF-aware staff requests, one
    lock-serialized refresh and request retry, and logout.
 7. anonymous CSRF-protected tenant registration with a required first-
-   administrator email, transactional tenant/location/account creation, and a
-   bounded per-client rate limit;
+   administrator email and transactional tenant/location/account creation;
 8. panel registration plus capability-gated administrator/manager account
    provisioning using the existing location-scoped API.
 
@@ -561,8 +560,9 @@ The following increments remain:
    used by local login. This step begins only after the local authentication and
    authorization foundation is complete.
 2. **Add RLS and operational hardening.** Establish verified database security
-   context, add policies, move rate-limit state to shared infrastructure before
-   multi-instance deployment, and extend operational security-event retention.
+   context, add policies, introduce a non-bypassable API gateway with shared
+   request throttling before public deployment, and extend operational
+   security-event retention.
 
 ## 13. Open Decisions
 
@@ -576,14 +576,25 @@ The following increments remain:
 
 ## 14. Decision Log
 
+### 2026-07-26 - Request rate limiting moved out of Spring
+
+* The in-memory authentication rate limiter and its login, refresh, and tenant-
+  registration policies were removed from the local slice.
+* The current local slice intentionally does not rate-limit those requests.
+* Before public deployment, a dedicated API gateway must enforce route- and
+  client-level throttling and must be the non-bypassable ingress to Spring.
+* Spring remains responsible for authentication semantics, credential
+  validation, refresh rotation and reuse detection, authorization, and audit
+  identity; only request-rate counters move to the future gateway.
+
 ### 2026-07-24 - Public tenant onboarding and panel provisioning implemented
 
 * Public tenant registration is the only anonymous account-creation flow. It
   atomically creates a tenant, first location, and first active administrator.
 * The first administrator requires a normalized globally unique email, but
   later manager/operator emails remain optional.
-* Registration requires CSRF, is limited to five attempts per client per hour
-  by default, creates no session, and returns the user to sign-in.
+* Registration requires CSRF, creates no session, and returns the user to
+  sign-in.
 * The panel exposes Orders and Accounts workspaces according to current-account
   capabilities. Administrators select location and role; managers are fixed to
   their assigned location and the operator role; operators have no Accounts
@@ -655,12 +666,8 @@ The following increments remain:
   across tabs in its later integration task.
 * Account provisioning is location-scoped. Disabling a provisioned account
   revokes all of its refresh sessions atomically.
-* The initial implementation rate-limits login attempts per client/account pair
-  with broader client and account guards, and refresh attempts per credential
-  with a higher per-client aggregate guard. Each API instance bounds active
-  in-memory windows at 10,000 and fails closed when that capacity is exhausted.
-  Distributed enforcement is part of the later operational hardening step
-  before multi-instance deployment.
+* The initial implementation included in-memory login and refresh rate limits.
+  That decision was superseded on 2026-07-26 by the API-gateway decision below.
 
 ### 2026-07-20 - OIDC deferred beyond the first authentication increment
 

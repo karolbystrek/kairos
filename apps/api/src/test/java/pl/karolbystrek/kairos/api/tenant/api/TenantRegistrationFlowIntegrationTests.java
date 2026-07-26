@@ -24,7 +24,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -232,38 +231,6 @@ class TenantRegistrationFlowIntegrationTests extends RedisListenerIsolatedIntegr
 
         assertThat(countAll("tenants")).isEqualTo(tenantCount);
         assertThat(countAll("locations")).isEqualTo(locationCount);
-    }
-
-    @Test
-    void rateLimitsTenantRegistrationBeforeAdditionalAccountsAreCreated() throws Exception {
-        var suffix = UUID.randomUUID().toString();
-        var csrf = bootstrapCsrf("198.51.100.20");
-
-        for (var index = 0; index < 5; index++) {
-            register(
-                registrationJson(
-                    "rate.limit." + index + "." + suffix,
-                    "rate.limit." + index + "." + suffix + "@example.com",
-                    PASSWORD
-                ),
-                csrf,
-                "198.51.100.20"
-            ).andExpect(status().isCreated());
-        }
-
-        var accountCount = countAll("accounts");
-        register(
-            registrationJson(
-                "rate.limit.rejected." + suffix,
-                "rate.limit.rejected." + suffix + "@example.com",
-                PASSWORD
-            ),
-            csrf,
-            "198.51.100.20"
-        )
-            .andExpect(status().isTooManyRequests())
-            .andExpect(header().exists(HttpHeaders.RETRY_AFTER));
-        assertThat(countAll("accounts")).isEqualTo(accountCount);
     }
 
     @Test

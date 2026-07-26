@@ -330,7 +330,7 @@ provisioning, verify:
 3. a registered administrator can provision managers and operators;
 4. a manager can provision only operators for the assigned location;
 5. an operator has no Accounts tab and direct unauthorized requests still fail;
-6. conflict, rate-limit, CSRF-recovery, and API errors remain visible.
+6. conflict, CSRF-recovery, and API errors remain visible.
 
 ## 15. Browser References
 

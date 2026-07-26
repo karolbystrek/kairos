@@ -40,10 +40,3 @@ kairos:
       absolute-lifetime: 30d
     password:
       bcrypt-strength: 12
-    rate-limit:
-      login-attempts: 10
-      login-window: 5m
-      refresh-attempts: 30
-      refresh-window: 1m
-      tenant-registration-attempts: 5
-      tenant-registration-window: 1h
