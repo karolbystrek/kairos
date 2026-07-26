@@ -45,10 +45,16 @@ public class OrderHistory {
     @Column(name = "initiator_id")
     private UUID initiatorId;
 
+    @Column(name = "initiator_api_key_id")
+    private UUID initiatorApiKeyId;
+
+    @Column(name = "initiator_api_key_version_id")
+    private UUID initiatorApiKeyVersionId;
+
     public static OrderHistory record(
-        @NonNull CustomerOrder order,
-        @NonNull OrderStatus status,
-        @NonNull Instant createdAt
+            @NonNull CustomerOrder order,
+            @NonNull OrderStatus status,
+            @NonNull Instant createdAt
     ) {
         var history = new OrderHistory();
         history.order = order;
@@ -58,14 +64,40 @@ public class OrderHistory {
     }
 
     public static OrderHistory recordByUser(
-        @NonNull CustomerOrder order,
-        @NonNull OrderStatus status,
-        @NonNull Instant createdAt,
-        @NonNull UUID accountId
+            @NonNull CustomerOrder order,
+            @NonNull OrderStatus status,
+            @NonNull Instant createdAt,
+            @NonNull UUID accountId
     ) {
         var history = record(order, status, createdAt);
         history.initiatorType = InitiatorType.USER;
         history.initiatorId = accountId;
+        return history;
+    }
+
+    public static OrderHistory recordByIntegration(
+            @NonNull CustomerOrder order,
+            @NonNull OrderStatus status,
+            @NonNull Instant createdAt,
+            @NonNull UUID integrationId,
+            @NonNull UUID apiKeyId,
+            @NonNull UUID apiKeyVersionId
+    ) {
+        var history = record(order, status, createdAt);
+        history.initiatorType = InitiatorType.INTEGRATION;
+        history.initiatorId = integrationId;
+        history.initiatorApiKeyId = apiKeyId;
+        history.initiatorApiKeyVersionId = apiKeyVersionId;
+        return history;
+    }
+
+    public static OrderHistory recordBySystem(
+            @NonNull CustomerOrder order,
+            @NonNull OrderStatus status,
+            @NonNull Instant createdAt
+    ) {
+        var history = record(order, status, createdAt);
+        history.initiatorType = InitiatorType.SYSTEM;
         return history;
     }
 }

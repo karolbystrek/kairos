@@ -37,7 +37,7 @@ class TrackedOrderApiIntegrationTests extends RedisListenerIsolatedIntegrationTe
     void returnsTheAnonymousCustomerRepresentationIncludingTerminalOrders() throws Exception {
         var trackingReference = insertOrder("42", "COMPLETED");
 
-        mockMvc.perform(apiGet("/tracked-orders/{trackingReference}", trackingReference))
+        mockMvc.perform(apiGet("/tracked-orders/v1/{trackingReference}", trackingReference))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.label").value("42"))
@@ -49,9 +49,9 @@ class TrackedOrderApiIntegrationTests extends RedisListenerIsolatedIntegrationTe
     void returnsNotFoundForUnknownAnonymousTrackingAndEventRequests() throws Exception {
         var trackingReference = UUID.randomUUID();
 
-        mockMvc.perform(apiGet("/tracked-orders/{trackingReference}", trackingReference))
+        mockMvc.perform(apiGet("/tracked-orders/v1/{trackingReference}", trackingReference))
                 .andExpect(status().isNotFound());
-        mockMvc.perform(apiGet("/tracked-orders/{trackingReference}/events", trackingReference))
+        mockMvc.perform(apiGet("/tracked-orders/v1/{trackingReference}/events", trackingReference))
                 .andExpect(status().isNotFound());
     }
 
@@ -60,10 +60,10 @@ class TrackedOrderApiIntegrationTests extends RedisListenerIsolatedIntegrationTe
         var activeReference = insertOrder("7", "READY");
         var terminalReference = insertOrder("8", "CANCELED");
 
-        mockMvc.perform(apiGet("/tracked-orders/{trackingReference}/events", activeReference))
+        mockMvc.perform(apiGet("/tracked-orders/v1/{trackingReference}/events", activeReference))
                 .andExpect(status().isOk())
                 .andExpect(request().asyncStarted());
-        mockMvc.perform(apiGet("/tracked-orders/{trackingReference}/events", terminalReference))
+        mockMvc.perform(apiGet("/tracked-orders/v1/{trackingReference}/events", terminalReference))
                 .andExpect(status().isNoContent());
     }
 

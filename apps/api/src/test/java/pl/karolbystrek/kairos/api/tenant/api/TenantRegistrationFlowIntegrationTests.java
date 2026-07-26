@@ -96,7 +96,7 @@ class TenantRegistrationFlowIntegrationTests extends RedisListenerIsolatedIntegr
         assertThat(responseCookies(result, ACCESS_COOKIE)).isEmpty();
         assertThat(responseCookies(result, REFRESH_COOKIE)).isEmpty();
 
-        mockMvc.perform(apiGet("/auth/me").secure(true))
+        mockMvc.perform(apiGet("/auth/v1/me").secure(true))
             .andExpect(status().isUnauthorized());
     }
 
@@ -111,7 +111,7 @@ class TenantRegistrationFlowIntegrationTests extends RedisListenerIsolatedIntegr
         );
 
         mockMvc.perform(withCsrf(
-                apiPost("/tenant-registrations")
+                apiPost("/tenant-registrations/v1")
                     .secure(true)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""
@@ -167,7 +167,7 @@ class TenantRegistrationFlowIntegrationTests extends RedisListenerIsolatedIntegr
     void requiresCsrfAndValidatesTheBcryptPasswordContract() throws Exception {
         var suffix = UUID.randomUUID().toString();
 
-        mockMvc.perform(apiPost("/tenant-registrations")
+        mockMvc.perform(apiPost("/tenant-registrations/v1")
                 .secure(true)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(registrationJson(
@@ -254,7 +254,7 @@ class TenantRegistrationFlowIntegrationTests extends RedisListenerIsolatedIntegr
         ).get("locationId").asText();
 
         var login = mockMvc.perform(withCsrf(
-                apiPost("/auth/login")
+                apiPost("/auth/v1/login")
                     .secure(true)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""
@@ -270,7 +270,7 @@ class TenantRegistrationFlowIntegrationTests extends RedisListenerIsolatedIntegr
         var access = activeResponseCookie(login, ACCESS_COOKIE);
         var rotatedCsrf = activeCsrfResponseCookie(login);
 
-        mockMvc.perform(apiGet("/locations")
+        mockMvc.perform(apiGet("/locations/v1")
                 .secure(true)
                 .cookie(access))
             .andExpect(status().isOk())
@@ -278,18 +278,20 @@ class TenantRegistrationFlowIntegrationTests extends RedisListenerIsolatedIntegr
 
         for (var role : List.of("MANAGER", "OPERATOR")) {
             mockMvc.perform(withCsrf(
-                    apiPost("/locations/{locationId}/accounts", locationId)
+                    apiPost("/accounts/v1")
                         .secure(true)
                         .cookie(access)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                             {
+                              "locationId": "%s",
                               "username": "%s.%s",
                               "email": null,
                               "password": "%s",
                               "role": "%s"
                             }
                             """.formatted(
+                                locationId,
                                 role.toLowerCase(),
                                 suffix,
                                 PASSWORD,
@@ -310,7 +312,7 @@ class TenantRegistrationFlowIntegrationTests extends RedisListenerIsolatedIntegr
         String clientAddress
     ) throws Exception {
         return mockMvc.perform(withCsrf(
-            apiPost("/tenant-registrations")
+            apiPost("/tenant-registrations/v1")
                 .secure(true)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json),
@@ -321,7 +323,7 @@ class TenantRegistrationFlowIntegrationTests extends RedisListenerIsolatedIntegr
 
     private Cookie bootstrapCsrf(String clientAddress) throws Exception {
         var result = mockMvc.perform(client(
-                apiGet("/auth/csrf").secure(true),
+                apiGet("/auth/v1/csrf").secure(true),
                 clientAddress
             ))
             .andExpect(status().isOk())

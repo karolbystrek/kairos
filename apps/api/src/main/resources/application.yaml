@@ -28,6 +28,7 @@ server:
     context-path: /api
 
 kairos:
+  runtime-mode: "${KAIROS_RUNTIME_MODE:api}"
   authentication:
     jwt:
       issuer: https://api.localhost
@@ -40,3 +41,17 @@ kairos:
       absolute-lifetime: 30d
     password:
       bcrypt-strength: 12
+  webhooks:
+    signing:
+      encryption-key-location: "${KAIROS_WEBHOOK_ENCRYPTION_KEY_LOCATION}"
+      rotation-overlap: 24h
+    delivery:
+      total-timeout: 10s
+      maximum-response-body-bytes: 16384
+    worker:
+      batch-size: 50
+      claim-lease: 30s
+      fanout-poll-delay: 500ms
+      delivery-poll-delay: 500ms
+      initial-delay: 1s
+    destination-policy: "${KAIROS_WEBHOOK_DESTINATION_POLICY:PUBLIC_HTTPS}"

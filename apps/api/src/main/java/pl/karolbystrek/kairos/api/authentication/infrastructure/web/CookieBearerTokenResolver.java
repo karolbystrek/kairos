@@ -31,12 +31,12 @@ public class CookieBearerTokenResolver implements BearerTokenResolver {
     }
 
     private static boolean ignoresAccessToken(String path) {
-        return path.equals("/auth/csrf")
-                || path.equals("/auth/login")
-                || path.equals("/auth/refresh")
-                || path.equals("/tenant-registrations")
-                || path.equals("/tracked-orders")
-                || path.startsWith("/tracked-orders/")
+        return path.equals("/auth/v1/csrf")
+                || path.equals("/auth/v1/login")
+                || path.equals("/auth/v1/refresh")
+                || path.equals("/tenant-registrations/v1")
+                || path.equals("/tracked-orders/v1")
+                || path.startsWith("/tracked-orders/v1/")
                 || path.equals("/actuator/health")
                 || path.startsWith("/actuator/health/");
     }

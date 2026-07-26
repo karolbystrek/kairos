@@ -88,7 +88,7 @@ class OrderServiceIntegrationTests extends RedisListenerIsolatedIntegrationTest 
         assertThat(created.trackingReference()).isNotNull();
         assertThat(locationService.listAccessible(principal)).extracting(location -> location.id())
             .containsExactly(locationId);
-        assertThat(orderService.listOrders(principal, locationId)).extracting(StaffOrderView::id)
+        assertThat(orderService.listOrders(principal, locationId, null)).extracting(StaffOrderView::id)
             .contains(created.id());
 
         var ready = orderService.updateStatus(principal, created.id(), OrderStatus.READY);
@@ -99,8 +99,8 @@ class OrderServiceIntegrationTests extends RedisListenerIsolatedIntegrationTest 
         assertThat(completed.status()).isEqualTo(OrderStatus.COMPLETED);
         assertThat(tracked.label()).isEqualTo("1");
         assertThat(tracked.status()).isEqualTo(OrderStatus.COMPLETED);
-        assertThat(orderService.listOrders(principal, locationId)).isEmpty();
-        assertThat(orderService.listTenantOrders(principal)).isEmpty();
+        assertThat(orderService.listOrders(principal, locationId, null)).isEmpty();
+        assertThat(orderService.listOrders(principal, null, null)).isEmpty();
         assertThat(historyRepository.count()).isEqualTo(3);
         assertThat(jdbcTemplate.queryForList(
             "SELECT initiator_type FROM order_history WHERE order_id = ? ORDER BY id",

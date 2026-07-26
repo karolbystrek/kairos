@@ -34,7 +34,7 @@ class SecurityFilterChainIntegrationTests extends RedisListenerIsolatedIntegrati
 
     @Test
     void bootstrapsAReadableSecureCsrfCookieAnonymously() throws Exception {
-        mockMvc.perform(apiGet("/auth/csrf").secure(true))
+        mockMvc.perform(apiGet("/auth/v1/csrf").secure(true))
                 .andExpect(status().isOk())
                 .andExpect(cookie().exists(CSRF_COOKIE))
                 .andExpect(cookie().secure(CSRF_COOKIE, true))
@@ -47,7 +47,7 @@ class SecurityFilterChainIntegrationTests extends RedisListenerIsolatedIntegrati
 
     @Test
     void returnsProblemDetailsWhenAuthenticationIsMissing() throws Exception {
-        mockMvc.perform(apiGet("/locations").secure(true))
+        mockMvc.perform(apiGet("/locations/v1").secure(true))
                 .andExpect(status().isUnauthorized())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.type").value("urn:kairos:problem:unauthorized"))
@@ -56,7 +56,7 @@ class SecurityFilterChainIntegrationTests extends RedisListenerIsolatedIntegrati
 
     @Test
     void distinguishesAMissingCsrfToken() throws Exception {
-        mockMvc.perform(apiPost("/auth/login")
+        mockMvc.perform(apiPost("/auth/v1/login")
                         .secure(true)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -70,11 +70,11 @@ class SecurityFilterChainIntegrationTests extends RedisListenerIsolatedIntegrati
 
     @Test
     void distinguishesAnInvalidCsrfToken() throws Exception {
-        var bootstrap = mockMvc.perform(apiGet("/auth/csrf").secure(true))
+        var bootstrap = mockMvc.perform(apiGet("/auth/v1/csrf").secure(true))
                 .andExpect(status().isOk())
                 .andReturn();
 
-        mockMvc.perform(apiPost("/auth/login")
+        mockMvc.perform(apiPost("/auth/v1/login")
                         .secure(true)
                         .cookie(bootstrap.getResponse().getCookie(CSRF_COOKIE))
                         .header(CSRF_HEADER, "not-the-cookie-token")
@@ -90,12 +90,12 @@ class SecurityFilterChainIntegrationTests extends RedisListenerIsolatedIntegrati
 
     @Test
     void rejectsAValidCsrfTokenSubmittedAsAFormParameterInsteadOfTheRequiredHeader() throws Exception {
-        var bootstrap = mockMvc.perform(apiGet("/auth/csrf").secure(true))
+        var bootstrap = mockMvc.perform(apiGet("/auth/v1/csrf").secure(true))
                 .andExpect(status().isOk())
                 .andReturn();
         var csrf = bootstrap.getResponse().getCookie(CSRF_COOKIE);
 
-        mockMvc.perform(apiPost("/auth/login")
+        mockMvc.perform(apiPost("/auth/v1/login")
                         .secure(true)
                         .cookie(csrf)
                         .param("_csrf", xorEncode(csrf.getValue()))

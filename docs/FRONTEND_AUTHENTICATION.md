@@ -1,7 +1,8 @@
 # Panel Frontend Authentication
 
-Status: implemented for local authentication, public tenant onboarding, and
-scoped account provisioning.
+Status: implemented for local authentication, public tenant onboarding,
+scoped account provisioning, and administrator External Integration
+management.
 
 This document explains the authentication integration in `apps/panel-app`: what
 the frontend owns, how session recovery works, and which invariants future
@@ -17,7 +18,7 @@ The panel frontend implements:
 * public tenant registration without automatic authentication;
 * a local username/password login form;
 * CSRF bootstrap and headers for cookie-authenticated unsafe requests;
-* current-account loading through `GET /api/auth/me`;
+* current-account loading through `GET /api/auth/v1/me`;
 * an SWR gate that mounts staff operations only for an authenticated account;
 * one automatic refresh attempt after `401 Unauthorized`;
 * one retry of the original request after successful recovery;
@@ -25,8 +26,10 @@ The panel frontend implements:
 * serialization of authentication-cookie mutations;
 * account-scoped SWR data and cache cleanup when authentication changes in the
   current tab;
-* capability-gated Orders and Accounts workspaces;
-* administrator and manager account-provisioning forms.
+* capability-gated Orders, Accounts, and Integrations workspaces;
+* administrator and manager account-provisioning forms;
+* administrator-only External Integration, API Key, and webhook-subscription
+  management with one-time secret confirmation.
 
 Spring Security remains the authentication and authorization authority. The
 frontend gate is a user-experience boundary, not a security boundary. Any
@@ -66,15 +69,21 @@ benefits from them without changing this browser-session model.
 | `apps/panel-app/app/page.tsx` | Server Component route that renders the client panel boundary. |
 | `apps/panel-app/components/staff-panel.tsx` | Signed-out tabs, login UI, current-account SWR state, logout UI, terminal-`401` subscription, and the authenticated workspace gate. |
 | `apps/panel-app/components/tenant-registration-form.tsx` | Public tenant-registration form and mutation state. |
-| `apps/panel-app/components/order-management.tsx` | Authenticated panel content with account-scoped SWR keys. |
+| `apps/panel-app/components/order-management.tsx` | Authenticated order-management content with account-scoped SWR keys. |
 | `apps/panel-app/components/account-management.tsx` | Capability-gated manager/operator provisioning UI. |
+| `apps/panel-app/components/integration-management.tsx` | Administrator-only External Integration workspace, integration selection, and transient one-time-secret gate. |
+| `apps/panel-app/components/integrations/` | API Key and webhook-subscription management, shared integration UI utilities, and the one-time-secret screen. |
 | `apps/panel-app/src/api/account-input.ts` | Shared Zod username, email, display-name, and BCrypt password input rules. |
 | `apps/panel-app/src/api/tenant-registrations.ts` | Zod contracts and anonymous tenant-registration request. |
 | `apps/panel-app/src/api/accounts.ts` | Zod contracts and authenticated account-provisioning request. |
-| `apps/panel-app/src/api/authentication.ts` | Zod contracts and the `/me`, login, logout, and logout-all operations. |
+| `apps/panel-app/src/api/integrations.ts` | Zod contracts and authenticated External Integration lifecycle requests. |
+| `apps/panel-app/src/api/api-keys.ts` | Zod contracts and authenticated API Key issuance, version rotation, listing, and revocation requests. |
+| `apps/panel-app/src/api/webhook-subscriptions.ts` | Zod contracts and authenticated webhook subscription and signing-secret lifecycle requests. |
+| `apps/panel-app/src/api/authentication.ts` | Zod contracts and the `/api/auth/v1/me`, login, logout, and logout-all operations. |
 | `apps/panel-app/src/api/api-fetch.ts` | Shared same-origin `fetch`, Problem Details errors, CSRF behavior, session recovery, and bounded retries. |
 | `apps/panel-app/src/api/auth-coordination.ts` | Authentication-cookie locking and a same-tab notification when authentication is required. |
 | `apps/panel-app/src/api/cache-keys.ts` | Identification of staff-owned SWR cache entries. |
+| `apps/panel-app/src/api/locations.ts` | Accessible-location response validation and request function shared by staff workspaces. |
 | `apps/panel-app/src/api/orders.ts` | Staff request module using the shared authenticated request client. |
 
 `page.tsx` stays a Server Component because it has no state, event handlers, or
@@ -97,22 +106,24 @@ token, coordination marker, or account record in `localStorage` or
 The readable `__Host-XSRF-TOKEN` cookie is deliberately different: it is a CSRF
 token, not an authentication credential. Before every unsafe request, the
 frontend ensures that this cookie exists, reads its latest value, and sends it
-in the `X-XSRF-TOKEN` header. Safe requests such as `GET /api/auth/me` do not
-bootstrap CSRF unnecessarily.
+in the `X-XSRF-TOKEN` header. Safe requests such as `GET /api/auth/v1/me` do not
+bootstrap CSRF unnecessarily. When bootstrap is required, the shared client
+uses `GET /api/auth/v1/csrf`.
 
 CSRF bootstrap is deduplicated within one tab. Public tenant registration uses
 the same CSRF-aware client, but it does not acquire the authentication-cookie
-lock because it neither reads nor mutates authentication state. When Spring returns a recognized
-missing- or invalid-CSRF Problem Details response, the client obtains a new
-token and retries that request once. Other `403 Forbidden` responses mean the
-authenticated account lacks permission and never start session refresh.
+lock because it neither reads nor mutates authentication state. When Spring
+returns a recognized missing- or invalid-CSRF Problem Details response, the
+client obtains a new token and retries that request once. Other `403 Forbidden`
+responses mean the authenticated account lacks permission and never start
+session refresh.
 
 ## 5. Initial Account Check
 
 On panel startup:
 
 1. `StaffPanel` asks SWR to run `getCurrentAccount()`.
-2. It sends `GET /api/auth/me`.
+2. It sends `GET /api/auth/v1/me`.
 3. A successful response is validated with Zod and becomes the current account.
 4. A `401` enters the common one-refresh recovery flow.
 5. If no valid refresh session remains, a same-tab notification clears staff
@@ -130,7 +141,7 @@ The login flow is:
    BCrypt's 72-byte password limit.
 2. The client initializes CSRF.
 3. It acquires the shared authentication-cookie lock.
-4. It posts the credentials to `POST /api/auth/login`.
+4. It posts the credentials to `POST /api/auth/v1/login`.
 5. Automatic `401` recovery is disabled so invalid credentials cannot start
    refresh.
 6. Spring validates the credentials, sets the authentication cookies, and
@@ -151,9 +162,10 @@ Zod trims and lowercases the username and email, validates the email, and
 enforces the 12-character and 72-UTF-8-byte BCrypt password contract. On
 success, the form clears both password values, switches to Sign in, prefills the
 normalized username returned by Spring, and shows confirmation. It does not
-mutate `/me`, authentication cookies, or staff-owned SWR state.
+mutate `/api/auth/v1/me`, authentication cookies, or staff-owned SWR state.
 
 The shared request client still initializes and recovers CSRF for registration.
+It submits registration to `POST /api/tenant-registrations/v1`.
 Automatic `401` recovery is disabled because registration is anonymous and must
 never start a refresh attempt.
 
@@ -166,11 +178,11 @@ schemas.
 When a protected request returns `401`:
 
 1. The client acquires the authentication-cookie lock.
-2. It rechecks `GET /api/auth/me` while holding the lock.
-3. If `/me` succeeds, another cooperating request or tab already refreshed the
-   shared cookies, so the client does not rotate again.
-4. If `/me` still returns `401`, the client posts
-   `POST /api/auth/refresh` once.
+2. It rechecks `GET /api/auth/v1/me` while holding the lock.
+3. If `/api/auth/v1/me` succeeds, another cooperating request or tab already
+   refreshed the shared cookies, so the client does not rotate again.
+4. If `/api/auth/v1/me` still returns `401`, the client posts
+   `POST /api/auth/v1/refresh` once.
 5. After an existing or newly recovered session is available, the original
    request is retried once while the lock is still held.
 6. A terminal `401` notifies `StaffPanel` in the current tab, clears staff-owned
@@ -179,8 +191,8 @@ When a protected request returns `401`:
 The refresh credential rotates and is single-use. All same-origin tabs in one
 browser profile share the same refresh cookie. The browser Web Lock therefore
 prevents cooperating tabs from presenting the same credential concurrently.
-The `/me` recheck is what prevents a tab that waited for the lock from
-unnecessarily rotating the replacement credential.
+The `/api/auth/v1/me` recheck is what prevents a tab that waited for the lock
+from unnecessarily rotating the replacement credential.
 
 When Web Locks are unavailable, a small module-level queue provides equivalent
 serialization only within the current tab. Cross-tab behavior is then
@@ -188,9 +200,10 @@ best-effort. The backend's credential-reuse detection remains the security
 boundary and fails closed if unsupported or non-cooperating clients race.
 
 No persistent browser marker is needed. If a refresh response is interrupted,
-a later retry first checks `/me`: it reuses replacement cookies if the browser
-received them, or lets the backend reject or recover the presented credential
-otherwise. Network and server failures remain visible so the user can retry.
+a later retry first checks `/api/auth/v1/me`: it reuses replacement cookies if
+the browser received them, or lets the backend reject or recover the presented
+credential otherwise. Network and server failures remain visible so the user
+can retry.
 
 ## 9. Logout
 
@@ -198,32 +211,35 @@ Ordinary logout:
 
 1. initializes CSRF;
 2. acquires the authentication-cookie lock;
-3. posts `POST /api/auth/logout`;
+3. posts `POST /api/auth/v1/logout`;
 4. if the access cookie expired first, performs at most one refresh and retries
    logout while retaining the lock;
 5. lets Spring revoke the refresh session and clear the cookies;
 6. clears the current account and staff-owned SWR cache entries in the current
    tab.
 
-`logoutAll()` follows the same process with `POST /api/auth/logout-all`.
+`logoutAll()` follows the same process with `POST /api/auth/v1/logout-all`.
 Other tabs reconcile on their next request, focus revalidation, or reconnect
 revalidation. Immediate cross-tab logout animation or cache clearing is not a
 requirement.
 
 ## 10. Authenticated Workspace and SWR Isolation
 
-`/api/auth/me` is the frontend authentication gate. Staff-data cache keys begin
-with `staff` and include the current account ID. Explicit login, logout, and a
-terminal `401` purge staff entries in the current tab.
+`/api/auth/v1/me` is the frontend authentication gate. Staff-data cache keys
+begin with `staff` and include the current account ID. Explicit login, logout,
+and a terminal `401` purge staff entries in the current tab.
 
-`OrderManagement` is also keyed by account ID when rendered. A different
+The authenticated workspace is keyed by account ID when rendered. A different
 account therefore receives a fresh component instance instead of inheriting the
-previous account's selected order or mutation state.
+previous account's selected order, integration, one-time secret, or mutation
+state.
 
 Operators render the Orders workspace directly. Administrators and managers
-receive HeroUI Orders and Accounts tabs according to the capabilities returned
-by `/api/auth/me`; visibility is presentation only. Administrators select an
-accessible location and either Manager or Operator. Managers use their fixed
+receive HeroUI workspace tabs according to the capabilities returned by
+`/api/auth/v1/me`; visibility is presentation only. Administrators receive
+Orders, Accounts, and Integrations. Managers receive Orders and Accounts, while
+operators receive Orders only. Administrators select an accessible location and
+either Manager or Operator for provisioning. Managers use their fixed
 assignment and the fixed Operator role.
 
 Order and account views use the same `staff/<accountId>/locations` SWR key, so
@@ -231,16 +247,41 @@ location reads are deduplicated and remain account-scoped. Successful
 provisioning shows the created account summary, clears username, email, and
 password fields, and retains the selected location and role.
 
+The Orders workspace reads `GET /api/orders/v1`. A concrete selection sends
+`locationId` as a query parameter, while a tenant administrator's All locations
+selection omits it for the aggregate active queue. Order creation uses
+`POST /api/orders/v1` with the selected `locationId` in the JSON body, and
+status changes use idempotent `PUT /api/orders/v1/{orderId}/status`. Account
+provisioning similarly sends the selected `locationId` in the JSON body to
+`POST /api/accounts/v1`.
+
+Integration, API Key, version, and webhook-subscription SWR keys also begin with
+`staff` and include the current account ID plus the owning resource identity.
+The Integrations workspace therefore participates in the same login, logout,
+terminal-`401`, focus, and reconnect behavior as Orders and Accounts. Its
+request modules use the shared authenticated client and treat frontend
+capability gating only as presentation.
+
+API Key credentials and webhook signing secrets are returned once. They remain
+only in transient React state on a dedicated confirmation screen; the
+integration workspace stays unmounted until the administrator confirms that
+the secret was copied. Rotation metadata is revalidated after that confirmation
+so the predecessor's overlap and immediate-retirement state are current without
+replacing the one-time-secret screen early. The detailed integration behavior
+and secret lifecycle remain defined in
+[`EXTERNAL_INTEGRATION_IMPLEMENTATION_PLAN.md`](EXTERNAL_INTEGRATION_IMPLEMENTATION_PLAN.md).
+
 These measures prevent normal React and SWR carryover of locations, orders, QR
-codes, and frontend-owned interaction state after the current tab observes an
-account change. They complement backend authorization; they do not replace it.
+codes, integrations, safe credential metadata, and frontend-owned interaction
+state after the current tab observes an account change. They complement backend
+authorization; they do not replace it.
 
 ## 11. Failure and Retry Rules
 
 These rules are intentional:
 
 * `401` may cause one lock-serialized refresh and one original-request retry.
-* The lock holder checks `/me` before deciding to refresh.
+* The lock holder checks `/api/auth/v1/me` before deciding to refresh.
 * Authorization `403` never causes refresh.
 * A recognized CSRF `403` may cause one CSRF bootstrap and one request retry.
 * Login never starts automatic refresh.
@@ -262,7 +303,7 @@ Preserve all of the following:
 * Route staff requests through the shared API client.
 * Use the same authentication-cookie lock for login, refresh, logout, and
   logout-all.
-* Recheck `/me` after acquiring the lock and before refreshing.
+* Recheck `/api/auth/v1/me` after acquiring the lock and before refreshing.
 * Keep refresh and original-request retries bounded to one each.
 * Never interpret an authorization `403` as an expired session.
 * Keep staff cache keys account-scoped and purge them when the current tab
@@ -275,6 +316,11 @@ Preserve all of the following:
 * Keep account-input Zod rules shared by registration and provisioning.
 * Keep the location SWR key shared and account-scoped between Orders and
   Accounts.
+* Keep Integration, API Key, version, and webhook-subscription cache keys
+  account-scoped and covered by staff-cache cleanup.
+* Keep one-time API Key and signing secrets in transient state, block the
+  management workspace until explicit copy confirmation, and revalidate
+  rotation metadata only after that confirmation.
 * Keep `page.tsx` server-side unless the route itself genuinely needs client
   APIs.
 * Update this document when the browser flow or its invariants change.
@@ -319,7 +365,11 @@ When runtime verification is explicitly requested for session recovery, verify:
 6. a refresh network failure remaining bounded and recoverable through an
    explicit retry;
 7. different accounts requiring separate profiles, private contexts, or
-   devices.
+   devices;
+8. administrator-only Integrations visibility and account-scoped integration
+   cache cleanup;
+9. one-time API Key and signing-secret screens surviving until explicit copy
+   confirmation, followed by fresh version metadata.
 
 When runtime verification is explicitly requested for registration or
 provisioning, verify:

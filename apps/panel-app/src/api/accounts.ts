@@ -38,13 +38,9 @@ export function provisionAccount(
 ): Promise<ManagedAccount> {
   const input = provisionAccountInputSchema.parse(account);
 
-  return request(
-    `/api/locations/${encodeURIComponent(locationId)}/accounts`,
-    managedAccountSchema,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input),
-    },
-  );
+  return request("/api/accounts/v1", managedAccountSchema, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ locationId, ...input }),
+  });
 }

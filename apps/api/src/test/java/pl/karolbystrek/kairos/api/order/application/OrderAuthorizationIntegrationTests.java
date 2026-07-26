@@ -85,16 +85,17 @@ class OrderAuthorizationIntegrationTests extends RedisListenerIsolatedIntegratio
             .containsExactly(locationId);
         assertThat(locationService.listAccessible(manager)).extracting(LocationView::id)
             .containsExactly(locationId);
-        assertThat(orderService.listTenantOrders(admin)).extracting(StaffOrderView::id)
+        assertThat(orderService.listOrders(admin, null, null)).extracting(StaffOrderView::id)
             .containsExactly(ownOrder.id())
             .doesNotContain(otherOrder.id());
 
-        assertThatThrownBy(() -> orderService.listOrders(manager, otherLocationId))
+        assertThatThrownBy(() -> orderService.listOrders(manager, otherLocationId, null))
             .isInstanceOf(StaffAccessDeniedException.class);
         assertThatThrownBy(() -> orderService.createOrder(operator, otherLocationId, null))
             .isInstanceOf(StaffAccessDeniedException.class);
-        assertThatThrownBy(() -> orderService.listTenantOrders(manager))
-            .isInstanceOf(StaffAccessDeniedException.class);
+        assertThat(orderService.listOrders(manager, null, null)).extracting(StaffOrderView::id)
+            .containsExactly(ownOrder.id())
+            .doesNotContain(otherOrder.id());
     }
 
     @Test

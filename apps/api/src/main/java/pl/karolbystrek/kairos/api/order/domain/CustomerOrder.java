@@ -50,6 +50,15 @@ public class CustomerOrder {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @Column(name = "external_integration_id")
+    private UUID externalIntegrationId;
+
+    @Column(name = "external_idempotency_key", length = 255)
+    private String externalIdempotencyKey;
+
+    @Column(name = "external_request_fingerprint", length = 64)
+    private String externalRequestFingerprint;
+
     public static CustomerOrder create(
             @NonNull Location location,
             @NonNull String label,
@@ -65,12 +74,31 @@ public class CustomerOrder {
         return order;
     }
 
-    public void transitionTo(@NonNull OrderStatus target, @NonNull Instant now) {
+    public static CustomerOrder createByIntegration(
+            @NonNull Location location,
+            @NonNull String label,
+            @NonNull Instant now,
+            @NonNull UUID integrationId,
+            @NonNull String idempotencyKey,
+            @NonNull String requestFingerprint
+    ) {
+        var order = create(location, label, now);
+        order.externalIntegrationId = integrationId;
+        order.externalIdempotencyKey = idempotencyKey;
+        order.externalRequestFingerprint = requestFingerprint;
+        return order;
+    }
+
+    public boolean transitionTo(@NonNull OrderStatus target, @NonNull Instant now) {
+        if (status == target) {
+            return false;
+        }
         if (!status.canTransitionTo(target)) {
             throw new InvalidOrderTransitionException(status, target);
         }
 
         status = target;
         updatedAt = now;
+        return true;
     }
 }

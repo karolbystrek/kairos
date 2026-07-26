@@ -17,10 +17,10 @@ import useSWRMutation from "swr/mutation";
 
 import { ApiError } from "@/src/api/api-fetch";
 import { staffCachePrefix, staffLocationsKey } from "@/src/api/cache-keys";
+import { listLocations } from "@/src/api/locations";
 import {
   createOrder as createOrderRequest,
   createOrderInputSchema,
-  listLocations,
   listOrders,
   updateOrderStatus,
   type OrderStatus,
@@ -30,9 +30,10 @@ import {
 
 const customerAppUrl =
   process.env.NEXT_PUBLIC_CUSTOMER_APP_URL ?? "https://app.localhost";
+const tenantOrderScope = "tenant";
 
-const ordersKey = (accountId: string, locationId: string) =>
-  [staffCachePrefix, accountId, "orders", locationId] as const;
+const ordersKey = (accountId: string, scope: string) =>
+  [staffCachePrefix, accountId, "orders", scope] as const;
 
 const statusLabels: Record<OrderStatus, string> = {
   IN_PREPARATION: "In preparation",
@@ -47,6 +48,10 @@ const nextStatuses: Partial<Record<OrderStatus, OrderStatus>> = {
 };
 
 type OrderListKey = ReturnType<typeof ordersKey>;
+type CreateMutationInput = {
+  locationId: string;
+  input: CreateOrderInput;
+};
 type StatusMutationInput = {
   orderId: string;
   status: OrderStatus;
@@ -67,10 +72,10 @@ function shouldRetryOnError(error: Error): boolean {
 }
 
 function createOrderMutation(
-  [, , , locationId]: OrderListKey,
-  { arg }: { arg: CreateOrderInput },
+  _key: OrderListKey,
+  { arg }: { arg: CreateMutationInput },
 ): Promise<StaffOrder> {
-  return createOrderRequest(locationId, arg);
+  return createOrderRequest(arg.locationId, arg.input);
 }
 
 function updateOrderMutation(
@@ -133,7 +138,13 @@ function OrderQrCode({
   );
 }
 
-export function OrderManagement({ accountId }: { accountId: string }) {
+export function OrderManagement({
+  accountId,
+  canViewTenantOrders,
+}: {
+  accountId: string;
+  canViewTenantOrders: boolean;
+}) {
   const [selectedLocationId, setSelectedLocationId] = useState<string>();
   const [selectedOrderId, setSelectedOrderId] = useState<string>();
   const [labelMode, setLabelMode] = useState<"AUTO" | "CUSTOM">("AUTO");
@@ -153,8 +164,13 @@ export function OrderManagement({ accountId }: { accountId: string }) {
     (location) => location.id === selectedLocationId,
   )
     ? selectedLocationId
-    : locations[0]?.id;
-  const currentOrdersKey = locationId ? ordersKey(accountId, locationId) : null;
+    : canViewTenantOrders
+      ? undefined
+      : locations[0]?.id;
+  const currentOrdersKey =
+    locations.length > 0
+      ? ordersKey(accountId, locationId ?? tenantOrderScope)
+      : null;
 
   const {
     data: orders = [],
@@ -164,7 +180,8 @@ export function OrderManagement({ accountId }: { accountId: string }) {
     mutate: mutateOrders,
   } = useSWR(
     currentOrdersKey,
-    ([, , , currentLocationId]) => listOrders(currentLocationId),
+    ([, , , scope]) =>
+      listOrders(scope === tenantOrderScope ? undefined : scope),
     {
       errorRetryCount: 3,
       shouldRetryOnError,
@@ -209,7 +226,10 @@ export function OrderManagement({ accountId }: { accountId: string }) {
     }
 
     setCustomLabelError(undefined);
-    const order = await triggerCreateOrder(validation.data);
+    const order = await triggerCreateOrder({
+      locationId,
+      input: validation.data,
+    });
 
     if (!order) return;
 
@@ -247,7 +267,7 @@ export function OrderManagement({ accountId }: { accountId: string }) {
     void mutateOrders(undefined, { throwOnError: false });
   }
 
-  function selectLocation(nextLocationId: string) {
+  function selectLocation(nextLocationId?: string) {
     setSelectedLocationId(nextLocationId);
     setSelectedOrderId(undefined);
     resetCreateOrder();
@@ -283,6 +303,14 @@ export function OrderManagement({ accountId }: { accountId: string }) {
           <section className="flex flex-col gap-3">
             <h2 className="text-2xl font-semibold">Location</h2>
             <div className="flex flex-wrap gap-2">
+              {canViewTenantOrders && (
+                <Button
+                  variant={locationId === undefined ? "primary" : "secondary"}
+                  onPress={() => selectLocation()}
+                >
+                  All locations
+                </Button>
+              )}
               {locations.map((location) => (
                 <Button
                   key={location.id}
@@ -295,66 +323,75 @@ export function OrderManagement({ accountId }: { accountId: string }) {
             </div>
           </section>
 
-          <section className="flex flex-col gap-3">
-            <h2 className="text-2xl font-semibold">Create order</h2>
-            <RadioGroup
-              isDisabled={isCreatingOrder}
-              name="order-label-mode"
-              orientation="horizontal"
-              value={labelMode}
-              onChange={(value) => {
-                setLabelMode(value === "CUSTOM" ? "CUSTOM" : "AUTO");
-                setCustomLabelError(undefined);
-              }}
-            >
-              <Label>Label</Label>
-              <Radio value="AUTO">
-                <Radio.Content>
-                  <Radio.Control>
-                    <Radio.Indicator />
-                  </Radio.Control>
-                  Auto
-                </Radio.Content>
-              </Radio>
-              <Radio value="CUSTOM">
-                <Radio.Content>
-                  <Radio.Control>
-                    <Radio.Indicator />
-                  </Radio.Control>
-                  Custom
-                </Radio.Content>
-              </Radio>
-            </RadioGroup>
-            {labelMode === "CUSTOM" && (
-              <TextField
-                fullWidth
-                className="max-w-sm"
+          {locationId ? (
+            <section className="flex flex-col gap-3">
+              <h2 className="text-2xl font-semibold">Create order</h2>
+              <RadioGroup
                 isDisabled={isCreatingOrder}
-                isInvalid={Boolean(customLabelError)}
-                maxLength={64}
-                name="custom-order-label"
-                value={customLabel}
+                name="order-label-mode"
+                orientation="horizontal"
+                value={labelMode}
                 onChange={(value) => {
-                  setCustomLabel(value);
+                  setLabelMode(value === "CUSTOM" ? "CUSTOM" : "AUTO");
                   setCustomLabelError(undefined);
                 }}
               >
-                <Label>Custom label</Label>
-                <Input placeholder="Table 4" />
-              </TextField>
-            )}
-            {customLabelError && (
-              <p className="text-sm text-danger">{customLabelError}</p>
-            )}
-            <Button
-              className="self-start"
-              isDisabled={isCreatingOrder}
-              variant="primary"
-              onPress={createOrder}
-            >
-              {isCreatingOrder ? "Creating…" : "Create"}
-            </Button>
-          </section>
+                <Label>Label</Label>
+                <Radio value="AUTO">
+                  <Radio.Content>
+                    <Radio.Control>
+                      <Radio.Indicator />
+                    </Radio.Control>
+                    Auto
+                  </Radio.Content>
+                </Radio>
+                <Radio value="CUSTOM">
+                  <Radio.Content>
+                    <Radio.Control>
+                      <Radio.Indicator />
+                    </Radio.Control>
+                    Custom
+                  </Radio.Content>
+                </Radio>
+              </RadioGroup>
+              {labelMode === "CUSTOM" && (
+                <TextField
+                  fullWidth
+                  className="max-w-sm"
+                  isDisabled={isCreatingOrder}
+                  isInvalid={Boolean(customLabelError)}
+                  maxLength={64}
+                  name="custom-order-label"
+                  value={customLabel}
+                  onChange={(value) => {
+                    setCustomLabel(value);
+                    setCustomLabelError(undefined);
+                  }}
+                >
+                  <Label>Custom label</Label>
+                  <Input placeholder="Table 4" />
+                </TextField>
+              )}
+              {customLabelError && (
+                <p className="text-sm text-danger">{customLabelError}</p>
+              )}
+              <Button
+                className="self-start"
+                isDisabled={isCreatingOrder}
+                variant="primary"
+                onPress={createOrder}
+              >
+                {isCreatingOrder ? "Creating…" : "Create"}
+              </Button>
+            </section>
+          ) : (
+            <section className="flex flex-col gap-2">
+              <h2 className="text-2xl font-semibold">Create order</h2>
+              <p className="text-muted">
+                Select a location before creating an order.
+              </p>
+            </section>
+          )}
 
           {selectedOrder && (
             <OrderQrCode accountId={accountId} order={selectedOrder} />
@@ -370,7 +407,11 @@ export function OrderManagement({ accountId }: { accountId: string }) {
             {areOrdersLoading ? (
               <Spinner aria-label="Loading orders" />
             ) : orders.length === 0 ? (
-              <p className="text-muted">No orders at this location.</p>
+              <p className="text-muted">
+                {locationId
+                  ? "No orders at this location."
+                  : "No orders across this tenant."}
+              </p>
             ) : (
               orders.map((order) => {
                 const nextStatus = nextStatuses[order.status];

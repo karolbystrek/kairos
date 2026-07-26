@@ -23,6 +23,7 @@ services:
 
   api:
     container_name: kairos-api
+    image: kairos-api:local
     build:
       context: ./apps/api
       dockerfile: Dockerfile
@@ -37,6 +38,51 @@ services:
       SPRING_DATA_REDIS_PORT: ${REDIS_PORT}
       KAIROS_AUTHENTICATION_JWT_PUBLIC_KEY_LOCATION: file:/run/secrets/jwt-public.pem
       KAIROS_AUTHENTICATION_JWT_PRIVATE_KEY_LOCATION: file:/run/secrets/jwt-private.pem
+      KAIROS_RUNTIME_MODE: api
+      KAIROS_WEBHOOK_ENCRYPTION_KEY_LOCATION: file:/run/secrets/webhook-encryption.bin
+      KAIROS_WEBHOOK_DESTINATION_POLICY: ${WEBHOOK_DESTINATION_POLICY:-LOCAL_DEVELOPMENT}
+    volumes:
+      - type: bind
+        source: ./secrets
+        target: /run/secrets
+        read_only: true
+        bind:
+          create_host_path: false
+    depends_on:
+      postgres:
+        condition: service_started
+      redis:
+        condition: service_started
+    develop:
+      watch:
+        - action: sync+exec
+          path: ./apps/api/src
+          target: /app/src
+          initial_sync: true
+          exec:
+            command: ./mvnw compile -DskipTests
+            working_dir: /app
+        - action: rebuild
+          path: ./apps/api/pom.xml
+    restart: unless-stopped
+
+  webhook-worker:
+    image: kairos-api:local
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+      target: development
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      SPRING_DATA_REDIS_HOST: ${REDIS_HOST}
+      SPRING_DATA_REDIS_PORT: ${REDIS_PORT}
+      KAIROS_AUTHENTICATION_JWT_PUBLIC_KEY_LOCATION: file:/run/secrets/jwt-public.pem
+      KAIROS_AUTHENTICATION_JWT_PRIVATE_KEY_LOCATION: file:/run/secrets/jwt-private.pem
+      KAIROS_RUNTIME_MODE: worker
+      KAIROS_WEBHOOK_ENCRYPTION_KEY_LOCATION: file:/run/secrets/webhook-encryption.bin
+      KAIROS_WEBHOOK_DESTINATION_POLICY: ${WEBHOOK_DESTINATION_POLICY:-LOCAL_DEVELOPMENT}
     volumes:
       - type: bind
         source: ./secrets

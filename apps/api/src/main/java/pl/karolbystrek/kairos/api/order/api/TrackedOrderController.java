@@ -15,7 +15,7 @@ import pl.karolbystrek.kairos.api.order.infrastructure.sse.OrderSseEmitterRegist
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/tracked-orders")
+@RequestMapping("/tracked-orders/v1")
 @RequiredArgsConstructor
 class TrackedOrderController {
 

@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import pl.karolbystrek.kairos.api.account.api.model.ManagedAccountResponse;
@@ -19,21 +20,21 @@ import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
 import java.util.UUID;
 
 @RestController
+@RequestMapping("/accounts/v1")
 @RequiredArgsConstructor
 class AccountController {
 
     private final AccountProvisioningService accountProvisioningService;
 
-    @PostMapping("/locations/{locationId}/accounts")
+    @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     ManagedAccountResponse provisionAccount(
         @AuthenticationPrincipal StaffPrincipal principal,
-        @PathVariable UUID locationId,
         @Valid @RequestBody ProvisionAccountRequest request
     ) {
         var account = accountProvisioningService.provision(
             principal,
-            locationId,
+            request.locationId(),
             request.username(),
             request.email(),
             request.password(),
@@ -42,7 +43,7 @@ class AccountController {
         return ManagedAccountResponse.from(account);
     }
 
-    @PatchMapping("/accounts/{accountId}/status")
+    @PatchMapping("/{accountId}/status")
     ManagedAccountResponse updateAccountStatus(
         @AuthenticationPrincipal StaffPrincipal principal,
         @PathVariable UUID accountId,

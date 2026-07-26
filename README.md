@@ -11,14 +11,17 @@ Copy the example environment file to create your local configuration:
 cp .env.example .env
 ```
 
-### 2. Create Local JWT Signing Keys
+### 2. Create Local Cryptographic Keys
 
-Generate the ignored local signing-key files with OpenSSL:
+Generate the ignored local JWT signing keys and webhook signing-secret
+encryption key with OpenSSL:
 ```bash
 ./scripts/init-jwt-keys.sh
+./scripts/init-webhook-encryption-key.sh
 ```
 
-The command is idempotent and reuses a valid existing key pair.
+Both commands are idempotent and reuse valid existing key material. Production
+deployments must provide these secrets through externally managed resources.
 
 ### 3. Build and Start the Development Environment
 Run Docker Compose with Watch enabled. Keep this terminal open while developing so frontend source changes use Next.js Fast Refresh and backend source changes are compiled before Spring Boot restarts:

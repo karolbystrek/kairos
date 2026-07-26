@@ -115,9 +115,9 @@ by integration tests.
 
 ### 4.1 Tenant registration
 
-`POST /api/tenant-registrations` is the only anonymous account-creation flow. It
-requires a valid browser CSRF token and accepts a nested administrator username,
-email, and password.
+`POST /api/tenant-registrations/v1` is the only anonymous account-creation
+flow. It requires a valid browser CSRF token and accepts a nested administrator
+username, email, and password.
 
 The backend:
 
@@ -228,8 +228,8 @@ accounts in different tabs of one browser profile.
 
 ### 4.5 Logout and revocation
 
-`POST /api/auth/logout` revokes the current refresh session and clears both
-authentication cookies. `POST /api/auth/logout-all` revokes every refresh
+`POST /api/auth/v1/logout` revokes the current refresh session and clears both
+authentication cookies. `POST /api/auth/v1/logout-all` revokes every refresh
 session owned by the current account and clears the current cookies.
 
 Disabling an account prevents new login and refresh immediately. Already-issued
@@ -238,7 +238,7 @@ operation performs an additional current-account check.
 
 ### 4.6 Current account
 
-`GET /api/auth/me` returns the current authorization context needed by the
+`GET /api/auth/v1/me` returns the current authorization context needed by the
 panel:
 
 * account ID and username;
@@ -344,7 +344,7 @@ Spring Security's SPA-specific CSRF behavior must be handled deliberately:
 An expired or missing access JWT produces `401 Unauthorized`. The panel may
 perform one refresh attempt and retry the original request once. Before
 refreshing, it acquires the authentication-cookie lock and rechecks
-`GET /api/auth/me`. If another cooperating tab already refreshed, the panel
+`GET /api/auth/v1/me`. If another cooperating tab already refreshed, the panel
 retries the original request without rotating again. `403 Forbidden` means the
 account is authenticated but lacks permission and must not trigger a refresh
 loop.
@@ -364,15 +364,17 @@ The API derives access from the authenticated account. A tenant ID, location ID,
 role, or initiator ID supplied by a client is never trusted as authorization
 evidence.
 
-Staff order operations must be changed as follows:
+Staff order operations are enforced as follows:
 
 * location listing returns only accessible locations;
-* order listing and creation require access to the path location;
+* order listing accepts an optional `locationId` query parameter, while order
+  creation carries `locationId` in its validated JSON body;
+* tenant administrators may omit the order-list location for a tenant-wide
+  active queue, while managers and operators remain constrained to their
+  assigned location;
 * order transitions derive location access through the stored order;
 * accepted staff transitions record `initiator_type = USER` and the authenticated
-  account ID;
-* tenant administrators may use an aggregate view while managers and operators
-  remain location-scoped.
+  account ID.
 
 Method- or service-level resource authorization must complement request-path
 rules. Repository queries and transactions will later establish verified tenant
@@ -382,26 +384,41 @@ and location context for PostgreSQL Row Level Security.
 
 The first authentication scope contains:
 
-* `GET /api/auth/csrf` - issue or refresh the readable CSRF cookie and return its
-  cookie and header names; the panel copies the cookie value into that header;
-* `POST /api/tenant-registrations` - anonymously create one tenant, its first
+* `GET /api/auth/v1/csrf` - issue or refresh the readable CSRF cookie and return
+  its cookie and header names; the panel copies the cookie value into that
+  header;
+* `POST /api/tenant-registrations/v1` - anonymously create one tenant, its first
   location, and its first active administrator without creating a session;
-* `POST /api/auth/login` - accept `username` and `password`, then issue cookies
+* `POST /api/auth/v1/login` - accept `username` and `password`, then issue cookies
   and return the current authorization context;
-* `POST /api/auth/refresh` - rotate the refresh credential and issue replacement
+* `POST /api/auth/v1/refresh` - rotate the refresh credential and issue
+  replacement cookies;
+* `POST /api/auth/v1/logout` - revoke the current refresh session and clear
   cookies;
-* `POST /api/auth/logout` - revoke the current refresh session and clear cookies;
-* `POST /api/auth/logout-all` - revoke all sessions for the current account and
+* `POST /api/auth/v1/logout-all` - revoke all sessions for the current account and
   clear cookies;
-* `GET /api/auth/me` - return the current authorization context;
-* `POST /api/locations/{locationId}/accounts` - provision a manager or operator
-  with an authorized provisioner-supplied initial password;
-* `PATCH /api/accounts/{accountId}/status` - activate or disable an account
+* `GET /api/auth/v1/me` - return the current authorization context;
+* `GET /api/locations/v1` - return only locations accessible to the current
+  account;
+* `POST /api/accounts/v1` - provision a manager or operator using a validated
+  JSON body containing `locationId`, username, optional email, initial password,
+  and assignment role;
+* `PATCH /api/accounts/v1/{accountId}/status` - activate or disable an account
   within the caller's provisioning authority; disabling revokes all sessions;
-* `GET /api/orders` - return the tenant-wide aggregate queue for tenant
-  administrators;
-* `GET /api/tracked-orders/{trackingReference}` - retain anonymous, read-only
-  access to the minimal customer-facing order projection.
+* `GET /api/orders/v1?locationId={optional}&status={optional}` - return an active
+  queue, using an explicit accessible location when supplied, the assigned
+  location for a manager or operator, or the tenant-wide aggregate for an
+  administrator that omits `locationId`; the optional status filter accepts
+  only active statuses;
+* `POST /api/orders/v1` - create an order using a validated JSON body containing
+  `locationId` and an optional custom label;
+* `PUT /api/orders/v1/{orderId}/status` - request the desired order status,
+  returning the unchanged order without another history entry when it is
+  already current;
+* `GET /api/tracked-orders/v1/{trackingReference}` - retain anonymous,
+  read-only access to the minimal customer-facing order projection;
+* `GET /api/tracked-orders/v1/{trackingReference}/events` - retain anonymous,
+  read-only access to the order's customer SSE stream.
 
 Local login accepts normalized usernames only. Provisioning accepts a password
 of at least 12 characters and at most 72 UTF-8 bytes, matching BCrypt's input
@@ -541,7 +558,7 @@ The implemented increments complete:
    policy;
 2. the OIDC-ready account and external-identity persistence boundary;
 3. local authentication, access-JWT issuance and validation, refresh rotation,
-   cookies, CSRF, logout, `/me`, failure handling, and tests;
+   cookies, CSRF, logout, `/api/auth/v1/me`, failure handling, and tests;
 4. staff endpoint protection, current-assignment resolution, tenant/location
    authorization, and authenticated audit identity;
 5. administrator/manager provisioning and scoped account disablement with
@@ -615,7 +632,7 @@ The following increments remain:
   mutations with one browser Web Lock when it is available. A small in-tab
   queue is the fallback when it is not.
 * After a protected request returns `401`, the lock holder rechecks
-  `GET /api/auth/me`. It refreshes only if the current access session is still
+  `GET /api/auth/v1/me`. It refreshes only if the current access session is still
   unavailable, then retries the original request once.
 * The earlier persistent `localStorage` refresh marker, storage events, and
   cross-tab authentication event state machine were removed. Authentication

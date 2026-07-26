@@ -27,7 +27,7 @@ export async function getTrackedOrder(
   trackingReference: string,
 ): Promise<CustomerOrder> {
   const response = await fetch(
-    `/api/tracked-orders/${encodeURIComponent(trackingReference)}`,
+    `/api/tracked-orders/v1/${encodeURIComponent(trackingReference)}`,
   );
 
   if (!response.ok) {

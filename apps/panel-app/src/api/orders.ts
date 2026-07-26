@@ -9,9 +9,7 @@ export const orderStatusSchema = z.enum([
   "CANCELED",
 ]);
 
-export const locationSchema = z.object({
-  id: z.uuid(),
-});
+export const activeOrderStatusSchema = z.enum(["IN_PREPARATION", "READY"]);
 
 export const staffOrderSchema = z.object({
   id: z.uuid(),
@@ -23,7 +21,6 @@ export const staffOrderSchema = z.object({
   updatedAt: z.iso.datetime({ offset: true }),
 });
 
-const locationsSchema = z.array(locationSchema);
 const staffOrdersSchema = z.array(staffOrderSchema);
 
 export const customOrderLabelSchema = z
@@ -48,17 +45,23 @@ export const createOrderInputSchema = z.discriminatedUnion("mode", [
 ]);
 
 export type OrderStatus = z.infer<typeof orderStatusSchema>;
-export type Location = z.infer<typeof locationSchema>;
+export type ActiveOrderStatus = z.infer<typeof activeOrderStatusSchema>;
 export type StaffOrder = z.infer<typeof staffOrderSchema>;
 export type CreateOrderInput = z.infer<typeof createOrderInputSchema>;
 
-export function listLocations(): Promise<Location[]> {
-  return request("/api/locations", locationsSchema);
-}
+export function listOrders(
+  locationId?: string,
+  status?: ActiveOrderStatus,
+): Promise<StaffOrder[]> {
+  const query = new URLSearchParams();
 
-export function listOrders(locationId: string): Promise<StaffOrder[]> {
+  if (locationId) query.set("locationId", locationId);
+  if (status) query.set("status", status);
+
+  const queryString = query.toString();
+
   return request(
-    `/api/locations/${encodeURIComponent(locationId)}/orders`,
+    `/api/orders/v1${queryString ? `?${queryString}` : ""}`,
     staffOrdersSchema,
   );
 }
@@ -71,15 +74,11 @@ export function createOrder(
   const body =
     parsedInput.mode === "CUSTOM" ? { label: parsedInput.label } : {};
 
-  return request(
-    `/api/locations/${encodeURIComponent(locationId)}/orders`,
-    staffOrderSchema,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    },
-  );
+  return request("/api/orders/v1", staffOrderSchema, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ locationId, ...body }),
+  });
 }
 
 export function updateOrderStatus(
@@ -87,10 +86,10 @@ export function updateOrderStatus(
   status: OrderStatus,
 ): Promise<StaffOrder> {
   return request(
-    `/api/orders/${encodeURIComponent(orderId)}/status`,
+    `/api/orders/v1/${encodeURIComponent(orderId)}/status`,
     staffOrderSchema,
     {
-      method: "PATCH",
+      method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status }),
     },

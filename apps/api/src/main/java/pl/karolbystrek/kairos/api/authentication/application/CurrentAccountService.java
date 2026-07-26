@@ -47,6 +47,7 @@ public class CurrentAccountService {
             capabilities.add("VIEW_TENANT_ORDERS");
             capabilities.add("PROVISION_MANAGERS");
             capabilities.add("PROVISION_OPERATORS");
+            capabilities.add("MANAGE_EXTERNAL_INTEGRATIONS");
         }
         else if (access.assignmentRole() == AssignmentRole.MANAGER) {
             capabilities.add("PROVISION_OPERATORS");

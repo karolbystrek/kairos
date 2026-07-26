@@ -73,15 +73,15 @@ public class SecurityConfig {
                 .authorizeHttpRequests(requests -> requests
                         .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
                         .requestMatchers(HttpMethod.GET,
-                                "/auth/csrf",
-                                "/tracked-orders/**",
+                                "/auth/v1/csrf",
+                                "/tracked-orders/v1/**",
                                 "/actuator/health",
                                 "/actuator/health/**"
                         ).permitAll()
                         .requestMatchers(HttpMethod.POST,
-                                "/auth/login",
-                                "/auth/refresh",
-                                "/tenant-registrations"
+                                "/auth/v1/login",
+                                "/auth/v1/refresh",
+                                "/tenant-registrations/v1"
                         ).permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(exceptions -> exceptions

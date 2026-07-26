@@ -53,7 +53,7 @@ function useOrderEventStream({
     enabled ? (["tracked-order-events", trackingReference] as const) : null,
     ([, reference]) => {
       const eventSource = new EventSource(
-        `/api/tracked-orders/${encodeURIComponent(reference)}/events`,
+        `/api/tracked-orders/v1/${encodeURIComponent(reference)}/events`,
       );
 
       eventSource.onopen = () => {

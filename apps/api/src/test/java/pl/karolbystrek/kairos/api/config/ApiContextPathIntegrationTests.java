@@ -26,8 +26,8 @@ class ApiContextPathIntegrationTests extends RedisListenerIsolatedIntegrationTes
     @Test
     void appliesTheConfiguredContextPathToControllersAndActuator() throws Exception {
         assertThat(contextPath).isEqualTo("/api");
-        assertThat(statusCode("/api/auth/csrf")).isEqualTo(200);
-        assertThat(statusCode("/auth/csrf")).isEqualTo(404);
+        assertThat(statusCode("/api/auth/v1/csrf")).isEqualTo(200);
+        assertThat(statusCode("/auth/v1/csrf")).isEqualTo(404);
         assertThat(statusCode("/api/actuator/health")).isIn(200, 503);
         assertThat(statusCode("/actuator/health")).isEqualTo(404);
     }

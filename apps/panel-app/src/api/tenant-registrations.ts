@@ -47,7 +47,7 @@ export function registerTenant(
   const input = tenantRegistrationInputSchema.parse(registration);
 
   return request(
-    "/api/tenant-registrations",
+    "/api/tenant-registrations/v1",
     tenantRegistrationSchema,
     {
       method: "POST",

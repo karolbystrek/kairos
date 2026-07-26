@@ -8,6 +8,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import pl.karolbystrek.kairos.api.account.application.exception.StaffAccessDeniedException;
+import pl.karolbystrek.kairos.api.order.application.exception.InvalidOrderRequestException;
 import pl.karolbystrek.kairos.api.order.application.exception.ResourceNotFoundException;
 import pl.karolbystrek.kairos.api.order.domain.InvalidOrderTransitionException;
 
@@ -22,6 +23,11 @@ class OrderExceptionHandler {
                 ? "The order request is invalid"
                 : fieldError.getDefaultMessage();
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, detail);
+    }
+
+    @ExceptionHandler(InvalidOrderRequestException.class)
+    ProblemDetail handleInvalidRequest(InvalidOrderRequestException exception) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, exception.getMessage());
     }
 
     @ExceptionHandler(ResourceNotFoundException.class)

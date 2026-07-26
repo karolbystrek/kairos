@@ -20,6 +20,7 @@ import { ZodError } from "zod";
 
 import { OrderManagement } from "@/components/order-management";
 import { AccountManagement } from "@/components/account-management";
+import { IntegrationManagement } from "@/components/integration-management";
 import { TenantRegistrationForm } from "@/components/tenant-registration-form";
 import { subscribeToAuthenticationRequired } from "@/src/api/auth-coordination";
 import { ApiError } from "@/src/api/api-fetch";
@@ -341,6 +342,13 @@ export function StaffPanel() {
     );
   }
 
+  const canProvisionAccounts = account.capabilities.includes(
+    "PROVISION_OPERATORS",
+  );
+  const canManageIntegrations = account.capabilities.includes(
+    "MANAGE_EXTERNAL_INTEGRATIONS",
+  );
+
   return (
     <div className="flex flex-col gap-8">
       <header className="flex flex-wrap items-start justify-between gap-4">
@@ -382,7 +390,7 @@ export function StaffPanel() {
         </Alert>
       )}
 
-      {account.capabilities.includes("PROVISION_OPERATORS") ? (
+      {canProvisionAccounts || canManageIntegrations ? (
         <Tabs>
           <Tabs.ListContainer>
             <Tabs.List aria-label="Staff workspace">
@@ -390,29 +398,53 @@ export function StaffPanel() {
                 Orders
                 <Tabs.Indicator />
               </Tabs.Tab>
-              <Tabs.Tab id="accounts">
-                Accounts
-                <Tabs.Indicator />
-              </Tabs.Tab>
+              {canProvisionAccounts && (
+                <Tabs.Tab id="accounts">
+                  Accounts
+                  <Tabs.Indicator />
+                </Tabs.Tab>
+              )}
+              {canManageIntegrations && (
+                <Tabs.Tab id="integrations">
+                  Integrations
+                  <Tabs.Indicator />
+                </Tabs.Tab>
+              )}
             </Tabs.List>
           </Tabs.ListContainer>
           <Tabs.Panel className="pt-6" id="orders">
             <OrderManagement
               key={`orders-${account.accountId}`}
               accountId={account.accountId}
+              canViewTenantOrders={account.capabilities.includes(
+                "VIEW_TENANT_ORDERS",
+              )}
             />
           </Tabs.Panel>
-          <Tabs.Panel className="pt-6" id="accounts">
-            <AccountManagement
-              key={`accounts-${account.accountId}`}
-              account={account}
-            />
-          </Tabs.Panel>
+          {canProvisionAccounts && (
+            <Tabs.Panel className="pt-6" id="accounts">
+              <AccountManagement
+                key={`accounts-${account.accountId}`}
+                account={account}
+              />
+            </Tabs.Panel>
+          )}
+          {canManageIntegrations && (
+            <Tabs.Panel className="pt-6" id="integrations">
+              <IntegrationManagement
+                key={`integrations-${account.accountId}`}
+                accountId={account.accountId}
+              />
+            </Tabs.Panel>
+          )}
         </Tabs>
       ) : (
         <OrderManagement
           key={account.accountId}
           accountId={account.accountId}
+          canViewTenantOrders={account.capabilities.includes(
+            "VIEW_TENANT_ORDERS",
+          )}
         />
       )}
     </div>

@@ -87,21 +87,27 @@ class OrderApiIntegrationTests extends RedisListenerIsolatedIntegrationTest {
     @Test
     void createsAutomaticAndNormalizedCustomOrders() throws Exception {
         mockMvc.perform(withAuthenticationAndCsrf(apiPost(
-                        "/locations/{locationId}/orders",
-                        locationId
+                        "/orders/v1"
                 )
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{}")))
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "locationId",
+                                locationId
+                        )))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.label").value("1"))
                 .andExpect(jsonPath("$.status").value("IN_PREPARATION"));
 
         mockMvc.perform(withAuthenticationAndCsrf(apiPost(
-                        "/locations/{locationId}/orders",
-                        locationId
+                        "/orders/v1"
                 )
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(Map.of("label", "  Table 4  ")))))
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "locationId",
+                                locationId,
+                                "label",
+                                "  Table 4  "
+                        )))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.label").value("Table 4"))
                 .andExpect(jsonPath("$.status").value("IN_PREPARATION"));
@@ -109,11 +115,15 @@ class OrderApiIntegrationTests extends RedisListenerIsolatedIntegrationTest {
 
     @Test
     void returnsClearProblemDetailsForInvalidCustomLabels() throws Exception {
-        var requestBody = objectMapper.writeValueAsString(Map.of("label", "Line 1\u2028Line 2"));
+        var requestBody = objectMapper.writeValueAsString(Map.of(
+                "locationId",
+                locationId,
+                "label",
+                "Line 1\u2028Line 2"
+        ));
 
         mockMvc.perform(withAuthenticationAndCsrf(apiPost(
-                        "/locations/{locationId}/orders",
-                        locationId
+                        "/orders/v1"
                 )
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody)))
@@ -134,8 +144,12 @@ class OrderApiIntegrationTests extends RedisListenerIsolatedIntegrationTest {
         var canceled = orderService.createOrder(principal, locationId, null);
         orderService.updateStatus(principal, canceled.id(), OrderStatus.CANCELED);
 
-        assertActiveQueue(apiGet("/locations/{locationId}/orders", locationId), inPreparation, ready);
-        assertActiveQueue(apiGet("/orders"), inPreparation, ready);
+        assertActiveQueue(
+                apiGet("/orders/v1").queryParam("locationId", locationId.toString()),
+                inPreparation,
+                ready
+        );
+        assertActiveQueue(apiGet("/orders/v1"), inPreparation, ready);
     }
 
     private void assertActiveQueue(
@@ -177,7 +191,7 @@ class OrderApiIntegrationTests extends RedisListenerIsolatedIntegrationTest {
     }
 
     private Cookie csrfCookie() throws Exception {
-        return mockMvc.perform(apiGet("/auth/csrf").secure(true))
+        return mockMvc.perform(apiGet("/auth/v1/csrf").secure(true))
                 .andExpect(status().isOk())
                 .andReturn()
                 .getResponse()

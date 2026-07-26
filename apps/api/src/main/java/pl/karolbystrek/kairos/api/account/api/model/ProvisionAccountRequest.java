@@ -7,7 +7,12 @@ import jakarta.validation.constraints.Size;
 import pl.karolbystrek.kairos.api.account.domain.assignment.AssignmentRole;
 import pl.karolbystrek.kairos.api.validation.Utf8Size;
 
+import java.util.UUID;
+
 public record ProvisionAccountRequest(
+    @NotNull(message = "Location is required")
+    UUID locationId,
+
     @NotBlank(message = "Username is required")
     @Size(max = 120, message = "Username must not exceed 120 characters")
     String username,

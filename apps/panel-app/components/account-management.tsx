@@ -23,7 +23,7 @@ import {
 } from "@/src/api/accounts";
 import { ApiError } from "@/src/api/api-fetch";
 import { staffCachePrefix, staffLocationsKey } from "@/src/api/cache-keys";
-import { listLocations } from "@/src/api/orders";
+import { listLocations } from "@/src/api/locations";
 
 type ProvisionMutationInput = {
   locationId: string;

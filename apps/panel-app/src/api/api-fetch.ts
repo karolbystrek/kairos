@@ -102,7 +102,7 @@ function readCookie(name: string): string | undefined {
 }
 
 async function fetchCsrfMetadata(): Promise<void> {
-  const response = await fetch("/api/auth/csrf", {
+  const response = await fetch("/api/auth/v1/csrf", {
     credentials: "same-origin",
     headers: { Accept: "application/json" },
   });
@@ -186,14 +186,14 @@ async function recoverSessionAndRetry(
   isAuthCookieLockHeld: boolean,
 ): Promise<Response> {
   const recoverAndRetry = async () => {
-    const currentSession = await sendWithCsrfRecovery("/api/auth/me");
+    const currentSession = await sendWithCsrfRecovery("/api/auth/v1/me");
 
     if (!currentSession.ok && currentSession.status !== 401) {
       throw await ApiError.fromResponse(currentSession);
     }
 
     if (currentSession.status === 401) {
-      const refresh = await sendWithCsrfRecovery("/api/auth/refresh", {
+      const refresh = await sendWithCsrfRecovery("/api/auth/v1/refresh", {
         method: "POST",
       });
 

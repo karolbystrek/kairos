@@ -4,6 +4,12 @@ Status: approved for implementation
 
 Decision date: 2026-07-24
 
+> **Historical route notice:** This plan records the original unversioned,
+> location-nested browser routes. The atomic route redesign in
+> [`EXTERNAL_INTEGRATION_IMPLEMENTATION_PLAN.md`](EXTERNAL_INTEGRATION_IMPLEMENTATION_PLAN.md)
+> supersedes those route shapes. Keep the older paths below as implementation
+> history; do not use them as the current HTTP contract.
+
 ## 1. Objective
 
 Complete the first usable restaurant order flow:

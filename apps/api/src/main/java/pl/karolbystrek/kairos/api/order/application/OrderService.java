@@ -1,30 +1,24 @@
 package pl.karolbystrek.kairos.api.order.application;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pl.karolbystrek.kairos.api.account.application.StaffAccessService;
-import pl.karolbystrek.kairos.api.account.application.exception.StaffAccessDeniedException;
 import pl.karolbystrek.kairos.api.account.application.model.StaffAccessContext;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
+import pl.karolbystrek.kairos.api.order.application.exception.InvalidOrderRequestException;
 import pl.karolbystrek.kairos.api.order.application.exception.ResourceNotFoundException;
+import pl.karolbystrek.kairos.api.order.application.model.OrderInitiator;
 import pl.karolbystrek.kairos.api.order.application.model.StaffOrderView;
-import pl.karolbystrek.kairos.api.order.application.model.OrderStatusChangedEvent;
 import pl.karolbystrek.kairos.api.order.application.model.TrackedOrderView;
 import pl.karolbystrek.kairos.api.location.domain.Location;
 import pl.karolbystrek.kairos.api.location.infrastructure.persistence.LocationRepository;
-import pl.karolbystrek.kairos.api.order.domain.CustomerOrder;
-import pl.karolbystrek.kairos.api.order.domain.OrderHistory;
 import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
 import pl.karolbystrek.kairos.api.order.infrastructure.persistence.CustomerOrderRepository;
-import pl.karolbystrek.kairos.api.order.infrastructure.persistence.OrderHistoryRepository;
 
 import java.time.Clock;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -33,32 +27,40 @@ public class OrderService {
 
     private final LocationRepository locationRepository;
     private final CustomerOrderRepository orderRepository;
-    private final OrderHistoryRepository historyRepository;
     private final StaffAccessService staffAccessService;
-    private final ApplicationEventPublisher eventPublisher;
+    private final OrderCommandService commandService;
     private final Clock clock;
 
     @Transactional(readOnly = true)
-    public List<StaffOrderView> listOrders(StaffPrincipal principal, UUID locationId) {
+    public List<StaffOrderView> listOrders(
+            StaffPrincipal principal,
+            UUID locationId,
+            OrderStatus status
+    ) {
         var access = staffAccessService.resolve(principal);
-        requireAccessibleLocation(access, locationId);
-        return orderRepository.findAllByLocationIdAndStatusInOrderByCreatedAtDesc(
-                        locationId,
-                        OrderStatus.activeStatuses()
-                ).stream()
-                .map(StaffOrderView::from)
-                .toList();
-    }
+        var statuses = status == null ? OrderStatus.activeStatuses() : activeStatusFilter(status);
 
-    @Transactional(readOnly = true)
-    public List<StaffOrderView> listTenantOrders(StaffPrincipal principal) {
-        var access = staffAccessService.resolve(principal);
-        if (!access.isTenantAdmin()) {
-            throw new StaffAccessDeniedException("Tenant-wide order access requires an administrator");
+        if (locationId != null) {
+            requireAccessibleLocation(access, locationId);
+            return orderRepository.findAllByLocationIdAndStatusInOrderByCreatedAtDesc(
+                            locationId,
+                            statuses
+                    ).stream()
+                    .map(StaffOrderView::from)
+                    .toList();
         }
+        if (!access.isTenantAdmin()) {
+            return orderRepository.findAllByLocationIdAndStatusInOrderByCreatedAtDesc(
+                            access.locationId(),
+                            statuses
+                    ).stream()
+                    .map(StaffOrderView::from)
+                    .toList();
+        }
+
         return orderRepository.findAllByLocationTenantIdAndStatusInOrderByCreatedAtDesc(
                         access.tenantId(),
-                        OrderStatus.activeStatuses()
+                        statuses
                 ).stream()
                 .map(StaffOrderView::from)
                 .toList();
@@ -69,15 +71,13 @@ public class OrderService {
         var access = staffAccessService.resolveForUpdate(principal);
         var location = requireAccessibleLocationForUpdate(access, locationId);
         var now = clock.instant();
-        var label = customLabel == null
-                ? Long.toString(nextAutomaticLabelNumber(locationId, now))
-                : customLabel;
-        var order = orderRepository.save(CustomerOrder.create(
+        var order = commandService.create(
                 location,
-                label,
+                customLabel,
+                OrderInitiator.user(access.accountId()),
+                null,
                 now
-        ));
-        historyRepository.save(OrderHistory.recordByUser(order, order.getStatus(), now, access.accountId()));
+        );
         return StaffOrderView.from(order);
     }
 
@@ -91,13 +91,12 @@ public class OrderService {
                 order.getLocation().getId()
         );
         var now = clock.instant();
-        order.transitionTo(target, now);
-        historyRepository.save(OrderHistory.recordByUser(order, target, now, access.accountId()));
-        eventPublisher.publishEvent(new OrderStatusChangedEvent(
-                order.getTrackingReference(),
+        commandService.updateStatus(
+                order,
                 target,
+                OrderInitiator.user(access.accountId()),
                 now
-        ));
+        );
         return StaffOrderView.from(order);
     }
 
@@ -126,16 +125,10 @@ public class OrderService {
         return location;
     }
 
-    private long nextAutomaticLabelNumber(UUID locationId, Instant now) {
-        var utcDate = LocalDate.ofInstant(now, ZoneOffset.UTC);
-        var startInclusive = utcDate.atStartOfDay(ZoneOffset.UTC).toInstant();
-        var endExclusive = utcDate.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
-        var existingOrderCount =
-                orderRepository.countByLocationIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
-                        locationId,
-                        startInclusive,
-                        endExclusive
-                );
-        return Math.addExact(existingOrderCount, 1);
+    private static Set<OrderStatus> activeStatusFilter(OrderStatus status) {
+        if (!status.isActive()) {
+            throw new InvalidOrderRequestException("Status filter must select an active order status");
+        }
+        return Set.of(status);
     }
 }

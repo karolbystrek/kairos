@@ -28,7 +28,7 @@ import static pl.karolbystrek.kairos.api.authentication.infrastructure.web.Authe
 import static pl.karolbystrek.kairos.api.authentication.infrastructure.web.AuthenticationHttpNames.CSRF_HEADER;
 
 @RestController
-@RequestMapping("/auth")
+@RequestMapping("/auth/v1")
 @RequiredArgsConstructor
 class AuthenticationController {
 

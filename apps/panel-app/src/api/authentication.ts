@@ -43,7 +43,7 @@ export type CurrentAccount = z.infer<typeof currentAccountSchema>;
 export type LoginCredentials = z.input<typeof loginCredentialsSchema>;
 
 export function getCurrentAccount(): Promise<CurrentAccount> {
-  return request("/api/auth/me", currentAccountSchema);
+  return request("/api/auth/v1/me", currentAccountSchema);
 }
 
 export async function login(
@@ -55,7 +55,7 @@ export async function login(
 
   return withAuthCookieLock(() =>
     requestWhileAuthLocked(
-      "/api/auth/login",
+      "/api/auth/v1/login",
       currentAccountSchema,
       {
         method: "POST",
@@ -71,7 +71,7 @@ export async function logout(): Promise<boolean> {
   await initializeCsrf();
 
   await withAuthCookieLock(async () => {
-    await apiFetchWhileAuthLocked("/api/auth/logout", { method: "POST" });
+    await apiFetchWhileAuthLocked("/api/auth/v1/logout", { method: "POST" });
   });
 
   return true;
@@ -81,7 +81,9 @@ export async function logoutAll(): Promise<boolean> {
   await initializeCsrf();
 
   await withAuthCookieLock(async () => {
-    await apiFetchWhileAuthLocked("/api/auth/logout-all", { method: "POST" });
+    await apiFetchWhileAuthLocked("/api/auth/v1/logout-all", {
+      method: "POST",
+    });
   });
 
   return true;

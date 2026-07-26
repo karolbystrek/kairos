@@ -88,7 +88,7 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
         assertReadableCsrfCookie(login.session().csrf());
         assertThat(login.session().csrf().getValue()).isNotEqualTo(initialCsrf.getValue());
 
-        mockMvc.perform(apiGet("/auth/me")
+        mockMvc.perform(apiGet("/auth/v1/me")
                 .secure(true)
                 .cookie(login.session().access()))
             .andExpect(status().isOk())
@@ -154,7 +154,7 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
         var initialCsrf = bootstrapCsrf("192.0.2.30");
         var login = login(operator.username(), PASSWORD, initialCsrf, "192.0.2.30");
 
-        mockMvc.perform(client(apiPost("/auth/logout")
+        mockMvc.perform(client(apiPost("/auth/v1/logout")
                 .secure(true)
                 .cookie(login.session().access(), login.session().refresh(), login.session().csrf())
                 .header(CSRF_HEADER, initialCsrf.getValue()), "192.0.2.30"))
@@ -163,7 +163,7 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
             .andExpect(jsonPath("$.type").value("urn:kairos:problem:csrf-token-invalid"));
 
         var logout = mockMvc.perform(withCsrf(
-            apiPost("/auth/logout")
+            apiPost("/auth/v1/logout")
                 .secure(true)
                 .cookie(login.session().access(), login.session().refresh()),
             login.session().csrf(),
@@ -191,7 +191,7 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
         var familyId = sessionId(initialRefresh);
 
         var rotation = mockMvc.perform(withCsrf(
-            apiPost("/auth/refresh")
+            apiPost("/auth/v1/refresh")
                 .secure(true)
                 .cookie(login.session().access(), login.session().refresh()),
             login.session().csrf(),
@@ -211,7 +211,7 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
         assertThat(replacedById(initialRefresh)).isEqualTo(sessionId(replacementRefresh.getValue()));
 
         var replay = mockMvc.perform(withCsrf(
-            apiPost("/auth/refresh")
+            apiPost("/auth/v1/refresh")
                 .secure(true)
                 .cookie(login.session().refresh()),
             login.session().csrf(),
@@ -225,7 +225,7 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
         assertThat(activeSessionsInFamily(familyId)).isZero();
 
         mockMvc.perform(withCsrf(
-            apiPost("/auth/refresh")
+            apiPost("/auth/v1/refresh")
                 .secure(true)
                 .cookie(replacementRefresh),
             login.session().csrf(),
@@ -245,7 +245,7 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
         );
 
         var logout = mockMvc.perform(withCsrf(
-            apiPost("/auth/logout")
+            apiPost("/auth/v1/logout")
                 .secure(true)
                 .cookie(first.session().access(), first.session().refresh()),
             first.session().csrf(),
@@ -258,7 +258,7 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
         assertThat(isSessionRevoked(second.session().refresh().getValue())).isFalse();
 
         var logoutAll = mockMvc.perform(withCsrf(
-            apiPost("/auth/logout-all")
+            apiPost("/auth/v1/logout-all")
                 .secure(true)
                 .cookie(second.session().access(), second.session().refresh()),
             second.session().csrf(),
@@ -271,7 +271,7 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
 
         var rotatedCsrf = activeCsrfResponseCookie(logoutAll);
         mockMvc.perform(withCsrf(
-            apiPost("/auth/refresh")
+            apiPost("/auth/v1/refresh")
                 .secure(true)
                 .cookie(second.session().refresh()),
             rotatedCsrf,
@@ -288,12 +288,12 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
         );
         var expiredAccess = new Cookie(ACCESS_COOKIE, expiredAccessToken(operator));
 
-        mockMvc.perform(apiGet("/auth/me")
+        mockMvc.perform(apiGet("/auth/v1/me")
                 .secure(true)
                 .cookie(expiredAccess))
             .andExpect(status().isUnauthorized());
 
-        var csrfBootstrap = mockMvc.perform(apiGet("/auth/csrf")
+        var csrfBootstrap = mockMvc.perform(apiGet("/auth/v1/csrf")
                 .secure(true)
                 .cookie(expiredAccess))
             .andExpect(status().isOk())
@@ -301,7 +301,7 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
         var csrf = activeCsrfResponseCookie(csrfBootstrap);
 
         mockMvc.perform(withCsrf(
-            apiPost("/auth/refresh")
+            apiPost("/auth/v1/refresh")
                 .secure(true)
                 .cookie(expiredAccess, login.session().refresh()),
             csrf,
@@ -310,7 +310,7 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
             .andExpect(status().isNoContent());
 
         var trackingReference = insertTrackedOrder(operator.locationId());
-        mockMvc.perform(apiGet("/tracked-orders/{trackingReference}", trackingReference)
+        mockMvc.perform(apiGet("/tracked-orders/v1/{trackingReference}", trackingReference)
             .secure(true)
             .cookie(expiredAccess))
             .andExpect(status().isOk())
@@ -325,7 +325,7 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
         String clientAddress
     ) throws Exception {
         var result = mockMvc.perform(withCsrf(
-            apiPost("/auth/login")
+            apiPost("/auth/v1/login")
                 .secure(true)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(loginJson(username, password)),
@@ -351,7 +351,7 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
         String clientAddress
     ) throws Exception {
         var result = mockMvc.perform(withCsrf(
-            apiPost("/auth/login")
+            apiPost("/auth/v1/login")
                 .secure(true)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(loginJson(username, password)),
@@ -370,7 +370,7 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
 
     private Cookie bootstrapCsrf(String clientAddress) throws Exception {
         var result = mockMvc.perform(client(
-            apiGet("/auth/csrf").secure(true),
+            apiGet("/auth/v1/csrf").secure(true),
             clientAddress
         ))
             .andExpect(status().isOk())
