@@ -4,6 +4,12 @@
 
 Kairos is a multi-tenant virtual pager system for restaurants. A tenant represents a customer organization, such as an independent restaurant or restaurant chain, and owns one or more physical locations. A customer scans a QR code assigned to an order and opens a lightweight web application that displays the current order state and receives real-time updates. Restaurant staff manage orders through a separate administrative panel. External systems, initially point-of-sale systems, can create and update orders through a versioned REST API and receive webhooks.
 
+Kairos replaces failure-prone physical restaurant pagers without requiring a
+customer to install a chain-specific native application for a short-lived
+transaction. It remains independently usable by restaurant staff while
+offering an optional, language-agnostic integration boundary for point-of-sale
+systems.
+
 The core system consists of three independently deployable applications:
 
 * **Customer application:** anonymous, mobile-first Next.js PWA for order tracking.
@@ -76,7 +82,48 @@ The customer application must:
 * provide clear terminal views for completed, canceled, or unknown orders;
 * keep completed and canceled tracking references readable without an expiration policy in the current scope.
 
-The current customer interface only refreshes the visible state. Wake Lock, vibration, audio, offline installation behavior, and other PWA notification features are deferred to a later frontend effort. Browser suspension may interrupt SSE delivery, so the application reconciles through REST when it becomes active again and does not promise reliable background delivery.
+The customer application is installable as one globally branded **Kairos** web
+application while remaining fully usable without installation. Installation is
+browser- or operating-system-initiated; Kairos does not show its own install
+prompt in the current scope. The installed application uses standalone display
+mode, a light-only appearance, and no orientation lock. Android Chrome and iOS
+Safari are the required installation targets, while desktop browsers must
+continue to provide the ordinary web experience.
+
+The manifest uses `Kairos Order Tracking` as its full name and `Kairos` as its
+short name. Its stable application ID and scope cover the complete customer
+origin. Home uses the ordinary root start URL. An order page exposes an
+order-aware manifest with the same stable identity and a start URL that enters
+through Home with only the tracking reference required for bootstrap.
+
+An installation initiated from an order page opens that order on the first
+installed launch while retaining one stable Kairos application identity and
+origin-wide scope. Each browser or installed-app context subsequently retains
+its own local recently tracked orders. The contexts are not synchronized with
+one another, with another device, or through the backend. This local collection
+does not establish customer identity or order ownership.
+
+The local collection retains every distinct successfully loaded order without
+an application-level count or time limit. Reopening an order refreshes its
+stored label, status, and server-provided `updatedAt` snapshot and moves it to
+the front of the collection. Home renders these stored summaries without making
+REST requests, opening SSE streams, or otherwise reconciling them. Selecting an
+entry opens its tracking page, where the normal authoritative REST and SSE flow
+resumes.
+
+After the one-time installation launch, opening the installed application
+directly reopens the most recently tracked order when its stored status is
+`IN_PREPARATION` or `READY`. When the latest stored status is terminal, or when
+no readable local collection exists, it opens Home. Home displays a centered
+empty state when local storage is empty, corrupt, unavailable, or inaccessible,
+and offers one confirmed action to clear all locally tracked orders. Terminal
+tracking views provide a home icon; active tracking views do not.
+
+The installability increment does not add a service worker, offline caching,
+Web Push, notifications, Wake Lock, vibration, audio, or reliable background
+delivery. Browser suspension may interrupt SSE delivery, so the application
+continues to reconcile through REST when it becomes active and makes no
+background-delivery promise.
 
 ### 3.3 Staff panel
 
@@ -147,8 +194,9 @@ CloudEvent ID and reject stale order snapshots by state and timestamp.
 
 Production webhook destinations require HTTPS and public network addresses.
 DNS is revalidated for delivery, redirects are not followed, and connection,
-response, and response-body handling are bounded. Only an operator-controlled
-local profile may relax HTTP and private-address restrictions.
+response, and response-body handling are bounded by a fixed ten-second total
+HTTP timeout. Only an operator-controlled local profile may relax HTTP and
+private-address restrictions.
 
 ## 4. Authentication and Security
 
@@ -156,7 +204,7 @@ local profile may relax HTTP and private-address restrictions.
 
 Spring Security is the sole authentication authority.
 
-The system supports:
+The target authentication model supports:
 
 * Kairos-managed accounts with normalized usernames and BCrypt-hashed passwords;
 * OAuth2/OIDC login, initially demonstrated with Google but configurable for another provider;
@@ -164,6 +212,31 @@ The system supports:
 * the same application authorization model regardless of login method.
 
 After either login method, Spring issues a short-lived signed access JWT and a rotating refresh credential. Browser credentials are transported in `Secure`, `HttpOnly`, `SameSite=Lax`, host-only cookies through the staff-panel origin. Cookie-authenticated state-changing requests require CSRF protection.
+
+The implemented local-authentication policy uses an RS256 access JWT with a
+five-minute lifetime, a seven-day refresh idle lifetime, and a 30-day absolute
+refresh-family lifetime. The access cookie is `__Host-access-token`, the
+refresh cookie is `__Host-refresh-token`, and both use `Path=/` with no
+`Domain` attribute. The readable CSRF cookie is `__Host-XSRF-TOKEN`; unsafe
+browser requests copy it into `X-XSRF-TOKEN`. No password, access credential,
+refresh credential, provider token, or current-account record may be stored in
+browser-managed persistent storage.
+
+The access JWT contains the issuer, audience, account ID subject, tenant ID,
+tenant-level role, issue and expiry times, and unique token ID. It does not
+contain the mutable username, email, or location assignment. The API resolves
+the current assignment and current account eligibility from PostgreSQL.
+
+Refresh credentials are opaque random values stored only as cryptographic
+hashes. Rotation locks the matching session, atomically consumes it, creates a
+replacement in the same family, and rechecks current account eligibility.
+Reuse of a consumed credential revokes the complete family. Cooperating panel
+requests serialize authentication-cookie mutations with a browser Web Lock
+when available, recheck the current account after acquiring it, and perform at
+most one refresh plus one replay of the original request. An authorization
+`403` never starts refresh. Login and anonymous tenant registration do not
+start automatic recovery; registration also does not acquire the
+authentication-cookie lock.
 
 Public tenant onboarding is the only anonymous account-creation flow. It atomically creates one tenant, its first location, and its first active administrator. The administrator requires a normalized, globally unique email address in addition to its normalized username and BCrypt-hashed password. Registration does not issue authentication cookies or sign the administrator in. During rapid development, tenants, locations, accounts, and orders have no separate display-name fields; accounts are presented by username and the other concepts by their full stable identifiers.
 
@@ -175,7 +248,13 @@ One browser profile on the staff-panel origin represents one signed-in account b
 
 The authenticated principal carries the account identity, owning tenant, and tenant-level role needed for authorization. The backend resolves the current location assignment rather than embedding mutable assignment data in the JWT. The API derives tenant and location access from the authenticated account and never trusts a tenant or location identifier merely because it was supplied by the client.
 
-The API provides operations for local login, session refresh, logout, and retrieving the current account identity, together with OAuth2/OIDC initiation and callback handling. Exact URL and payload naming belongs to the later API design rather than this requirements document.
+The API provides operations for CSRF bootstrap, local login, session refresh,
+logout, logout-all, and retrieving the current account identity.
+OAuth2/OIDC initiation, callback handling, and explicit external-identity
+linking remain deferred. A future provider email alone must never create an
+account, select a tenant, or grant access; login resolves an already linked
+immutable provider subject to the same Kairos account and session issuance used
+by local login.
 
 ### 4.2 Customer access
 
@@ -247,6 +326,54 @@ Caddy terminates TLS and routes the independently deployable services.
 * The dedicated API origin remains available for External Integration REST access. Webhook delivery originates from the separate worker and has no inbound worker endpoint.
 * The Next.js services render frontend concerns only; the Spring API owns API security.
 
+### 7.1 Current HTTP resource families
+
+The implemented browser-facing contract consists of:
+
+```text
+GET    /api/auth/v1/csrf
+POST   /api/auth/v1/login
+POST   /api/auth/v1/refresh
+POST   /api/auth/v1/logout
+POST   /api/auth/v1/logout-all
+GET    /api/auth/v1/me
+POST   /api/tenant-registrations/v1
+
+GET    /api/locations/v1
+POST   /api/accounts/v1
+PATCH  /api/accounts/v1/{accountId}/status
+
+GET    /api/orders/v1
+POST   /api/orders/v1
+PUT    /api/orders/v1/{orderId}/status
+
+GET    /api/tracked-orders/v1/{trackingReference}
+GET    /api/tracked-orders/v1/{trackingReference}/events
+```
+
+The authenticated administrator management families are
+`/api/external-integrations/v1`, `/api/api-keys/v1`,
+`/api/api-key-versions/v1`, `/api/webhook-subscriptions/v1`, and
+`/api/webhook-signing-secrets/v1`. Their lifecycle operations use the flat
+resource-family convention and never accept client-supplied tenant ownership.
+
+The implemented External Integration order contract is:
+
+```text
+GET    /api/external/orders/v1
+GET    /api/external/orders/v1/{orderId}
+POST   /api/external/orders/v1
+PUT    /api/external/orders/v1/{orderId}/status
+```
+
+Staff order listing accepts an optional `locationId` and active `status`.
+External listing accepts an opaque cursor plus optional authorized
+`locationId` and `status`. Order creation carries `locationId` and an optional
+custom label in its validated body. External creation additionally requires
+`Idempotency-Key`. Desired-state updates use idempotent `PUT`; a same-state
+request returns the unchanged representation without another history, customer
+event, or outbox event.
+
 Docker Compose provides the local environment for both frontends, the API,
 separate webhook worker, PostgreSQL, Redis, and Caddy. API and worker modes are
 built from the same Spring Boot codebase and image. The worker exposes no
@@ -275,7 +402,8 @@ business endpoint and can scale independently.
 * Local login, invalid credentials, token expiry, refresh rotation, logout, and cookie/CSRF behavior are covered by tests.
 * Anonymous tenant registration requires CSRF, creates exactly one related tenant, location, and active administrator in one transaction, requires and normalizes the administrator email, and creates no session.
 * Registration conflicts roll back the tenant and location, and successful registration returns to sign-in without automatic authentication.
-* OAuth2/OIDC login creates or links the correct account and tenant ownership.
+* When implemented, OAuth2/OIDC login creates or links the correct account and
+  tenant ownership without deriving authorization from provider email.
 * A tenant administrator can access all locations in the tenant but none in another tenant.
 * A location manager can access and manage orders only in its assigned location and can provision operator accounts only for that location.
 * A location operator can list, create, read, and update orders only in its assigned location and cannot provision accounts.
@@ -283,35 +411,93 @@ business endpoint and can scale independently.
 * Location-scoped API Keys cannot access an unassigned location, and direct order lookup outside a key's grants does not disclose that the order exists.
 * Unauthenticated, unauthorized, cross-tenant, and cross-location staff or External Integration access is rejected, including when accessing data directly through repositories protected by RLS.
 * Customer tracking works without an account, receives validated SSE invalidations only for the possessed tracking reference, and reconciles through REST after events and reconnects.
+* The customer application exposes a valid globally branded manifest and the
+  required regular, maskable, Apple touch, and favicon assets supplied for the
+  project.
+* Android Chrome and iOS Safari can install the customer application and launch
+  it in standalone mode without changing the ordinary desktop-browser
+  experience.
+* Installing from an order page opens that order once on the first installed
+  launch while preserving one stable Kairos application identity.
+* Each browser or installed-app context independently retains all distinct
+  successfully loaded orders in most-recently-opened order, using only their
+  tracking reference, label, last stored status, and server `updatedAt` value.
+* Home renders local order summaries without network or SSE activity, opens the
+  latest locally active order on subsequent installed launches, remains Home
+  when the latest stored order is terminal, tolerates unavailable or invalid
+  local storage, and can clear the collection after confirmation.
+* Installability does not register a service worker, cache order responses for
+  offline use, show an application-owned install prompt, or claim background
+  notification delivery.
 * A valid transition from either the staff panel or an External Integration produces the same persisted state, history record, customer event, and transactional outbox event.
 * Integration, API Key, API Key Version, webhook subscription, and signing-secret lifecycle changes preserve one-time secret handling and historical audit attribution.
 * Exact idempotent creation replays and same-state status commands create no duplicate order, history, outbox, or customer event.
 * Webhook delivery failure cannot roll back or corrupt the committed order transition and is retained as a terminal dead-letter record.
 * The REST and webhook contracts remain language-agnostic.
 
-## 10. Incremental Delivery
+## 10. Current Delivery Status and Roadmap
 
-The first walking vertical slice is intentionally limited to local development. Its main-flow increment provides persisted labeled-order creation and transitions in the staff panel, on-screen QR-code generation, anonymous customer state retrieval through REST, and customer-only SSE invalidation through Redis Pub/Sub. The database starts empty; tenants and locations are not seeded by production migrations.
+The current walking vertical slice is implemented for local development:
 
-The original walking slice temporarily exposed unauthenticated order-management endpoints. The backend authentication increment now protects staff operations with provisioned local accounts, tenant/location authorization, CSRF, and trusted authenticated audit identity. The panel frontend now provides local login, current-account loading, logout, automatic CSRF headers, and one refresh plus request retry after an expired access credential. Cooperating same-origin tabs serialize refresh through a browser Web Lock and recheck the current session after acquiring it, avoiding a duplicate rotation without maintaining a persistent cross-tab state machine. Authentication credentials remain in secure `HttpOnly` cookies and are not stored by the frontend. The main-flow increment replaces the temporary manual-only customer refresh with SSE invalidation plus REST reconciliation; SWR continues to call handwritten native `fetch` request modules rather than OpenAPI tooling or generated clients. PostgreSQL RLS enforcement remains required before deployment. The external contract is now versioned and language-agnostic; OpenAPI publication, rendered reference documentation, generated SDKs, and formal automated public-contract checks are deferred to the next increment.
+* persisted labeled-order creation and controlled transitions;
+* authenticated, tenant- and location-authorized staff operations;
+* public tenant onboarding and scoped manager/operator provisioning;
+* on-screen customer QR codes and anonymous tracking through REST;
+* customer-only SSE invalidation through Redis Pub/Sub with REST
+  reconciliation;
+* customer PWA manifest, order-aware first-launch, and local recently tracked
+  order behavior, with final regular, maskable, and Apple-touch PNG assets and
+  device installation acceptance still outstanding;
+* administrator-managed External Integrations, API Keys, and webhook
+  subscriptions;
+* versioned external order commands with idempotent creation and desired-state
+  updates;
+* transactional CloudEvents outbox fan-out and a separately deployable
+  single-attempt webhook worker.
 
-The in-process authentication rate limiter was removed from the local slice. Login, refresh, and tenant registration are currently not request-rate-limited. A later production ingress increment introduces a dedicated API gateway for route- and client-level throttling before these endpoints are exposed publicly; the deployment must make the gateway non-bypassable.
+The panel removes terminal orders from the active queue after an accepted
+transition and shows the customer QR code without a separate tracking-link,
+printing, or download workflow. The database starts empty. Because the local
+database was discarded while developing these increments, schema changes are
+consolidated in the initial Flyway migration rather than compatibility
+migrations.
 
-The main-flow increment originally covered staff-panel creation and transitions
-only. The subsequent External Integration increment adds administrator-managed
-integrations, versioned API Keys, external order commands, webhook
-subscriptions, transactional outbox fan-out, and the independently deployed
-single-attempt delivery worker. Live staff queue synchronization, order
-archives, label editing, printable QR artifacts, cancellation confirmation,
-alerts, and tracking-reference expiration remain outside its scope. The panel
-removes terminal orders from the active queue immediately after an accepted
-transition. It shows only the QR code for customer access and does not add a
-separate tracking-link, printing, or download workflow.
+Completing customer PWA installability requires supplying the referenced
+192×192 and 512×512 regular icons, 512×512 maskable icon, and 180×180 Apple
+touch icon, then checking installation and standalone launch behavior on
+Android Chrome and iOS Safari. The manifest and launch behavior must not be
+redesigned while completing that asset and acceptance gap.
 
-The local database was discarded before this increment, so its schema changes are consolidated into the existing initial Flyway migration rather than added as a compatibility migration. Backend and frontend automated tests are run only when explicitly requested; the implementation otherwise receives the repository's prescribed static checks.
+The next External Integration increment publishes an OpenAPI document, rendered
+public reference documentation, and formal automated public-contract checks.
+The handwritten frontend clients remain in place; generated SDKs are a later,
+separate decision.
 
-The implementation sequences and verification checklists are maintained in [`ORDER_MAIN_FLOW_IMPLEMENTATION_PLAN.md`](ORDER_MAIN_FLOW_IMPLEMENTATION_PLAN.md) and [`EXTERNAL_INTEGRATION_IMPLEMENTATION_PLAN.md`](EXTERNAL_INTEGRATION_IMPLEMENTATION_PLAN.md).
+The later authentication increment adds OAuth2/OIDC provider configuration,
+explicit identity linking, callbacks, and the same Kairos session issuance and
+authorization model used by local login. Linking must validate state, nonce,
+issuer, audience, and the provider's immutable subject. Whether linking begins
+from an authenticated account or a future administrator-created setup flow
+remains an open product decision.
 
-The staff-authentication increment implements provisioned local username/password accounts, Kairos-issued access and refresh credentials, secure cookies, CSRF protection, logout, account and session revocation, tenant/location authorization, provisioning rules, and authenticated audit identity. OAuth2/OIDC login is delivered in a later increment after that local authentication and authorization foundation is complete. The earlier increment must nevertheless keep the account schema, external-identity boundary, authenticated principal, and session-issuance services compatible with the later OIDC method so that both login methods resolve to the same Kairos account and authorization model.
+Before any public deployment:
 
-The panel now exposes public tenant onboarding and capability-gated account provisioning. Onboarding creates the first tenant administrator only; it is not general account self-registration. Authenticated administrators can provision managers and operators for accessible locations, while managers can provision only operators for their fixed location. Additional administrators, later location creation, account listing or status management, invitations, password setup links, email verification, recovery, and CAPTCHA remain outside this increment.
+* establish a verified tenant and location database security context and enable
+  PostgreSQL Row Level Security for every tenant-owned or ownership-derived
+  table;
+* introduce a non-bypassable API gateway that preserves a trustworthy client
+  address and rate-limits login, refresh, tenant registration, External
+  Integration access, and future recovery or linking routes;
+* provide externally managed JWT signing keys and webhook-secret encryption
+  keys, documented rotation procedures, security-event retention, monitoring,
+  and dependency patching.
+
+Deferred operational and product work includes live staff queue
+synchronization, order archives and search, printable QR artifacts,
+cancellation confirmation, tracking-reference expiration, account listing and
+session-management UI, additional administrators and locations, invitations,
+setup links, email verification, recovery, CAPTCHA, MFA, passkeys, webhook DLQ
+inspection and alerts, automatic webhook retry or redelivery, strict delivery
+ordering, service workers, offline caching, application-owned install prompts,
+Web Push, notifications, and native mobile variants. Any of these requires an
+explicitly approved increment and synchronized changes to this document.
