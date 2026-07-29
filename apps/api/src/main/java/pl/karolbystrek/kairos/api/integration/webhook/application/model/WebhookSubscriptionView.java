@@ -1,7 +1,7 @@
 package pl.karolbystrek.kairos.api.integration.webhook.application.model;
 
 import lombok.NonNull;
-import pl.karolbystrek.kairos.api.integration.webhook.domain.WebhookEventType;
+import pl.karolbystrek.kairos.api.order.domain.OrderEventType;
 import pl.karolbystrek.kairos.api.integration.webhook.domain.WebhookSubscription;
 import pl.karolbystrek.kairos.api.integration.webhook.domain.WebhookSubscriptionStatus;
 
@@ -17,7 +17,7 @@ public record WebhookSubscriptionView(
         @NonNull String destinationUrl,
         @NonNull WebhookSubscriptionStatus status,
         @NonNull Set<UUID> locationIds,
-        @NonNull Set<WebhookEventType> eventTypes,
+        @NonNull Set<OrderEventType> eventTypes,
         @NonNull List<WebhookSigningSecretVersionView> signingSecretVersions,
         @NonNull Instant createdAt,
         @NonNull Instant updatedAt
@@ -26,7 +26,7 @@ public record WebhookSubscriptionView(
     public static WebhookSubscriptionView from(
             WebhookSubscription subscription,
             Set<UUID> locationIds,
-            Set<WebhookEventType> eventTypes,
+            Set<OrderEventType> eventTypes,
             List<WebhookSigningSecretVersionView> signingSecretVersions
     ) {
         return new WebhookSubscriptionView(

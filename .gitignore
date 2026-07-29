@@ -11,6 +11,10 @@
 **/*.key
 **/*.pk8
 
+# Generated service worker
+/apps/customer-app/public/sw.js
+/apps/customer-app/public/sw.js.map
+
 # IDE and System Files
 .idea/
 .vscode/

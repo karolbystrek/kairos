@@ -1,4 +1,13 @@
 app.localhost {
+	@service_worker path /sw.js
+	header @service_worker {
+		Cache-Control "no-cache, no-store, must-revalidate"
+		Content-Security-Policy "default-src 'self'; script-src 'self'"
+		Content-Type "application/javascript; charset=utf-8"
+		Service-Worker-Allowed "/"
+		X-Content-Type-Options "nosniff"
+	}
+
 	handle /api/* {
 		reverse_proxy api:8080
 	}

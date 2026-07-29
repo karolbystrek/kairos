@@ -79,6 +79,7 @@ class OrderStatusRedisAdapterTests {
 
     private static OrderStatusChangedEvent event(OrderStatus status) {
         return new OrderStatusChangedEvent(
+                UUID.fromString("00000000-0000-0000-0000-000000000002"),
                 UUID.fromString("00000000-0000-0000-0000-000000000001"),
                 status,
                 Instant.parse("2026-07-24T12:00:00Z")

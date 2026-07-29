@@ -16,6 +16,7 @@ import java.util.Base64;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -110,6 +111,40 @@ class SecurityFilterChainIntegrationTests extends RedisListenerIsolatedIntegrati
     }
 
     @Test
+    void exposesNotificationConfigurationAnonymously() throws Exception {
+        mockMvc.perform(apiGet("/customer-notifications/v1/configuration").secure(true))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.applicationServerKey").isNotEmpty());
+    }
+
+    @Test
+    void keepsAnonymousNotificationMutationsCsrfProtected() throws Exception {
+        mockMvc.perform(apiPut("/customer-notifications/v1/subscription")
+                        .secure(true)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.type").value(
+                        "urn:kairos:problem:csrf-token-missing"
+                ));
+        var bootstrap = mockMvc.perform(apiGet("/auth/v1/csrf").secure(true))
+                .andExpect(status().isOk())
+                .andReturn();
+        var csrf = bootstrap.getResponse().getCookie(CSRF_COOKIE);
+
+        mockMvc.perform(apiPut("/customer-notifications/v1/subscription")
+                        .secure(true)
+                        .cookie(csrf)
+                        .header(CSRF_HEADER, csrf.getValue())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(
+                        "INVALID_CUSTOMER_PUSH_SUBSCRIPTION"
+                ));
+    }
+
+    @Test
     void permitsInternalAsyncDispatchesWithoutReauthorizingTheOriginalRequest() throws Exception {
         mockMvc.perform(apiGet("/error").with(request -> {
                     request.setDispatcherType(DispatcherType.ASYNC);
@@ -125,6 +160,10 @@ class SecurityFilterChainIntegrationTests extends RedisListenerIsolatedIntegrati
 
     private static MockHttpServletRequestBuilder apiPost(String path) {
         return post(API_CONTEXT_PATH + path).contextPath(API_CONTEXT_PATH);
+    }
+
+    private static MockHttpServletRequestBuilder apiPut(String path) {
+        return put(API_CONTEXT_PATH + path).contextPath(API_CONTEXT_PATH);
     }
 
     private static String xorEncode(String token) {

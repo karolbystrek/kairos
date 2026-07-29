@@ -2,7 +2,7 @@
 
 import { Alert, Button, Chip, Spinner } from "@heroui/react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 import useSWRSubscription from "swr/subscription";
 
@@ -16,7 +16,15 @@ import {
   isActiveOrderStatus,
   orderStatusLabels,
 } from "@/src/orders/order-status";
-import { rememberTrackedOrder } from "@/src/pwa/recently-tracked-orders";
+import { updateApplicationBadge } from "@/src/pwa/badge";
+import { NotificationControl } from "@/src/pwa/notification-control";
+import { useCustomerNotifications } from "@/src/pwa/notification-provider";
+import {
+  readTrackedOrder,
+  rememberTrackedOrder,
+  removeTrackedOrder,
+  type StoredTrackedOrder,
+} from "@/src/pwa/storage";
 
 function shouldRetryOnError(error: Error): boolean {
   return !(
@@ -93,7 +101,14 @@ export function OrderTracker({
   trackingReference: string;
 }) {
   const router = useRouter();
+  const { enrollOrder } = useCustomerNotifications();
   const [isStreamConnected, setIsStreamConnected] = useState(false);
+  const [offlineOrder, setOfflineOrder] = useState<StoredTrackedOrder | null>(
+    null,
+  );
+  const [offlineLookupComplete, setOfflineLookupComplete] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
+  const previousTransition = useRef<string | null>(null);
   const {
     data: order,
     error,
@@ -114,19 +129,75 @@ export function OrderTracker({
     },
   );
   const isOrderActive = isActive(order);
+  const displayedOrder = order ?? offlineOrder;
+  const isOfflineSnapshot = !order && offlineOrder !== null;
+
+  useEffect(() => {
+    const synchronizeConnectivity = () => {
+      setIsOnline(navigator.onLine);
+    };
+
+    synchronizeConnectivity();
+    window.addEventListener("online", synchronizeConnectivity);
+    window.addEventListener("offline", synchronizeConnectivity);
+
+    return () => {
+      window.removeEventListener("online", synchronizeConnectivity);
+      window.removeEventListener("offline", synchronizeConnectivity);
+    };
+  }, []);
 
   useEffect(() => {
     if (!order) {
       return;
     }
 
-    rememberTrackedOrder({
+    const transitionIdentity = `${order.status}:${order.updatedAt}`;
+
+    if (
+      previousTransition.current !== null &&
+      previousTransition.current !== transitionIdentity
+    ) {
+      try {
+        navigator.vibrate?.(100);
+      } catch {
+        // Foreground vibration is a best-effort progressive enhancement.
+      }
+    }
+    previousTransition.current = transitionIdentity;
+    void rememberTrackedOrder({
       trackingReference,
       label: order.label,
       status: order.status,
       updatedAt: order.updatedAt,
+    }).then(async () => {
+      await updateApplicationBadge();
+      if (isActiveOrderStatus(order.status)) {
+        await enrollOrder(trackingReference);
+      }
     });
-  }, [order, trackingReference]);
+  }, [enrollOrder, order, trackingReference]);
+
+  useEffect(() => {
+    if (!error || order) {
+      return;
+    }
+    let active = true;
+
+    void readTrackedOrder(trackingReference).then((snapshot) => {
+      if (active) {
+        setOfflineOrder(snapshot);
+        setOfflineLookupComplete(true);
+        if (snapshot) {
+          previousTransition.current = `${snapshot.status}:${snapshot.updatedAt}`;
+        }
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [error, order, trackingReference]);
 
   useOrderEventStream({
     enabled: isOrderActive,
@@ -135,18 +206,20 @@ export function OrderTracker({
     setConnected: setIsStreamConnected,
   });
 
-  if (isLoading && !order) {
+  if ((isLoading || (error && !offlineLookupComplete)) && !displayedOrder) {
     return <Spinner aria-label="Loading order" />;
   }
 
-  if (!order) {
+  if (!displayedOrder) {
     return (
       <Alert status="danger">
         <Alert.Indicator />
         <Alert.Content>
           <Alert.Title>Order unavailable</Alert.Title>
           <Alert.Description>
-            {getTrackingErrorMessage(error)}
+            {!isOnline && offlineLookupComplete
+              ? "This order has no last-known snapshot on this device. Reconnect to retrieve its status."
+              : getTrackingErrorMessage(error)}
           </Alert.Description>
         </Alert.Content>
       </Alert>
@@ -155,29 +228,47 @@ export function OrderTracker({
 
   return (
     <section className="flex flex-col items-start gap-4">
-      {error && (
+      {(error || isOfflineSnapshot) && (
         <Alert status="warning">
           <Alert.Indicator />
           <Alert.Content>
-            <Alert.Title>Status may be out of date</Alert.Title>
+            <Alert.Title>
+              {isOfflineSnapshot
+                ? "Offline snapshot"
+                : "Status may be out of date"}
+            </Alert.Title>
             <Alert.Description>
-              {getTrackingErrorMessage(error)} Showing the last known status.
+              {isOfflineSnapshot
+                ? `This is the last known status from ${new Date(displayedOrder.updatedAt).toLocaleString()}. Reconnect for the current status.`
+                : `${getTrackingErrorMessage(error)} Showing the last known status.`}
             </Alert.Description>
           </Alert.Content>
         </Alert>
       )}
       <div className="flex w-full items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-semibold">Order {order.label}</h1>
-          <p className="text-muted">Current order status</p>
+          <h1 className="text-3xl font-semibold">
+            Order {displayedOrder.label}
+          </h1>
+          <p className="text-muted">
+            {isOfflineSnapshot
+              ? "Last known order status"
+              : "Current order status"}
+          </p>
         </div>
-        {!isOrderActive && (
+        {!isActiveOrderStatus(displayedOrder.status) && (
           <Button
             isIconOnly
             aria-label="Go to recently tracked orders"
             variant="secondary"
             onPress={() => {
-              router.push("/");
+              void removeTrackedOrder(
+                trackingReference,
+                "terminal",
+                displayedOrder.status,
+              ).then(() => {
+                router.push("/");
+              });
             }}
           >
             <svg
@@ -198,14 +289,20 @@ export function OrderTracker({
           </Button>
         )}
       </div>
-      <Chip color={order.status === "READY" ? "success" : "default"} size="lg">
-        {orderStatusLabels[order.status]}
+      <Chip
+        color={displayedOrder.status === "READY" ? "success" : "default"}
+        size="lg"
+      >
+        {orderStatusLabels[displayedOrder.status]}
       </Chip>
       <p className="text-sm text-muted">
-        Updated {new Date(order.updatedAt).toLocaleString()}
+        Updated {new Date(displayedOrder.updatedAt).toLocaleString()}
       </p>
+      {isActiveOrderStatus(displayedOrder.status) && (
+        <NotificationControl primary={!isOfflineSnapshot} />
+      )}
       <Button
-        isDisabled={isValidating}
+        isDisabled={isValidating || !isOnline}
         variant="secondary"
         onPress={() => {
           void mutate(undefined, { throwOnError: false });

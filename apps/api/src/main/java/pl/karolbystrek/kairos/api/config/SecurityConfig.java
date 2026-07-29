@@ -75,6 +75,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET,
                                 "/auth/v1/csrf",
                                 "/tracked-orders/v1/**",
+                                "/customer-notifications/v1/configuration",
                                 "/actuator/health",
                                 "/actuator/health/**"
                         ).permitAll()
@@ -82,6 +83,11 @@ public class SecurityConfig {
                                 "/auth/v1/login",
                                 "/auth/v1/refresh",
                                 "/tenant-registrations/v1"
+                        ).permitAll()
+                        .requestMatchers(
+                                "/customer-notifications/v1/subscription",
+                                "/customer-notifications/v1/subscription-replacement",
+                                "/customer-notifications/v1/enrollments"
                         ).permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(exceptions -> exceptions

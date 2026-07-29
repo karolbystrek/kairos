@@ -3,10 +3,11 @@ package pl.karolbystrek.kairos.api.integration.webhook.infrastructure.persistenc
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import pl.karolbystrek.kairos.api.integration.webhook.application.OrderCloudEventFactory;
-import pl.karolbystrek.kairos.api.integration.webhook.domain.WebhookEventType;
-import pl.karolbystrek.kairos.api.integration.webhook.domain.WebhookOutboxEvent;
 import pl.karolbystrek.kairos.api.order.application.port.OrderEventOutbox;
 import pl.karolbystrek.kairos.api.order.domain.CustomerOrder;
+import pl.karolbystrek.kairos.api.order.domain.OrderEventType;
+import pl.karolbystrek.kairos.api.order.domain.OrderOutboxEvent;
+import pl.karolbystrek.kairos.api.order.infrastructure.persistence.OrderOutboxEventRepository;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -15,36 +16,39 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class JpaOrderEventOutbox implements OrderEventOutbox {
 
-    private final WebhookOutboxEventRepository outboxRepository;
+    private final OrderOutboxEventRepository outboxRepository;
     private final OrderCloudEventFactory cloudEventFactory;
 
     @Override
-    public void recordCreated(CustomerOrder order, Instant occurredAt) {
-        record(order, WebhookEventType.ORDER_CREATED, occurredAt);
+    public UUID recordCreated(CustomerOrder order, Instant occurredAt) {
+        return record(order, OrderEventType.ORDER_CREATED, occurredAt);
     }
 
     @Override
-    public void recordStatusChanged(CustomerOrder order, Instant occurredAt) {
-        record(order, WebhookEventType.forStatus(order.getStatus()), occurredAt);
+    public UUID recordStatusChanged(CustomerOrder order, Instant occurredAt) {
+        return record(order, OrderEventType.forStatus(order.getStatus()), occurredAt);
     }
 
-    private void record(
+    private UUID record(
             CustomerOrder order,
-            WebhookEventType eventType,
+            OrderEventType eventType,
             Instant occurredAt
     ) {
         var eventId = UUID.randomUUID();
         var location = order.getLocation();
         var payload = cloudEventFactory.create(eventId, eventType, order, occurredAt);
-        outboxRepository.save(WebhookOutboxEvent.create(
+        outboxRepository.saveAndFlush(OrderOutboxEvent.create(
                 eventId,
                 order.getId(),
                 location.getTenantId(),
                 location.getId(),
+                order.getTrackingReference(),
                 eventType,
+                order.getStatus(),
                 occurredAt,
                 payload,
                 occurredAt
         ));
+        return eventId;
     }
 }

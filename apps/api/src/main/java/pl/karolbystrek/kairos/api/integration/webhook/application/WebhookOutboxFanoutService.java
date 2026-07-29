@@ -8,9 +8,10 @@ import pl.karolbystrek.kairos.api.integration.webhook.domain.WebhookDeliverySign
 import pl.karolbystrek.kairos.api.integration.webhook.infrastructure.config.WebhookProperties;
 import pl.karolbystrek.kairos.api.integration.webhook.infrastructure.persistence.WebhookDeliveryRepository;
 import pl.karolbystrek.kairos.api.integration.webhook.infrastructure.persistence.WebhookDeliverySigningVersionRepository;
-import pl.karolbystrek.kairos.api.integration.webhook.infrastructure.persistence.WebhookOutboxEventRepository;
 import pl.karolbystrek.kairos.api.integration.webhook.infrastructure.persistence.WebhookSigningSecretVersionRepository;
 import pl.karolbystrek.kairos.api.integration.webhook.infrastructure.persistence.WebhookSubscriptionRepository;
+import pl.karolbystrek.kairos.api.order.domain.OrderOutboxEvent;
+import pl.karolbystrek.kairos.api.order.infrastructure.persistence.OrderOutboxEventRepository;
 
 import java.time.Clock;
 
@@ -18,7 +19,7 @@ import java.time.Clock;
 @RequiredArgsConstructor
 public class WebhookOutboxFanoutService {
 
-    private final WebhookOutboxEventRepository outboxRepository;
+    private final OrderOutboxEventRepository outboxRepository;
     private final WebhookSubscriptionRepository subscriptionRepository;
     private final WebhookSigningSecretVersionRepository signingSecretRepository;
     private final WebhookDeliveryRepository deliveryRepository;
@@ -28,14 +29,14 @@ public class WebhookOutboxFanoutService {
 
     @Transactional
     public int fanOutAvailable() {
-        var events = outboxRepository.findAvailableForFanout(properties.worker().batchSize());
+        var events = outboxRepository.findAvailableForWebhookFanout(properties.worker().batchSize());
         for (var event : events) {
             fanOut(event);
         }
         return events.size();
     }
 
-    private void fanOut(pl.karolbystrek.kairos.api.integration.webhook.domain.WebhookOutboxEvent event) {
+    private void fanOut(OrderOutboxEvent event) {
         var subscriptions = subscriptionRepository.findMatchingForFanout(
                 event.getTenantId(),
                 event.getLocationId(),
@@ -63,7 +64,7 @@ public class WebhookOutboxFanoutService {
                     event.getId(),
                     subscription.getId(),
                     subscription.getDestinationUrl(),
-                    event.getPayload(),
+                    event.getWebhookPayload(),
                     now
             ));
             deliverySigningRepository.saveAll(signingVersions.stream()
@@ -73,6 +74,6 @@ public class WebhookOutboxFanoutService {
                     ))
                     .toList());
         }
-        event.completeFanout(now);
+        event.completeWebhookFanout(now);
     }
 }

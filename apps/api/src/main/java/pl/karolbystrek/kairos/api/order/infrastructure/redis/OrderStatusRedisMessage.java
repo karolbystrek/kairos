@@ -9,15 +9,17 @@ import java.util.UUID;
 
 public record OrderStatusRedisMessage(
         int version,
+        @NonNull UUID eventId,
         @NonNull UUID trackingReference,
         @NonNull OrderStatus status,
         @NonNull Instant updatedAt
 ) {
-    public static final int CURRENT_VERSION = 1;
+    public static final int CURRENT_VERSION = 2;
 
     public static OrderStatusRedisMessage from(OrderStatusChangedEvent event) {
         return new OrderStatusRedisMessage(
                 CURRENT_VERSION,
+                event.eventId(),
                 event.trackingReference(),
                 event.status(),
                 event.updatedAt()
@@ -29,6 +31,6 @@ public record OrderStatusRedisMessage(
     }
 
     public OrderStatusChangedEvent toApplicationEvent() {
-        return new OrderStatusChangedEvent(trackingReference, status, updatedAt);
+        return new OrderStatusChangedEvent(eventId, trackingReference, status, updatedAt);
     }
 }

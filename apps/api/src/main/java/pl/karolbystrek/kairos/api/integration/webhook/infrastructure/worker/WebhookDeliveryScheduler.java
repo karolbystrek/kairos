@@ -2,7 +2,6 @@ package pl.karolbystrek.kairos.api.integration.webhook.infrastructure.worker;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import pl.karolbystrek.kairos.api.integration.webhook.application.WebhookDeliveryClaimService;
@@ -11,7 +10,6 @@ import pl.karolbystrek.kairos.api.integration.webhook.application.WebhookDeliver
 import java.util.concurrent.Executors;
 
 @Component
-@ConditionalOnProperty(name = "kairos.runtime-mode", havingValue = "worker")
 @RequiredArgsConstructor
 @Slf4j
 class WebhookDeliveryScheduler {

@@ -24,7 +24,7 @@ import pl.karolbystrek.kairos.api.integration.webhook.api.model.UpdateWebhookSub
 import pl.karolbystrek.kairos.api.integration.webhook.api.model.UpdateWebhookSubscriptionStatusRequest;
 import pl.karolbystrek.kairos.api.integration.webhook.api.model.WebhookSubscriptionResponse;
 import pl.karolbystrek.kairos.api.integration.webhook.application.WebhookSubscriptionManagementService;
-import pl.karolbystrek.kairos.api.integration.webhook.domain.WebhookEventType;
+import pl.karolbystrek.kairos.api.order.domain.OrderEventType;
 
 import java.util.List;
 import java.util.Set;
@@ -107,10 +107,10 @@ class WebhookSubscriptionController {
         subscriptionService.archive(principal, subscriptionId);
     }
 
-    private static Set<WebhookEventType> parseEventTypes(Set<String> eventTypes) {
+    private static Set<OrderEventType> parseEventTypes(Set<String> eventTypes) {
         try {
             return eventTypes.stream()
-                    .map(WebhookEventType::fromCloudEventType)
+                    .map(OrderEventType::fromCloudEventType)
                     .collect(Collectors.toUnmodifiableSet());
         } catch (IllegalArgumentException exception) {
             throw new InvalidIntegrationRequestException(exception.getMessage(), exception);

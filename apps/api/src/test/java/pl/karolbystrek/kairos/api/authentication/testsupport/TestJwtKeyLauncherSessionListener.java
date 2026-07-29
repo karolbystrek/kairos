@@ -10,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.GeneralSecurityException;
 import java.security.KeyPairGenerator;
+import java.security.spec.ECGenParameterSpec;
 import java.util.Base64;
 
 public class TestJwtKeyLauncherSessionListener implements LauncherSessionListener {
@@ -27,6 +28,19 @@ public class TestJwtKeyLauncherSessionListener implements LauncherSessionListene
             Files.createDirectories(keyDirectory);
             writePem(keyDirectory.resolve("test-jwt-public.pem"), "PUBLIC KEY", keyPair.getPublic().getEncoded());
             writePem(keyDirectory.resolve("test-jwt-private.pem"), "PRIVATE KEY", keyPair.getPrivate().getEncoded());
+            var vapidGenerator = KeyPairGenerator.getInstance("EC");
+            vapidGenerator.initialize(new ECGenParameterSpec("secp256r1"));
+            var vapidKeyPair = vapidGenerator.generateKeyPair();
+            writePem(
+                    keyDirectory.resolve("test-vapid-public.pem"),
+                    "PUBLIC KEY",
+                    vapidKeyPair.getPublic().getEncoded()
+            );
+            writePem(
+                    keyDirectory.resolve("test-vapid-private.pem"),
+                    "PRIVATE KEY",
+                    vapidKeyPair.getPrivate().getEncoded()
+            );
         } catch (GeneralSecurityException | IOException | URISyntaxException exception) {
             throw new IllegalStateException("Could not generate the JWT key pair for backend tests", exception);
         }

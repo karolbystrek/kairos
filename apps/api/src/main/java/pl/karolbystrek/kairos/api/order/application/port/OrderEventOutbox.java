@@ -4,10 +4,11 @@ import lombok.NonNull;
 import pl.karolbystrek.kairos.api.order.domain.CustomerOrder;
 
 import java.time.Instant;
+import java.util.UUID;
 
 public interface OrderEventOutbox {
 
-    void recordCreated(@NonNull CustomerOrder order, @NonNull Instant occurredAt);
+    UUID recordCreated(@NonNull CustomerOrder order, @NonNull Instant occurredAt);
 
-    void recordStatusChanged(@NonNull CustomerOrder order, @NonNull Instant occurredAt);
+    UUID recordStatusChanged(@NonNull CustomerOrder order, @NonNull Instant occurredAt);
 }

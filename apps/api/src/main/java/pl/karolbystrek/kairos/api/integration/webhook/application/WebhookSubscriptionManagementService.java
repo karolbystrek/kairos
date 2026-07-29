@@ -16,7 +16,7 @@ import pl.karolbystrek.kairos.api.integration.webhook.application.model.IssuedWe
 import pl.karolbystrek.kairos.api.integration.webhook.application.model.IssuedWebhookSubscriptionView;
 import pl.karolbystrek.kairos.api.integration.webhook.application.model.WebhookSigningSecretVersionView;
 import pl.karolbystrek.kairos.api.integration.webhook.application.model.WebhookSubscriptionView;
-import pl.karolbystrek.kairos.api.integration.webhook.domain.WebhookEventType;
+import pl.karolbystrek.kairos.api.order.domain.OrderEventType;
 import pl.karolbystrek.kairos.api.integration.webhook.domain.WebhookSigningSecretVersion;
 import pl.karolbystrek.kairos.api.integration.webhook.domain.WebhookSubscription;
 import pl.karolbystrek.kairos.api.integration.webhook.domain.WebhookSubscriptionEventSelection;
@@ -74,7 +74,7 @@ public class WebhookSubscriptionManagementService {
             String candidateName,
             String candidateDestination,
             Set<UUID> locationIds,
-            Set<WebhookEventType> eventTypes
+            Set<OrderEventType> eventTypes
     ) {
         var access = administrationAccessService.requireAdministratorForUpdate(principal);
         requireIntegration(integrationId, access.tenantId(), true);
@@ -119,7 +119,7 @@ public class WebhookSubscriptionManagementService {
             String candidateName,
             String candidateDestination,
             Set<UUID> locationIds,
-            Set<WebhookEventType> eventTypes
+            Set<OrderEventType> eventTypes
     ) {
         var access = administrationAccessService.requireAdministratorForUpdate(principal);
         var subscription = requireSubscriptionForUpdate(subscriptionId, access.tenantId());
@@ -323,7 +323,7 @@ public class WebhookSubscriptionManagementService {
     private void replaceSelections(
             WebhookSubscription subscription,
             Set<UUID> locationIds,
-            Set<WebhookEventType> eventTypes
+            Set<OrderEventType> eventTypes
     ) {
         locationAccessRepository.deleteAllBySubscriptionId(subscription.getId());
         eventSelectionRepository.deleteAllBySubscriptionId(subscription.getId());
@@ -347,7 +347,7 @@ public class WebhookSubscriptionManagementService {
     private void validateSelections(
             UUID tenantId,
             Set<UUID> locationIds,
-            Set<WebhookEventType> eventTypes
+            Set<OrderEventType> eventTypes
     ) {
         if (locationIds == null || locationIds.isEmpty()) {
             throw new InvalidIntegrationRequestException(

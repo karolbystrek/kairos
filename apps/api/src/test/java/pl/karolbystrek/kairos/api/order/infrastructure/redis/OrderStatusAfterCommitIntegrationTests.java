@@ -58,6 +58,7 @@ class OrderStatusAfterCommitIntegrationTests {
 
     private static OrderStatusChangedEvent event() {
         return new OrderStatusChangedEvent(
+                UUID.fromString("00000000-0000-0000-0000-000000000002"),
                 UUID.fromString("00000000-0000-0000-0000-000000000001"),
                 OrderStatus.READY,
                 Instant.parse("2026-07-24T12:00:00Z")

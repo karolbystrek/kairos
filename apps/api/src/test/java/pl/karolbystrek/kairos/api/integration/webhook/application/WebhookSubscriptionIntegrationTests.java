@@ -14,7 +14,7 @@ import pl.karolbystrek.kairos.api.integration.domain.ExternalIntegrationStatus;
 import pl.karolbystrek.kairos.api.integration.testsupport.IntegrationTestFixture;
 import pl.karolbystrek.kairos.api.integration.testsupport.MutableTestClock;
 import pl.karolbystrek.kairos.api.integration.testsupport.MutableTestClockConfiguration;
-import pl.karolbystrek.kairos.api.integration.webhook.domain.WebhookEventType;
+import pl.karolbystrek.kairos.api.order.domain.OrderEventType;
 import pl.karolbystrek.kairos.api.integration.webhook.domain.WebhookSubscriptionStatus;
 import pl.karolbystrek.kairos.api.order.application.OrderService;
 import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
@@ -76,7 +76,7 @@ class WebhookSubscriptionIntegrationTests extends RedisListenerIsolatedIntegrati
                 "  Order Events  ",
                 "http://127.0.0.1:9080/events",
                 Set.of(tenant.firstLocationId()),
-                Set.of(WebhookEventType.ORDER_CREATED, WebhookEventType.ORDER_READY)
+                Set.of(OrderEventType.ORDER_CREATED, OrderEventType.ORDER_READY)
         );
 
         assertThat(issued.subscription().name()).isEqualTo("Order Events");
@@ -86,8 +86,8 @@ class WebhookSubscriptionIntegrationTests extends RedisListenerIsolatedIntegrati
                 .containsExactly(tenant.firstLocationId());
         assertThat(issued.subscription().eventTypes())
                 .containsExactlyInAnyOrder(
-                        WebhookEventType.ORDER_CREATED,
-                        WebhookEventType.ORDER_READY
+                        OrderEventType.ORDER_CREATED,
+                        OrderEventType.ORDER_READY
                 );
         var encrypted = jdbcTemplate.queryForObject(
                 """
@@ -113,7 +113,7 @@ class WebhookSubscriptionIntegrationTests extends RedisListenerIsolatedIntegrati
                 "order events",
                 "http://127.0.0.1:9081/events",
                 Set.of(tenant.firstLocationId()),
-                Set.of(WebhookEventType.ORDER_CREATED)
+                Set.of(OrderEventType.ORDER_CREATED)
         )).isInstanceOf(IntegrationConflictException.class);
         assertThatThrownBy(() -> subscriptionService.list(
                 tenant.manager(),
@@ -123,7 +123,7 @@ class WebhookSubscriptionIntegrationTests extends RedisListenerIsolatedIntegrati
 
     @Test
     void rotatesWithOverlapAndAllowsImmediatePredecessorRetirement() {
-        var issued = createSubscription(Set.of(WebhookEventType.ORDER_CREATED));
+        var issued = createSubscription(Set.of(OrderEventType.ORDER_CREATED));
         clock.advance(Duration.ofMinutes(10));
         var replacement = subscriptionService.rotateSigningSecret(
                 tenant.administrator(),
@@ -152,7 +152,7 @@ class WebhookSubscriptionIntegrationTests extends RedisListenerIsolatedIntegrati
 
     @Test
     void filtersFanoutAndSerializesACompleteSafeCloudEventSnapshot() throws Exception {
-        var issued = createSubscription(Set.of(WebhookEventType.ORDER_READY));
+        var issued = createSubscription(Set.of(OrderEventType.ORDER_READY));
         subscriptionService.changeStatus(
                 tenant.administrator(),
                 issued.subscription().id(),
@@ -165,7 +165,7 @@ class WebhookSubscriptionIntegrationTests extends RedisListenerIsolatedIntegrati
                 "Pickup 4"
         );
         assertThat(jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM webhook_outbox_events WHERE order_id = ?",
+                "SELECT COUNT(*) FROM order_outbox_events WHERE order_id = ?",
                 Long.class,
                 order.id()
         )).isEqualTo(1);
@@ -208,7 +208,7 @@ class WebhookSubscriptionIntegrationTests extends RedisListenerIsolatedIntegrati
 
     @Test
     void doesNotReplayEventsMissedWhileIntegrationWasDisabled() {
-        var issued = createSubscription(Set.of(WebhookEventType.ORDER_CREATED));
+        var issued = createSubscription(Set.of(OrderEventType.ORDER_CREATED));
         subscriptionService.changeStatus(
                 tenant.administrator(),
                 issued.subscription().id(),
@@ -241,7 +241,7 @@ class WebhookSubscriptionIntegrationTests extends RedisListenerIsolatedIntegrati
     }
 
     private pl.karolbystrek.kairos.api.integration.webhook.application.model.IssuedWebhookSubscriptionView
-    createSubscription(Set<WebhookEventType> eventTypes) {
+    createSubscription(Set<OrderEventType> eventTypes) {
         return subscriptionService.create(
                 tenant.administrator(),
                 integrationId,

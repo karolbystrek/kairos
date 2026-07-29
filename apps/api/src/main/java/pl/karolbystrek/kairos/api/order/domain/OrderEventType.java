@@ -1,11 +1,10 @@
-package pl.karolbystrek.kairos.api.integration.webhook.domain;
+package pl.karolbystrek.kairos.api.order.domain;
 
 import lombok.NonNull;
-import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
 
 import java.util.Arrays;
 
-public enum WebhookEventType {
+public enum OrderEventType {
     ORDER_CREATED("order.created"),
     ORDER_READY("order.ready"),
     ORDER_COMPLETED("order.completed"),
@@ -13,7 +12,7 @@ public enum WebhookEventType {
 
     private final String cloudEventType;
 
-    WebhookEventType(String cloudEventType) {
+    OrderEventType(String cloudEventType) {
         this.cloudEventType = cloudEventType;
     }
 
@@ -21,7 +20,7 @@ public enum WebhookEventType {
         return cloudEventType;
     }
 
-    public static WebhookEventType fromCloudEventType(@NonNull String candidate) {
+    public static OrderEventType fromCloudEventType(@NonNull String candidate) {
         return Arrays.stream(values())
                 .filter(eventType -> eventType.cloudEventType.equals(candidate))
                 .findFirst()
@@ -30,7 +29,7 @@ public enum WebhookEventType {
                 ));
     }
 
-    public static WebhookEventType forStatus(@NonNull OrderStatus status) {
+    public static OrderEventType forStatus(@NonNull OrderStatus status) {
         return switch (status) {
             case READY -> ORDER_READY;
             case COMPLETED -> ORDER_COMPLETED;

@@ -7,18 +7,30 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
     restart: unless-stopped
 
   redis:
     image: redis:8-alpine
     container_name: kairos-redis
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
     restart: unless-stopped
 
   api:
@@ -27,7 +39,7 @@ services:
     build:
       context: ./apps/api
       dockerfile: Dockerfile
-      target: development
+      target: runner
     expose:
       - "8080"
     environment:
@@ -38,7 +50,11 @@ services:
       SPRING_DATA_REDIS_PORT: ${REDIS_PORT}
       KAIROS_AUTHENTICATION_JWT_PUBLIC_KEY_LOCATION: file:/run/secrets/jwt-public.pem
       KAIROS_AUTHENTICATION_JWT_PRIVATE_KEY_LOCATION: file:/run/secrets/jwt-private.pem
-      KAIROS_RUNTIME_MODE: api
+      KAIROS_PUSH_DESTINATION_POLICY: ${PUSH_DESTINATION_POLICY:-PUBLIC_HTTPS}
+      KAIROS_PUSH_SUBSCRIPTION_ENCRYPTION_KEY_LOCATION: file:/run/secrets/push-subscription-encryption.bin
+      KAIROS_PUSH_VAPID_PRIVATE_KEY_LOCATION: file:/run/secrets/vapid-private.pem
+      KAIROS_PUSH_VAPID_PUBLIC_KEY_LOCATION: file:/run/secrets/vapid-public.pem
+      KAIROS_PUSH_VAPID_SUBJECT: mailto:kairos@localhost
       KAIROS_WEBHOOK_ENCRYPTION_KEY_LOCATION: file:/run/secrets/webhook-encryption.bin
       KAIROS_WEBHOOK_DESTINATION_POLICY: ${WEBHOOK_DESTINATION_POLICY:-LOCAL_DEVELOPMENT}
     volumes:
@@ -50,62 +66,15 @@ services:
           create_host_path: false
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
       redis:
-        condition: service_started
-    develop:
-      watch:
-        - action: sync+exec
-          path: ./apps/api/src
-          target: /app/src
-          initial_sync: true
-          exec:
-            command: ./mvnw compile -DskipTests
-            working_dir: /app
-        - action: rebuild
-          path: ./apps/api/pom.xml
-    restart: unless-stopped
-
-  webhook-worker:
-    image: kairos-api:local
-    build:
-      context: ./apps/api
-      dockerfile: Dockerfile
-      target: development
-    environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
-      SPRING_DATA_REDIS_HOST: ${REDIS_HOST}
-      SPRING_DATA_REDIS_PORT: ${REDIS_PORT}
-      KAIROS_AUTHENTICATION_JWT_PUBLIC_KEY_LOCATION: file:/run/secrets/jwt-public.pem
-      KAIROS_AUTHENTICATION_JWT_PRIVATE_KEY_LOCATION: file:/run/secrets/jwt-private.pem
-      KAIROS_RUNTIME_MODE: worker
-      KAIROS_WEBHOOK_ENCRYPTION_KEY_LOCATION: file:/run/secrets/webhook-encryption.bin
-      KAIROS_WEBHOOK_DESTINATION_POLICY: ${WEBHOOK_DESTINATION_POLICY:-LOCAL_DEVELOPMENT}
-    volumes:
-      - type: bind
-        source: ./secrets
-        target: /run/secrets
-        read_only: true
-        bind:
-          create_host_path: false
-    depends_on:
-      postgres:
-        condition: service_started
-      redis:
-        condition: service_started
-    develop:
-      watch:
-        - action: sync+exec
-          path: ./apps/api/src
-          target: /app/src
-          initial_sync: true
-          exec:
-            command: ./mvnw compile -DskipTests
-            working_dir: /app
-        - action: rebuild
-          path: ./apps/api/pom.xml
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8080/api/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     restart: unless-stopped
 
   customer-app:
@@ -113,24 +82,18 @@ services:
     build:
       context: ./apps/customer-app
       dockerfile: Dockerfile
-      target: development
+      target: runner
     expose:
       - "3000"
     depends_on:
-      - api
-    develop:
-      watch:
-        - action: sync
-          path: ./apps/customer-app
-          target: /app
-          initial_sync: true
-          ignore:
-            - node_modules/
-            - .next/
-        - action: rebuild
-          path: ./apps/customer-app/package.json
-        - action: rebuild
-          path: ./apps/customer-app/package-lock.json
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
     restart: unless-stopped
 
   panel-app:
@@ -138,24 +101,18 @@ services:
     build:
       context: ./apps/panel-app
       dockerfile: Dockerfile
-      target: development
+      target: runner
     expose:
       - "3000"
     depends_on:
-      - api
-    develop:
-      watch:
-        - action: sync
-          path: ./apps/panel-app
-          target: /app
-          initial_sync: true
-          ignore:
-            - node_modules/
-            - .next/
-        - action: rebuild
-          path: ./apps/panel-app/package.json
-        - action: rebuild
-          path: ./apps/panel-app/package-lock.json
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
     restart: unless-stopped
 
   caddy:
@@ -169,9 +126,12 @@ services:
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
-      - customer-app
-      - panel-app
-      - api
+      customer-app:
+        condition: service_healthy
+      panel-app:
+        condition: service_healthy
+      api:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:

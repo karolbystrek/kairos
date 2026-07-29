@@ -82,4 +82,4 @@ echo
 echo "Kairos is ready. Starting the application..."
 
 cd "${repository_directory}"
-exec docker compose up --build --watch
+exec docker compose up --build

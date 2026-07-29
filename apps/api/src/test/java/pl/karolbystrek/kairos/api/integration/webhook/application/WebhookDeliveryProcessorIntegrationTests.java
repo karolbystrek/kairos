@@ -9,7 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import pl.karolbystrek.kairos.api.integration.application.ExternalIntegrationManagementService;
 import pl.karolbystrek.kairos.api.integration.testsupport.IntegrationTestFixture;
 import pl.karolbystrek.kairos.api.integration.webhook.domain.WebhookDeliveryStatus;
-import pl.karolbystrek.kairos.api.integration.webhook.domain.WebhookEventType;
+import pl.karolbystrek.kairos.api.order.domain.OrderEventType;
 import pl.karolbystrek.kairos.api.integration.webhook.domain.WebhookSubscriptionStatus;
 import pl.karolbystrek.kairos.api.integration.webhook.infrastructure.persistence.WebhookDeliveryRepository;
 import pl.karolbystrek.kairos.api.order.application.OrderService;
@@ -76,7 +76,7 @@ class WebhookDeliveryProcessorIntegrationTests
                     "Processor failures",
                     "http://127.0.0.1:" + server.getAddress().getPort() + "/failure",
                     Set.of(tenant.firstLocationId()),
-                    Set.of(WebhookEventType.ORDER_CREATED)
+                    Set.of(OrderEventType.ORDER_CREATED)
             );
             subscriptionService.changeStatus(
                     tenant.administrator(),

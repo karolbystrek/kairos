@@ -46,6 +46,9 @@ public interface CustomerOrderRepository
     Optional<CustomerOrder> findForUpdateById(UUID orderId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<CustomerOrder> findForUpdateByTrackingReference(UUID trackingReference);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<CustomerOrder> findForUpdateByIdAndLocationIdIn(
             UUID orderId,
             Collection<UUID> locationIds

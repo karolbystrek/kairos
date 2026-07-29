@@ -34,6 +34,10 @@ class ConcurrentOrderCreationIntegrationTests extends RedisListenerIsolatedInteg
     void removeCommittedFixtures() {
         for (var tenantId : tenantIds) {
             jdbcTemplate.update(
+                    "DELETE FROM order_outbox_events WHERE tenant_id = ?",
+                    tenantId
+            );
+            jdbcTemplate.update(
                     """
                     DELETE FROM order_history
                     WHERE order_id IN (

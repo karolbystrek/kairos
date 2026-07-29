@@ -68,8 +68,9 @@ public class OrderCommandService {
         }
 
         historyRepository.save(historyFor(order, target, now, initiator));
-        eventOutbox.recordStatusChanged(order, now);
+        var eventId = eventOutbox.recordStatusChanged(order, now);
         eventPublisher.publishEvent(new OrderStatusChangedEvent(
+                eventId,
                 order.getTrackingReference(),
                 target,
                 now

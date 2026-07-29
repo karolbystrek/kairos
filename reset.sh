@@ -43,8 +43,6 @@ confirm() {
     esac
 }
 
-remove_compose_data=false
-
 echo
 echo "WARNING: Reset can remove all Kairos containers and Compose volume data."
 echo
@@ -64,7 +62,6 @@ if confirm "Remove Kairos containers and all Compose volume data?"; then
         echo "No .env found; using .env.example for Docker Compose."
         docker compose --env-file .env.example down -v --remove-orphans
     fi
-    remove_compose_data=true
 else
     echo "Keeping Kairos containers and Compose volume data."
 fi
@@ -78,18 +75,6 @@ if confirm "Reset .env from .env.example?"; then
     echo "Copied .env.example to .env."
 else
     echo "Keeping the existing .env file."
-fi
-
-if [ "${remove_compose_data}" = true ]; then
-    echo "Regenerating local signing and encryption keys..."
-    "${repository_directory}/scripts/init-jwt-keys.sh" --force
-    "${repository_directory}/scripts/init-webhook-encryption-key.sh" --force
-    "${repository_directory}/scripts/init-customer-push-secrets.sh" --force
-else
-    echo "Checking local signing and encryption keys..."
-    "${repository_directory}/scripts/init-jwt-keys.sh"
-    "${repository_directory}/scripts/init-webhook-encryption-key.sh"
-    "${repository_directory}/scripts/init-customer-push-secrets.sh"
 fi
 
 echo

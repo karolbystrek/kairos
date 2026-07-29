@@ -364,36 +364,107 @@ CREATE TABLE order_history
 
 CREATE INDEX order_history_order_id_idx ON order_history (order_id, id);
 
-CREATE TABLE webhook_outbox_events
+CREATE TABLE customer_push_subscriptions
 (
-    id                  UUID PRIMARY KEY,
-    order_id            UUID                     NOT NULL REFERENCES orders (id),
-    tenant_id           UUID                     NOT NULL REFERENCES tenants (id),
-    location_id         UUID                     NOT NULL,
-    event_type          VARCHAR(32)              NOT NULL,
-    occurred_at         TIMESTAMP WITH TIME ZONE NOT NULL,
-    payload             TEXT                     NOT NULL,
-    created_at          TIMESTAMP WITH TIME ZONE NOT NULL,
-    fanout_completed_at TIMESTAMP WITH TIME ZONE,
-    CONSTRAINT webhook_outbox_location_tenant_fk
-        FOREIGN KEY (location_id, tenant_id)
-            REFERENCES locations (id, tenant_id),
-    CONSTRAINT webhook_outbox_event_type_check CHECK (
-        event_type IN ('ORDER_CREATED', 'ORDER_READY', 'ORDER_COMPLETED', 'ORDER_CANCELED')
-        ),
-    CONSTRAINT webhook_outbox_payload_not_blank_check CHECK (TRIM(payload) <> ''),
-    CONSTRAINT webhook_outbox_fanout_check CHECK (
-        fanout_completed_at IS NULL OR fanout_completed_at >= created_at
+    id                       UUID PRIMARY KEY,
+    endpoint_hash            VARCHAR(64)              NOT NULL UNIQUE,
+    endpoint_origin          VARCHAR(255)             NOT NULL,
+    encrypted_endpoint       BYTEA                    NOT NULL,
+    endpoint_nonce           BYTEA                    NOT NULL,
+    p256dh_key               BYTEA                    NOT NULL,
+    encrypted_auth_secret    BYTEA                    NOT NULL,
+    auth_secret_nonce        BYTEA                    NOT NULL,
+    vapid_key_fingerprint    VARCHAR(64)              NOT NULL,
+    created_at               TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at               TIMESTAMP WITH TIME ZONE NOT NULL,
+    last_seen_at             TIMESTAMP WITH TIME ZONE NOT NULL,
+    expires_at               TIMESTAMP WITH TIME ZONE,
+    CONSTRAINT customer_push_subscriptions_endpoint_hash_check
+        CHECK (endpoint_hash ~ '^[0-9a-f]{64}$'),
+    CONSTRAINT customer_push_subscriptions_endpoint_origin_check
+        CHECK (TRIM(endpoint_origin) <> ''),
+    CONSTRAINT customer_push_subscriptions_endpoint_nonce_check
+        CHECK (OCTET_LENGTH(endpoint_nonce) = 12),
+    CONSTRAINT customer_push_subscriptions_p256dh_check
+        CHECK (OCTET_LENGTH(p256dh_key) = 65),
+    CONSTRAINT customer_push_subscriptions_auth_nonce_check
+        CHECK (OCTET_LENGTH(auth_secret_nonce) = 12),
+    CONSTRAINT customer_push_subscriptions_vapid_fingerprint_check
+        CHECK (TRIM(vapid_key_fingerprint) <> ''),
+    CONSTRAINT customer_push_subscriptions_time_check
+        CHECK (
+            updated_at >= created_at
+            AND last_seen_at >= created_at
+            AND (expires_at IS NULL OR expires_at > created_at)
         )
 );
 
-CREATE INDEX webhook_outbox_available_idx
-    ON webhook_outbox_events (fanout_completed_at, occurred_at, id);
+CREATE INDEX customer_push_subscriptions_dormant_idx
+    ON customer_push_subscriptions (expires_at, last_seen_at, id);
+
+CREATE TABLE customer_push_enrollments
+(
+    id              UUID PRIMARY KEY,
+    subscription_id UUID                     NOT NULL
+        REFERENCES customer_push_subscriptions (id) ON DELETE CASCADE,
+    order_id        UUID                     NOT NULL REFERENCES orders (id),
+    created_at      TIMESTAMP WITH TIME ZONE NOT NULL,
+    CONSTRAINT customer_push_enrollments_subscription_order_key
+        UNIQUE (subscription_id, order_id)
+);
+
+CREATE INDEX customer_push_enrollments_order_idx
+    ON customer_push_enrollments (order_id, subscription_id);
+
+CREATE TABLE order_outbox_events
+(
+    id                          UUID PRIMARY KEY,
+    order_id                    UUID                     NOT NULL REFERENCES orders (id),
+    tenant_id                   UUID                     NOT NULL REFERENCES tenants (id),
+    location_id                 UUID                     NOT NULL,
+    tracking_reference          UUID                     NOT NULL,
+    event_type                  VARCHAR(32)              NOT NULL,
+    status                      VARCHAR(32)              NOT NULL,
+    occurred_at                 TIMESTAMP WITH TIME ZONE NOT NULL,
+    webhook_payload             TEXT                     NOT NULL,
+    created_at                  TIMESTAMP WITH TIME ZONE NOT NULL,
+    webhook_fanout_completed_at TIMESTAMP WITH TIME ZONE,
+    push_fanout_completed_at    TIMESTAMP WITH TIME ZONE,
+    CONSTRAINT order_outbox_location_tenant_fk
+        FOREIGN KEY (location_id, tenant_id)
+            REFERENCES locations (id, tenant_id),
+    CONSTRAINT order_outbox_event_type_check CHECK (
+        event_type IN ('ORDER_CREATED', 'ORDER_READY', 'ORDER_COMPLETED', 'ORDER_CANCELED')
+        ),
+    CONSTRAINT order_outbox_status_check CHECK (
+        status IN ('IN_PREPARATION', 'READY', 'COMPLETED', 'CANCELED')
+        ),
+    CONSTRAINT order_outbox_event_status_check CHECK (
+        (event_type = 'ORDER_CREATED' AND status = 'IN_PREPARATION')
+        OR (event_type = 'ORDER_READY' AND status = 'READY')
+        OR (event_type = 'ORDER_COMPLETED' AND status = 'COMPLETED')
+        OR (event_type = 'ORDER_CANCELED' AND status = 'CANCELED')
+        ),
+    CONSTRAINT order_outbox_webhook_payload_not_blank_check
+        CHECK (TRIM(webhook_payload) <> ''),
+    CONSTRAINT order_outbox_webhook_fanout_check CHECK (
+        webhook_fanout_completed_at IS NULL OR webhook_fanout_completed_at >= created_at
+        ),
+    CONSTRAINT order_outbox_push_fanout_check CHECK (
+        push_fanout_completed_at IS NULL OR push_fanout_completed_at >= created_at
+        )
+);
+
+CREATE INDEX order_outbox_webhook_available_idx
+    ON order_outbox_events (webhook_fanout_completed_at, occurred_at, id);
+
+CREATE INDEX order_outbox_push_available_idx
+    ON order_outbox_events (push_fanout_completed_at, occurred_at, id);
 
 CREATE TABLE webhook_deliveries
 (
     id                 UUID PRIMARY KEY,
-    outbox_event_id    UUID                     NOT NULL REFERENCES webhook_outbox_events (id),
+    outbox_event_id    UUID                     NOT NULL REFERENCES order_outbox_events (id),
     subscription_id    UUID                     NOT NULL REFERENCES webhook_subscriptions (id),
     destination_url    VARCHAR(2048)            NOT NULL,
     payload            TEXT                     NOT NULL,
@@ -447,3 +518,69 @@ CREATE TABLE webhook_delivery_signing_versions
 
 CREATE INDEX webhook_delivery_signing_version_idx
     ON webhook_delivery_signing_versions (signing_secret_version_id, delivery_id);
+
+CREATE TABLE customer_push_deliveries
+(
+    id                   UUID PRIMARY KEY,
+    outbox_event_id      UUID                     NOT NULL REFERENCES order_outbox_events (id),
+    subscription_id      UUID REFERENCES customer_push_subscriptions (id) ON DELETE SET NULL,
+    order_id             UUID                     NOT NULL REFERENCES orders (id),
+    endpoint_fingerprint VARCHAR(64)              NOT NULL,
+    push_service_origin  VARCHAR(255)             NOT NULL,
+    payload              TEXT,
+    status               VARCHAR(32)              NOT NULL,
+    attempt_count        INTEGER                  NOT NULL DEFAULT 0,
+    next_attempt_at      TIMESTAMP WITH TIME ZONE NOT NULL,
+    deadline_at          TIMESTAMP WITH TIME ZONE NOT NULL,
+    created_at           TIMESTAMP WITH TIME ZONE NOT NULL,
+    claim_token          UUID,
+    claimed_at           TIMESTAMP WITH TIME ZONE,
+    claim_until          TIMESTAMP WITH TIME ZONE,
+    completed_at         TIMESTAMP WITH TIME ZONE,
+    response_status      INTEGER,
+    outcome              VARCHAR(64),
+    diagnostic           VARCHAR(1024),
+    CONSTRAINT customer_push_deliveries_event_subscription_key
+        UNIQUE (outbox_event_id, subscription_id),
+    CONSTRAINT customer_push_deliveries_endpoint_fingerprint_check
+        CHECK (endpoint_fingerprint ~ '^[0-9a-f]{64}$'),
+    CONSTRAINT customer_push_deliveries_origin_check
+        CHECK (TRIM(push_service_origin) <> ''),
+    CONSTRAINT customer_push_deliveries_status_check CHECK (
+        status IN (
+            'PENDING',
+            'PROCESSING',
+            'ACCEPTED',
+            'DEAD_LETTERED',
+            'EXPIRED',
+            'SUPERSEDED',
+            'CANCELED'
+            )
+        ),
+    CONSTRAINT customer_push_deliveries_attempt_count_check
+        CHECK (attempt_count >= 0),
+    CONSTRAINT customer_push_deliveries_state_check CHECK (
+        (status = 'PENDING'
+            AND payload IS NOT NULL
+            AND claim_token IS NULL
+            AND claim_until IS NULL
+            AND completed_at IS NULL)
+        OR (status = 'PROCESSING'
+            AND payload IS NOT NULL
+            AND claim_token IS NOT NULL
+            AND claimed_at IS NOT NULL
+            AND claim_until IS NOT NULL
+            AND completed_at IS NULL)
+        OR (status IN ('ACCEPTED', 'DEAD_LETTERED', 'EXPIRED', 'SUPERSEDED', 'CANCELED')
+            AND payload IS NULL
+            AND claim_token IS NULL
+            AND claim_until IS NULL
+            AND completed_at IS NOT NULL)
+        )
+);
+
+CREATE INDEX customer_push_deliveries_available_idx
+    ON customer_push_deliveries (status, next_attempt_at, claim_until, created_at, id);
+
+CREATE INDEX customer_push_deliveries_cleanup_idx
+    ON customer_push_deliveries (status, completed_at, id);

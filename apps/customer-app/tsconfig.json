@@ -4,7 +4,8 @@
     "lib": [
       "dom",
       "dom.iterable",
-      "esnext"
+      "esnext",
+      "webworker"
     ],
     "allowJs": true,
     "skipLibCheck": true,
@@ -23,6 +24,9 @@
         "name": "next"
       }
     ],
+    "types": [
+      "@serwist/next/typings"
+    ],
     "paths": {
       "@/*": [
         "./*"
@@ -34,9 +38,12 @@
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts"
+    ".next/dev/types/**/*.ts",
+    "app/sw.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "public/sw.js",
+    "public/sw.js.map"
   ]
 }

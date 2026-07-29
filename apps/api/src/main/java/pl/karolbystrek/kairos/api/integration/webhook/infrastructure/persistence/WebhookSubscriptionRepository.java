@@ -49,7 +49,7 @@ public interface WebhookSubscriptionRepository extends JpaRepository<WebhookSubs
               AND location_access.location_id = :locationId
               AND event_selection.event_type = :eventType
             ORDER BY subscription.created_at, subscription.id
-            FOR SHARE OF subscription, integration
+            FOR UPDATE
             """, nativeQuery = true)
     List<WebhookSubscription> findMatchingForFanout(
             @Param("tenantId") UUID tenantId,

@@ -3,30 +3,19 @@
 import { AlertDialog, Button, Card, Chip, Spinner } from "@heroui/react";
 import NextLink from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   isActiveOrderStatus,
   orderStatusLabels,
 } from "@/src/orders/order-status";
+import { consumeInstallationBootstrap } from "@/src/pwa/recently-tracked-orders";
+import { NotificationControl } from "@/src/pwa/notification-control";
+import { useCustomerNotifications } from "@/src/pwa/notification-provider";
 import {
-  clearRecentlyTrackedOrders,
-  consumeInstallationBootstrap,
-  readRecentlyTrackedOrders,
-  type RecentlyTrackedOrder,
-} from "@/src/pwa/recently-tracked-orders";
-
-function subscribeToHydration(): () => void {
-  return () => undefined;
-}
-
-function getClientHydrationSnapshot(): boolean {
-  return true;
-}
-
-function getServerHydrationSnapshot(): boolean {
-  return false;
-}
+  pruneTerminalTrackedOrders,
+  type StoredTrackedOrder,
+} from "@/src/pwa/storage";
 
 function isStandaloneDisplayMode(): boolean {
   const navigatorWithStandalone = navigator as Navigator & {
@@ -43,7 +32,7 @@ function getTrackedOrderHref(trackingReference: string): string {
   return `/orders/${encodeURIComponent(trackingReference)}`;
 }
 
-function OrderSummaryCard({ order }: { order: RecentlyTrackedOrder }) {
+function OrderSummaryCard({ order }: { order: StoredTrackedOrder }) {
   return (
     <NextLink
       className="block rounded-3xl no-underline outline-none focus-visible:ring-2 focus-visible:ring-accent"
@@ -77,22 +66,29 @@ export function CustomerHome({
   installationTrackingReference: string | null;
 }) {
   const router = useRouter();
-  const isHydrated = useSyncExternalStore(
-    subscribeToHydration,
-    getClientHydrationSnapshot,
-    getServerHydrationSnapshot,
-  );
-  const [ordersOverride, setOrdersOverride] = useState<
-    RecentlyTrackedOrder[] | null
+  const { clearOrders } = useCustomerNotifications();
+  const [recentlyTrackedOrders, setRecentlyTrackedOrders] = useState<
+    StoredTrackedOrder[] | null
   >(null);
   const hasResolvedInstalledLaunch = useRef(false);
-  const recentlyTrackedOrders = isHydrated
-    ? (ordersOverride ?? readRecentlyTrackedOrders())
-    : [];
-  const mostRecentlyTrackedOrder = recentlyTrackedOrders[0];
+  const mostRecentlyTrackedOrder = recentlyTrackedOrders?.[0];
 
   useEffect(() => {
-    if (!isHydrated || hasResolvedInstalledLaunch.current) {
+    let active = true;
+
+    void pruneTerminalTrackedOrders().then((orders) => {
+      if (active) {
+        setRecentlyTrackedOrders(orders);
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!recentlyTrackedOrders || hasResolvedInstalledLaunch.current) {
       return;
     }
 
@@ -112,7 +108,10 @@ export function CustomerHome({
       return;
     }
 
-    if (isActiveOrderStatus(mostRecentlyTrackedOrder?.status)) {
+    if (
+      mostRecentlyTrackedOrder &&
+      isActiveOrderStatus(mostRecentlyTrackedOrder.status)
+    ) {
       router.replace(
         getTrackedOrderHref(mostRecentlyTrackedOrder.trackingReference),
       );
@@ -125,12 +124,12 @@ export function CustomerHome({
     }
   }, [
     installationTrackingReference,
-    isHydrated,
     mostRecentlyTrackedOrder,
+    recentlyTrackedOrders,
     router,
   ]);
 
-  if (!isHydrated) {
+  if (!recentlyTrackedOrders) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <Spinner aria-label="Loading recently tracked orders" />
@@ -140,11 +139,16 @@ export function CustomerHome({
 
   if (recentlyTrackedOrders.length === 0) {
     return (
-      <section className="flex min-h-[60vh] flex-col items-center justify-center gap-3 text-center">
-        <h1 className="text-3xl font-semibold">Kairos Order Tracking</h1>
-        <p className="max-w-sm text-muted">
-          Scan the QR code provided by the restaurant to open your order.
-        </p>
+      <section className="flex min-h-[60vh] flex-col items-center justify-center gap-6 text-center">
+        <div className="flex flex-col items-center gap-3">
+          <h1 className="text-3xl font-semibold">Kairos Order Tracking</h1>
+          <p className="max-w-sm text-muted">
+            Scan the QR code provided by the restaurant to open your order.
+          </p>
+        </div>
+        <div className="w-full max-w-sm text-left">
+          <NotificationControl />
+        </div>
       </section>
     );
   }
@@ -161,6 +165,8 @@ export function CustomerHome({
           <OrderSummaryCard key={order.trackingReference} order={order} />
         ))}
       </div>
+
+      <NotificationControl />
 
       <AlertDialog>
         <Button className="self-start" variant="secondary">
@@ -179,7 +185,8 @@ export function CustomerHome({
               <AlertDialog.Body>
                 <p>
                   This removes every order remembered in this browser or
-                  installed app.
+                  installed app and stops notifications for those orders. Kairos
+                  notifications remain enabled for future orders.
                 </p>
               </AlertDialog.Body>
               <AlertDialog.Footer>
@@ -190,8 +197,11 @@ export function CustomerHome({
                   slot="close"
                   variant="danger"
                   onPress={() => {
-                    clearRecentlyTrackedOrders();
-                    setOrdersOverride([]);
+                    void clearOrders().then((cleared) => {
+                      if (cleared) {
+                        setRecentlyTrackedOrders([]);
+                      }
+                    });
                   }}
                 >
                   Clear all

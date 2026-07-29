@@ -16,13 +16,16 @@ The core system consists of three independently deployable applications:
 * **Staff panel:** authenticated Next.js application for queue management and QR-code generation.
 * **API:** Spring Boot application responsible for all business rules, security, persistence, real-time communication, and external integrations.
 
-Native mobile applications, App Clips, Instant Apps, and Web Push may be added later, but the browser experience must work without installing an application.
+Native mobile applications, App Clips, and Instant Apps may be added later, but
+the browser experience must work without installing the customer PWA. Web Push
+is an optional enhancement that requires explicit customer consent; foreground
+REST and SSE tracking remains the primary experience.
 
 ## 2. Technology and Ownership Decisions
 
 ### 2.1 Frontend applications
 
-Both frontends use Next.js 16, React 19, TypeScript, Tailwind CSS 4, and HeroUI 3. They remain separate because they serve different audiences and have different authentication, PWA, caching, and release concerns.
+Both frontends use Next.js 16, React 19, TypeScript, Tailwind CSS 4, and HeroUI 3. They remain separate because they serve different audiences and have different authentication, PWA, caching, and release concerns. The customer application uses a custom TypeScript service worker built with Serwist in configurator mode and owns its offline snapshots in IndexedDB.
 
 HeroUI is the component library for both applications. Zod validates frontend-owned form input and server-sent event payloads. Native `fetch` is the HTTP transport inside small handwritten REST request modules. SWR manages REST-backed client state in both frontends where caching, request deduplication, mutations, focus revalidation, or reconnect revalidation applies. React effects are reserved for synchronization with external systems rather than routine REST request orchestration.
 
@@ -39,7 +42,8 @@ The backend uses Java 25 and Spring Boot 4. It is the only system of record and 
 * Server-Sent Events publication;
 * Redis-backed coordination and pub/sub;
 * External Integration authentication, REST access, and webhooks;
-* transactional outbox processing.
+* transactional order-event outbox processing;
+* anonymous customer notification enrollment and durable Web Push delivery.
 
 Browser-facing API requests are routed through Caddy to the Spring API. Next.js route handlers are limited to frontend rendering concerns.
 
@@ -80,7 +84,14 @@ The customer application must:
 * poll REST approximately every 15 seconds while the event stream is disconnected, and stop fallback polling when it reconnects;
 * reconcile through REST on focus and browser connectivity restoration;
 * provide clear terminal views for completed, canceled, or unknown orders;
-* keep completed and canceled tracking references readable without an expiration policy in the current scope.
+* keep completed and canceled tracking references readable without an expiration
+  policy in the current scope;
+* use a service worker for an installable shell, explicit offline fallback, Web
+  Push handling, and application badges without treating cached order REST
+  responses as authoritative;
+* support current Chrome on Android, Safari on iOS and iPadOS, and current
+  desktop Chrome and Firefox progressively, while preserving the ordinary web
+  experience when an optional PWA API is unavailable.
 
 The customer application is installable as one globally branded **Kairos** web
 application while remaining fully usable without installation. Installation is
@@ -103,27 +114,67 @@ its own local recently tracked orders. The contexts are not synchronized with
 one another, with another device, or through the backend. This local collection
 does not establish customer identity or order ownership.
 
-The local collection retains every distinct successfully loaded order without
-an application-level count or time limit. Reopening an order refreshes its
-stored label, status, and server-provided `updatedAt` snapshot and moves it to
-the front of the collection. Home renders these stored summaries without making
-REST requests, opening SSE streams, or otherwise reconciling them. Selecting an
-entry opens its tracking page, where the normal authoritative REST and SSE flow
-resumes.
+The local collection uses IndexedDB and retains only distinct active
+`IN_PREPARATION` or `READY` orders. Reopening an order refreshes its stored
+label, status, and server-provided `updatedAt` snapshot and moves it to the front
+of the collection. A terminal REST response or accepted push transition removes
+the order from that active collection. A short-lived terminal tombstone prevents
+an older response or push from resurrecting it. Home renders these stored
+summaries without opening SSE streams; when notifications are enabled it may
+reconcile the current browser push subscription and active enrollments with the
+API. Selecting an entry opens its tracking page, where the normal authoritative
+REST and SSE flow resumes.
 
 After the one-time installation launch, opening the installed application
 directly reopens the most recently tracked order when its stored status is
-`IN_PREPARATION` or `READY`. When the latest stored status is terminal, or when
-no readable local collection exists, it opens Home. Home displays a centered
-empty state when local storage is empty, corrupt, unavailable, or inaccessible,
-and offers one confirmed action to clear all locally tracked orders. Terminal
-tracking views provide a home icon; active tracking views do not.
+`IN_PREPARATION` or `READY`. When no readable active collection exists, it opens
+Home. Home displays a centered empty state when IndexedDB is empty, corrupt,
+unavailable, or inaccessible, and offers one confirmed action to clear all
+locally tracked orders. Terminal tracking views provide a home icon; active
+tracking views do not.
 
-The installability increment does not add a service worker, offline caching,
-Web Push, notifications, Wake Lock, vibration, audio, or reliable background
-delivery. Browser suspension may interrupt SSE delivery, so the application
-continues to reconcile through REST when it becomes active and makes no
-background-delivery promise.
+Order REST endpoints are network-only in the service worker. The application
+shell and a dedicated offline route are precached, while application code
+explicitly reads last-known order snapshots from IndexedDB after a network
+failure. An offline view must label its data and timestamp as last known and
+must not imply that it is current. When no snapshot exists, the application
+shows an offline explanation rather than manufacturing an order state.
+
+Notification consent belongs to the complete Kairos PWA context rather than an
+individual order. Kairos requests browser permission only from a direct user
+action. On iOS and iPadOS outside standalone Home Screen mode, the control first
+explains how to add Kairos to the Home Screen instead of calling the permission
+API. A denied permission shows browser-settings guidance. Once enabled, every
+locally active order is automatically reconciled as an enrollment for the
+current browser push subscription. New active orders are enrolled silently, and
+terminal orders are removed after their final notification delivery has been
+materialized. The API limits a subscription to ten contexts per order.
+
+The application exposes one notification control on Home and active order
+views. Disabling notifications durably retires the current subscription and all
+of its enrollments before removing the browser subscription. Clearing tracked
+orders removes the selected active-order enrollments but preserves the app-level
+notification preference for future orders; both actions require a network
+connection so the UI does not make a false backend-cleanup promise.
+Browser-initiated subscription replacement is reconciled once from the service
+worker and idempotently retried on the next application start if needed.
+
+Background notifications are generated for `READY`, `COMPLETED`, and `CANCELED`
+transitions only. Their title is the global Kairos brand, their body describes
+the state without disclosing the order label, and their click target is the
+order route. Notifications use one replacement tag per order. The service worker
+validates a versioned payload, deduplicates its stable event ID, and applies the
+transition only when it is reachable from the locally stored state graph.
+Malformed or unprocessable payloads produce a generic, privacy-preserving
+notification. The foreground tracking page continues to use REST and SSE and
+may issue one short vibration pulse for a newly observed transition when the
+browser permits it; no custom notification vibration pattern or sound is used.
+
+The application badge, where supported, is the number of locally active orders
+enrolled for notifications. Kairos does not add Background Sync, Periodic
+Background Sync, Screen Wake Lock, synthetic audio, or a separate background
+polling promise. The service worker does not force `skipWaiting` or immediately
+claim existing clients; an update activates through the browser lifecycle.
 
 ### 3.3 Staff panel
 
@@ -184,11 +235,13 @@ carry signatures from both the current and immediately preceding versions. The
 `t=<epoch-seconds>,v1=<lowercase-hex>[,v1=<lowercase-hex>]`, and each signature
 covers the UTF-8 bytes of `<epoch-seconds>.<exact-body>`.
 
-Order changes create an immutable outbox event in the same database transaction
-as the order and history mutation. A separate worker fans out recipient-specific
-delivery rows and attempts each delivery once at the application-policy level.
+Order changes create one immutable, channel-neutral outbox event in the same
+database transaction as the order and history mutation. Independent background
+pipelines inside the Spring API fan out recipient-specific webhook and
+customer-push delivery rows.
+The webhook pipeline attempts each delivery once at the application-policy level.
 Any redirect, timeout, network failure, or non-`2xx` response is durably
-dead-lettered; v1 performs no automatic delivery retry. Worker crash recovery
+dead-lettered; v1 performs no automatic delivery retry. API process crash recovery
 may result in duplicate delivery, so consumers deduplicate by the stable
 CloudEvent ID and reject stale order snapshots by state and timestamp.
 
@@ -260,6 +313,23 @@ by local login.
 
 Customer order tracking is anonymous. QR codes use high-entropy, unguessable order references and expose only the minimum customer-facing order information. Possession of a tracking reference grants read-only access to that order and never authorizes staff operations or access to tenant data.
 
+Customer notification enrollment is also anonymous and treats the complete
+browser push subscription capability as its credential: endpoint, P-256 client
+public key, and authentication secret must all match for mutation or removal.
+Unsafe notification requests retain normal CSRF protection. Enrollment requires
+each high-entropy tracking reference and does not create a durable customer
+identity or reveal whether an unrelated order exists.
+
+Push endpoints must use HTTPS and resolve to public network addresses in
+production. DNS is revalidated for delivery, pinned for the connection,
+redirects are not followed, and fixed timeouts and response limits apply. Only
+an operator-controlled local profile may relax the public-address restriction.
+The endpoint and authentication secret are encrypted at rest with an externally
+managed key; the endpoint is additionally stored as a non-reversible hash for
+lookup. Logs, error responses, and metrics must not expose complete subscription
+endpoints or key material. VAPID signing keys are externally managed and never
+generated by the application or image.
+
 ### 4.3 External Integration access
 
 External clients authenticate only with an API Key version secret in the
@@ -298,8 +368,18 @@ The database schema must include tables covering the following concepts. Names a
 * **API Keys and versions:** immutable scopes, expiration and location grants on the stable named key; hashed one-time secret material and overlap validity on each version.
 * **Webhook subscriptions:** integration association, normalized name, destination, enabled/disabled/archive state, selected locations, and selected event types.
 * **Webhook signing-secret versions:** encrypted recoverable signing material, rotation overlap, and retirement state. Encryption keys are externally managed and never generated by the application or image.
-* **Outbox events:** immutable event identity, order/location association, exact serialized CloudEvent payload, occurrence time, and fan-out state.
+* **Order outbox events:** immutable event identity, order/location and tracking association, exact serialized webhook payload, resulting order state, occurrence time, and independent webhook and customer-push fan-out state.
 * **Webhook deliveries:** recipient-specific captured destination, payload, signing versions, claim state, one attempt outcome, bounded response details, and durable success or dead-letter state.
+* **Customer push subscriptions:** a browser-context capability with hashed
+  endpoint, encrypted recoverable endpoint and authentication secret, client
+  P-256 public key, VAPID-key fingerprint, expiration when supplied by the
+  browser, and last-observed time.
+* **Customer push enrollments:** the many-to-many association between a complete
+  browser push subscription and active order tracking references.
+* **Customer push deliveries:** one mutable retry row per outbox event and
+  subscription, including the privacy-minimal payload, freshness deadline,
+  claim state, attempt count, next-attempt time, bounded outcome details, and
+  accepted, superseded, canceled, expired, or terminal dead-letter state.
 * **External order creation identity:** integration-and-location-scoped idempotency value and canonical creation-input fingerprint associated with the created order.
 
 Tenant ownership may be direct or derived through an unambiguous relationship such as order to location to tenant. Tables must carry enough association for RLS enforcement and efficient access checks without duplicating ownership data by default. Secrets, passwords, refresh credentials, and API keys must never be stored in plaintext.
@@ -314,7 +394,18 @@ Order-state events are published only after the PostgreSQL transition and histor
 
 Redis Pub/Sub and SSE are intentionally non-durable. The client reconciles through REST when the stream opens or reopens, on focus, and after browser connectivity returns. Cache invalidation may clear the internal SWR entry before refetching, but the customer UI retains the last authoritative order during that request so the active stream is not torn down and reopened. While SSE is disconnected it falls back to approximately 15-second REST polling. No periodic safety request runs while SSE appears healthy, so the current increment accepts the rare possibility that an after-commit Redis publication failure leaves a page stale until another reconciliation trigger.
 
-A terminal transition produces the final invalidation and ends the live stream. Opening an already terminal order returns its REST state without maintaining an SSE connection. Servlet async and error redispatches continue processing the authorization decision made for the original request instead of being treated as new protected commands. Customer live delivery is the only real-time browser channel in this increment; authenticated staff queue streaming is deferred. Future genuinely bidirectional features may introduce WebSocket independently rather than changing this SSE contract.
+A terminal transition produces the final invalidation and ends the live stream. Opening an already terminal order returns its REST state without maintaining an SSE connection. Servlet async and error redispatches continue processing the authorization decision made for the original request instead of being treated as new protected commands.
+
+Web Push complements rather than replaces this foreground contract. `READY`,
+`COMPLETED`, and `CANCELED` order events are durably fanned out to enrolled
+browser subscriptions. The service worker treats a push as a last-known
+transition snapshot and notification trigger; opening or focusing the
+application still reconciles authoritative state through REST. At-least-once
+delivery, unordered push services, and multiple subscriptions require stable
+event IDs, state-graph monotonicity, replacement tags, and pre-submission checks
+against current PostgreSQL order state. Authenticated staff queue streaming
+remains deferred. Future genuinely bidirectional features may introduce
+WebSocket independently rather than changing the SSE or Web Push contracts.
 
 ## 7. Routing and Deployment
 
@@ -323,7 +414,7 @@ Caddy terminates TLS and routes the independently deployable services.
 * The customer and staff applications retain separate origins.
 * Browser-facing REST, SSE, and OAuth paths are proxied through the relevant frontend origin to avoid an unnecessary cross-origin browser architecture.
 * Browser resource families use `/api/{resource-family}/v1`; external resource families use `/api/external/{resource-family}/v1`. Location identifiers remain in validated bodies or query parameters rather than nested resource paths.
-* The dedicated API origin remains available for External Integration REST access. Webhook delivery originates from the separate worker and has no inbound worker endpoint.
+* The dedicated API origin remains available for External Integration REST access. Scheduled background jobs inside the Spring API perform webhook and customer-push delivery.
 * The Next.js services render frontend concerns only; the Spring API owns API security.
 
 ### 7.1 Current HTTP resource families
@@ -349,6 +440,12 @@ PUT    /api/orders/v1/{orderId}/status
 
 GET    /api/tracked-orders/v1/{trackingReference}
 GET    /api/tracked-orders/v1/{trackingReference}/events
+
+GET    /api/customer-notifications/v1/configuration
+PUT    /api/customer-notifications/v1/subscription
+POST   /api/customer-notifications/v1/subscription-replacement
+DELETE /api/customer-notifications/v1/subscription
+DELETE /api/customer-notifications/v1/enrollments
 ```
 
 The authenticated administrator management families are
@@ -374,10 +471,21 @@ custom label in its validated body. External creation additionally requires
 request returns the unchanged representation without another history, customer
 event, or outbox event.
 
-Docker Compose provides the local environment for both frontends, the API,
-separate webhook worker, PostgreSQL, Redis, and Caddy. API and worker modes are
-built from the same Spring Boot codebase and image. The worker exposes no
-business endpoint and can scale independently.
+Docker Compose provides a production-like local environment for both frontends,
+the API, PostgreSQL, Redis, and Caddy. It builds
+immutable production-mode application images and does not synchronize source
+files or run Fast Refresh or Spring Boot DevTools. Both Next.js applications run
+their standalone build output, and the customer build generates the Serwist
+service worker before the runtime image is assembled. The packaged Spring Boot
+API runs Flyway migrations and scheduled webhook and customer-push background
+jobs in the same application process. PostgreSQL and Redis remain on the Compose network for application
+traffic and also bind their standard ports to the host loopback interface for
+local development tools. Caddy is the browser-facing ingress. Applying source
+changes requires rebuilding and recreating the affected application container.
+
+Caddy serves the generated customer service worker with a root scope,
+JavaScript content type, restrictive content-security policy, and explicit
+no-cache headers so update checks do not reuse a stale script.
 
 ## 8. Resilience and Consistency
 
@@ -388,6 +496,22 @@ business endpoint and can scale independently.
 * Redis unavailability must not corrupt PostgreSQL state; event delivery may be delayed and recovered according to operational policy.
 * A known webhook delivery outcome is attempted once and stored as success or a terminal dead-letter result; v1 has no policy retry or `Retry-After` handling.
 * Crash recovery may repeat an uncertain webhook attempt, and repeated external client commands are handled safely where an integration can legitimately retry.
+* Customer-push fan-out and delivery failure cannot roll back a committed order
+  transition or block webhook fan-out.
+* Customer-push delivery has a ten-minute freshness deadline and at most eight
+  attempts. Transient network failures, `408`, `425`, `429`, and `5xx` use full
+  jitter with a five-second exponential base capped at two minutes and honor a
+  valid earlier `Retry-After` time. Other `4xx` responses terminate only the
+  delivery; `404` and `410` also retire the complete subscription and its
+  enrollments.
+* A push is revalidated against the authoritative order immediately before
+  submission. A queued notification that no longer represents the current
+  order state is superseded rather than sent. Uncertain crash recovery may
+  duplicate an accepted push, so the client deduplicates by stable event ID.
+* Accepted, superseded, or subscription-canceled push rows are retained for
+  seven days by default; expired and terminal dead-letter rows are retained for
+  30 days. Unenrolled dormant subscriptions are removed after 30 days by
+  default.
 * An order remains associated with its original location for its entire lifecycle and history.
 * Terminal orders remain readable to the holder of the tracking reference according to the configured retention policy but cannot re-enter an active lifecycle.
 
@@ -419,16 +543,37 @@ business endpoint and can scale independently.
   experience.
 * Installing from an order page opens that order once on the first installed
   launch while preserving one stable Kairos application identity.
-* Each browser or installed-app context independently retains all distinct
-  successfully loaded orders in most-recently-opened order, using only their
-  tracking reference, label, last stored status, and server `updatedAt` value.
-* Home renders local order summaries without network or SSE activity, opens the
-  latest locally active order on subsequent installed launches, remains Home
-  when the latest stored order is terminal, tolerates unavailable or invalid
-  local storage, and can clear the collection after confirmation.
-* Installability does not register a service worker, cache order responses for
-  offline use, show an application-owned install prompt, or claim background
-  notification delivery.
+* Each browser or installed-app context independently retains active, explicit
+  IndexedDB order snapshots in most-recently-opened order and removes terminal
+  orders without allowing a stale response to resurrect them.
+* Home renders local active-order summaries without opening SSE, opens the
+  latest locally active order on subsequent installed launches, tolerates
+  unavailable or invalid local storage, and can clear the collection and its
+  backend enrollments after confirmation.
+* The generated service worker precaches only the application shell and offline
+  route, applies `NetworkOnly` to tracked-order REST, and shows an explicitly
+  labeled last-known IndexedDB snapshot when navigation or REST is unavailable.
+* Notification permission is requested only from a direct user action; iOS and
+  iPadOS receive an Add to Home Screen explanation before any unsupported
+  request, and denied permission receives browser-settings guidance.
+* Enabling notifications reconciles one complete browser subscription with
+  every locally active order, automatically enrolls later active orders,
+  replaces browser-rotated subscriptions idempotently, and enforces ten
+  subscription contexts per order.
+* Disabling notifications removes the complete backend subscription before the
+  browser subscription. Clearing local orders removes their enrollments while
+  preserving the app-level preference. Neither flow reports success while
+  offline.
+* `READY`, `COMPLETED`, and `CANCELED` generate privacy-minimal versioned push
+  payloads. The customer service worker validates the payload, deduplicates
+  stable event IDs, enforces reachable state transitions, replaces older
+  notifications for the same order, updates the active-enrollment badge, and
+  opens or focuses the corresponding route.
+* Web Push encryption, VAPID headers, public-endpoint enforcement, result
+  classification, freshness, jittered retry, `Retry-After`, permanent
+  retirement, and retention behavior are covered by protocol-level and
+  application-level tests and by current-device acceptance on the required
+  browsers before public deployment.
 * A valid transition from either the staff panel or an External Integration produces the same persisted state, history record, customer event, and transactional outbox event.
 * Integration, API Key, API Key Version, webhook subscription, and signing-secret lifecycle changes preserve one-time secret handling and historical audit attribution.
 * Exact idempotent creation replays and same-state status commands create no duplicate order, history, outbox, or customer event.
@@ -445,15 +590,18 @@ The current walking vertical slice is implemented for local development:
 * on-screen customer QR codes and anonymous tracking through REST;
 * customer-only SSE invalidation through Redis Pub/Sub with REST
   reconciliation;
-* customer PWA manifest, order-aware first-launch, and local recently tracked
-  order behavior, with final regular, maskable, and Apple-touch PNG assets and
-  device installation acceptance still outstanding;
+* customer PWA manifest, order-aware first-launch, active-only IndexedDB
+  snapshots, generated Serwist service worker, explicit offline fallback,
+  app-level notification consent and controls, application badges, and
+  monotonic privacy-preserving push handling, with final regular, maskable, and
+  Apple-touch PNG assets and device acceptance still outstanding;
 * administrator-managed External Integrations, API Keys, and webhook
   subscriptions;
 * versioned external order commands with idempotent creation and desired-state
   updates;
-* transactional CloudEvents outbox fan-out and a separately deployable
-  single-attempt webhook worker.
+* one channel-neutral transactional order outbox with Spring API background
+  jobs for independent single-attempt webhook and durable retrying Web Push
+  delivery.
 
 The panel removes terminal orders from the active queue after an accepted
 transition and shows the customer QR code without a separate tracking-link,
@@ -488,9 +636,13 @@ Before any public deployment:
 * introduce a non-bypassable API gateway that preserves a trustworthy client
   address and rate-limits login, refresh, tenant registration, External
   Integration access, and future recovery or linking routes;
-* provide externally managed JWT signing keys and webhook-secret encryption
-  keys, documented rotation procedures, security-event retention, monitoring,
-  and dependency patching.
+* provide externally managed JWT signing keys, webhook-secret encryption keys,
+  VAPID signing keys, and push-subscription encryption keys, with documented
+  rotation procedures, security-event retention, monitoring, and dependency
+  patching;
+* complete Android Chrome, iOS/iPadOS Safari, desktop Chrome, and desktop Firefox
+  service-worker, offline, subscription, notification, click, badge, and
+  subscription-replacement acceptance.
 
 Deferred operational and product work includes live staff queue
 synchronization, order archives and search, printable QR artifacts,
@@ -498,6 +650,6 @@ cancellation confirmation, tracking-reference expiration, account listing and
 session-management UI, additional administrators and locations, invitations,
 setup links, email verification, recovery, CAPTCHA, MFA, passkeys, webhook DLQ
 inspection and alerts, automatic webhook retry or redelivery, strict delivery
-ordering, service workers, offline caching, application-owned install prompts,
-Web Push, notifications, and native mobile variants. Any of these requires an
-explicitly approved increment and synchronized changes to this document.
+ordering, application-owned install prompts, and native mobile variants. Any of
+these requires an explicitly approved increment and synchronized changes to
+this document.

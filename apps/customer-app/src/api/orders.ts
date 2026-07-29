@@ -9,6 +9,7 @@ export const customerOrderSchema = z.object({
 });
 
 export const orderStatusChangedEventSchema = z.object({
+  eventId: z.uuid(),
   trackingReference: z.uuid(),
   status: orderStatusSchema,
   updatedAt: z.iso.datetime({ offset: true }),

@@ -4,8 +4,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import pl.karolbystrek.kairos.api.integration.webhook.application.model.ExternalOrderSnapshot;
 import pl.karolbystrek.kairos.api.integration.webhook.application.model.StructuredOrderCloudEvent;
-import pl.karolbystrek.kairos.api.integration.webhook.domain.WebhookEventType;
 import pl.karolbystrek.kairos.api.order.domain.CustomerOrder;
+import pl.karolbystrek.kairos.api.order.domain.OrderEventType;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
@@ -24,7 +24,7 @@ public class OrderCloudEventFactory {
 
     public String create(
             UUID eventId,
-            WebhookEventType eventType,
+            OrderEventType eventType,
             CustomerOrder order,
             Instant occurredAt
     ) {

@@ -10,7 +10,7 @@ import pl.karolbystrek.kairos.api.integration.application.ExternalIntegrationMan
 import pl.karolbystrek.kairos.api.integration.testsupport.IntegrationTestFixture;
 import pl.karolbystrek.kairos.api.integration.webhook.application.model.ClaimedWebhookDelivery;
 import pl.karolbystrek.kairos.api.integration.webhook.domain.WebhookDeliveryStatus;
-import pl.karolbystrek.kairos.api.integration.webhook.domain.WebhookEventType;
+import pl.karolbystrek.kairos.api.order.domain.OrderEventType;
 import pl.karolbystrek.kairos.api.integration.webhook.domain.WebhookSubscriptionStatus;
 import pl.karolbystrek.kairos.api.integration.webhook.infrastructure.http.WebhookHttpResult;
 import pl.karolbystrek.kairos.api.integration.webhook.infrastructure.persistence.WebhookDeliveryRepository;
@@ -70,7 +70,7 @@ class WebhookDeliveryIntegrationTests extends RedisListenerIsolatedIntegrationTe
                 "Order created",
                 "http://127.0.0.1:9080/events",
                 Set.of(tenant.firstLocationId()),
-                Set.of(WebhookEventType.ORDER_CREATED)
+                Set.of(OrderEventType.ORDER_CREATED)
         );
         subscriptionId = subscription.subscription().id();
         subscriptionService.changeStatus(
@@ -106,7 +106,7 @@ class WebhookDeliveryIntegrationTests extends RedisListenerIsolatedIntegrationTe
                 tenantId
         );
         jdbcTemplate.update(
-                "DELETE FROM webhook_outbox_events WHERE tenant_id = ?",
+                "DELETE FROM order_outbox_events WHERE tenant_id = ?",
                 tenantId
         );
         jdbcTemplate.update(
@@ -253,6 +253,7 @@ class WebhookDeliveryIntegrationTests extends RedisListenerIsolatedIntegrationTe
                 claimed.addAll(future.get());
             }
         }
+        claimed.addAll(claimService.claimAvailable());
 
         assertThat(claimed).hasSize(12);
         assertThat(claimed)

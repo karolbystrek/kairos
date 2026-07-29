@@ -19,6 +19,7 @@ import org.springframework.stereotype.Component;
 import pl.karolbystrek.kairos.api.integration.webhook.infrastructure.config.WebhookProperties;
 
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
@@ -63,7 +64,11 @@ public class WebhookHttpClient {
                 closeImmediately(clientReference.get());
                 return failure("TIMEOUT", "Webhook delivery exceeded the total timeout");
             } catch (ExecutionException exception) {
-                return failure("NETWORK_ERROR", safeMessage(exception.getCause()));
+                var cause = exception.getCause();
+                if (isTimeout(cause)) {
+                    return failure("TIMEOUT", "Webhook delivery exceeded the total timeout");
+                }
+                return failure("NETWORK_ERROR", safeMessage(cause));
             } catch (InterruptedException exception) {
                 deadlineExceeded.set(true);
                 future.cancel(true);
@@ -208,6 +213,18 @@ public class WebhookHttpClient {
         }
         var message = throwable.getMessage();
         return message.length() <= 1024 ? message : message.substring(0, 1024);
+    }
+
+    private static boolean isTimeout(Throwable throwable) {
+        var current = throwable;
+        while (current != null) {
+            if (current instanceof InterruptedIOException
+                    || current instanceof TimeoutException) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     private record PinnedDnsResolver(

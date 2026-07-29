@@ -1,24 +1,28 @@
 import { z } from "zod";
 
-import { orderStatusSchema, type OrderStatus } from "@/src/orders/order-status";
+import {
+  isActiveOrderStatus,
+  orderStatusSchema,
+} from "@/src/orders/order-status";
+import { rememberTrackedOrder } from "@/src/pwa/storage";
 
 const RECENTLY_TRACKED_ORDERS_STORAGE_KEY = "kairos.recently-tracked-orders";
 const CONSUMED_INSTALLATION_BOOTSTRAPS_STORAGE_KEY =
   "kairos.consumed-installation-bootstraps";
 
-const recentlyTrackedOrderSchema = z
-  .object({
-    trackingReference: z.string().min(1),
-    label: z.string(),
-    status: orderStatusSchema,
-    updatedAt: z.iso.datetime({ offset: true }),
-  })
-  .strict();
-
-const recentlyTrackedOrdersPayloadSchema = z
+const legacyTrackedOrdersPayloadSchema = z
   .object({
     version: z.literal(1),
-    orders: z.array(recentlyTrackedOrderSchema),
+    orders: z.array(
+      z
+        .object({
+          trackingReference: z.string().min(1),
+          label: z.string(),
+          status: orderStatusSchema,
+          updatedAt: z.iso.datetime({ offset: true }),
+        })
+        .strict(),
+    ),
   })
   .strict();
 
@@ -28,8 +32,6 @@ const consumedInstallationBootstrapsPayloadSchema = z
     trackingReferences: z.array(z.string().min(1)),
   })
   .strict();
-
-export type RecentlyTrackedOrder = z.infer<typeof recentlyTrackedOrderSchema>;
 
 function getLocalStorage(): Storage | null {
   if (typeof window === "undefined") {
@@ -60,57 +62,7 @@ function parseStoredValue<T>(
   }
 }
 
-export function readRecentlyTrackedOrders(): RecentlyTrackedOrder[] {
-  const storage = getLocalStorage();
-
-  if (!storage) {
-    return [];
-  }
-
-  try {
-    return (
-      parseStoredValue(
-        storage.getItem(RECENTLY_TRACKED_ORDERS_STORAGE_KEY),
-        recentlyTrackedOrdersPayloadSchema,
-      )?.orders ?? []
-    );
-  } catch {
-    return [];
-  }
-}
-
-export function rememberTrackedOrder(order: {
-  trackingReference: string;
-  label: string;
-  status: OrderStatus;
-  updatedAt: string;
-}): void {
-  const parsedOrder = recentlyTrackedOrderSchema.safeParse(order);
-  const storage = getLocalStorage();
-
-  if (!parsedOrder.success || !storage) {
-    return;
-  }
-
-  const orders = readRecentlyTrackedOrders().filter(
-    ({ trackingReference }) =>
-      trackingReference !== parsedOrder.data.trackingReference,
-  );
-
-  try {
-    storage.setItem(
-      RECENTLY_TRACKED_ORDERS_STORAGE_KEY,
-      JSON.stringify({
-        version: 1,
-        orders: [parsedOrder.data, ...orders],
-      }),
-    );
-  } catch {
-    // Browser storage is best effort and never blocks authoritative tracking.
-  }
-}
-
-export function clearRecentlyTrackedOrders(): void {
+export async function migrateLegacyRecentlyTrackedOrders(): Promise<void> {
   const storage = getLocalStorage();
 
   if (!storage) {
@@ -118,9 +70,19 @@ export function clearRecentlyTrackedOrders(): void {
   }
 
   try {
+    const payload = parseStoredValue(
+      storage.getItem(RECENTLY_TRACKED_ORDERS_STORAGE_KEY),
+      legacyTrackedOrdersPayloadSchema,
+    );
+
+    for (const order of payload?.orders ?? []) {
+      if (isActiveOrderStatus(order.status)) {
+        await rememberTrackedOrder(order);
+      }
+    }
     storage.removeItem(RECENTLY_TRACKED_ORDERS_STORAGE_KEY);
   } catch {
-    // Home presents an empty in-memory view even when storage is inaccessible.
+    // Invalid, inaccessible, and incompatible legacy storage is discarded.
   }
 }
 

@@ -25,6 +25,7 @@ class OrderSseEmitterRegistryTests {
         registry.register(otherReference);
 
         registry.forward(new OrderStatusChangedEvent(
+                UUID.randomUUID(),
                 matchingReference,
                 OrderStatus.READY,
                 Instant.parse("2026-07-24T12:00:00Z")
@@ -43,6 +44,7 @@ class OrderSseEmitterRegistryTests {
         registry.register(otherReference);
 
         registry.forward(new OrderStatusChangedEvent(
+                UUID.randomUUID(),
                 matchingReference,
                 OrderStatus.CANCELED,
                 Instant.parse("2026-07-24T12:00:00Z")
@@ -73,6 +75,7 @@ class OrderSseEmitterRegistryTests {
 
         failingRegistry.register(trackingReference);
         failingRegistry.forward(new OrderStatusChangedEvent(
+                UUID.randomUUID(),
                 trackingReference,
                 OrderStatus.READY,
                 Instant.parse("2026-07-24T12:00:00Z")

@@ -2,11 +2,9 @@ package pl.karolbystrek.kairos.api.order.infrastructure.sse;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @Configuration(proxyBeanMethods = false)
-@EnableScheduling
 class OrderSseConfiguration {
 
     @Bean

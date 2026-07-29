@@ -24,7 +24,6 @@ server:
     context-path: /api
 
 kairos:
-  runtime-mode: api
   authentication:
     jwt:
       issuer: https://api.localhost
@@ -49,5 +48,32 @@ kairos:
       claim-lease: 30s
       fanout-poll-delay: 500ms
       delivery-poll-delay: 500ms
-      initial-delay: 1s
+      initial-delay: 24h
+    destination-policy: LOCAL_DEVELOPMENT
+  customer-notifications:
+    vapid:
+      public-key-location: "classpath:keys/test-vapid-public.pem"
+      private-key-location: "classpath:keys/test-vapid-private.pem"
+      subject: "mailto:test@kairos.local"
+    subscription:
+      encryption-key-location: "classpath:keys/test-webhook-encryption.bin"
+      maximum-enrollments-per-order: 10
+      dormant-retention: 30d
+    delivery:
+      freshness-window: 10m
+      maximum-attempts: 8
+      initial-retry-delay: 5s
+      maximum-retry-delay: 2m
+      total-timeout: 10s
+      successful-retention: 7d
+      failed-retention: 30d
+      maximum-payload-bytes: 3072
+    worker:
+      batch-size: 10
+      claim-lease: 30s
+      fanout-poll-delay: 500ms
+      delivery-poll-delay: 500ms
+      initial-delay: 24h
+      cleanup-delay: 1h
+      cleanup-initial-delay: 24h
     destination-policy: LOCAL_DEVELOPMENT

@@ -11,6 +11,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.NonNull;
+import pl.karolbystrek.kairos.api.order.domain.OrderEventType;
 
 import java.util.UUID;
 
@@ -28,11 +29,11 @@ public class WebhookSubscriptionEventSelection {
     @Id
     @Enumerated(EnumType.STRING)
     @Column(name = "event_type", nullable = false, length = 32)
-    private WebhookEventType eventType;
+    private OrderEventType eventType;
 
     public static WebhookSubscriptionEventSelection create(
             @NonNull UUID subscriptionId,
-            @NonNull WebhookEventType eventType
+            @NonNull OrderEventType eventType
     ) {
         var selection = new WebhookSubscriptionEventSelection();
         selection.subscriptionId = subscriptionId;
