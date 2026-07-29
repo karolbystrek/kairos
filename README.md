@@ -11,6 +11,12 @@ Prepare the local environment:
 ./setup.sh
 ```
 
+Start the applications when needed:
+
+```bash
+docker compose up --build
+```
+
 The local applications are available at:
 
 * Customer app: https://app.localhost
@@ -19,27 +25,14 @@ The local applications are available at:
 
 ## Reset the local environment
 
-Run the interactive reset:
+Run the reset:
 
 ```bash
 ./reset.sh
 ```
 
-The reset script independently asks whether to:
-
-* remove the Kairos containers and all Compose volume data;
-* replace `.env` from `.env.example`, saving the previous file as `.env.old`.
-
-The reset script leaves local signing and encryption keys unchanged. The setup
-script is solely responsible for preparing those resources.
-
-To confirm both reset actions without prompts, run:
-
-```bash
-./reset.sh -y
-```
-
-After resetting, run `./setup.sh` to start Kairos again.
+The script resets the complete local environment without asking for
+confirmation.
 
 Product behavior and architecture are documented in
 [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md).

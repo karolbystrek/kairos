@@ -137,7 +137,8 @@ Use Conventional Commits for every commit.
 ## Local Setup
 
 Run `./setup.sh` to prepare local configuration and externally managed key
-files, then build and start Compose. Use `./reset.sh` only when the user has
-authorized resetting containers or data. Source is not synchronized into the
-production-mode containers; rebuild and recreate only affected services when
-runtime verification requires updated code.
+files. Start Compose separately with `docker compose up --build`. Use
+`./reset.sh` only when the user has authorized resetting containers or data.
+Source is not synchronized into the production-mode containers; rebuild and
+recreate only affected services when runtime verification requires updated
+code.

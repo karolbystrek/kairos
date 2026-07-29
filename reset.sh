@@ -3,48 +3,14 @@
 set -eu
 
 repository_directory="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
-auto_confirm=false
 
-if [ "$#" -gt 1 ]; then
-    echo "Usage: $0 [-y]" >&2
+if [ "$#" -ne 0 ]; then
+    echo "Usage: $0" >&2
     exit 2
 fi
 
-case "${1:-}" in
-    "")
-        ;;
-    -y)
-        auto_confirm=true
-        ;;
-    *)
-        echo "Usage: $0 [-y]" >&2
-        exit 2
-        ;;
-esac
-
-confirm() {
-    prompt="$1"
-    answer=""
-
-    if [ "${auto_confirm}" = true ]; then
-        return 0
-    fi
-
-    printf "%s [y/N] " "${prompt}"
-    IFS= read -r answer || answer=""
-
-    case "${answer}" in
-        y|Y|yes|YES|Yes)
-            return 0
-            ;;
-        *)
-            return 1
-            ;;
-    esac
-}
-
 echo
-echo "WARNING: Reset can remove all Kairos containers and Compose volume data."
+echo "Resetting Kairos containers, Compose volume data, and local environment..."
 echo
 
 cd "${repository_directory}"
@@ -54,28 +20,29 @@ if [ ! -f ".env.example" ]; then
     exit 1
 fi
 
-if confirm "Remove Kairos containers and all Compose volume data?"; then
-    echo "Stopping Kairos and removing its containers and volumes..."
-    if [ -f ".env" ] || [ -L ".env" ]; then
-        docker compose down -v --remove-orphans
-    else
-        echo "No .env found; using .env.example for Docker Compose."
-        docker compose --env-file .env.example down -v --remove-orphans
-    fi
+echo "Stopping Kairos and removing its containers and volumes..."
+if [ -f ".env" ] || [ -L ".env" ]; then
+    docker compose down -v --remove-orphans
 else
-    echo "Keeping Kairos containers and Compose volume data."
+    echo "No .env found; using .env.example for Docker Compose."
+    docker compose --env-file .env.example down -v --remove-orphans
 fi
 
-if confirm "Reset .env from .env.example?"; then
-    if [ -f ".env" ] || [ -L ".env" ]; then
-        mv -f ".env" ".env.old"
-        echo "Saved the previous .env as .env.old."
-    fi
-    cp ".env.example" ".env"
-    echo "Copied .env.example to .env."
-else
-    echo "Keeping the existing .env file."
+if [ -f ".env" ] || [ -L ".env" ]; then
+    mv -f ".env" ".env.old"
+    echo "Saved the previous .env as .env.old."
 fi
+cp ".env.example" ".env"
+echo "Copied .env.example to .env."
+
+rm -f \
+    "secrets/jwt-private.pem" \
+    "secrets/jwt-public.pem" \
+    "secrets/webhook-encryption.bin" \
+    "secrets/vapid-private.pem" \
+    "secrets/vapid-public.pem" \
+    "secrets/push-subscription-encryption.bin"
+echo "Removed generated signing and encryption keys."
 
 echo
 echo "Reset complete. Run ./setup.sh to start Kairos."
