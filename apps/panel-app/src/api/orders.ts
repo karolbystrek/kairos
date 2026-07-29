@@ -33,7 +33,7 @@ export const customOrderLabelSchema = z
   )
   .refine(
     (label) => !/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/.test(label),
-    "Use single-line text without control characters.",
+    "Use one line of text.",
   );
 
 export const createOrderInputSchema = z.discriminatedUnion("mode", [

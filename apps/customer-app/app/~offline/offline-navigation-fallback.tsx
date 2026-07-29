@@ -24,7 +24,7 @@ export function OfflineNavigationFallback() {
   }, []);
 
   if (snapshot === undefined) {
-    return <Spinner aria-label="Loading offline order snapshot" />;
+    return <Spinner aria-label="Loading saved order status" />;
   }
 
   if (!snapshot) {
@@ -34,8 +34,8 @@ export function OfflineNavigationFallback() {
         <Alert.Content>
           <Alert.Title>You are offline</Alert.Title>
           <Alert.Description>
-            This order has no last-known snapshot on this device. Reconnect to
-            retrieve its status.
+            No saved status is available for this order. Reconnect to check its
+            status.
           </Alert.Description>
         </Alert.Content>
       </Alert>
@@ -44,21 +44,11 @@ export function OfflineNavigationFallback() {
 
   return (
     <section className="flex flex-col items-start gap-4">
-      <Alert status="warning">
-        <Alert.Indicator />
-        <Alert.Content>
-          <Alert.Title>Offline snapshot</Alert.Title>
-          <Alert.Description>
-            This status was last updated{" "}
-            {new Date(snapshot.updatedAt).toLocaleString()}. Reconnect for the
-            current status.
-          </Alert.Description>
-        </Alert.Content>
-      </Alert>
-      <div>
-        <h1 className="text-3xl font-semibold">Order {snapshot.label}</h1>
-        <p className="text-muted">Last known order status</p>
-      </div>
+      <p className="text-sm text-warning">
+        You&apos;re offline. Showing the status from{" "}
+        {new Date(snapshot.updatedAt).toLocaleString()}.
+      </p>
+      <h1 className="text-3xl font-semibold">Order {snapshot.label}</h1>
       <Chip
         color={snapshot.status === "READY" ? "success" : "default"}
         size="lg"

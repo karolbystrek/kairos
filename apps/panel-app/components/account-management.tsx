@@ -45,9 +45,15 @@ function getErrorMessage(error: unknown): string {
     return error.issues[0]?.message ?? "The submitted values are not valid.";
   }
 
-  return error instanceof Error
-    ? error.message
-    : "An unexpected error occurred.";
+  if (error instanceof ApiError) {
+    if (error.status === 409) {
+      return "That username or email is already in use.";
+    }
+
+    return error.message;
+  }
+
+  return "Account provisioning could not be completed. Check your connection and try again.";
 }
 
 function shouldRetryOnError(error: Error): boolean {
@@ -156,15 +162,9 @@ export function AccountManagement({ account }: { account: CurrentAccount }) {
       {areLocationsLoading ? (
         <Spinner aria-label="Loading locations" />
       ) : locations.length === 0 || !locationId ? (
-        <Alert status="warning">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Title>No location available</Alert.Title>
-            <Alert.Description>
-              Account provisioning requires an accessible location.
-            </Alert.Description>
-          </Alert.Content>
-        </Alert>
+        <p className="text-muted">
+          Account provisioning requires an available location.
+        </p>
       ) : (
         <>
           <section className="flex flex-col gap-3">

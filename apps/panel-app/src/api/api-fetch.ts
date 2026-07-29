@@ -33,12 +33,18 @@ type ProblemDetails = z.infer<typeof problemDetailsSchema>;
 let csrfInitialization: Promise<void> | undefined;
 let isCsrfInitialized = false;
 
+function logTechnicalError(message: string, error: unknown): void {
+  // Technical details belong in diagnostics, never in user-facing messages.
+  // eslint-disable-next-line no-console
+  console.error(message, error);
+}
+
 export class ApiError extends Error {
   constructor(
     public readonly status: number,
     public readonly problem?: ProblemDetails,
   ) {
-    super(problem?.detail ?? defaultErrorMessage(status));
+    super(defaultErrorMessage(status));
     this.name = "ApiError";
   }
 
@@ -60,7 +66,7 @@ export class ApiError extends Error {
 function defaultErrorMessage(status: number): string {
   switch (status) {
     case 400:
-      return "The request was not valid.";
+      return "Check the submitted values and try again.";
     case 401:
       return "Your session has expired. Sign in again to continue.";
     case 403:
@@ -72,7 +78,7 @@ function defaultErrorMessage(status: number): string {
     case 429:
       return "Too many requests. Please wait and try again.";
     default:
-      return `The API returned ${status}.`;
+      return "The request could not be completed. Check your connection and try again.";
   }
 }
 
@@ -102,17 +108,27 @@ function readCookie(name: string): string | undefined {
 }
 
 async function fetchCsrfMetadata(): Promise<void> {
-  const response = await fetch("/api/auth/v1/csrf", {
-    credentials: "same-origin",
-    headers: { Accept: "application/json" },
-  });
+  try {
+    const response = await fetch("/api/auth/v1/csrf", {
+      credentials: "same-origin",
+      headers: { Accept: "application/json" },
+    });
 
-  if (!response.ok) throw await ApiError.fromResponse(response);
+    if (!response.ok) throw await ApiError.fromResponse(response);
 
-  csrfMetadataSchema.parse(await response.json());
+    csrfMetadataSchema.parse(await response.json());
 
-  if (!readCookie(csrfCookieName)) {
-    throw new Error("The API did not issue the required CSRF cookie.");
+    if (!readCookie(csrfCookieName)) {
+      throw new Error("The API did not issue the required CSRF cookie.");
+    }
+  } catch (error) {
+    logTechnicalError("Panel security setup failed.", error);
+
+    if (error instanceof ApiError) throw error;
+
+    throw new Error("Security setup could not be completed.", {
+      cause: error,
+    });
   }
 }
 
@@ -235,20 +251,44 @@ async function apiFetchInternal(
   return response;
 }
 
-export function apiFetch(
+export async function apiFetch(
   url: string,
   init?: RequestInit,
   options?: ApiFetchOptions,
 ): Promise<Response> {
-  return apiFetchInternal(url, init, options, false);
+  try {
+    return await apiFetchInternal(url, init, options, false);
+  } catch (error) {
+    logTechnicalError("Panel API request failed.", error);
+    throw error;
+  }
 }
 
-export function apiFetchWhileAuthLocked(
+export async function apiFetchWhileAuthLocked(
   url: string,
   init?: RequestInit,
   options?: ApiFetchOptions,
 ): Promise<Response> {
-  return apiFetchInternal(url, init, options, true);
+  try {
+    return await apiFetchInternal(url, init, options, true);
+  } catch (error) {
+    logTechnicalError("Panel API request failed.", error);
+    throw error;
+  }
+}
+
+async function parseResponse<T>(
+  response: Response,
+  schema: z.ZodType<T>,
+): Promise<T> {
+  try {
+    return schema.parse(await response.json());
+  } catch (error) {
+    logTechnicalError("Panel API response validation failed.", error);
+    throw new Error("The server response could not be read.", {
+      cause: error,
+    });
+  }
 }
 
 export async function request<T>(
@@ -259,7 +299,7 @@ export async function request<T>(
 ): Promise<T> {
   const response = await apiFetch(url, init, options);
 
-  return schema.parse(await response.json());
+  return parseResponse(response, schema);
 }
 
 export async function requestWhileAuthLocked<T>(
@@ -270,5 +310,5 @@ export async function requestWhileAuthLocked<T>(
 ): Promise<T> {
   const response = await apiFetchWhileAuthLocked(url, init, options);
 
-  return schema.parse(await response.json());
+  return parseResponse(response, schema);
 }

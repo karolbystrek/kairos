@@ -38,6 +38,12 @@ function replaceApiKey(keys: ApiKey[] | undefined, updated: ApiKey): ApiKey[] {
   );
 }
 
+function apiKeyAccessLabel(apiKey: ApiKey): string {
+  return apiKey.scopes.includes("orders:write")
+    ? "Read and write orders"
+    : "Read orders";
+}
+
 export function ApiKeyManagement({
   accountId,
   integrationId,
@@ -63,7 +69,6 @@ export function ApiKeyManagement({
     data: apiKeys = [],
     error: apiKeysError,
     isLoading: areApiKeysLoading,
-    isValidating: areApiKeysValidating,
     mutate: mutateApiKeys,
   } = useSWR(apiKeysCacheKey, () => listApiKeys(integrationId), {
     errorRetryCount: 3,
@@ -174,7 +179,7 @@ export function ApiKeyManagement({
       onSecretIssued({
         title: `New API Key secret for ${apiKey.name}`,
         description:
-          "Deploy the new credential before its predecessor reaches the overlap deadline.",
+          "Update the external system now. The old credential stops working 24 hours after this rotation.",
         value: result.secret,
         afterConfirmed: () => {
           void listApiKeyVersions(apiKey.id)
@@ -226,8 +231,8 @@ export function ApiKeyManagement({
         <div>
           <h3 className="text-xl font-semibold">Issue API Key</h3>
           <p className="text-sm text-muted">
-            Scope and location access are immutable. Issue a replacement Key to
-            change either setting.
+            Order and location access cannot be changed. Issue a new API Key
+            with the access you need instead.
           </p>
         </div>
 
@@ -319,12 +324,7 @@ export function ApiKeyManagement({
       </section>
 
       <section className="flex flex-col gap-4">
-        <div>
-          <h3 className="text-xl font-semibold">API Keys</h3>
-          {areApiKeysValidating && (
-            <p className="text-sm text-muted">Refreshing API Keys…</p>
-          )}
-        </div>
+        <h3 className="text-xl font-semibold">API Keys</h3>
 
         {areApiKeysLoading ? (
           <Spinner aria-label="Loading API Keys" />
@@ -333,24 +333,19 @@ export function ApiKeyManagement({
         ) : (
           <div className="grid gap-4 lg:grid-cols-2">
             {apiKeys.map((apiKey) => (
-              <Surface
-                key={apiKey.id}
-                className="flex flex-col gap-4 rounded-2xl p-4"
-              >
+              <Surface key={apiKey.id} className="flex flex-col gap-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <h4 className="font-semibold">{apiKey.name}</h4>
-                    <p className="break-all text-xs text-muted">{apiKey.id}</p>
-                  </div>
+                  <h4 className="font-semibold">{apiKey.name}</h4>
                   <Chip color={apiKey.revokedAt ? "danger" : "success"}>
                     {apiKey.revokedAt ? "Revoked" : "Active"}
                   </Chip>
                 </div>
 
-                <div className="flex flex-wrap gap-2">
-                  {apiKey.scopes.map((scope) => (
-                    <Chip key={scope}>{scope}</Chip>
-                  ))}
+                <div>
+                  <p className="text-sm font-medium">Order access</p>
+                  <p className="text-sm text-muted">
+                    {apiKeyAccessLabel(apiKey)}
+                  </p>
                 </div>
 
                 <div>
@@ -413,7 +408,8 @@ export function ApiKeyManagement({
                 {selectedApiKey.name} versions
               </h3>
               <p className="text-sm text-muted">
-                Rotation keeps the prior version valid for a bounded overlap.
+                After rotation, the old secret remains valid until the time
+                shown below.
               </p>
             </div>
             <Button
@@ -434,14 +430,11 @@ export function ApiKeyManagement({
               {versions.map((version) => (
                 <Surface
                   key={version.id}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl p-3"
+                  className="flex flex-wrap items-center justify-between gap-3"
                 >
-                  <div>
-                    <p className="break-all font-mono text-xs">{version.id}</p>
-                    <p className="text-sm text-muted">
-                      Issued {formatIntegrationDateTime(version.issuedAt)}
-                    </p>
-                  </div>
+                  <p className="text-sm text-muted">
+                    Issued {formatIntegrationDateTime(version.issuedAt)}
+                  </p>
                   <Chip color={version.retiredAt ? "default" : "success"}>
                     {version.retiredAt
                       ? "Retired"

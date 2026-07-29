@@ -64,15 +64,13 @@ export function CustomerPwaProvider({
   const synchronize = useCallback(async () => {
     if (!supportsWebPush()) {
       setState("unsupported");
-      setMessage("Notifications are not supported in this browser.");
+      setMessage(null);
 
       return;
     }
     if (process.env.NODE_ENV !== "production") {
       setState("unsupported");
-      setMessage(
-        "Notifications are available in the production-like PWA build.",
-      );
+      setMessage(null);
 
       return;
     }

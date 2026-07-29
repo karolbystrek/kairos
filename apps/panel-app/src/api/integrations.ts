@@ -12,7 +12,7 @@ export const managedIntegrationNameSchema = z
   )
   .refine(
     (name) => !/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/.test(name),
-    "Name must be single-line text without control characters",
+    "Use one line of text.",
   );
 
 export const externalIntegrationStatusSchema = z.enum([

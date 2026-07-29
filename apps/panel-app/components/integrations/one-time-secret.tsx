@@ -29,7 +29,7 @@ export function OneTimeSecret({
   }
 
   return (
-    <Surface className="mx-auto flex w-full max-w-3xl flex-col gap-6 rounded-3xl p-6 sm:p-8">
+    <Surface className="mx-auto flex w-full max-w-3xl flex-col gap-6">
       <div>
         <p className="text-sm font-medium text-warning">One-time secret</p>
         <h2 className="text-2xl font-semibold">{secret.title}</h2>

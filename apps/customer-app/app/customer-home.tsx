@@ -35,19 +35,14 @@ function getTrackedOrderHref(trackingReference: string): string {
 function OrderSummaryCard({ order }: { order: StoredTrackedOrder }) {
   return (
     <NextLink
-      className="block rounded-3xl no-underline outline-none focus-visible:ring-2 focus-visible:ring-accent"
+      className="block no-underline outline-none focus-visible:ring-2 focus-visible:ring-accent"
       href={getTrackedOrderHref(order.trackingReference)}
     >
-      <Card className="w-full gap-4 transition-colors hover:bg-surface-secondary">
+      <Card className="w-full">
         <Card.Header className="flex-row items-start justify-between gap-4">
-          <div className="min-w-0">
-            <Card.Title className="truncate text-lg">
-              Order {order.label}
-            </Card.Title>
-            <Card.Description>
-              Updated {new Date(order.updatedAt).toLocaleString()}
-            </Card.Description>
-          </div>
+          <Card.Title className="truncate text-lg">
+            Order {order.label}
+          </Card.Title>
           <Chip
             color={order.status === "READY" ? "success" : "default"}
             size="sm"

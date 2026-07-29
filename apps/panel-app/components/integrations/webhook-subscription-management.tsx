@@ -198,7 +198,7 @@ function WebhookEditor({
   }
 
   return (
-    <Surface className="flex flex-col gap-4 rounded-2xl p-4">
+    <Surface className="flex flex-col gap-4">
       <div>
         <h4 className="font-semibold">Edit {subscription.name}</h4>
         <p className="text-sm text-muted">
@@ -250,7 +250,6 @@ export function WebhookSubscriptionManagement({
     data: subscriptions = [],
     error: subscriptionsError,
     isLoading: areSubscriptionsLoading,
-    isValidating: areSubscriptionsValidating,
     mutate: mutateSubscriptions,
   } = useSWR(
     staffWebhookSubscriptionsKey(accountId, integrationId),
@@ -397,7 +396,7 @@ export function WebhookSubscriptionManagement({
       onSecretIssued({
         title: `New signing secret for ${subscription.name}`,
         description:
-          "Deploy the new secret before the preceding signing version reaches the overlap deadline.",
+          "Update the webhook recipient now. The old signing secret stops working 24 hours after this rotation.",
         value: result.signingSecret,
         afterConfirmed: () => {
           void listWebhookSubscriptions(integrationId)
@@ -487,12 +486,7 @@ export function WebhookSubscriptionManagement({
       </section>
 
       <section className="flex flex-col gap-4">
-        <div>
-          <h3 className="text-xl font-semibold">Webhook subscriptions</h3>
-          {areSubscriptionsValidating && (
-            <p className="text-sm text-muted">Refreshing subscriptions…</p>
-          )}
-        </div>
+        <h3 className="text-xl font-semibold">Webhook subscriptions</h3>
 
         {areSubscriptionsLoading ? (
           <Spinner aria-label="Loading webhook subscriptions" />
@@ -501,17 +495,9 @@ export function WebhookSubscriptionManagement({
         ) : (
           <div className="grid gap-4 xl:grid-cols-2">
             {subscriptions.map((subscription) => (
-              <Surface
-                key={subscription.id}
-                className="flex flex-col gap-4 rounded-2xl p-4"
-              >
+              <Surface key={subscription.id} className="flex flex-col gap-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <h4 className="font-semibold">{subscription.name}</h4>
-                    <p className="break-all text-xs text-muted">
-                      {subscription.id}
-                    </p>
-                  </div>
+                  <h4 className="font-semibold">{subscription.name}</h4>
                   <Chip
                     color={
                       subscription.status === "ENABLED" ? "success" : "default"
@@ -586,8 +572,8 @@ export function WebhookSubscriptionManagement({
                         className="flex flex-wrap items-center justify-between gap-2"
                       >
                         <div>
-                          <p className="break-all font-mono text-xs">
-                            {version.id}
+                          <p className="text-xs text-muted">
+                            Issued {formatIntegrationDateTime(version.issuedAt)}
                           </p>
                           <p className="text-xs text-muted">
                             {version.retiredAt

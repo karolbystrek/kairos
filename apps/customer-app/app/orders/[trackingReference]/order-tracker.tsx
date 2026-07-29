@@ -113,7 +113,6 @@ export function OrderTracker({
     data: order,
     error,
     isLoading,
-    isValidating,
     mutate,
   } = useSWR(
     ["tracked-order", trackingReference] as const,
@@ -218,7 +217,7 @@ export function OrderTracker({
           <Alert.Title>Order unavailable</Alert.Title>
           <Alert.Description>
             {!isOnline && offlineLookupComplete
-              ? "This order has no last-known snapshot on this device. Reconnect to retrieve its status."
+              ? "You're offline and no saved status is available for this order. Reconnect to check its status."
               : getTrackingErrorMessage(error)}
           </Alert.Description>
         </Alert.Content>
@@ -229,33 +228,14 @@ export function OrderTracker({
   return (
     <section className="flex flex-col items-start gap-4">
       {(error || isOfflineSnapshot) && (
-        <Alert status="warning">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Title>
-              {isOfflineSnapshot
-                ? "Offline snapshot"
-                : "Status may be out of date"}
-            </Alert.Title>
-            <Alert.Description>
-              {isOfflineSnapshot
-                ? `This is the last known status from ${new Date(displayedOrder.updatedAt).toLocaleString()}. Reconnect for the current status.`
-                : `${getTrackingErrorMessage(error)} Showing the last known status.`}
-            </Alert.Description>
-          </Alert.Content>
-        </Alert>
+        <p className="text-sm text-warning">
+          {!isOnline
+            ? `You're offline. Showing the status from ${new Date(displayedOrder.updatedAt).toLocaleString()}.`
+            : `Status may be out of date. Showing the status from ${new Date(displayedOrder.updatedAt).toLocaleString()}.`}
+        </p>
       )}
       <div className="flex w-full items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-semibold">
-            Order {displayedOrder.label}
-          </h1>
-          <p className="text-muted">
-            {isOfflineSnapshot
-              ? "Last known order status"
-              : "Current order status"}
-          </p>
-        </div>
+        <h1 className="text-3xl font-semibold">Order {displayedOrder.label}</h1>
         {!isActiveOrderStatus(displayedOrder.status) && (
           <Button
             isIconOnly
@@ -295,21 +275,9 @@ export function OrderTracker({
       >
         {orderStatusLabels[displayedOrder.status]}
       </Chip>
-      <p className="text-sm text-muted">
-        Updated {new Date(displayedOrder.updatedAt).toLocaleString()}
-      </p>
       {isActiveOrderStatus(displayedOrder.status) && (
         <NotificationControl primary={!isOfflineSnapshot} />
       )}
-      <Button
-        isDisabled={isValidating || !isOnline}
-        variant="secondary"
-        onPress={() => {
-          void mutate(undefined, { throwOnError: false });
-        }}
-      >
-        {isValidating ? "Refreshing…" : "Refresh"}
-      </Button>
     </section>
   );
 }

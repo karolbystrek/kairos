@@ -5,6 +5,7 @@ import { useState } from "react";
 import useSWRMutation from "swr/mutation";
 import { ZodError } from "zod";
 
+import { ApiError } from "@/src/api/api-fetch";
 import {
   registerTenant,
   type TenantRegistration,
@@ -25,9 +26,15 @@ function getErrorMessage(error: unknown): string {
     return error.issues[0]?.message ?? "The submitted values are not valid.";
   }
 
-  return error instanceof Error
-    ? error.message
-    : "An unexpected error occurred.";
+  if (error instanceof ApiError) {
+    if (error.status === 409) {
+      return "That username or email is already registered.";
+    }
+
+    return error.message;
+  }
+
+  return "Registration could not be completed. Check your connection and try again.";
 }
 
 export function TenantRegistrationForm({
@@ -70,13 +77,6 @@ export function TenantRegistrationForm({
 
   return (
     <div className="flex flex-col gap-5">
-      <div>
-        <h2 className="text-xl font-semibold">Register tenant</h2>
-        <p className="text-sm text-muted">
-          Create a tenant, its first location, and the first administrator.
-        </p>
-      </div>
-
       {error && (
         <Alert status="danger">
           <Alert.Indicator />

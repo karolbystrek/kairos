@@ -7,9 +7,9 @@ export function getIntegrationErrorMessage(error: unknown): string {
     return error.issues[0]?.message ?? "The submitted values are not valid.";
   }
 
-  return error instanceof Error
-    ? error.message
-    : "An unexpected error occurred.";
+  if (error instanceof ApiError) return error.message;
+
+  return "The integration request could not be completed. Check your connection and try again.";
 }
 
 export function shouldRetryIntegrationRequest(error: Error): boolean {

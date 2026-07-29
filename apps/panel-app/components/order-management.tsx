@@ -58,9 +58,20 @@ type StatusMutationInput = {
 };
 
 function getErrorMessage(error: unknown): string {
-  return error instanceof Error
-    ? error.message
-    : "An unexpected error occurred.";
+  if (error instanceof ApiError) {
+    switch (error.status) {
+      case 403:
+        return "You are not allowed to manage these orders.";
+      case 404:
+        return "The selected order or location is no longer available.";
+      case 409:
+        return "The order changed before this action was completed. Review its current status and try again.";
+      default:
+        return error.message;
+    }
+  }
+
+  return "Order data could not be loaded or updated. Check your connection and try again.";
 }
 
 function shouldRetryOnError(error: Error): boolean {
@@ -119,7 +130,7 @@ function OrderQrCode({
           <Alert.Content>
             <Alert.Title>QR code unavailable</Alert.Title>
             <Alert.Description>
-              The customer QR code could not be generated. Try showing it again.
+              The customer QR code could not be generated.
             </Alert.Description>
           </Alert.Content>
         </Alert>
@@ -176,7 +187,6 @@ export function OrderManagement({
     data: orders = [],
     error: ordersError,
     isLoading: areOrdersLoading,
-    isValidating: areOrdersValidating,
     mutate: mutateOrders,
   } = useSWR(
     currentOrdersKey,
@@ -289,15 +299,7 @@ export function OrderManagement({
       {areLocationsLoading ? (
         <Spinner aria-label="Loading locations" />
       ) : locations.length === 0 ? (
-        <Alert status="warning">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Title>No locations found</Alert.Title>
-            <Alert.Description>
-              Ask a tenant administrator to configure an accessible location.
-            </Alert.Description>
-          </Alert.Content>
-        </Alert>
+        <p className="text-muted">No locations are available.</p>
       ) : (
         <>
           <section className="flex flex-col gap-3">
@@ -398,12 +400,7 @@ export function OrderManagement({
           )}
 
           <section className="flex flex-col gap-3">
-            <div className="flex items-center gap-3">
-              <h2 className="text-2xl font-semibold">Orders</h2>
-              {areOrdersValidating && !areOrdersLoading && (
-                <span className="text-sm text-muted">Refreshing…</span>
-              )}
-            </div>
+            <h2 className="text-2xl font-semibold">Orders</h2>
             {areOrdersLoading ? (
               <Spinner aria-label="Loading orders" />
             ) : orders.length === 0 ? (

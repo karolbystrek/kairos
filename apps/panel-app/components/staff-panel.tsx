@@ -9,7 +9,6 @@ import {
   Input,
   Label,
   Spinner,
-  Surface,
   Tabs,
   TextField,
 } from "@heroui/react";
@@ -60,9 +59,17 @@ function getErrorMessage(error: unknown): string {
     return error.issues[0]?.message ?? "The submitted values are not valid.";
   }
 
-  return error instanceof Error
-    ? error.message
-    : "An unexpected error occurred.";
+  if (error instanceof ApiError) return error.message;
+
+  return "The request could not be completed. Check your connection and try again.";
+}
+
+function getLoginErrorMessage(error: unknown): string {
+  if (error instanceof ApiError && error.status === 401) {
+    return "The username or password is incorrect.";
+  }
+
+  return getErrorMessage(error);
 }
 
 function LoginForm({
@@ -91,13 +98,6 @@ function LoginForm({
 
   return (
     <div className="flex flex-col gap-5">
-      <div>
-        <h2 className="text-xl font-semibold">Sign in</h2>
-        <p className="text-sm text-muted">
-          Use an account registered for this panel.
-        </p>
-      </div>
-
       {confirmation && (
         <Alert status="success">
           <Alert.Indicator />
@@ -113,7 +113,7 @@ function LoginForm({
           <Alert.Indicator />
           <Alert.Content>
             <Alert.Title>Sign-in failed</Alert.Title>
-            <Alert.Description>{getErrorMessage(error)}</Alert.Description>
+            <Alert.Description>{getLoginErrorMessage(error)}</Alert.Description>
           </Alert.Content>
         </Alert>
       )}
@@ -180,13 +180,8 @@ function SignedOutPanel({
 
   return (
     <div className="flex min-h-[60vh] items-center justify-center">
-      <Surface className="flex w-full max-w-xl flex-col gap-6 rounded-3xl p-6 sm:p-8">
-        <div className="flex flex-col gap-2">
-          <h1 className="text-3xl font-semibold">Kairos Staff Panel</h1>
-          <p className="text-muted">
-            Sign in to an existing account or register a new tenant.
-          </p>
-        </div>
+      <div className="flex w-full max-w-xl flex-col gap-6">
+        <h1 className="text-3xl font-semibold">Kairos Staff Panel</h1>
 
         <Tabs
           selectedKey={selectedView}
@@ -224,7 +219,7 @@ function SignedOutPanel({
             <TenantRegistrationForm onRegistered={registered} />
           </Tabs.Panel>
         </Tabs>
-      </Surface>
+      </div>
     </div>
   );
 }
@@ -243,7 +238,6 @@ export function StaffPanel() {
     data: account,
     error: accountError,
     isLoading,
-    isValidating,
     mutate: mutateAccount,
   } = useSWR(currentAccountKey, getCurrentAccount, {
     errorRetryCount: 3,
@@ -357,9 +351,6 @@ export function StaffPanel() {
           <p className="text-muted">
             {account.username} · {accountScope(account)}
           </p>
-          {isValidating && (
-            <p className="text-sm text-muted">Refreshing account…</p>
-          )}
         </div>
         <Button isPending={isLoggingOut} variant="secondary" onPress={signOut}>
           {isLoggingOut ? "Signing out…" : "Sign out"}

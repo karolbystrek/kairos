@@ -24,5 +24,5 @@ export const passwordInputSchema = z
   .min(12, "Password must contain at least 12 characters")
   .refine(
     (password) => new TextEncoder().encode(password).length <= 72,
-    "Password must not exceed 72 UTF-8 bytes",
+    "Password is too long",
   );

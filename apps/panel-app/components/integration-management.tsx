@@ -120,18 +120,15 @@ function IntegrationDetails({
         </Alert>
       )}
 
-      <Surface className="flex flex-col gap-5 rounded-2xl p-5">
+      <Surface className="flex flex-col gap-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-2xl font-semibold">{integration.name}</h2>
-              <Chip
-                color={integration.status === "ENABLED" ? "success" : "default"}
-              >
-                {integration.status === "ENABLED" ? "Enabled" : "Disabled"}
-              </Chip>
-            </div>
-            <p className="break-all text-sm text-muted">{integration.id}</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-2xl font-semibold">{integration.name}</h2>
+            <Chip
+              color={integration.status === "ENABLED" ? "success" : "default"}
+            >
+              {integration.status === "ENABLED" ? "Enabled" : "Disabled"}
+            </Chip>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button
@@ -225,7 +222,6 @@ export function IntegrationManagement({ accountId }: { accountId: string }) {
     data: integrations = [],
     error: integrationsError,
     isLoading: areIntegrationsLoading,
-    isValidating: areIntegrationsValidating,
     mutate: mutateIntegrations,
   } = useSWR(staffIntegrationsKey(accountId), listExternalIntegrations, {
     errorRetryCount: 3,
@@ -356,25 +352,11 @@ export function IntegrationManagement({ accountId }: { accountId: string }) {
       {areIntegrationsLoading || areLocationsLoading ? (
         <Spinner aria-label="Loading integrations" />
       ) : integrations.length === 0 ? (
-        <Alert status="default">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Title>No integrations yet</Alert.Title>
-            <Alert.Description>
-              Create an integration before issuing credentials or configuring
-              webhooks.
-            </Alert.Description>
-          </Alert.Content>
-        </Alert>
+        <p className="text-muted">No integrations yet.</p>
       ) : (
         <>
           <section className="flex flex-col gap-3">
-            <div>
-              <h3 className="text-xl font-semibold">Integrations</h3>
-              {areIntegrationsValidating && (
-                <p className="text-sm text-muted">Refreshing integrations…</p>
-              )}
-            </div>
+            <h3 className="text-xl font-semibold">Integrations</h3>
             <div className="flex flex-wrap gap-2">
               {integrations.map((integration) => (
                 <Button
@@ -393,16 +375,9 @@ export function IntegrationManagement({ accountId }: { accountId: string }) {
           </section>
 
           {locations.length === 0 && (
-            <Alert status="warning">
-              <Alert.Indicator />
-              <Alert.Content>
-                <Alert.Title>No locations available</Alert.Title>
-                <Alert.Description>
-                  API Keys and webhook subscriptions require at least one tenant
-                  location.
-                </Alert.Description>
-              </Alert.Content>
-            </Alert>
+            <p className="text-muted">
+              API Keys and webhook subscriptions require an available location.
+            </p>
           )}
 
           {selectedIntegration && (

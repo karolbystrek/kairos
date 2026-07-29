@@ -11,7 +11,7 @@ export function NotificationControl({
 }) {
   const { disable, enable, message, state } = useCustomerNotifications();
 
-  if (state === "loading") {
+  if (state === "loading" || state === "unsupported") {
     return null;
   }
 
@@ -40,7 +40,6 @@ export function NotificationControl({
           Disable notifications
         </Button>
       ) : (
-        state !== "unsupported" &&
         state !== "blocked" && (
           <Button
             variant={primary ? "primary" : "secondary"}

@@ -83,6 +83,9 @@ The customer application must:
 * rely on the browser's native `EventSource` reconnection and fetch the current state through REST whenever the stream opens or reopens;
 * poll REST approximately every 15 seconds while the event stream is disconnected, and stop fallback polling when it reconnects;
 * reconcile through REST on focus and browser connectivity restoration;
+* present an active order primarily by its label and status, show a status
+  timestamp only when the displayed data is explicitly stale, and rely on
+  automatic reconciliation rather than an always-visible manual refresh;
 * provide clear terminal views for completed, canceled, or unknown orders;
 * keep completed and canceled tracking references readable without an expiration
   policy in the current scope;
@@ -191,7 +194,10 @@ The staff panel must:
 * allow tenant administrators to provision location managers and operators within their tenant;
 * allow a location manager to provision operators only for the manager's assigned location;
 * allow tenant administrators to manage External Integrations, API Keys, and webhook subscriptions;
-* provide clear feedback for stale data, rejected transitions, expired sessions, and network failures.
+* provide clear feedback for stale data, rejected transitions, expired sessions, and network failures;
+* keep messages and administrative summaries user-oriented by omitting routine
+  background-refresh narration, arbitrary backend error details, internal
+  integration or credential identifiers, and raw permission tokens.
 
 ### 3.4 External Integration API and webhooks
 
