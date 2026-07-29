@@ -1,119 +1,143 @@
 # Kairos
 
-## Overview
-Virtual pager system for restaurants. Customer scans a QR code assigned to their order to open a web app that tracks order status through REST plus Server-Sent Events. Staff manage the order queue via an admin panel. External systems, initially point-of-sale systems, integrate through a versioned REST/webhook interface.
+## Project
 
-Original thesis framing and problem description: `docs/PROBLEM_DESCRIPTION.md`.
-Full product behavior, architecture, security requirements, contracts, current
-delivery status, and roadmap: `docs/REQUIREMENTS.md`.
+Kairos is a virtual pager system for restaurants. Customers anonymously track
+orders from QR codes, staff manage queues through an authenticated panel, and
+external systems integrate through versioned REST APIs and webhooks.
 
-> **Development prerequisite:** Read `docs/REQUIREMENTS.md` in full before planning, implementing, reviewing, refactoring, or otherwise changing project code, database migrations, APIs, security, infrastructure, or tests. Treat it as the source of truth for system behavior and architecture throughout the task, not only during initial orientation.
+- Thesis framing: `docs/PROBLEM_DESCRIPTION.md`
+- Canonical product behavior, architecture, security requirements, contracts,
+  delivery status, and roadmap: `docs/REQUIREMENTS.md`
 
-## Tech Stack
-* **customer-app** (`apps/customer-app`): Next.js 16, React 19, TypeScript, Tailwind CSS 4, HeroUI 3, Zod, SWR for client-side server state, Serwist custom service worker, IndexedDB offline snapshots, and Web Push.
-* **panel-app** (`apps/panel-app`): Next.js 16, React 19, TypeScript, Tailwind CSS 4, HeroUI 3, Zod, SWR where client-side synchronization is useful.
-* **api** (`apps/api`): Java 25, Spring Boot 4, Spring Security, Spring MVC with Server-Sent Events.
-* **Database:** PostgreSQL. Shared database/shared schema, tenant isolation via Row Level Security using direct or relationship-derived ownership as defined in `docs/REQUIREMENTS.md`.
-* **Cache & real-time:** Redis Pub/Sub for cross-instance customer event fan-out; PostgreSQL remains authoritative.
-* **Infra:** Docker Compose, Caddy (reverse proxy/TLS).
+> **Development prerequisite:** Read `docs/REQUIREMENTS.md` in full before
+> planning, implementing, reviewing, refactoring, or otherwise changing code,
+> database migrations, APIs, security, infrastructure, or tests. Treat it as the
+> source of truth throughout the task.
+
+## Repository and Stack
+
+```text
+apps/
+  customer-app/   Next.js customer PWA
+  panel-app/      Next.js staff panel
+  api/            Spring Boot API
+docs/             Canonical product and architecture documentation
+compose.yaml      Local PostgreSQL, Redis, applications, and Caddy
+Caddyfile         Local reverse proxy and TLS
+```
+
+- Both frontends: Next.js 16, React 19, TypeScript, Tailwind CSS 4, HeroUI 3,
+  Zod, native `fetch`, and SWR.
+- Customer PWA: Serwist service worker, IndexedDB offline snapshots, and Web
+  Push.
+- API: Java 25, Spring Boot 4, Spring Security, and Spring MVC.
+- Data and real time: PostgreSQL is authoritative; Redis Pub/Sub fans out
+  cross-instance customer events.
+- Infrastructure: Docker Compose and Caddy.
+- Each application is independently deployable and owns its dependency
+  manifest and Dockerfile.
 
 ## Architecture Boundaries
-* Keep `customer-app`, `panel-app`, and `api` independently deployable.
-* Spring Boot is the system of record and the sole owner of business rules, authentication, authorization, tenant isolation, persistence, SSE delivery, anonymous customer notification enrollment, Web Push delivery, External Integration access, webhooks, and outbox processing. Application-level request rate limiting is deferred to a future API gateway in front of Spring; do not add an in-process rate limiter to the current local slice.
-* Browser-facing REST, SSE, and OAuth paths are exposed through Caddy on the relevant frontend origin. Keep the dedicated API origin for External Integration access.
-* Keep REST as the boundary between the frontends, External Integrations, and the API. Browser resource families use `/api/{resource-family}/v1`; external families use `/api/external/{resource-family}/v1`. The frontends retain small handwritten TypeScript types and native `fetch`. OpenAPI publication, rendered reference documentation, generated SDKs, and formal public-contract checks are deferred to the next integration increment.
-* Use customer-only Server-Sent Events for order-change invalidation. Validate every event with Zod, then revalidate the authoritative REST state through SWR. Publish after commit through Redis Pub/Sub so every API instance can notify its locally connected customers. Keep staff and External Integration commands on REST.
-* Keep tracked-order REST network-only in the customer service worker. Precache only the application shell and dedicated offline route, read explicit last-known order snapshots from IndexedDB after a network failure, and label them as stale. Web Push complements foreground REST and SSE; it never becomes the authoritative order state.
-* Treat customer notification consent as app-wide and each complete push subscription as an anonymous capability. Request permission only from direct user action, automatically reconcile active local orders, keep endpoints and auth secrets encrypted at rest, use channel-independent outbox fan-out, and preserve the durable delivery, retry, destination, privacy, and retention contract in `docs/REQUIREMENTS.md`.
-* Use native `fetch` inside the handwritten REST request modules. Use SWR in Client Components to manage REST-backed server state, including caching, request deduplication, mutations, focus revalidation, and reconnect revalidation. Do not add Next.js Server Actions or proxy route handlers as an API layer in front of Spring.
 
-## Repository Structure
-```
-apps/
-  customer-app/   Next.js client PWA (order tracking screen)
-  panel-app/      Next.js staff admin panel (order queue, QR generation)
-  api/            Spring Boot backend (REST API, SSE, External Integration webhooks)
-docs/             Problem description and canonical requirements
-compose.yaml      Local dev orchestration (postgres, redis, api, apps, caddy)
-Caddyfile         Reverse proxy config for local HTTPS
-```
+- Spring Boot owns business rules, authentication, authorization, tenant
+  isolation, persistence, browser and external APIs, SSE, Web Push, webhooks,
+  and outbox processing.
+- Keep REST as the boundary between frontends, External Integrations, and the
+  API. Browser families use `/api/{resource-family}/v1`; external families use
+  `/api/external/{resource-family}/v1`.
+- Browser-facing API and SSE traffic is exposed by Caddy on the relevant
+  frontend origin. External Integrations use the dedicated API origin.
+- Frontends use small handwritten request modules and response types with
+  native `fetch`. Use SWR for REST-backed client state and Zod for
+  frontend-owned input and event validation.
+- Do not add Next.js Server Actions or proxy route handlers as an API layer in
+  front of Spring.
+- Customer SSE and Web Push are invalidation or notification mechanisms; REST
+  remains authoritative. Tracked-order REST stays network-only in the service
+  worker, and explicit IndexedDB snapshots must be labelled stale when used
+  offline.
+- Enforce security and tenant access in the API. Frontend redirects and hidden
+  controls are user-experience features, not authorization controls.
+- Keep access and refresh credentials unavailable to JavaScript.
+- Keep production migrations free of environment-specific seed data.
 
-## Conventions
-* **Always use HeroUI** (`@heroui/react`) for UI components in `apps/customer-app` and `apps/panel-app`.
-* Use Zod for frontend-owned input and event validation. During the walking vertical slice, keep REST request functions and response types small and handwritten in each frontend.
-* Do not use React effects to orchestrate routine REST request state. Reserve effects for synchronization with external systems, such as error reporting, EventSource, or other browser API subscriptions. Keep the official `eslint-plugin-react-hooks` recommended rules enabled, including exhaustive dependency validation; use local state hooks normally for frontend-owned interaction state.
-* Organize backend code first by business feature and then by `api`, `application`, `domain`, and `infrastructure` layers. Add cohesive subpackages such as `model`, `exception`, `port`, `config`, `jwt`, `web`, or `persistence` when a layer contains distinct concerns; do not use broad catch-all packages or create one-class packages without a conceptual boundary.
-* Configure the application-wide `/api` base path through `server.servlet.context-path` in `application.yaml`. Controller mappings declare only resource-relative paths and must not repeat `/api`; Actuator shares the same context path.
-* Map application or domain projections to API response records through a static `from(...)` factory on the response type. Do not keep response-mapping helpers in controllers, and assign a service result to a clearly named local variable before passing it to `from(...)`.
-* Use final dependency fields with Lombok `@RequiredArgsConstructor` for routine Spring constructor injection. Keep an explicit constructor only when it performs validation, derives additional state, or initializes a superclass.
-* Use Lombok `@NonNull` for runtime-enforced null contracts on internal record components and domain factory or mutator parameters. Use Jakarta Bean Validation for validated API input, and do not write manual `Objects.requireNonNull(...)` guards.
-* Prefer Spring Data derived query methods when a property path expresses the query. Put descriptive lock semantics before `By`, retain `@Lock` for pessimistic locking, and reserve manual `@Query` declarations for bulk updates or genuinely non-derivable queries.
-* Use Lombok `@Slf4j` instead of declaring `Logger` and `LoggerFactory` fields manually.
-* Use `var` for initialized local variables when the initializer makes the type evident. Keep an explicit type when inference is impossible or when an interface, generic contract, or numeric width materially improves understanding.
-* Indent Java source and test code with four spaces. Do not use tab characters in Java files.
-* Enforce security and tenant access in the API. Frontend redirects and hidden controls are user-experience features, not authorization controls.
-* Route all panel REST calls through the shared authenticated native-`fetch` client. Keep staff SWR keys scoped by the current account ID and purge staff-owned cache entries when the current tab observes an authentication change. Reset frontend-owned state when the authenticated account changes.
-* Keep access and refresh credentials unavailable to JavaScript. Serialize login, refresh, logout, and logout-all with the shared browser Web Lock when available; after acquiring it, recheck `/api/auth/v1/me` before refreshing. Permit at most one refresh and one replay of the original request. Never treat an authorization `403` as an expired session. Keep anonymous tenant registration outside this authentication-cookie lock and disable automatic session recovery for it.
-* Keep one-time API Key credentials and webhook signing secrets only in transient panel state. Do not remount the management workspace until the administrator explicitly confirms copying the secret, and revalidate rotation metadata only after that confirmation.
-* Model each panel account as owned directly by one tenant. Public tenant onboarding may create only the tenant's first administrator and must not create an authenticated session. All standalone accounts remain provisioned: tenant administrators have tenant-wide access and may provision location managers or operators; managers and operators have at most one location assignment; managers may provision only operators for their own location, while operators cannot provision accounts. Treat location operator accounts as device-oriented and create a separate account for each panel device that needs independent credentials or revocation. Do not add standalone account self-registration.
-* Keep production migrations free of seeded tenants, locations, accounts, credentials, or other environment-specific records. Tests create isolated fixtures and roll them back.
-* Serialize concurrent transitions of the same order with a database row lock before validating the current state. Store each accepted resulting state once in append-only history rather than duplicating its preceding state.
-* Classify known transition initiators generally as a user, external integration, or system action and record the corresponding identity where one exists. Never trust an initiator identity supplied by an unauthenticated client.
-* **Always use Conventional Commits** for commit messages (`feat:`, `fix:`, `refactor:`, `chore:`, `docs:`, `test:`, etc.).
-* Each app (`customer-app`, `panel-app`, `api`) is independent: separate dependency manifests, separate Dockerfiles.
+## Implementation Conventions
 
-## Current Development Stage
-The walking vertical slice is local-only. The Spring API contains provisioned local username/password accounts, signed access and rotating refresh credentials in secure cookies, CSRF protection, logout and revocation, current-account retrieval, account provisioning, tenant/location application authorization, and authenticated order audit identity. It also exposes anonymous but CSRF-protected tenant registration, which atomically creates one tenant, its first location, and its first active administrator with a required normalized email; registration creates no session. Tenant administrators manage named External Integrations, versioned one-time API Key secrets, independently optional webhook subscriptions, and versioned one-time signing secrets. External order creation and transitions share the staff domain behavior, audit the integration, stable key, and exact key version, and write one immutable channel-neutral event to a transactional PostgreSQL outbox. Scheduled workers inside the Spring API independently fan out webhooks and customer Web Push: webhook delivery is attempted once, while push delivery is freshness-bounded, retried, deduplicated on the client, and retained by terminal outcome. The current local slice does not rate-limit login, refresh, tenant-registration, External Integration, or customer-notification requests; request throttling is deferred until a production API gateway is introduced. For rapid development, tenants, locations, accounts, and orders have no separate display-name fields; the panel presents accounts by username and locations/orders by their full stable identifiers. The panel route remains a Server Component and renders one interactive staff-panel boundary. Its signed-out surface provides Sign in and Register tenant tabs, while its authenticated Orders/Accounts/Integrations workspace is capability-gated. The SWR current-account gate and shared native-`fetch` client add CSRF headers to unsafe requests, serialize authentication-cookie mutations with a browser Web Lock when available, recheck the current session after acquiring that lock, and perform at most one refresh and request retry after `401`. One-time integration secrets are kept only in transient panel state until the administrator explicitly confirms copying them. Tenant registration uses the shared CSRF client but never acquires the authentication-cookie lock or starts session recovery. Authentication credentials remain unavailable to JavaScript. Treat one browser profile as one signed-in account: same-account tabs are best-effort, immediate cross-tab UI synchronization is not required, and different accounts in different tabs are unsupported. Standalone account self-registration, additional tenant administrators, later location creation, email verification, recovery, invitations, and CAPTCHA remain excluded. Anonymous customer REST tracking remains available through SWR-managed client state backed by handwritten native `fetch` requests. The customer app implements the globally branded manifest, one-time order-aware installed launch, active-only IndexedDB snapshots, a generated Serwist service worker with an explicit offline route and network-only tracked-order REST, and app-level Web Push consent, enrollment, notification, and badge behavior. Its required regular, maskable, and Apple-touch PNG assets are not yet present, and cross-browser/device PWA and Web Push acceptance remains incomplete. Production migrations must still create an empty, deployable schema rather than demo data.
+### Frontend
 
-The next External Integration increment is OpenAPI publication, rendered
-reference documentation, and formal public-contract checks. OAuth2/OIDC login,
-PostgreSQL RLS, generated SDKs, and production ingress hardening remain
-deferred. RLS and a non-bypassable rate-limiting API gateway are required before
-public deployment.
+- Always use HeroUI (`@heroui/react`) for UI components.
+- Reserve React effects for synchronization with external systems such as
+  EventSource or browser APIs; do not use effects for routine REST request
+  orchestration.
+- Keep the official `eslint-plugin-react-hooks` recommended rules enabled.
+- Route panel REST calls through the shared authenticated native-`fetch`
+  client, scope staff SWR keys by account ID, and clear staff-owned state when
+  the authenticated account changes.
 
-The Spring application and Docker images never generate JWT signing keys, the webhook signing-secret encryption key, VAPID signing keys, or the push-subscription encryption key. Run `./setup.sh` to prepare `.env` and the ignored files under `secrets/`, then build and start the production-mode local containers; it asks before replacing an existing resource. Use `./reset.sh` to interactively remove Kairos Compose containers and volume data and optionally restore `.env`, or `./reset.sh -y` to confirm both actions. Reset never creates, validates, replaces, or removes key material. Compose bind-mounts `secrets/` read-only into the API container. Production deployments require externally managed key resources.
+### Backend
 
-## Documentation Synchronization
-* Do not leave accepted project decisions only in the conversation. When discussion with the user changes or clarifies architecture, requirements, scope, security, data ownership, technology choices, or development conventions, update the relevant documentation in the same task.
-* Update `docs/REQUIREMENTS.md` for product behavior, architecture, security, persistence concepts, integration contracts, and acceptance criteria.
-* Update `AGENTS.md` for repository-wide technology choices, boundaries, workflows, and implementation conventions agents must follow.
-* Keep `README.md`, `AGENTS.md`, `docs/PROBLEM_DESCRIPTION.md`, and `docs/REQUIREMENTS.md` as the only Markdown documentation files in the repository. Do not add standalone plans, ADRs, context files, or app READMEs; consolidate durable decisions into the appropriate canonical file.
-* Keep documentation and code consistent. When a code change alters documented behavior or structure, update the affected documentation alongside the code; when a documentation decision affects existing code, identify and reconcile the mismatch rather than silently ignoring it.
+- Organize code first by business feature and then by `api`, `application`,
+  `domain`, and `infrastructure`. Add cohesive subpackages only where they
+  represent a real conceptual boundary.
+- Configure the application-wide `/api` base path with
+  `server.servlet.context-path`; controller mappings declare resource-relative
+  paths and do not repeat `/api`.
+- Map projections through a static `from(...)` factory on API response records.
+- Use Lombok `@RequiredArgsConstructor` for routine constructor injection,
+  `@NonNull` for internal runtime null contracts, and `@Slf4j` for logging. Use
+  Jakarta Bean Validation for API input.
+- Prefer Spring Data derived query methods when the property path expresses the
+  query; reserve manual `@Query` declarations for non-derivable or bulk
+  operations.
+- Use `var` when an initializer makes the local type evident. Indent Java with
+  four spaces and never use tabs.
 
-## Agent Development Workflow
-* Before changing files, inspect `git status --short`. Do not inspect or exercise the running Compose stack unless runtime verification is specifically requested or necessary to diagnose a reported runtime problem.
-* By default, verify changes by reading the affected files, tracing relevant callers and consumers, and running static code checks. Do not run backend or frontend automated tests, whether focused or full-suite, unless the user explicitly requests tests in the current task. Browser and manual runtime smoke tests are also opt-in and should be performed only when the user specifically requests them.
-* If runtime verification is requested, assume an already-running stack belongs to the user and was started with `./setup.sh` or `docker compose up --build`; do not start a duplicate foreground Compose process. If the stack is not running, start it only when the requested verification requires it and keep that process active for the task.
-* Local Compose uses the production Dockerfile runner targets. Frontends run standalone Next.js servers, the customer image includes its generated Serwist service worker, and the API runs the packaged Spring Boot JAR with its scheduled background workers and without DevTools. Source is not synchronized into containers and there is no Fast Refresh; rebuild and recreate an affected service to apply changes.
-* If a change is not reflected in a running service, inspect bounded service logs first. As a fallback, rebuild and recreate only affected services with `docker compose up -d --build --no-deps <service...>`.
-* Treat the running environment as user-owned. Never stop the complete stack, run `docker compose down`, delete volumes, reset PostgreSQL, or prune Docker state unless the user explicitly authorizes it.
-* Use repository-owned command interfaces instead of invoking installed binaries directly:
-  * From the repository root, validate a frontend with `npm --prefix apps/customer-app run check` or `npm --prefix apps/panel-app run check`.
-  * Use `npm run` or `npm --prefix` for frontend tooling. Do not invoke `node_modules/.bin`, use `npx` for an installed project tool, or run raw ESLint or TypeScript commands.
-  * Run backend Maven commands through `apps/api/mvnw` (or `./mvnw` from `apps/api`), never through a system `mvn` executable.
-  * Add or update frontend dependencies with `npm install` from the affected app so its `package-lock.json` remains synchronized. Do not edit lockfiles manually.
-* `npm run lint` and `npm run check` are read-only validation commands. Use `npm run lint:fix` only as an intentional edit, then review the resulting diff.
-* Validate the affected scope before handoff:
-  * Frontend change: inspect the affected components and request modules and run that app's static `check` script when practical. Do not run a frontend test command unless the user explicitly requests it.
-  * Backend change: inspect the affected layers, configuration, repositories, and callers and use non-test static or compilation checks when practical. Do not run focused tests or the full `./mvnw test` suite unless the user explicitly requests backend tests.
-  * Shared REST contract change: statically inspect every backend and frontend consumer and run relevant non-test static checks when practical. Run contract, integration, or other automated tests only when the user explicitly requests them.
-  * Always run `git diff --check`.
-  * Reserve production builds for dependency, build configuration, or Dockerfile changes, explicit release verification, or when the task specifically requires them.
-* A changed Flyway migration can be rejected by a persistent local database because its recorded checksum no longer matches. Report the failure and ask before any database-volume reset; never erase the volume automatically.
-* In the final report, distinguish checks that passed, failed, were blocked by the environment, or were not run. Do not describe stale containers or interrupted commands as successfully verified.
+Use Conventional Commits for every commit.
 
-## Local Development
-```bash
-./setup.sh
-```
-The setup script prepares local configuration and keys, then runs
-`docker compose up --build`. Run `./reset.sh` to choose whether to
-remove the Kairos containers and Compose volume data and whether to restore
-`.env` from `.env.example`; the previous file is saved as `.env.old`. Passing
-`-y` confirms both reset actions without prompting. Reset leaves signing and
-encryption keys unchanged; `./setup.sh` is the only local preparation workflow
-that invokes the key initializers.
+## Documentation
 
-* Customer app: https://app.localhost
-* Panel app: https://panel.localhost
-* API: https://api.localhost
+- Record accepted product, architecture, security, data-ownership, scope, and
+  contract decisions in `docs/REQUIREMENTS.md`.
+- Keep `AGENTS.md` limited to durable repository-wide technology, boundaries,
+  conventions, and workflows.
+- Keep `README.md`, `AGENTS.md`, `docs/PROBLEM_DESCRIPTION.md`, and
+  `docs/REQUIREMENTS.md` as the repository's only Markdown documentation files.
+- Update documentation and implementation together when either changes the
+  other.
+
+## Agent Workflow
+
+- Before changing files, inspect `git status --short` and preserve unrelated
+  worktree changes.
+- Do not inspect or exercise the running Compose stack unless runtime
+  verification is requested or needed to diagnose a runtime problem.
+- Automated tests and browser or manual runtime checks are opt-in; run them
+  only when the user explicitly requests them. Default to static inspection and
+  non-test checks.
+- Use repository-owned commands:
+  - Customer frontend: `npm --prefix apps/customer-app run check`
+  - Panel frontend: `npm --prefix apps/panel-app run check`
+  - Backend: `apps/api/mvnw` from the repository root, or `./mvnw` from
+    `apps/api`
+  - Frontend dependencies: run `npm install` from the affected application and
+    let it update `package-lock.json`
+- Do not invoke installed frontend tools through `npx`, raw binaries, or
+  `node_modules/.bin`. Use `npm run` or `npm --prefix`.
+- Validate the affected scope when practical and always run
+  `git diff --check`. Reserve production builds for dependency, build,
+  Dockerfile, release-verification, or explicitly requested work.
+- Treat running containers and data as user-owned. Never stop the full stack,
+  run `docker compose down`, delete volumes, reset PostgreSQL, or prune Docker
+  state without explicit authorization.
+- If a changed Flyway migration conflicts with a persistent database checksum,
+  report it and ask before resetting data.
+- Report checks as passed, failed, blocked, or not run.
+
+## Local Setup
+
+Run `./setup.sh` to prepare local configuration and externally managed key
+files, then build and start Compose. Use `./reset.sh` only when the user has
+authorized resetting containers or data. Source is not synchronized into the
+production-mode containers; rebuild and recreate only affected services when
+runtime verification requires updated code.

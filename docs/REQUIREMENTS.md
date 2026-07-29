@@ -599,8 +599,9 @@ The current walking vertical slice is implemented for local development:
 * customer PWA manifest, order-aware first-launch, active-only IndexedDB
   snapshots, generated Serwist service worker, explicit offline fallback,
   app-level notification consent and controls, application badges, and
-  monotonic privacy-preserving push handling, with final regular, maskable, and
-  Apple-touch PNG assets and device acceptance still outstanding;
+  monotonic privacy-preserving push handling, with the final regular, maskable,
+  Apple-touch, and favicon assets supplied and device acceptance still
+  outstanding;
 * administrator-managed External Integrations, API Keys, and webhook
   subscriptions;
 * versioned external order commands with idempotent creation and desired-state
@@ -616,11 +617,12 @@ database was discarded while developing these increments, schema changes are
 consolidated in the initial Flyway migration rather than compatibility
 migrations.
 
-Completing customer PWA installability requires supplying the referenced
-192×192 and 512×512 regular icons, 512×512 maskable icon, and 180×180 Apple
-touch icon, then checking installation and standalone launch behavior on
-Android Chrome and iOS Safari. The manifest and launch behavior must not be
-redesigned while completing that asset and acceptance gap.
+The customer PWA now supplies the referenced 192×192 and 512×512 regular
+icons, 512×512 maskable icon, 180×180 Apple touch icon, and multi-resolution
+favicon. Completing installability acceptance requires checking installation
+and standalone launch behavior on Android Chrome and iOS Safari. The manifest
+and launch behavior must not be redesigned while completing that acceptance
+gap.
 
 The next External Integration increment publishes an OpenAPI document, rendered
 public reference documentation, and formal automated public-contract checks.
