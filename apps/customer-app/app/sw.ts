@@ -6,6 +6,7 @@ import type { PrecacheEntry, SerwistGlobalConfig } from "serwist";
 import { NavigationRoute, NetworkOnly, Serwist } from "serwist";
 import * as z from "zod/mini";
 
+import { apiOrigin, apiUrl } from "@/src/api/api-url";
 import { updateApplicationBadge } from "@/src/pwa/badge";
 import {
   applyPushTransition,
@@ -49,7 +50,7 @@ const serwist = new Serwist({
 
 serwist.registerCapture(
   ({ url }) =>
-    url.origin === self.location.origin &&
+    url.origin === apiOrigin &&
     url.pathname.startsWith("/api/tracked-orders/v1/"),
   new NetworkOnly(),
   "GET",
@@ -205,9 +206,10 @@ async function replaceChangedSubscription(
   }
   try {
     const response = await fetch(
-      "/api/customer-notifications/v1/subscription-replacement",
+      apiUrl("/api/customer-notifications/v1/subscription-replacement"),
       {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
           "X-XSRF-TOKEN": metadata.csrfToken,

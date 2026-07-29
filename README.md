@@ -19,9 +19,9 @@ docker compose up --build
 
 The local applications are available at:
 
-* Customer app: https://app.localhost
-* Staff panel: https://panel.localhost
-* API: https://api.localhost
+* Customer app: http://localhost:3000
+* Staff panel: http://localhost:3001
+* API: http://localhost:8080
 
 ## Reset the local environment
 

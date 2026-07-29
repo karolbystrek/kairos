@@ -2,6 +2,8 @@ import type { SerializedPushSubscription } from "@/src/pwa/storage";
 
 import { z } from "zod";
 
+import { apiUrl } from "@/src/api/api-url";
+
 const CSRF_COOKIE_NAME = "__Host-XSRF-TOKEN";
 const CSRF_HEADER_NAME = "X-XSRF-TOKEN";
 
@@ -55,7 +57,9 @@ export function serializePushSubscription(
 export async function getNotificationConfiguration(): Promise<{
   applicationServerKey: string;
 }> {
-  const response = await fetch("/api/customer-notifications/v1/configuration");
+  const response = await fetch(
+    apiUrl("/api/customer-notifications/v1/configuration"),
+  );
 
   if (!response.ok) {
     throw await notificationApiError(response);
@@ -136,7 +140,9 @@ export async function removePushEnrollments(
 }
 
 async function getCsrfToken(): Promise<string> {
-  const response = await fetch("/api/auth/v1/csrf");
+  const response = await fetch(apiUrl("/api/auth/v1/csrf"), {
+    credentials: "include",
+  });
 
   if (!response.ok) {
     throw new NotificationApiError(response.status);
@@ -156,8 +162,9 @@ async function notificationMutation(
   body: unknown,
   csrfToken: string,
 ): Promise<void> {
-  const response = await fetch(url, {
+  const response = await fetch(apiUrl(url), {
     method,
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
       [CSRF_HEADER_NAME]: csrfToken,

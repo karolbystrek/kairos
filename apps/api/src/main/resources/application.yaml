@@ -28,6 +28,9 @@ server:
     context-path: /api
 
 kairos:
+  browser-cors:
+    customer-origin: "${NEXT_PUBLIC_CUSTOMER_APP_URL}"
+    panel-origin: "${PANEL_APP_URL}"
   authentication:
     jwt:
       issuer: https://api.localhost

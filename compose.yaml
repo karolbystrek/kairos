@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
     ports:
-      - "127.0.0.1:5432:5432"
+      - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql
     healthcheck:
@@ -22,7 +22,7 @@ services:
     image: redis:8-alpine
     container_name: kairos-redis
     ports:
-      - "127.0.0.1:6379:6379"
+      - "6379:6379"
     volumes:
       - redisdata:/data
     healthcheck:
@@ -36,12 +36,14 @@ services:
   api:
     container_name: kairos-api
     image: kairos-api:local
+    env_file:
+      - .env
     build:
       context: ./apps/api
       dockerfile: Dockerfile
       target: runner
-    expose:
-      - "8080"
+    ports:
+      - "8080:8080"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
@@ -83,8 +85,11 @@ services:
       context: ./apps/customer-app
       dockerfile: Dockerfile
       target: runner
-    expose:
-      - "3000"
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL}
+        NEXT_TELEMETRY_DISABLED: ${NEXT_TELEMETRY_DISABLED}
+    ports:
+      - "3000:3000"
     depends_on:
       api:
         condition: service_healthy
@@ -102,8 +107,12 @@ services:
       context: ./apps/panel-app
       dockerfile: Dockerfile
       target: runner
-    expose:
-      - "3000"
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL}
+        NEXT_PUBLIC_CUSTOMER_APP_URL: ${NEXT_PUBLIC_CUSTOMER_APP_URL}
+        NEXT_TELEMETRY_DISABLED: ${NEXT_TELEMETRY_DISABLED}
+    ports:
+      - "3001:3000"
     depends_on:
       api:
         condition: service_healthy
@@ -115,27 +124,6 @@ services:
       start_period: 20s
     restart: unless-stopped
 
-  caddy:
-    container_name: kairos-caddy
-    image: caddy:2-alpine
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile
-      - caddy_data:/data
-      - caddy_config:/config
-    depends_on:
-      customer-app:
-        condition: service_healthy
-      panel-app:
-        condition: service_healthy
-      api:
-        condition: service_healthy
-    restart: unless-stopped
-
 volumes:
   pgdata:
   redisdata:
-  caddy_data:
-  caddy_config:

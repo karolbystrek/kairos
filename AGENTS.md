@@ -23,8 +23,7 @@ apps/
   panel-app/      Next.js staff panel
   api/            Spring Boot API
 docs/             Canonical product and architecture documentation
-compose.yaml      Local PostgreSQL, Redis, applications, and Caddy
-Caddyfile         Local reverse proxy and TLS
+compose.yaml      Local PostgreSQL, Redis, and applications
 ```
 
 - Both frontends: Next.js 16, React 19, TypeScript, Tailwind CSS 4, HeroUI 3,
@@ -34,7 +33,7 @@ Caddyfile         Local reverse proxy and TLS
 - API: Java 25, Spring Boot 4, Spring Security, and Spring MVC.
 - Data and real time: PostgreSQL is authoritative; Redis Pub/Sub fans out
   cross-instance customer events.
-- Infrastructure: Docker Compose and Caddy.
+- Infrastructure: Docker Compose.
 - Each application is independently deployable and owns its dependency
   manifest and Dockerfile.
 
@@ -46,8 +45,9 @@ Caddyfile         Local reverse proxy and TLS
 - Keep REST as the boundary between frontends, External Integrations, and the
   API. Browser families use `/api/{resource-family}/v1`; external families use
   `/api/external/{resource-family}/v1`.
-- Browser-facing API and SSE traffic is exposed by Caddy on the relevant
-  frontend origin. External Integrations use the dedicated API origin.
+- Local browser-facing API and SSE traffic goes directly to the dedicated API
+  origin over HTTP with explicit credentialed CORS scoped by frontend origin
+  and browser resource family.
 - Frontends use small handwritten request modules and response types with
   native `fetch`. Use SWR for REST-backed client state and Zod for
   frontend-owned input and event validation.

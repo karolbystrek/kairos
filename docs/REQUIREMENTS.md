@@ -45,7 +45,10 @@ The backend uses Java 25 and Spring Boot 4. It is the only system of record and 
 * transactional order-event outbox processing;
 * anonymous customer notification enrollment and durable Web Push delivery.
 
-Browser-facing API requests are routed through Caddy to the Spring API. Next.js route handlers are limited to frontend rendering concerns.
+Browser-facing API requests go directly to the Spring API. The local HTTP
+environment uses credentialed CORS scoped by frontend origin and browser
+resource family. Next.js route handlers are limited to frontend rendering
+concerns.
 
 ### 2.3 API contracts
 
@@ -270,7 +273,12 @@ The target authentication model supports:
 * linking an external provider identity to a Kairos account and its owning tenant;
 * the same application authorization model regardless of login method.
 
-After either login method, Spring issues a short-lived signed access JWT and a rotating refresh credential. Browser credentials are transported in `Secure`, `HttpOnly`, `SameSite=Lax`, host-only cookies through the staff-panel origin. Cookie-authenticated state-changing requests require CSRF protection.
+After either login method, Spring issues a short-lived signed access JWT and a
+rotating refresh credential. Browser credentials are transported in `Secure`,
+`HttpOnly`, `SameSite=Lax`, host-only cookies issued by the API. The local HTTP
+environment relies on browsers' localhost secure-context exception while
+retaining those cookie attributes. Cookie-authenticated state-changing requests
+require CSRF protection.
 
 The implemented local-authentication policy uses an RS256 access JWT with a
 five-minute lifetime, a seven-day refresh idle lifetime, and a 30-day absolute
@@ -394,7 +402,14 @@ Order labels are trimmed, single-line text with a maximum of 32 characters. Auto
 
 ## 6. Real-Time Communication
 
-The API exposes a same-origin Server-Sent Events stream for each active customer tracking reference. The stream is anonymous and read-only: possession of the high-entropy tracking reference grants access to that order's events but never authorizes a command. The customer validates each compact event with Zod and treats it only as an invalidation signal; SWR then retrieves the authoritative customer representation through REST.
+The API exposes a Server-Sent Events stream for each active customer tracking
+reference. In the local environment the customer application connects to that
+stream directly across the explicitly allowed HTTP origins. The stream is
+anonymous and read-only: possession of the high-entropy tracking reference
+grants access to that order's events but never authorizes a command. The
+customer validates each compact event with Zod and treats it only as an
+invalidation signal; SWR then retrieves the authoritative customer
+representation through REST.
 
 Order-state events are published only after the PostgreSQL transition and history transaction commits. Redis Pub/Sub distributes each event to every live API instance, and each instance forwards it to its locally connected SSE clients for that tracking reference. Publishing and subscription are mandatory application behavior and have no feature flag. Redis remains part of application health reporting and its health contributor must not be disabled. The publishing instance must not turn a committed transition into a failed command response when Redis is unavailable.
 
@@ -415,13 +430,24 @@ WebSocket independently rather than changing the SSE or Web Push contracts.
 
 ## 7. Routing and Deployment
 
-Caddy terminates TLS and routes the independently deployable services.
+The independently deployable services are exposed directly in the local Docker
+Compose environment.
 
-* The customer and staff applications retain separate origins.
-* Browser-facing REST, SSE, and OAuth paths are proxied through the relevant frontend origin to avoid an unnecessary cross-origin browser architecture.
-* Browser resource families use `/api/{resource-family}/v1`; external resource families use `/api/external/{resource-family}/v1`. Location identifiers remain in validated bodies or query parameters rather than nested resource paths.
-* The dedicated API origin remains available for External Integration REST access. Scheduled background jobs inside the Spring API perform webhook and customer-push delivery.
-* The Next.js services render frontend concerns only; the Spring API owns API security.
+* The customer, staff-panel, and API origins are configured in the root
+  environment file from the values documented in `.env.example`.
+* Browser-facing REST and SSE requests go directly to the API origin. Spring
+  allows credentialed CORS from the customer origin only for customer-owned
+  resource families and from the panel origin for staff-owned resource
+  families.
+* Browser resource families use `/api/{resource-family}/v1`; external resource
+  families use `/api/external/{resource-family}/v1`. Location identifiers
+  remain in validated bodies or query parameters rather than nested resource
+  paths.
+* The Next.js services render frontend concerns only; the Spring API owns API
+  security, scheduled webhook delivery, and customer-push delivery.
+* The HTTP topology is local-development-only. A public deployment still
+  requires TLS and the non-bypassable gateway described in the security
+  roadmap.
 
 ### 7.1 Current HTTP resource families
 
@@ -478,20 +504,20 @@ request returns the unchanged representation without another history, customer
 event, or outbox event.
 
 Docker Compose provides a production-like local environment for both frontends,
-the API, PostgreSQL, Redis, and Caddy. It builds
+the API, PostgreSQL, and Redis. It builds
 immutable production-mode application images and does not synchronize source
 files or run Fast Refresh or Spring Boot DevTools. Both Next.js applications run
 their standalone build output, and the customer build generates the Serwist
 service worker before the runtime image is assembled. The packaged Spring Boot
 API runs Flyway migrations and scheduled webhook and customer-push background
-jobs in the same application process. PostgreSQL and Redis remain on the Compose network for application
-traffic and also bind their standard ports to the host loopback interface for
-local development tools. Caddy is the browser-facing ingress. Applying source
-changes requires rebuilding and recreating the affected application container.
+jobs in the same application process. Every service remains on the Compose
+network. The customer application, staff panel, API, PostgreSQL, and Redis
+publish their development ports on every host interface. Applying source changes
+requires rebuilding and recreating the affected application container.
 
-Caddy serves the generated customer service worker with a root scope,
-JavaScript content type, restrictive content-security policy, and explicit
-no-cache headers so update checks do not reuse a stale script.
+The customer Next.js application serves the generated service worker with a
+root scope, JavaScript content type, restrictive content-security policy, and
+explicit no-cache headers so update checks do not reuse a stale script.
 
 ## 8. Resilience and Consistency
 

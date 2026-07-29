@@ -12,6 +12,7 @@ import {
   orderStatusChangedEventSchema,
   type CustomerOrder,
 } from "@/src/api/orders";
+import { apiUrl } from "@/src/api/api-url";
 import {
   isActiveOrderStatus,
   orderStatusLabels,
@@ -61,7 +62,9 @@ function useOrderEventStream({
     enabled ? (["tracked-order-events", trackingReference] as const) : null,
     ([, reference]) => {
       const eventSource = new EventSource(
-        `/api/tracked-orders/v1/${encodeURIComponent(reference)}/events`,
+        apiUrl(
+          `/api/tracked-orders/v1/${encodeURIComponent(reference)}/events`,
+        ),
       );
 
       eventSource.onopen = () => {

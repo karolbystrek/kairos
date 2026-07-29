@@ -1,6 +1,7 @@
 package pl.karolbystrek.kairos.api.config;
 
 import jakarta.servlet.DispatcherType;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -14,17 +15,59 @@ import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfFilter;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.security.web.authentication.session.NullAuthenticatedSessionStrategy;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import pl.karolbystrek.kairos.api.authentication.infrastructure.jwt.StaffPrincipalJwtAuthenticationConverter;
 import pl.karolbystrek.kairos.api.authentication.infrastructure.web.CookieBearerTokenResolver;
 import pl.karolbystrek.kairos.api.authentication.infrastructure.web.SecurityProblemDetailsHandler;
 import pl.karolbystrek.kairos.api.authentication.infrastructure.web.SpaCsrfTokenRequestHandler;
 
+import java.util.List;
+
 import static pl.karolbystrek.kairos.api.authentication.infrastructure.web.AuthenticationHttpNames.CSRF_COOKIE;
 import static pl.karolbystrek.kairos.api.authentication.infrastructure.web.AuthenticationHttpNames.CSRF_HEADER;
+import static org.springframework.security.config.Customizer.withDefaults;
 
 @Configuration
 @EnableMethodSecurity
+@EnableConfigurationProperties(BrowserCorsProperties.class)
 public class SecurityConfig {
+
+    @Bean
+    CorsConfigurationSource corsConfigurationSource(BrowserCorsProperties properties) {
+        var customerConfiguration = corsConfiguration(properties.customerOrigin());
+        var panelConfiguration = corsConfiguration(properties.panelOrigin());
+        var sharedConfiguration = corsConfiguration(
+                properties.customerOrigin(),
+                properties.panelOrigin()
+        );
+
+        var source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/auth/v1/csrf", sharedConfiguration);
+        source.registerCorsConfiguration("/tracked-orders/**", customerConfiguration);
+        source.registerCorsConfiguration("/customer-notifications/**", customerConfiguration);
+        source.registerCorsConfiguration("/**", panelConfiguration);
+        return source;
+    }
+
+    private static CorsConfiguration corsConfiguration(String... allowedOrigins) {
+        var configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(List.of(allowedOrigins));
+        configuration.setAllowedMethods(List.of(
+                "GET",
+                "HEAD",
+                "POST",
+                "PUT",
+                "PATCH",
+                "DELETE",
+                "OPTIONS"
+        ));
+        configuration.setAllowedHeaders(List.of("*"));
+        configuration.setAllowCredentials(true);
+        configuration.setMaxAge(3600L);
+        return configuration;
+    }
 
     @Bean
     CsrfTokenRepository csrfTokenRepository() {
@@ -50,6 +93,7 @@ public class SecurityConfig {
             SecurityProblemDetailsHandler problemDetailsHandler
     ) {
         return http
+                .cors(withDefaults())
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(csrfTokenRepository)
                         .csrfTokenRequestHandler(csrfTokenRequestHandler)

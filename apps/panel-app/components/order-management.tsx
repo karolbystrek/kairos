@@ -27,9 +27,8 @@ import {
   type StaffOrder,
   type CreateOrderInput,
 } from "@/src/api/orders";
+import { customerAppUrl } from "@/src/config/public-environment";
 
-const customerAppUrl =
-  process.env.NEXT_PUBLIC_CUSTOMER_APP_URL ?? "https://app.localhost";
 const tenantOrderScope = "tenant";
 
 const ordersKey = (accountId: string, scope: string) =>

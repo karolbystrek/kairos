@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { apiUrl } from "@/src/api/api-url";
 import { orderStatusSchema } from "@/src/orders/order-status";
 
 export const customerOrderSchema = z.object({
@@ -28,7 +29,7 @@ export async function getTrackedOrder(
   trackingReference: string,
 ): Promise<CustomerOrder> {
   const response = await fetch(
-    `/api/tracked-orders/v1/${encodeURIComponent(trackingReference)}`,
+    apiUrl(`/api/tracked-orders/v1/${encodeURIComponent(trackingReference)}`),
   );
 
   if (!response.ok) {

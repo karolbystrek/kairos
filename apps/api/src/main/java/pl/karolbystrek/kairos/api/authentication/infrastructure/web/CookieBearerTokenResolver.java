@@ -37,6 +37,8 @@ public class CookieBearerTokenResolver implements BearerTokenResolver {
                 || path.equals("/tenant-registrations/v1")
                 || path.equals("/tracked-orders/v1")
                 || path.startsWith("/tracked-orders/v1/")
+                || path.equals("/customer-notifications/v1")
+                || path.startsWith("/customer-notifications/v1/")
                 || path.equals("/actuator/health")
                 || path.startsWith("/actuator/health/");
     }

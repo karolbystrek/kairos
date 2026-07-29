@@ -20,6 +20,7 @@ class CookieBearerTokenResolverTests {
         assertThat(resolver.resolve(request("/auth/v1/login", accessCookie))).isNull();
         assertThat(resolver.resolve(request("/auth/v1/refresh", accessCookie))).isNull();
         assertThat(resolver.resolve(request("/tracked-orders/v1/123", accessCookie))).isNull();
+        assertThat(resolver.resolve(request("/customer-notifications/v1/configuration", accessCookie))).isNull();
         assertThat(resolver.resolve(request("/actuator/health", accessCookie))).isNull();
     }
 

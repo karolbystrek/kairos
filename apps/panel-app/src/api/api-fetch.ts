@@ -5,6 +5,8 @@ import {
   withAuthCookieLock,
 } from "./auth-coordination";
 
+import { apiBaseUrl } from "@/src/config/public-environment";
+
 const csrfCookieName = "__Host-XSRF-TOKEN";
 const csrfHeaderName = "X-XSRF-TOKEN";
 const csrfProblemTypes = new Set([
@@ -32,6 +34,10 @@ type ProblemDetails = z.infer<typeof problemDetailsSchema>;
 
 let csrfInitialization: Promise<void> | undefined;
 let isCsrfInitialized = false;
+
+function apiUrl(path: string): string {
+  return new URL(path, apiBaseUrl).toString();
+}
 
 function logTechnicalError(message: string, error: unknown): void {
   // Technical details belong in diagnostics, never in user-facing messages.
@@ -109,8 +115,8 @@ function readCookie(name: string): string | undefined {
 
 async function fetchCsrfMetadata(): Promise<void> {
   try {
-    const response = await fetch("/api/auth/v1/csrf", {
-      credentials: "same-origin",
+    const response = await fetch(apiUrl("/api/auth/v1/csrf"), {
+      credentials: "include",
       headers: { Accept: "application/json" },
     });
 
@@ -169,9 +175,9 @@ async function send(url: string, init?: RequestInit): Promise<Response> {
     headers.set(csrfHeaderName, token);
   }
 
-  return fetch(url, {
+  return fetch(apiUrl(url), {
     ...init,
-    credentials: "same-origin",
+    credentials: "include",
     headers,
   });
 }
