@@ -284,10 +284,18 @@ The implemented local-authentication policy uses an RS256 access JWT with a
 five-minute lifetime, a seven-day refresh idle lifetime, and a 30-day absolute
 refresh-family lifetime. The access cookie is `__Host-access-token`, the
 refresh cookie is `__Host-refresh-token`, and both use `Path=/` with no
-`Domain` attribute. The readable CSRF cookie is `__Host-XSRF-TOKEN`; unsafe
-browser requests copy it into `X-XSRF-TOKEN`. No password, access credential,
-refresh credential, provider token, or current-account record may be stored in
-browser-managed persistent storage.
+`Domain` attribute. The host-only CSRF cookie is `__Host-XSRF-TOKEN`. The
+credentialed CSRF bootstrap response returns its current token value together
+with the cookie and header names so a frontend on another trusted subdomain
+can cache the token only in its active execution context and send it as
+`X-XSRF-TOKEN` on unsafe requests. The customer service worker independently
+bootstraps a current token for unsafe background work and never treats a
+persisted token as authoritative. A recognized missing or invalid CSRF response
+clears the execution-context token, bootstraps again, and replays the unsafe
+request at most once. Login, logout, logout-all, and any future operation that
+rotates CSRF state are followed by a fresh bootstrap. No password, access
+credential, refresh credential, provider token, current-account record, or
+CSRF token may be stored in browser-managed persistent storage.
 
 The access JWT contains the issuer, audience, account ID subject, tenant ID,
 tenant-level role, issue and expiry times, and unique token ID. It does not

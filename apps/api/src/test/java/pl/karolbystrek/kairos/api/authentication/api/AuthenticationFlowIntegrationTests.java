@@ -374,6 +374,7 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
             clientAddress
         ))
             .andExpect(status().isOk())
+            .andExpect(jsonPath("$.token").isNotEmpty())
             .andExpect(jsonPath("$.cookieName").value(CSRF_COOKIE))
             .andExpect(jsonPath("$.headerName").value(CSRF_HEADER))
             .andReturn();

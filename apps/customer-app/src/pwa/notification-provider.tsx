@@ -395,20 +395,15 @@ async function synchronizeGrantedSubscription(): Promise<void> {
       previousSubscription,
       serialized,
       trackingReferences,
-      metadata.csrfToken,
     );
   }
-  const csrfToken = await reconcilePushSubscription(
-    serialized,
-    trackingReferences,
-  );
+  await reconcilePushSubscription(serialized, trackingReferences);
 
   await updateNotificationMetadata({
     notificationsEnabled: true,
     enrolledTrackingReferences: trackingReferences,
     pendingSubscriptionReplacement: undefined,
     registeredEndpoint: subscription.endpoint,
-    csrfToken,
   });
   await updateApplicationBadge();
 }

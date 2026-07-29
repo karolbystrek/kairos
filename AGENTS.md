@@ -112,9 +112,9 @@ Use Conventional Commits for every commit.
   worktree changes.
 - Do not inspect or exercise the running Compose stack unless runtime
   verification is requested or needed to diagnose a runtime problem.
-- Automated tests and browser or manual runtime checks are opt-in; run them
-  only when the user explicitly requests them. Default to static inspection and
-  non-test checks.
+- Run automated tests for the affected scope when practical. Browser or manual
+  runtime checks remain opt-in and should run only when the user explicitly
+  requests them or when they are needed to diagnose a runtime problem.
 - Use repository-owned commands:
   - Customer frontend: `npm --prefix apps/customer-app run check`
   - Panel frontend: `npm --prefix apps/panel-app run check`

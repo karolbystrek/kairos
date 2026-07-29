@@ -28,6 +28,22 @@ type PushSubscriptionChangeEvent = ExtendableEvent & {
   oldSubscription?: PushSubscription | null;
 };
 
+const CSRF_COOKIE_NAME = "__Host-XSRF-TOKEN";
+const CSRF_HEADER_NAME = "X-XSRF-TOKEN";
+const CSRF_PROBLEM_TYPES = new Set([
+  "urn:kairos:problem:csrf-token-missing",
+  "urn:kairos:problem:csrf-token-invalid",
+]);
+
+const csrfMetadataSchema = z.strictObject({
+  token: z.string().check(z.minLength(1)),
+  cookieName: z.literal(CSRF_COOKIE_NAME),
+  headerName: z.literal(CSRF_HEADER_NAME),
+});
+
+let csrfInitialization: Promise<string> | undefined;
+let csrfToken: string | undefined;
+
 const pushPayloadSchema = z.strictObject({
   version: z.literal(1),
   eventId: z.uuid(),
@@ -201,27 +217,21 @@ async function replaceChangedSubscription(
   await updateNotificationMetadata({
     pendingSubscriptionReplacement: pending,
   });
-  if (!metadata.csrfToken) {
-    return;
-  }
   try {
-    const response = await fetch(
-      apiUrl("/api/customer-notifications/v1/subscription-replacement"),
-      {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          "X-XSRF-TOKEN": metadata.csrfToken,
-        },
-        body: JSON.stringify({
-          previousSubscription: previousSerialized,
-          currentSubscription: currentSerialized,
-          trackingReferences: metadata.enrolledTrackingReferences ?? [],
-        }),
-      },
+    const body = JSON.stringify({
+      previousSubscription: previousSerialized,
+      currentSubscription: currentSerialized,
+      trackingReferences: metadata.enrolledTrackingReferences ?? [],
+    });
+    let response = await sendSubscriptionReplacement(
+      body,
+      await getCsrfToken(),
     );
 
+    if (await isCsrfFailure(response)) {
+      resetCsrfToken();
+      response = await sendSubscriptionReplacement(body, await getCsrfToken());
+    }
     if (!response.ok) {
       return;
     }
@@ -231,6 +241,80 @@ async function replaceChangedSubscription(
     });
   } catch {
     // The next application start performs the idempotent reconciliation.
+  }
+}
+
+async function getCsrfToken(): Promise<string> {
+  if (csrfToken) {
+    return csrfToken;
+  }
+  if (!csrfInitialization) {
+    csrfInitialization = bootstrapCsrfToken()
+      .then((token) => {
+        csrfToken = token;
+
+        return token;
+      })
+      .finally(() => {
+        csrfInitialization = undefined;
+      });
+  }
+
+  return csrfInitialization;
+}
+
+async function bootstrapCsrfToken(): Promise<string> {
+  const response = await fetch(apiUrl("/api/auth/v1/csrf"), {
+    credentials: "include",
+    headers: { Accept: "application/json" },
+  });
+
+  if (!response.ok) {
+    throw new Error(`CSRF bootstrap returned ${response.status}.`);
+  }
+  const result = z.safeParse(csrfMetadataSchema, await response.json());
+
+  if (!result.success) {
+    throw new Error("CSRF bootstrap returned an invalid response.");
+  }
+
+  return result.data.token;
+}
+
+function resetCsrfToken(): void {
+  csrfToken = undefined;
+}
+
+function sendSubscriptionReplacement(
+  body: string,
+  token: string,
+): Promise<Response> {
+  return fetch(
+    apiUrl("/api/customer-notifications/v1/subscription-replacement"),
+    {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        [CSRF_HEADER_NAME]: token,
+      },
+      body,
+    },
+  );
+}
+
+async function isCsrfFailure(response: Response): Promise<boolean> {
+  if (response.status !== 403) {
+    return false;
+  }
+  try {
+    const problem = (await response.json()) as { type?: unknown };
+
+    return (
+      typeof problem.type === "string" && CSRF_PROBLEM_TYPES.has(problem.type)
+    );
+  } catch {
+    return false;
   }
 }
 

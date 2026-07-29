@@ -6,7 +6,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -39,9 +38,10 @@ class AuthenticationController {
     private final CsrfTokenService csrfTokenService;
 
     @GetMapping("/csrf")
-    CsrfTokenResponse csrf(CsrfToken csrfToken) {
-        csrfToken.getToken();
+    CsrfTokenResponse csrf(HttpServletRequest request) {
+        var csrfToken = csrfTokenService.current(request);
         return new CsrfTokenResponse(
+            csrfToken.getToken(),
             CSRF_COOKIE,
             CSRF_HEADER
         );

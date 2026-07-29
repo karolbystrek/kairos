@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   apiFetchWhileAuthLocked,
   initializeCsrf,
+  refreshCsrf,
   request,
   requestWhileAuthLocked,
 } from "./api-fetch";
@@ -53,8 +54,8 @@ export async function login(
 
   await initializeCsrf();
 
-  return withAuthCookieLock(() =>
-    requestWhileAuthLocked(
+  return withAuthCookieLock(async () => {
+    const account = await requestWhileAuthLocked(
       "/api/auth/v1/login",
       currentAccountSchema,
       {
@@ -63,8 +64,12 @@ export async function login(
         body: JSON.stringify(input),
       },
       { retryUnauthorized: false },
-    ),
-  );
+    );
+
+    await refreshCsrf();
+
+    return account;
+  });
 }
 
 export async function logout(): Promise<boolean> {
@@ -72,6 +77,7 @@ export async function logout(): Promise<boolean> {
 
   await withAuthCookieLock(async () => {
     await apiFetchWhileAuthLocked("/api/auth/v1/logout", { method: "POST" });
+    await refreshCsrf();
   });
 
   return true;
@@ -84,6 +90,7 @@ export async function logoutAll(): Promise<boolean> {
     await apiFetchWhileAuthLocked("/api/auth/v1/logout-all", {
       method: "POST",
     });
+    await refreshCsrf();
   });
 
   return true;

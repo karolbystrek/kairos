@@ -15,6 +15,7 @@ const csrfProblemTypes = new Set([
 ]);
 
 const csrfMetadataSchema = z.object({
+  token: z.string().min(1),
   cookieName: z.literal(csrfCookieName),
   headerName: z.literal(csrfHeaderName),
 });
@@ -32,8 +33,8 @@ type ApiFetchOptions = {
 
 type ProblemDetails = z.infer<typeof problemDetailsSchema>;
 
-let csrfInitialization: Promise<void> | undefined;
-let isCsrfInitialized = false;
+let csrfInitialization: Promise<string> | undefined;
+let csrfToken: string | undefined;
 
 function apiUrl(path: string): string {
   return new URL(path, apiBaseUrl).toString();
@@ -94,26 +95,7 @@ function isUnsafeRequest(init?: RequestInit): boolean {
   return !["GET", "HEAD", "OPTIONS", "TRACE"].includes(method);
 }
 
-function readCookie(name: string): string | undefined {
-  if (typeof document === "undefined") return undefined;
-
-  const prefix = `${encodeURIComponent(name)}=`;
-  const cookie = document.cookie
-    .split("; ")
-    .find((value) => value.startsWith(prefix));
-
-  if (!cookie) return undefined;
-
-  const value = cookie.slice(prefix.length);
-
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return value;
-  }
-}
-
-async function fetchCsrfMetadata(): Promise<void> {
+async function fetchCsrfMetadata(): Promise<string> {
   try {
     const response = await fetch(apiUrl("/api/auth/v1/csrf"), {
       credentials: "include",
@@ -122,11 +104,7 @@ async function fetchCsrfMetadata(): Promise<void> {
 
     if (!response.ok) throw await ApiError.fromResponse(response);
 
-    csrfMetadataSchema.parse(await response.json());
-
-    if (!readCookie(csrfCookieName)) {
-      throw new Error("The API did not issue the required CSRF cookie.");
-    }
+    return csrfMetadataSchema.parse(await response.json()).token;
   } catch (error) {
     logTechnicalError("Panel security setup failed.", error);
 
@@ -138,15 +116,17 @@ async function fetchCsrfMetadata(): Promise<void> {
   }
 }
 
-export function initializeCsrf(): Promise<void> {
-  if (isCsrfInitialized && readCookie(csrfCookieName)) {
-    return Promise.resolve();
+export function initializeCsrf(): Promise<string> {
+  if (csrfToken) {
+    return Promise.resolve(csrfToken);
   }
 
   if (!csrfInitialization) {
     csrfInitialization = fetchCsrfMetadata()
-      .then(() => {
-        isCsrfInitialized = true;
+      .then((token) => {
+        csrfToken = token;
+
+        return token;
       })
       .finally(() => {
         csrfInitialization = undefined;
@@ -156,8 +136,14 @@ export function initializeCsrf(): Promise<void> {
   return csrfInitialization;
 }
 
-function resetCsrfInitialization() {
-  isCsrfInitialized = false;
+export async function refreshCsrf(): Promise<string> {
+  resetCsrf();
+
+  return initializeCsrf();
+}
+
+function resetCsrf(): void {
+  csrfToken = undefined;
 }
 
 async function send(url: string, init?: RequestInit): Promise<Response> {
@@ -166,11 +152,7 @@ async function send(url: string, init?: RequestInit): Promise<Response> {
   if (!headers.has("Accept")) headers.set("Accept", "application/json");
 
   if (isUnsafeRequest(init)) {
-    await initializeCsrf();
-
-    const token = readCookie(csrfCookieName);
-
-    if (!token) throw new Error("The CSRF token is unavailable.");
+    const token = await initializeCsrf();
 
     headers.set(csrfHeaderName, token);
   }
@@ -196,7 +178,7 @@ async function sendWithCsrfRecovery(
     throw error;
   }
 
-  resetCsrfInitialization();
+  resetCsrf();
   await initializeCsrf();
 
   return send(url, init);

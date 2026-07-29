@@ -9,6 +9,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
+import tools.jackson.databind.ObjectMapper;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
@@ -33,17 +34,29 @@ class SecurityFilterChainIntegrationTests extends RedisListenerIsolatedIntegrati
     @Autowired
     private MockMvc mockMvc;
 
+    @Autowired
+    private ObjectMapper objectMapper;
+
     @Test
-    void bootstrapsAReadableSecureCsrfCookieAnonymously() throws Exception {
-        mockMvc.perform(apiGet("/auth/v1/csrf").secure(true))
+    void bootstrapsAHostOnlyCsrfCookieAndMatchingTokenAnonymously() throws Exception {
+        var result = mockMvc.perform(apiGet("/auth/v1/csrf").secure(true))
                 .andExpect(status().isOk())
                 .andExpect(cookie().exists(CSRF_COOKIE))
                 .andExpect(cookie().secure(CSRF_COOKIE, true))
                 .andExpect(cookie().httpOnly(CSRF_COOKIE, false))
                 .andExpect(cookie().sameSite(CSRF_COOKIE, "Lax"))
                 .andExpect(cookie().path(CSRF_COOKIE, "/"))
+                .andExpect(jsonPath("$.token").isNotEmpty())
                 .andExpect(jsonPath("$.cookieName").value(CSRF_COOKIE))
-                .andExpect(jsonPath("$.headerName").value(CSRF_HEADER));
+                .andExpect(jsonPath("$.headerName").value(CSRF_HEADER))
+                .andReturn();
+        var csrfCookie = result.getResponse().getCookie(CSRF_COOKIE);
+        var csrfResponse = objectMapper.readTree(
+                result.getResponse().getContentAsString()
+        );
+
+        assertThat(csrfCookie.getDomain()).isNull();
+        assertThat(csrfResponse.get("token").asText()).isEqualTo(csrfCookie.getValue());
     }
 
     @Test

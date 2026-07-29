@@ -49,7 +49,6 @@ export type StoredTrackedOrder = z.infer<typeof storedOrderSchema>;
 export type StoredPushEvent = z.infer<typeof pushEventSchema>;
 
 export type NotificationMetadata = {
-  csrfToken?: string;
   enrolledTrackingReferences?: string[];
   notificationsEnabled?: boolean;
   pendingSubscriptionReplacement?: {

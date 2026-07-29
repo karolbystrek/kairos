@@ -6,6 +6,18 @@ import { apiUrl } from "@/src/api/api-url";
 
 const CSRF_COOKIE_NAME = "__Host-XSRF-TOKEN";
 const CSRF_HEADER_NAME = "X-XSRF-TOKEN";
+const CSRF_PROBLEM_TYPES = new Set([
+  "urn:kairos:problem:csrf-token-missing",
+  "urn:kairos:problem:csrf-token-invalid",
+]);
+
+const csrfMetadataSchema = z
+  .object({
+    token: z.string().min(1),
+    cookieName: z.literal(CSRF_COOKIE_NAME),
+    headerName: z.literal(CSRF_HEADER_NAME),
+  })
+  .strict();
 
 const notificationConfigurationSchema = z
   .object({
@@ -18,14 +30,19 @@ const notificationProblemSchema = z
     code: z.string().optional(),
     detail: z.string().optional(),
     trackingReference: z.string().optional(),
+    type: z.string().optional(),
   })
   .passthrough();
+
+let csrfInitialization: Promise<string> | undefined;
+let csrfToken: string | undefined;
 
 export class NotificationApiError extends Error {
   constructor(
     public readonly status: number,
     public readonly code?: string,
     public readonly trackingReference?: string,
+    public readonly type?: string,
   ) {
     super(`The customer notification API returned ${status}.`);
   }
@@ -71,9 +88,7 @@ export async function getNotificationConfiguration(): Promise<{
 export async function reconcilePushSubscription(
   subscription: SerializedPushSubscription,
   trackingReferences: string[],
-): Promise<string> {
-  const csrfToken = await getCsrfToken();
-
+): Promise<void> {
   await notificationMutation(
     "/api/customer-notifications/v1/subscription",
     "PUT",
@@ -81,20 +96,14 @@ export async function reconcilePushSubscription(
       subscription,
       trackingReferences,
     },
-    csrfToken,
   );
-
-  return csrfToken;
 }
 
 export async function replacePushSubscription(
   previousSubscription: SerializedPushSubscription,
   currentSubscription: SerializedPushSubscription,
   trackingReferences: string[],
-  csrfToken?: string,
-): Promise<string> {
-  const token = csrfToken ?? (await getCsrfToken());
-
+): Promise<void> {
   await notificationMutation(
     "/api/customer-notifications/v1/subscription-replacement",
     "POST",
@@ -103,10 +112,7 @@ export async function replacePushSubscription(
       currentSubscription,
       trackingReferences,
     },
-    token,
   );
-
-  return token;
 }
 
 export async function disablePushSubscription(
@@ -116,7 +122,6 @@ export async function disablePushSubscription(
     "/api/customer-notifications/v1/subscription",
     "DELETE",
     subscription,
-    await getCsrfToken(),
   );
 }
 
@@ -135,46 +140,92 @@ export async function removePushEnrollments(
       subscription,
       trackingReferences,
     },
-    await getCsrfToken(),
   );
 }
 
 async function getCsrfToken(): Promise<string> {
+  if (csrfToken) {
+    return csrfToken;
+  }
+  if (!csrfInitialization) {
+    csrfInitialization = bootstrapCsrfToken()
+      .then((token) => {
+        csrfToken = token;
+
+        return token;
+      })
+      .finally(() => {
+        csrfInitialization = undefined;
+      });
+  }
+
+  return csrfInitialization;
+}
+
+async function bootstrapCsrfToken(): Promise<string> {
   const response = await fetch(apiUrl("/api/auth/v1/csrf"), {
     credentials: "include",
+    headers: { Accept: "application/json" },
   });
 
   if (!response.ok) {
-    throw new NotificationApiError(response.status);
-  }
-  const token = readCookie(CSRF_COOKIE_NAME);
-
-  if (!token) {
-    throw new Error("The CSRF token cookie is unavailable.");
+    throw await notificationApiError(response);
   }
 
-  return token;
+  return csrfMetadataSchema.parse(await response.json()).token;
+}
+
+function resetCsrfToken(): void {
+  csrfToken = undefined;
 }
 
 async function notificationMutation(
   url: string,
   method: "DELETE" | "POST" | "PUT",
   body: unknown,
-  csrfToken: string,
 ): Promise<void> {
-  const response = await fetch(apiUrl(url), {
+  let response = await sendNotificationMutation(
+    url,
     method,
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      [CSRF_HEADER_NAME]: csrfToken,
-    },
-    body: JSON.stringify(body),
-  });
+    body,
+    await getCsrfToken(),
+  );
+
+  if (response.status === 403) {
+    const error = await notificationApiError(response);
+
+    if (!error.type || !CSRF_PROBLEM_TYPES.has(error.type)) {
+      throw error;
+    }
+    resetCsrfToken();
+    response = await sendNotificationMutation(
+      url,
+      method,
+      body,
+      await getCsrfToken(),
+    );
+  }
 
   if (!response.ok) {
     throw await notificationApiError(response);
   }
+}
+
+function sendNotificationMutation(
+  url: string,
+  method: "DELETE" | "POST" | "PUT",
+  body: unknown,
+  token: string,
+): Promise<Response> {
+  return fetch(apiUrl(url), {
+    method,
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+      [CSRF_HEADER_NAME]: token,
+    },
+    body: JSON.stringify(body),
+  });
 }
 
 async function notificationApiError(
@@ -187,23 +238,11 @@ async function notificationApiError(
       response.status,
       result.success ? result.data.code : undefined,
       result.success ? result.data.trackingReference : undefined,
+      result.success ? result.data.type : undefined,
     );
   } catch {
     return new NotificationApiError(response.status);
   }
-}
-
-function readCookie(name: string): string | null {
-  if (typeof document === "undefined") {
-    return null;
-  }
-  const prefix = `${name}=`;
-  const value = document.cookie
-    .split("; ")
-    .find((cookie) => cookie.startsWith(prefix))
-    ?.slice(prefix.length);
-
-  return value ? decodeURIComponent(value) : null;
 }
 
 export function fromBase64Url(value: string): Uint8Array {

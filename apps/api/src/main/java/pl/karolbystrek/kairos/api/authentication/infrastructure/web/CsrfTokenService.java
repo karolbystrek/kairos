@@ -13,6 +13,10 @@ public class CsrfTokenService {
 
     private final CsrfTokenRepository tokenRepository;
 
+    public CsrfToken current(HttpServletRequest request) {
+        return SpaCsrfTokenRequestHandler.rawToken(request);
+    }
+
     public CsrfToken rotate(HttpServletRequest request, HttpServletResponse response) {
         tokenRepository.saveToken(null, request, response);
         var token = tokenRepository.generateToken(request);

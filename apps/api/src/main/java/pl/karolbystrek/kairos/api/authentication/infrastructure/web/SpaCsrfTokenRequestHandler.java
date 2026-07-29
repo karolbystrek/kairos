@@ -19,6 +19,9 @@ import static pl.karolbystrek.kairos.api.authentication.infrastructure.web.Authe
 @Component
 public class SpaCsrfTokenRequestHandler implements CsrfTokenRequestHandler {
 
+    private static final String RAW_TOKEN_ATTRIBUTE =
+            SpaCsrfTokenRequestHandler.class.getName() + ".RAW_TOKEN";
+
     private final CsrfTokenRequestHandler plain = new CsrfTokenRequestAttributeHandler();
     private final CsrfTokenRequestHandler xor = new XorCsrfTokenRequestAttributeHandler();
 
@@ -28,8 +31,9 @@ public class SpaCsrfTokenRequestHandler implements CsrfTokenRequestHandler {
             HttpServletResponse response,
             Supplier<CsrfToken> csrfToken
     ) {
-        xor.handle(request, response, csrfToken);
-        csrfToken.get();
+        var rawToken = csrfToken.get();
+        request.setAttribute(RAW_TOKEN_ATTRIBUTE, rawToken);
+        xor.handle(request, response, () -> rawToken);
     }
 
     @Override
@@ -44,6 +48,14 @@ public class SpaCsrfTokenRequestHandler implements CsrfTokenRequestHandler {
             return null;
         }
         return plain.resolveCsrfTokenValue(request, csrfToken);
+    }
+
+    static CsrfToken rawToken(HttpServletRequest request) {
+        var token = request.getAttribute(RAW_TOKEN_ATTRIBUTE);
+        if (token instanceof CsrfToken csrfToken) {
+            return csrfToken;
+        }
+        throw new IllegalStateException("The current CSRF token is unavailable");
     }
 
     private static boolean equalsConstantTime(String expected, String actual) {
