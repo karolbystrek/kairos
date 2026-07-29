@@ -5,26 +5,11 @@ the customer PWA, while restaurant staff manage orders in a separate panel.
 
 ## Run locally
 
-Prerequisites:
-
-* Docker with Docker Compose
-* OpenSSL
-
 Prepare the local environment:
 
 ```bash
 ./setup.sh
 ```
-
-The setup script copies `.env.example` to `.env` and creates all local signing
-and encryption keys. If a file already exists, the script asks before replacing
-it. After preparation, it builds and starts production-mode application
-containers. Keep that terminal open while using Kairos.
-
-The local stack deliberately runs packaged Spring Boot processes and standalone
-Next.js servers. Source files are not mounted into containers, so apply code
-changes by stopping the stack and running `./setup.sh` again to rebuild it. This
-keeps local PWA, service-worker, and Web Push behavior close to deployment.
 
 The local applications are available at:
 
