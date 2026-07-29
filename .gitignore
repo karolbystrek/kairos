@@ -1,5 +1,6 @@
 # Local environment files
 .env
+.env.old
 .env.local
 .env.*.local
 /.codex/

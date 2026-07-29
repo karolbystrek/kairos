@@ -69,13 +69,13 @@ PostgreSQL RLS, generated SDKs, and production ingress hardening remain
 deferred. RLS and a non-bypassable rate-limiting API gateway are required before
 public deployment.
 
-The Spring application and Docker images never generate JWT signing keys or the webhook signing-secret encryption key. Before starting local Compose, run `./scripts/init-jwt-keys.sh` and `./scripts/init-webhook-encryption-key.sh` to idempotently prepare the ignored files under `secrets/`. Compose bind-mounts `secrets/` read-only into the API and worker containers. Production deployments require externally managed key resources.
+The Spring application and Docker images never generate JWT signing keys, the webhook signing-secret encryption key, VAPID signing keys, or the push-subscription encryption key. Run `./setup.sh` to prepare `.env` and the ignored files under `secrets/`, then start local Compose Watch; it asks before replacing an existing resource. Use `./reset.sh` to interactively remove Kairos Compose containers and volume data and optionally restore `.env`, or `./reset.sh -y` to confirm both actions. Reset regenerates key material only after volume data is removed. Compose bind-mounts `secrets/` read-only into the API and worker containers. Production deployments require externally managed key resources.
 
 ## Documentation Synchronization
 * Do not leave accepted project decisions only in the conversation. When discussion with the user changes or clarifies architecture, requirements, scope, security, data ownership, technology choices, or development conventions, update the relevant documentation in the same task.
 * Update `docs/REQUIREMENTS.md` for product behavior, architecture, security, persistence concepts, integration contracts, and acceptance criteria.
 * Update `AGENTS.md` for repository-wide technology choices, boundaries, workflows, and implementation conventions agents must follow.
-* Keep `AGENTS.md`, `docs/PROBLEM_DESCRIPTION.md`, and `docs/REQUIREMENTS.md` as the only Markdown documentation files in the repository. Do not add standalone plans, ADRs, context files, or app READMEs; consolidate durable decisions into the appropriate canonical file.
+* Keep `README.md`, `AGENTS.md`, `docs/PROBLEM_DESCRIPTION.md`, and `docs/REQUIREMENTS.md` as the only Markdown documentation files in the repository. Do not add standalone plans, ADRs, context files, or app READMEs; consolidate durable decisions into the appropriate canonical file.
 * Keep documentation and code consistent. When a code change alters documented behavior or structure, update the affected documentation alongside the code; when a documentation decision affects existing code, identify and reconcile the mismatch rather than silently ignoring it.
 
 ## Agent Development Workflow
@@ -102,11 +102,15 @@ The Spring application and Docker images never generate JWT signing keys or the 
 
 ## Local Development
 ```bash
-cp .env.example .env
-./scripts/init-jwt-keys.sh
-./scripts/init-webhook-encryption-key.sh
-docker compose up --build --watch
+./setup.sh
 ```
+The setup script prepares local configuration and keys, then runs
+`docker compose up --build --watch`. Run `./reset.sh` to choose whether to
+remove the Kairos containers and Compose volume data and whether to restore
+`.env` from `.env.example`; the previous file is saved as `.env.old`. Passing
+`-y` confirms both reset actions without prompting. Signing and encryption keys
+are regenerated only when volume data is removed.
+
 * Customer app: https://app.localhost
 * Panel app: https://panel.localhost
 * API: https://api.localhost

@@ -2,6 +2,20 @@
 
 set -eu
 
+force=false
+
+case "${1:-}" in
+    "")
+        ;;
+    --force)
+        force=true
+        ;;
+    *)
+        echo "Usage: $0 [--force]" >&2
+        exit 2
+        ;;
+esac
+
 repository_directory="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 key_directory="${repository_directory}/secrets"
 private_key="${key_directory}/jwt-private.pem"
@@ -16,7 +30,7 @@ trap 'rm -rf "${temporary_directory}"' EXIT HUP INT TERM
 derived_public_key="${temporary_directory}/derived-public.pem"
 normalized_public_key="${temporary_directory}/normalized-public.pem"
 
-if [ -f "${private_key}" ]; then
+if [ "${force}" = false ] && [ -f "${private_key}" ]; then
     openssl pkey -in "${private_key}" -check -noout >/dev/null
     openssl pkey -in "${private_key}" -pubout -out "${derived_public_key}"
 
@@ -37,7 +51,7 @@ if [ -f "${private_key}" ]; then
     exit 0
 fi
 
-if [ -f "${public_key}" ]; then
+if [ "${force}" = false ] && [ -f "${public_key}" ]; then
     echo "secrets/jwt-private.pem is missing while the public key exists." >&2
     exit 1
 fi
