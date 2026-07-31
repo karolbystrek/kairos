@@ -7,7 +7,6 @@ import {
 
 import { apiBaseUrl } from "@/src/config/public-environment";
 
-const csrfCookieName = "__Host-XSRF-TOKEN";
 const csrfHeaderName = "X-XSRF-TOKEN";
 const csrfProblemTypes = new Set([
   "urn:kairos:problem:csrf-token-missing",
@@ -16,8 +15,6 @@ const csrfProblemTypes = new Set([
 
 const csrfMetadataSchema = z.object({
   token: z.string().min(1),
-  cookieName: z.literal(csrfCookieName),
-  headerName: z.literal(csrfHeaderName),
 });
 
 const problemDetailsSchema = z.object({

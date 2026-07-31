@@ -285,10 +285,10 @@ five-minute lifetime, a seven-day refresh idle lifetime, and a 30-day absolute
 refresh-family lifetime. The access cookie is `__Host-access-token`, the
 refresh cookie is `__Host-refresh-token`, and both use `Path=/` with no
 `Domain` attribute. The host-only CSRF cookie is `__Host-XSRF-TOKEN`. The
-credentialed CSRF bootstrap response returns its current token value together
-with the cookie and header names so a frontend on another trusted subdomain
-can cache the token only in its active execution context and send it as
-`X-XSRF-TOKEN` on unsafe requests. The customer service worker independently
+credentialed CSRF bootstrap response returns its current token value so a
+frontend on another trusted subdomain can cache the token only in its active
+execution context and send it as `X-XSRF-TOKEN` on unsafe requests. The
+customer service worker independently
 bootstraps a current token for unsafe background work and never treats a
 persisted token as authoritative. A recognized missing or invalid CSRF response
 clears the execution-context token, bootstraps again, and replays the unsafe

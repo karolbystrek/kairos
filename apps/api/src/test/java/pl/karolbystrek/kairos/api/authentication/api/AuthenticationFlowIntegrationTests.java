@@ -375,8 +375,6 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
         ))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.token").isNotEmpty())
-            .andExpect(jsonPath("$.cookieName").value(CSRF_COOKIE))
-            .andExpect(jsonPath("$.headerName").value(CSRF_HEADER))
             .andReturn();
         var csrf = activeCsrfResponseCookie(result);
         assertReadableCsrfCookie(csrf);

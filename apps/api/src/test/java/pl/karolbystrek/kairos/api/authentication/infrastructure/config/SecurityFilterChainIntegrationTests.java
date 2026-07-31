@@ -47,8 +47,6 @@ class SecurityFilterChainIntegrationTests extends RedisListenerIsolatedIntegrati
                 .andExpect(cookie().sameSite(CSRF_COOKIE, "Lax"))
                 .andExpect(cookie().path(CSRF_COOKIE, "/"))
                 .andExpect(jsonPath("$.token").isNotEmpty())
-                .andExpect(jsonPath("$.cookieName").value(CSRF_COOKIE))
-                .andExpect(jsonPath("$.headerName").value(CSRF_HEADER))
                 .andReturn();
         var csrfCookie = result.getResponse().getCookie(CSRF_COOKIE);
         var csrfResponse = objectMapper.readTree(

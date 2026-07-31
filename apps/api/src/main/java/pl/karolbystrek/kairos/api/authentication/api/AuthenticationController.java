@@ -23,9 +23,6 @@ import pl.karolbystrek.kairos.api.authentication.application.exception.InvalidRe
 import pl.karolbystrek.kairos.api.authentication.infrastructure.web.AuthenticationCookieService;
 import pl.karolbystrek.kairos.api.authentication.infrastructure.web.CsrfTokenService;
 
-import static pl.karolbystrek.kairos.api.authentication.infrastructure.web.AuthenticationHttpNames.CSRF_COOKIE;
-import static pl.karolbystrek.kairos.api.authentication.infrastructure.web.AuthenticationHttpNames.CSRF_HEADER;
-
 @RestController
 @RequestMapping("/auth/v1")
 @RequiredArgsConstructor
@@ -40,11 +37,7 @@ class AuthenticationController {
     @GetMapping("/csrf")
     CsrfTokenResponse csrf(HttpServletRequest request) {
         var csrfToken = csrfTokenService.current(request);
-        return new CsrfTokenResponse(
-            csrfToken.getToken(),
-            CSRF_COOKIE,
-            CSRF_HEADER
-        );
+        return new CsrfTokenResponse(csrfToken.getToken());
     }
 
     @PostMapping("/login")

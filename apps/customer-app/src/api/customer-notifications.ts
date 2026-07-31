@@ -4,7 +4,6 @@ import { z } from "zod";
 
 import { apiUrl } from "@/src/api/api-url";
 
-const CSRF_COOKIE_NAME = "__Host-XSRF-TOKEN";
 const CSRF_HEADER_NAME = "X-XSRF-TOKEN";
 const CSRF_PROBLEM_TYPES = new Set([
   "urn:kairos:problem:csrf-token-missing",
@@ -14,8 +13,6 @@ const CSRF_PROBLEM_TYPES = new Set([
 const csrfMetadataSchema = z
   .object({
     token: z.string().min(1),
-    cookieName: z.literal(CSRF_COOKIE_NAME),
-    headerName: z.literal(CSRF_HEADER_NAME),
   })
   .strict();
 

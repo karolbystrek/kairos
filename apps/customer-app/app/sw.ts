@@ -28,7 +28,6 @@ type PushSubscriptionChangeEvent = ExtendableEvent & {
   oldSubscription?: PushSubscription | null;
 };
 
-const CSRF_COOKIE_NAME = "__Host-XSRF-TOKEN";
 const CSRF_HEADER_NAME = "X-XSRF-TOKEN";
 const CSRF_PROBLEM_TYPES = new Set([
   "urn:kairos:problem:csrf-token-missing",
@@ -37,8 +36,6 @@ const CSRF_PROBLEM_TYPES = new Set([
 
 const csrfMetadataSchema = z.strictObject({
   token: z.string().check(z.minLength(1)),
-  cookieName: z.literal(CSRF_COOKIE_NAME),
-  headerName: z.literal(CSRF_HEADER_NAME),
 });
 
 let csrfInitialization: Promise<string> | undefined;
