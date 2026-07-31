@@ -6,16 +6,16 @@ x-deployment-logging: &deployment-logging
 
 services:
   nginx:
+    environment:
+      KAIROS_NGINX_REAL_IP_CONFIGURATION: |-
+        set_real_ip_from 172.31.255.0/24;
+        real_ip_header CF-Connecting-IP;
     mem_limit: 128m
     cpus: 0.50
     logging: *deployment-logging
-    volumes:
-      - type: bind
-        source: ${KAIROS_TLS_SECRETS_DIRECTORY:?Set KAIROS_TLS_SECRETS_DIRECTORY}
-        target: /run/secrets/tls
-        read_only: true
-        bind:
-          create_host_path: false
+    networks:
+      - gateway
+      - edge
 
   customer-app:
     image: ${KAIROS_IMAGE_REGISTRY:?Set KAIROS_IMAGE_REGISTRY}/customer-app:${KAIROS_RELEASE_VERSION:?Set KAIROS_RELEASE_VERSION}
@@ -79,8 +79,14 @@ services:
       nginx:
         condition: service_healthy
     networks:
-      - gateway
+      - edge
     mem_limit: 256m
     cpus: 0.50
     logging: *deployment-logging
     restart: unless-stopped
+
+networks:
+  edge:
+    ipam:
+      config:
+        - subnet: 172.31.255.0/24

@@ -459,6 +459,21 @@ services do not publish host ports.
 * NGINX, both frontends, and the API share a gateway network. Only the API also
   joins the internal data network containing PostgreSQL and Redis, so neither
   the gateway nor a frontend can reach a data service.
+* NGINX selects one of the three applications by exact hostname, rejects
+  unknown hosts, keeps frontend and API path spaces separate, and exposes
+  Spring Actuator only to container-internal health checks. The API hostname
+  forwards only the broad `/api/` namespace; the frontend hostnames reject that
+  namespace rather than maintaining a fragile endpoint-by-endpoint allowlist.
+* NGINX replaces browser-supplied forwarding metadata with one canonical
+  client address, host, HTTPS scheme, and port before proxying. Local traffic
+  does not trust forwarding headers. The deployment overlay gives NGINX and
+  `cloudflared` a dedicated edge subnet and accepts `CF-Connecting-IP` only
+  from that controlled hop. The same core configuration terminates local TLS;
+  hosted tunnel traffic uses plain HTTP on the private same-host edge network.
+* The shared gateway applies bounded request-body, header, connection, and
+  timeout settings. Its tracked-order SSE route disables proxy buffering and
+  keeps the upstream read timeout longer than the API's 30-minute emitter
+  lifetime.
 * Local Compose builds application images from the working tree, mounts
   disposable secrets at `/run/secrets`, and publishes only NGINX HTTPS on
   `127.0.0.1`. Direct service ports are not part of the maintained topology.
@@ -701,11 +716,13 @@ The current walking vertical slice is implemented for local development:
   delivery;
 * one environment-independent API configuration whose hosted values and
   externally mounted secrets are supplied by the deployment environment;
-* a shared NGINX/application/data Compose topology with small local and hosted
-  deployment overlays selected by the environment file, health-gated
-  dependencies, PostgreSQL-only persistence, nondurable staging-authenticated
-  Redis, stable secret paths, and a documented manual version-pinned deployment
-  sequence with recorded registry digests;
+* a shared, hostname-routing NGINX/application/data Compose topology with small
+  local and hosted deployment overlays selected by the environment file,
+  controlled forwarding metadata, buffered-disabled SSE, internal-only health
+  paths, health-gated dependencies, PostgreSQL-only persistence, nondurable
+  staging-authenticated Redis, stable application-secret paths, and a
+  documented manual version-pinned deployment sequence with recorded registry
+  digests;
 * GitHub Actions validation for pull requests and `main`, followed on successful
   `main` runs by immutable, commit-tagged `linux/amd64` publication of all three
   application images to GHCR without a deployment or GitHub Release.

@@ -1,5 +1,10 @@
 services:
   nginx:
+    environment:
+      KAIROS_NGINX_LISTEN: "443 ssl"
+      KAIROS_NGINX_TLS_CONFIGURATION: |-
+        ssl_certificate /run/secrets/tls/tls.crt;
+        ssl_certificate_key /run/secrets/tls/tls.key;
     ports:
       - "127.0.0.1:443:443"
     volumes:
@@ -16,8 +21,8 @@ services:
       dockerfile: Dockerfile
       target: runner
       args:
-        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL}
-        NEXT_TELEMETRY_DISABLED: ${NEXT_TELEMETRY_DISABLED}
+        NEXT_PUBLIC_API_BASE_URL:
+        NEXT_TELEMETRY_DISABLED:
 
   panel-app:
     build:
@@ -25,9 +30,9 @@ services:
       dockerfile: Dockerfile
       target: runner
       args:
-        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL}
-        NEXT_PUBLIC_CUSTOMER_APP_URL: ${NEXT_PUBLIC_CUSTOMER_APP_URL}
-        NEXT_TELEMETRY_DISABLED: ${NEXT_TELEMETRY_DISABLED}
+        NEXT_PUBLIC_API_BASE_URL:
+        NEXT_PUBLIC_CUSTOMER_APP_URL:
+        NEXT_TELEMETRY_DISABLED:
 
   api:
     build:
