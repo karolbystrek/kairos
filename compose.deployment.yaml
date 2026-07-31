@@ -1,0 +1,86 @@
+x-deployment-logging: &deployment-logging
+  driver: local
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  nginx:
+    mem_limit: 128m
+    cpus: 0.50
+    logging: *deployment-logging
+    volumes:
+      - type: bind
+        source: ${KAIROS_TLS_SECRETS_DIRECTORY:?Set KAIROS_TLS_SECRETS_DIRECTORY}
+        target: /run/secrets/tls
+        read_only: true
+        bind:
+          create_host_path: false
+
+  customer-app:
+    image: ${KAIROS_IMAGE_REGISTRY:?Set KAIROS_IMAGE_REGISTRY}/customer-app:${KAIROS_RELEASE_VERSION:?Set KAIROS_RELEASE_VERSION}
+    mem_limit: 512m
+    cpus: 0.75
+    logging: *deployment-logging
+
+  panel-app:
+    image: ${KAIROS_IMAGE_REGISTRY:?Set KAIROS_IMAGE_REGISTRY}/panel-app:${KAIROS_RELEASE_VERSION:?Set KAIROS_RELEASE_VERSION}
+    mem_limit: 512m
+    cpus: 0.75
+    logging: *deployment-logging
+
+  api:
+    image: ${KAIROS_IMAGE_REGISTRY:?Set KAIROS_IMAGE_REGISTRY}/api:${KAIROS_RELEASE_VERSION:?Set KAIROS_RELEASE_VERSION}
+    mem_limit: 1g
+    cpus: 1.50
+    logging: *deployment-logging
+    volumes:
+      - type: bind
+        source: ${KAIROS_APPLICATION_SECRETS_DIRECTORY:?Set KAIROS_APPLICATION_SECRETS_DIRECTORY}
+        target: /run/secrets
+        read_only: true
+        bind:
+          create_host_path: false
+
+  postgres:
+    mem_limit: 1g
+    cpus: 1.00
+    logging: *deployment-logging
+
+  redis:
+    mem_limit: 256m
+    cpus: 0.50
+    logging: *deployment-logging
+
+  cloudflared:
+    image: cloudflare/cloudflared:2026.7.2
+    command:
+      [
+        "tunnel",
+        "--config",
+        "/etc/cloudflared/config.yml",
+        "--no-autoupdate",
+        "run",
+      ]
+    volumes:
+      - type: bind
+        source: ${CLOUDFLARED_CONFIG_FILE:?Set CLOUDFLARED_CONFIG_FILE}
+        target: /etc/cloudflared/config.yml
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${CLOUDFLARED_CREDENTIALS_FILE:?Set CLOUDFLARED_CREDENTIALS_FILE}
+        target: /run/secrets/cloudflared-credentials.json
+        read_only: true
+        bind:
+          create_host_path: false
+    depends_on:
+      nginx:
+        condition: service_healthy
+    networks:
+      - gateway
+    mem_limit: 256m
+    cpus: 0.50
+    logging: *deployment-logging
+    restart: unless-stopped

@@ -12,6 +12,7 @@ echo "Copied .env.example to .env."
 "${repository_directory}/scripts/init-jwt-keys.sh"
 "${repository_directory}/scripts/init-webhook-encryption-key.sh"
 "${repository_directory}/scripts/init-customer-push-secrets.sh"
+"${repository_directory}/scripts/init-local-tls.sh"
 
 echo
 echo "Kairos dependencies are ready."

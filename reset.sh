@@ -41,8 +41,10 @@ rm -f \
     "secrets/webhook-encryption.bin" \
     "secrets/vapid-private.pem" \
     "secrets/vapid-public.pem" \
-    "secrets/push-subscription-encryption.bin"
-echo "Removed generated signing and encryption keys."
+    "secrets/push-subscription-encryption.bin" \
+    "secrets/tls/tls.crt" \
+    "secrets/tls/tls.key"
+echo "Removed generated signing, encryption, and local TLS keys."
 
 echo
 echo "Reset complete. Run ./setup.sh to start Kairos."

@@ -45,10 +45,10 @@ The backend uses Java 25 and Spring Boot 4. It is the only system of record and 
 * transactional order-event outbox processing;
 * anonymous customer notification enrollment and durable Web Push delivery.
 
-Browser-facing API requests go directly to the Spring API. The local HTTP
-environment uses credentialed CORS scoped by frontend origin and browser
-resource family. Next.js route handlers are limited to frontend rendering
-concerns.
+Browser-facing API requests go directly to the Spring API origin through the
+shared NGINX gateway. The local HTTPS environment uses credentialed CORS scoped
+by frontend origin and browser resource family. Next.js route handlers are
+limited to frontend rendering concerns.
 
 ### 2.3 API contracts
 
@@ -275,10 +275,10 @@ The target authentication model supports:
 
 After either login method, Spring issues a short-lived signed access JWT and a
 rotating refresh credential. Browser credentials are transported in `Secure`,
-`HttpOnly`, `SameSite=Lax`, host-only cookies issued by the API. The local HTTP
-environment relies on browsers' localhost secure-context exception while
-retaining those cookie attributes. Cookie-authenticated state-changing requests
-require CSRF protection.
+`HttpOnly`, `SameSite=Lax`, host-only cookies issued by the API. Local browser
+traffic uses trusted HTTPS subdomains through NGINX and retains the same cookie
+attributes as staging and production. Cookie-authenticated state-changing
+requests require CSRF protection.
 
 The implemented local-authentication policy uses an RS256 access JWT with a
 five-minute lifetime, a seven-day refresh idle lifetime, and a 30-day absolute
@@ -412,7 +412,7 @@ Order labels are trimmed, single-line text with a maximum of 32 characters. Auto
 
 The API exposes a Server-Sent Events stream for each active customer tracking
 reference. In the local environment the customer application connects to that
-stream directly across the explicitly allowed HTTP origins. The stream is
+stream on the dedicated API HTTPS origin through NGINX. The stream is
 anonymous and read-only: possession of the high-entropy tracking reference
 grants access to that order's events but never authorizes a command. The
 customer validates each compact event with Zod and treats it only as an
@@ -438,11 +438,13 @@ WebSocket independently rather than changing the SSE or Web Push contracts.
 
 ## 7. Routing and Deployment
 
-The independently deployable services are exposed directly in the local Docker
-Compose environment.
+The independently deployable services share one production-like Docker Compose
+topology. NGINX is the only normal browser ingress; application and data
+services do not publish host ports.
 
-* The customer, staff-panel, and API origins are configured in the root
-  environment file from the values documented in `.env.example`.
+* The customer, staff-panel, and API HTTPS origins and gateway hostnames are
+  configured in the root environment file from the values documented in
+  `.env.example`.
 * Browser-facing REST and SSE requests go directly to the API origin. Spring
   allows credentialed CORS from the customer origin only for customer-owned
   resource families and from the panel origin only for staff-owned resource
@@ -454,9 +456,23 @@ Compose environment.
   paths.
 * The Next.js services render frontend concerns only; the Spring API owns API
   security, scheduled webhook delivery, and customer-push delivery.
-* The HTTP topology is local-development-only. A public deployment still
-  requires TLS and the non-bypassable gateway described in the security
-  roadmap.
+* NGINX, both frontends, and the API share a gateway network. Only the API also
+  joins the internal data network containing PostgreSQL and Redis, so neither
+  the gateway nor a frontend can reach a data service.
+* Local Compose builds application images from the working tree, mounts
+  disposable secrets at `/run/secrets`, and publishes only NGINX HTTPS on
+  `127.0.0.1`. Direct service ports are not part of the maintained topology.
+* The deployment overlay supports private staging and later production. It
+  constructs all three application image references from one registry and one
+  immutable release version, keeps infrastructure image versions in the
+  repository, adds Cloudflare Tunnel, preserves the same secret paths, applies
+  basic CPU and memory limits, and bounds container logs. It publishes no
+  service port.
+* Each environment file selects either the local or deployment overlay through
+  `COMPOSE_FILE`, so ordinary Compose commands do not carry repeated file-list
+  arguments.
+* PostgreSQL owns the only data volume. Redis Pub/Sub is nondurable and has no
+  volume.
 
 ### 7.1 Current HTTP resource families
 
@@ -512,36 +528,34 @@ custom label in its validated body. External creation additionally requires
 request returns the unchanged representation without another history, customer
 event, or outbox event.
 
-Docker Compose provides a production-like local environment for both frontends,
-the API, PostgreSQL, and Redis. It builds
-immutable production-mode application images and does not synchronize source
-files or run Fast Refresh or Spring Boot DevTools. Both Next.js applications run
-their standalone build output, and the customer build generates the Serwist
-service worker before the runtime image is assembled. The packaged Spring Boot
-API runs Flyway migrations and scheduled webhook and customer-push background
-jobs in the same application process. Every service remains on the Compose
-network. The customer application, staff panel, API, PostgreSQL, and Redis
-publish their development ports on every host interface. Applying source changes
-requires rebuilding and recreating the affected application container.
+Docker Compose builds immutable production-mode application images locally and
+does not synchronize source files or run Fast Refresh or Spring Boot DevTools.
+Both Next.js applications run their standalone build output, and the customer
+build generates the Serwist service worker before the runtime image is
+assembled. The packaged Spring Boot API runs Flyway migrations and scheduled
+webhook and customer-push background jobs in the same application process.
+Applying source changes requires rebuilding and recreating the affected
+application container.
 
 The customer Next.js application serves the generated service worker with a
 root scope, JavaScript content type, restrictive content-security policy, and
 explicit no-cache headers so update checks do not reuse a stale script.
 
-The Spring API has an explicit `staging` profile for disposable private VPS
-staging. Activating it requires distinct customer, panel, and API HTTPS origins,
-a JWT issuer equal to the API origin, a real VAPID mail contact,
-non-development PostgreSQL and Redis credentials, and
-externally mounted key files. The shared application configuration uses the
-same environment-variable names and `/run/secrets` paths in every environment;
-the staging profile adds validation and binds the Redis credentials that local
-Redis does not require rather than redefining shared values. It requires the
-public-HTTPS webhook and Customer Push policies and rejects local or placeholder
-origins and identities, packaged key resources, development credentials, and
-relaxed delivery policy. Secure, host-only `SameSite=Lax` cookie behavior
-remains a non-configurable application invariant. The complete environment-
-variable surface is recorded once in `.env.example`; the shared VPS Compose
-topology and secret mounts remain separate deployment work.
+The Spring API uses one environment-independent configuration rather than
+environment-specific profiles or heuristic staging validation. Hosted
+deployments replace the local origins, credentials, identities, and delivery
+policies through the root environment file and mount externally managed keys at
+the same `/run/secrets` paths used locally. Secure, host-only `SameSite=Lax`
+cookie behavior remains a non-configurable application invariant. The complete
+environment-variable surface is recorded once in `.env.example`. The shared
+deployment overlay mounts environment-specific material at those paths,
+constructs the three application image references from one registry plus one
+immutable source-revision release value, and takes repository-owned
+infrastructure image versions directly from the Compose files. Deployment
+remains a manual, operator-initiated procedure: publish images tagged by the
+source revision, record their registry digests, pull that release on the VPS,
+let API startup apply Flyway migrations, replace dependent services only after
+health succeeds, and verify the internal and external paths.
 
 ## 8. Resilience and Consistency
 
@@ -659,10 +673,13 @@ The current walking vertical slice is implemented for local development:
 * one channel-neutral transactional order outbox with Spring API background
   jobs for independent single-attempt webhook and durable retrying Web Push
   delivery;
-* a fail-fast private-staging API configuration contract with exact browser
-  CORS families, HTTPS environment identities, secure cookie policy,
-  public-HTTPS delivery policy, externally mounted key paths, and independent
-  PostgreSQL and Redis credentials.
+* one environment-independent API configuration whose hosted values and
+  externally mounted secrets are supplied by the deployment environment;
+* a shared NGINX/application/data Compose topology with small local and hosted
+  deployment overlays selected by the environment file, health-gated
+  dependencies, PostgreSQL-only persistence, nondurable staging-authenticated
+  Redis, stable secret paths, and a documented manual version-pinned deployment
+  sequence with recorded registry digests.
 
 The panel removes terminal orders from the active queue after an accepted
 transition and shows the customer QR code without a separate tracking-link,
