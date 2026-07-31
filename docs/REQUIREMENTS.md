@@ -445,8 +445,9 @@ Compose environment.
   environment file from the values documented in `.env.example`.
 * Browser-facing REST and SSE requests go directly to the API origin. Spring
   allows credentialed CORS from the customer origin only for customer-owned
-  resource families and from the panel origin for staff-owned resource
-  families.
+  resource families and from the panel origin only for staff-owned resource
+  families. The `/external/**` External Integration API and internal management
+  endpoints such as Actuator do not receive a browser CORS policy.
 * Browser resource families use `/api/{resource-family}/v1`; external resource
   families use `/api/external/{resource-family}/v1`. Location identifiers
   remain in validated bodies or query parameters rather than nested resource
@@ -526,6 +527,21 @@ requires rebuilding and recreating the affected application container.
 The customer Next.js application serves the generated service worker with a
 root scope, JavaScript content type, restrictive content-security policy, and
 explicit no-cache headers so update checks do not reuse a stale script.
+
+The Spring API has an explicit `staging` profile for disposable private VPS
+staging. Activating it requires distinct customer, panel, and API HTTPS origins,
+a JWT issuer equal to the API origin, a real VAPID mail contact,
+non-development PostgreSQL and Redis credentials, and
+externally mounted key files. The shared application configuration uses the
+same environment-variable names and `/run/secrets` paths in every environment;
+the staging profile adds validation and binds the Redis credentials that local
+Redis does not require rather than redefining shared values. It requires the
+public-HTTPS webhook and Customer Push policies and rejects local or placeholder
+origins and identities, packaged key resources, development credentials, and
+relaxed delivery policy. Secure, host-only `SameSite=Lax` cookie behavior
+remains a non-configurable application invariant. The complete environment-
+variable surface is recorded once in `.env.example`; the shared VPS Compose
+topology and secret mounts remain separate deployment work.
 
 ## 8. Resilience and Consistency
 
@@ -642,7 +658,11 @@ The current walking vertical slice is implemented for local development:
   updates;
 * one channel-neutral transactional order outbox with Spring API background
   jobs for independent single-attempt webhook and durable retrying Web Push
-  delivery.
+  delivery;
+* a fail-fast private-staging API configuration contract with exact browser
+  CORS families, HTTPS environment identities, secure cookie policy,
+  public-HTTPS delivery policy, externally mounted key paths, and independent
+  PostgreSQL and Redis credentials.
 
 The panel removes terminal orders from the active queue after an accepted
 transition and shows the customer QR code without a separate tracking-link,

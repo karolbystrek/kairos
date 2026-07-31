@@ -5,9 +5,10 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
 @Validated
-@ConfigurationProperties("kairos.browser-cors")
-public record BrowserCorsProperties(
-        @NotBlank String customerOrigin,
-        @NotBlank String panelOrigin
+@ConfigurationProperties("kairos.origins")
+public record ApplicationOriginsProperties(
+        @NotBlank String customer,
+        @NotBlank String panel,
+        @NotBlank String api
 ) {
 }

@@ -44,21 +44,6 @@ services:
       target: runner
     ports:
       - "8080:8080"
-    environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
-      SPRING_DATA_REDIS_HOST: ${REDIS_HOST}
-      SPRING_DATA_REDIS_PORT: ${REDIS_PORT}
-      KAIROS_AUTHENTICATION_JWT_PUBLIC_KEY_LOCATION: file:/run/secrets/jwt-public.pem
-      KAIROS_AUTHENTICATION_JWT_PRIVATE_KEY_LOCATION: file:/run/secrets/jwt-private.pem
-      KAIROS_PUSH_DESTINATION_POLICY: ${PUSH_DESTINATION_POLICY:-PUBLIC_HTTPS}
-      KAIROS_PUSH_SUBSCRIPTION_ENCRYPTION_KEY_LOCATION: file:/run/secrets/push-subscription-encryption.bin
-      KAIROS_PUSH_VAPID_PRIVATE_KEY_LOCATION: file:/run/secrets/vapid-private.pem
-      KAIROS_PUSH_VAPID_PUBLIC_KEY_LOCATION: file:/run/secrets/vapid-public.pem
-      KAIROS_PUSH_VAPID_SUBJECT: mailto:kairos@localhost
-      KAIROS_WEBHOOK_ENCRYPTION_KEY_LOCATION: file:/run/secrets/webhook-encryption.bin
-      KAIROS_WEBHOOK_DESTINATION_POLICY: ${WEBHOOK_DESTINATION_POLICY:-LOCAL_DEVELOPMENT}
     volumes:
       - type: bind
         source: ./secrets

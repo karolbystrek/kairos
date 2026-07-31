@@ -24,9 +24,10 @@ server:
     context-path: /api
 
 kairos:
-  browser-cors:
-    customer-origin: "http://localhost:3000"
-    panel-origin: "http://localhost:3001"
+  origins:
+    customer: "http://localhost:3000"
+    panel: "http://localhost:3001"
+    api: "http://localhost:8080"
   authentication:
     jwt:
       issuer: https://api.localhost

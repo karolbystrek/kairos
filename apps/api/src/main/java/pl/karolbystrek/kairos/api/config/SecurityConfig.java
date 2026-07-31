@@ -31,23 +31,32 @@ import static org.springframework.security.config.Customizer.withDefaults;
 
 @Configuration
 @EnableMethodSecurity
-@EnableConfigurationProperties(BrowserCorsProperties.class)
+@EnableConfigurationProperties(ApplicationOriginsProperties.class)
 public class SecurityConfig {
 
     @Bean
-    CorsConfigurationSource corsConfigurationSource(BrowserCorsProperties properties) {
-        var customerConfiguration = corsConfiguration(properties.customerOrigin());
-        var panelConfiguration = corsConfiguration(properties.panelOrigin());
+    CorsConfigurationSource corsConfigurationSource(ApplicationOriginsProperties properties) {
+        var customerConfiguration = corsConfiguration(properties.customer());
+        var panelConfiguration = corsConfiguration(properties.panel());
         var sharedConfiguration = corsConfiguration(
-                properties.customerOrigin(),
-                properties.panelOrigin()
+                properties.customer(),
+                properties.panel()
         );
 
         var source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/auth/v1/csrf", sharedConfiguration);
         source.registerCorsConfiguration("/tracked-orders/**", customerConfiguration);
         source.registerCorsConfiguration("/customer-notifications/**", customerConfiguration);
-        source.registerCorsConfiguration("/**", panelConfiguration);
+        source.registerCorsConfiguration("/auth/**", panelConfiguration);
+        source.registerCorsConfiguration("/tenant-registrations/**", panelConfiguration);
+        source.registerCorsConfiguration("/locations/**", panelConfiguration);
+        source.registerCorsConfiguration("/accounts/**", panelConfiguration);
+        source.registerCorsConfiguration("/orders/**", panelConfiguration);
+        source.registerCorsConfiguration("/external-integrations/**", panelConfiguration);
+        source.registerCorsConfiguration("/api-keys/**", panelConfiguration);
+        source.registerCorsConfiguration("/api-key-versions/**", panelConfiguration);
+        source.registerCorsConfiguration("/webhook-subscriptions/**", panelConfiguration);
+        source.registerCorsConfiguration("/webhook-signing-secrets/**", panelConfiguration);
         return source;
     }
 

@@ -12,10 +12,15 @@ spring:
   jackson:
     time-zone: UTC
   datasource:
+    url: "jdbc:postgresql://postgres:5432/${POSTGRES_DB}"
+    username: "${POSTGRES_USER}"
+    password: "${POSTGRES_PASSWORD}"
     hikari:
       connection-init-sql: SET TIME ZONE 'UTC'
   data:
     redis:
+      host: "${REDIS_HOST}"
+      port: "${REDIS_PORT}"
       repositories:
         enabled: false
   mvc:
@@ -28,16 +33,17 @@ server:
     context-path: /api
 
 kairos:
-  browser-cors:
-    customer-origin: "${NEXT_PUBLIC_CUSTOMER_APP_URL}"
-    panel-origin: "${PANEL_APP_URL}"
+  origins:
+    customer: "${NEXT_PUBLIC_CUSTOMER_APP_URL}"
+    panel: "${PANEL_APP_URL}"
+    api: "${NEXT_PUBLIC_API_BASE_URL}"
   authentication:
     jwt:
-      issuer: https://api.localhost
+      issuer: "${JWT_ISSUER:https://api.localhost}"
       audience: kairos-panel
       access-lifetime: 5m
-      public-key-location: "${KAIROS_AUTHENTICATION_JWT_PUBLIC_KEY_LOCATION}"
-      private-key-location: "${KAIROS_AUTHENTICATION_JWT_PRIVATE_KEY_LOCATION}"
+      public-key-location: "file:/run/secrets/jwt-public.pem"
+      private-key-location: "file:/run/secrets/jwt-private.pem"
     refresh:
       idle-lifetime: 7d
       absolute-lifetime: 30d
@@ -45,7 +51,7 @@ kairos:
       bcrypt-strength: 12
   webhooks:
     signing:
-      encryption-key-location: "${KAIROS_WEBHOOK_ENCRYPTION_KEY_LOCATION}"
+      encryption-key-location: "file:/run/secrets/webhook-encryption.bin"
       rotation-overlap: 24h
     delivery:
       total-timeout: 10s
@@ -56,14 +62,14 @@ kairos:
       fanout-poll-delay: 500ms
       delivery-poll-delay: 500ms
       initial-delay: 1s
-    destination-policy: "${KAIROS_WEBHOOK_DESTINATION_POLICY:PUBLIC_HTTPS}"
+    destination-policy: "${WEBHOOK_DESTINATION_POLICY:PUBLIC_HTTPS}"
   customer-notifications:
     vapid:
-      public-key-location: "${KAIROS_PUSH_VAPID_PUBLIC_KEY_LOCATION}"
-      private-key-location: "${KAIROS_PUSH_VAPID_PRIVATE_KEY_LOCATION}"
-      subject: "${KAIROS_PUSH_VAPID_SUBJECT}"
+      public-key-location: "file:/run/secrets/vapid-public.pem"
+      private-key-location: "file:/run/secrets/vapid-private.pem"
+      subject: "${VAPID_SUBJECT:mailto:kairos@localhost}"
     subscription:
-      encryption-key-location: "${KAIROS_PUSH_SUBSCRIPTION_ENCRYPTION_KEY_LOCATION}"
+      encryption-key-location: "file:/run/secrets/push-subscription-encryption.bin"
       maximum-enrollments-per-order: 10
       dormant-retention: 30d
     delivery:
@@ -83,4 +89,4 @@ kairos:
       initial-delay: 1s
       cleanup-delay: 1h
       cleanup-initial-delay: 5m
-    destination-policy: "${KAIROS_PUSH_DESTINATION_POLICY:PUBLIC_HTTPS}"
+    destination-policy: "${PUSH_DESTINATION_POLICY:PUBLIC_HTTPS}"

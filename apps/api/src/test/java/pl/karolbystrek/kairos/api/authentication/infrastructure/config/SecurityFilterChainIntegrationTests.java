@@ -16,6 +16,7 @@ import java.util.Base64;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -156,6 +157,19 @@ class SecurityFilterChainIntegrationTests extends RedisListenerIsolatedIntegrati
     }
 
     @Test
+    void restrictsCredentialedCorsToTheOwningFrontendAndBrowserResourceFamily() throws Exception {
+        assertCorsAllowed("http://localhost:3000", "/tracked-orders/v1/reference", "GET");
+        assertCorsAllowed("http://localhost:3001", "/orders/v1", "POST");
+        assertCorsAllowed("http://localhost:3000", "/auth/v1/csrf", "GET");
+        assertCorsAllowed("http://localhost:3001", "/auth/v1/csrf", "GET");
+
+        assertCorsRejected("http://localhost:3000", "/orders/v1", "POST");
+        assertCorsRejected("http://localhost:3001", "/tracked-orders/v1/reference", "GET");
+        assertCorsRejected("http://localhost:3001", "/external/orders/v1", "GET");
+        assertCorsRejected("https://unknown.example.org", "/orders/v1", "GET");
+    }
+
+    @Test
     void permitsInternalAsyncDispatchesWithoutReauthorizingTheOriginalRequest() throws Exception {
         mockMvc.perform(apiGet("/error").with(request -> {
                     request.setDispatcherType(DispatcherType.ASYNC);
@@ -175,6 +189,35 @@ class SecurityFilterChainIntegrationTests extends RedisListenerIsolatedIntegrati
 
     private static MockHttpServletRequestBuilder apiPut(String path) {
         return put(API_CONTEXT_PATH + path).contextPath(API_CONTEXT_PATH);
+    }
+
+    private void assertCorsAllowed(String origin, String path, String method) throws Exception {
+        mockMvc.perform(corsPreflight(origin, path, method))
+                .andExpect(status().isOk())
+                .andExpect(result -> assertThat(
+                        result.getResponse().getHeader("Access-Control-Allow-Origin")
+                ).isEqualTo(origin))
+                .andExpect(result -> assertThat(
+                        result.getResponse().getHeader("Access-Control-Allow-Credentials")
+                ).isEqualTo("true"));
+    }
+
+    private void assertCorsRejected(String origin, String path, String method) throws Exception {
+        mockMvc.perform(corsPreflight(origin, path, method))
+                .andExpect(result -> assertThat(
+                        result.getResponse().getHeader("Access-Control-Allow-Origin")
+                ).isNull());
+    }
+
+    private static MockHttpServletRequestBuilder corsPreflight(
+            String origin,
+            String path,
+            String method
+    ) {
+        return options(API_CONTEXT_PATH + path)
+                .contextPath(API_CONTEXT_PATH)
+                .header("Origin", origin)
+                .header("Access-Control-Request-Method", method);
     }
 
     private static String xorEncode(String token) {
