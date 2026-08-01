@@ -489,25 +489,27 @@ services do not publish host ports.
 * PostgreSQL owns the only data volume. Redis Pub/Sub is nondurable and has no
   volume.
 
-GitHub Actions validates pull requests and pushes to `main`. Each frontend
-installs its locked dependencies, runs lint and type-checking, runs its `test`
-script when one is defined, and creates its production build. The API runs the
-complete Maven `verify` lifecycle. Frontend validation and image construction
-require the non-secret `NEXT_PUBLIC_API_BASE_URL` and
+GitHub Actions validates pull requests and pushes to `main`. A manual workflow
+dispatch for `main` repeats the same validation before publishing. Each
+frontend installs its locked dependencies, runs lint and type-checking, runs
+its `test` script when one is defined, and creates its production build. The
+API runs the complete Maven `verify` lifecycle. Frontend validation and image
+construction require the non-secret `NEXT_PUBLIC_API_BASE_URL` and
 `NEXT_PUBLIC_CUSTOMER_APP_URL` repository variables and fail clearly when a
 required value is absent.
 
-Only a successful `main` validation may publish application images. It builds
-the customer app, panel app, and API runner images for `linux/amd64` and pushes
-them to the repository-owned GHCR namespace with the common immutable
-`sha-<full-source-revision>` tag. A rerun preserves an existing service image
-under that tag and may complete missing images left by an interrupted publish.
-The complete workflow must be successful before the three-image set is eligible
-for manual deployment. Changing a frontend build-time repository variable
-requires a subsequent `main` commit and tag rather than overwriting an existing
-commit-tagged image. The workflow grants package-write access only to the
-publishing jobs, does not publish a moving `latest` tag, does not create GitHub
-Releases, and does not deploy any environment.
+Only a successful manually dispatched `main` workflow may publish application
+images. It builds the customer app, panel app, and API runner images for
+`linux/amd64` and pushes them to the repository-owned GHCR namespace with the
+common immutable `sha-<full-source-revision>` tag. A rerun preserves an
+existing service image under that tag and may complete missing images left by
+an interrupted publish. The complete workflow must be successful before the
+three-image set is eligible for manual deployment. Changing a frontend
+build-time repository variable requires a subsequent `main` commit and manual
+workflow dispatch rather than overwriting an existing commit-tagged image. The
+workflow grants package-write access only to the publishing jobs, does not
+publish a moving `latest` tag, does not create GitHub Releases, and does not
+deploy any environment.
 
 ### 7.1 Current HTTP resource families
 
@@ -624,11 +626,12 @@ health succeeds, and verify the internal and external paths.
 
 * Both frontends build and lint independently.
 * Pull-request and `main` CI runs lint, type-check, optional configured frontend
-  tests, production frontend builds, and the complete API test suite before a
-  `main` run may publish images.
-* A successful `main` workflow publishes one `linux/amd64` GHCR image for each
-  independently deployable application under the same immutable full-source-
-  revision tag and performs no deployment or GitHub Release creation.
+  tests, production frontend builds, and the complete API test suite. A manual
+  `main` workflow repeats those checks before it may publish images.
+* A successful manually dispatched `main` workflow publishes one `linux/amd64`
+  GHCR image for each independently deployable application under the same
+  immutable full-source-revision tag and performs no deployment or GitHub
+  Release creation.
 * Each frontend's handwritten request code and response types match the REST behavior covered by integration tests during the walking vertical slice.
 * REST-backed Client Components use keyed SWR state rather than effects for request orchestration, retain cached data during background revalidation, and do not apply order transitions before the Spring API accepts them.
 * New orders start in `IN_PREPARATION`, receive an immutable label, and create exactly one initial history entry for that resulting state.
@@ -723,9 +726,10 @@ The current walking vertical slice is implemented for local development:
   staging-authenticated Redis, stable application-secret paths, and a
   documented manual version-pinned deployment sequence with recorded registry
   digests;
-* GitHub Actions validation for pull requests and `main`, followed on successful
-  `main` runs by immutable, commit-tagged `linux/amd64` publication of all three
-  application images to GHCR without a deployment or GitHub Release.
+* GitHub Actions validation for pull requests and `main`, plus manually
+  dispatched `main` validation followed by immutable, commit-tagged
+  `linux/amd64` publication of all three application images to GHCR without a
+  deployment or GitHub Release.
 
 The panel removes terminal orders from the active queue after an accepted
 transition and shows the customer QR code without a separate tracking-link,
