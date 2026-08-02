@@ -483,6 +483,10 @@ services do not publish host ports.
   repository, adds Cloudflare Tunnel, preserves the same secret paths, applies
   basic CPU and memory limits, and bounds container logs. It publishes no
   service port.
+* The repository versions a non-secret, locally managed Cloudflare Tunnel
+  configuration template with three explicit non-wildcard hostname routes to
+  NGINX over the private edge network and a final `404` catch-all. A deployed
+  copy and its tunnel credential remain external to the repository.
 * Each environment file selects either the local or deployment overlay through
   `COMPOSE_FILE`, so ordinary Compose commands do not carry repeated file-list
   arguments.

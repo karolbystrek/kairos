@@ -1,0 +1,14 @@
+# Copy this file outside the repository before use. Replace the tunnel UUID and
+# all three example hostnames with the exact private-staging values. Keep the
+# credentials file at the container path mounted by compose.deployment.yaml.
+tunnel: 00000000-0000-0000-0000-000000000000
+credentials-file: /run/secrets/cloudflared-credentials.json
+
+ingress:
+  - hostname: customer.staging.example.com
+    service: http://nginx:80
+  - hostname: panel.staging.example.com
+    service: http://nginx:80
+  - hostname: api.staging.example.com
+    service: http://nginx:80
+  - service: http_status:404

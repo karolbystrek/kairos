@@ -39,6 +39,17 @@ The applications are available at:
 * Staff panel: https://panel.kairos.localhost
 * API: https://api.kairos.localhost
 
+## Repository checks
+
+Run the checks from the repository root:
+
+```bash
+npm --prefix apps/customer-app run check
+npm --prefix apps/panel-app run check
+(cd apps/api && ./mvnw --batch-mode verify)
+git diff --check
+```
+
 ## Resetting the local environment
 
 To reset the local containers, persisted data, configuration, and generated key
@@ -54,3 +65,4 @@ This deletes the Compose volumes and generated keys.
 
 * [Problem description](docs/PROBLEM_DESCRIPTION.md)
 * [Product requirements and architecture](docs/REQUIREMENTS.md)
+* [Private staging deployment](deployment/RUNBOOK.txt)
