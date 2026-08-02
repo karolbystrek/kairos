@@ -3,6 +3,8 @@
 .env.old
 .env.local
 .env.*.local
+/.env.tmp.*
+/.kairos-setup.*
 /.codex/
 
 # Private key material

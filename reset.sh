@@ -33,7 +33,8 @@ if [ -f ".env" ] || [ -L ".env" ]; then
     echo "Saved the previous .env as .env.old."
 fi
 cp ".env.example" ".env"
-echo "Copied .env.example to .env."
+chmod 0600 ".env"
+echo "Copied .env.example to .env with mode 0600."
 
 rm -f \
     "secrets/jwt-private.pem" \

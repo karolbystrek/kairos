@@ -5,7 +5,21 @@ Access. Read docs/REQUIREMENTS.md before any public deployment.
 
 PREPARE
 
-1. Copy .env.example to .env with mode 0600 and configure every value. Set:
+1. Ensure /srv/kairos exists and is writable by the deployment user. From the
+   checkout, create .env and the complete staging-only application key set:
+
+   ./setup.sh \
+     --non-interactive \
+     --replace-env \
+     --secrets-directory /srv/kairos/application-secrets \
+     --no-tls
+
+   The non-interactive command fails if application keys already exist unless
+   --replace-keys or --keep-keys is explicit. It creates the secrets directory
+   with mode 0700 and every application key with mode 0400. It never generates
+   staging key material in the checkout or an application image.
+
+   Configure every value in .env. Set:
 
    COMPOSE_FILE=compose.yaml:compose.deployment.yaml
    KAIROS_IMAGE_REGISTRY=ghcr.io/karolbystrek/kairos
@@ -14,8 +28,8 @@ PREPARE
    Set matching NEXT_PUBLIC_API_BASE_URL and NEXT_PUBLIC_CUSTOMER_APP_URL
    GitHub variables before publishing the release.
 
-2. Mount these staging-only files from the external application-secret
-   directory at /run/secrets:
+   Set KAIROS_APPLICATION_SECRETS_DIRECTORY to that absolute directory. Compose
+   mounts these files read-only at /run/secrets:
 
    jwt-private.pem
    jwt-public.pem
@@ -24,15 +38,15 @@ PREPARE
    vapid-public.pem
    push-subscription-encryption.bin
 
-   Keep the host directory root:root mode 0700 and files mode 0400 while the
-   API runner uses root. Keep .env owned by the deployment user, mode 0600.
+   Keep the host directory, files, and .env owned by the deployment user. The
+   generated .env has mode 0600.
 
-3. Copy deployment/cloudflared/config.yml.example outside the checkout.
+2. Copy deployment/cloudflared/config.yml.example outside the checkout.
    Replace the UUID and hostnames, keep the final http_status:404 rule, and
    mount the real credential separately. Keep both files root:65532 mode 0440.
    Do not commit environment values or credentials.
 
-4. Validate the configuration:
+3. Validate the configuration:
 
    docker compose config --quiet
    docker compose run --rm --no-deps cloudflared \
@@ -86,7 +100,14 @@ To reset, confirm docker compose config --volumes lists only pgdata, then run:
    docker compose down -v --remove-orphans
 
 Keep the complete key set or replace it with the database. Do not use reset.sh
-on the VPS.
+on the VPS. To replace both, remove the Compose volumes as above and run:
+
+   ./setup.sh \
+     --non-interactive \
+     --keep-env \
+     --secrets-directory /srv/kairos/application-secrets \
+     --replace-keys \
+     --no-tls
 
 OPERATIONS
 

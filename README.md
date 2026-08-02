@@ -27,6 +27,10 @@ Prepare the local configuration and development keys:
 ./setup.sh
 ```
 
+Setup prompts before replacing an existing `.env`, asks for the secrets
+directory with `secrets/` as its default, and asks whether to generate the local
+TLS certificate. Pressing Enter accepts the displayed default.
+
 Build and start Kairos:
 
 ```bash

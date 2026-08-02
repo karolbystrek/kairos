@@ -483,6 +483,21 @@ services do not publish host ports.
   repository, adds Cloudflare Tunnel, preserves the same secret paths, applies
   basic CPU and memory limits, and bounds container logs. It publishes no
   service port.
+* One standalone repository-owned setup file provides an environment-agnostic
+  preparation flow. Interactive use asks before replacing an existing `.env`,
+  with replacement from `.env.example` as the default, asks for a secrets
+  directory with the Git-ignored repository `secrets/` directory as the
+  default, keeps a complete valid application key set unless replacement is
+  explicitly accepted, and asks whether to generate a local TLS certificate
+  with generation as the default. Explicit options provide the same flow
+  non-interactively for hosted preparation. The private-staging invocation
+  supplies an absolute external secrets directory and disables local TLS. The
+  setup file generates and validates the complete JWT, webhook-encryption,
+  VAPID, and push-subscription-encryption key set as one unit, installs it with
+  a directory mode of `0700` and file modes of `0400`, and fails safely on
+  partial, invalid, or existing sets when their handling was not explicit.
+  Staging key material is never generated in the checkout or an application
+  image.
 * The repository versions a non-secret, locally managed Cloudflare Tunnel
   configuration template with three explicit non-wildcard hostname routes to
   NGINX over the private edge network and a final `404` catch-all. A deployed
@@ -723,6 +738,10 @@ The current walking vertical slice is implemented for local development:
   delivery;
 * one environment-independent API configuration whose hosted values and
   externally mounted secrets are supplied by the deployment environment;
+* one standalone, environment-agnostic setup file with interactive defaults for
+  local preparation and explicit non-interactive options for private staging;
+  it creates and validates the complete application key set as one unit, uses
+  restrictive permissions, and requires explicit existing-key handling;
 * a shared, hostname-routing NGINX/application/data Compose topology with small
   local and hosted deployment overlays selected by the environment file,
   controlled forwarding metadata, buffered-disabled SSE, internal-only health
