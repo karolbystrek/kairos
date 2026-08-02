@@ -18,7 +18,6 @@ import {
   orderStatusLabels,
 } from "@/src/orders/order-status";
 import { updateApplicationBadge } from "@/src/pwa/badge";
-import { NotificationControl } from "@/src/pwa/notification-control";
 import { useCustomerNotifications } from "@/src/pwa/notification-provider";
 import {
   readTrackedOrder,
@@ -243,6 +242,7 @@ export function OrderTracker({
           <Button
             isIconOnly
             aria-label="Go to recently tracked orders"
+            className="fixed right-16 top-4 z-50"
             variant="secondary"
             onPress={() => {
               void removeTrackedOrder(
@@ -278,9 +278,6 @@ export function OrderTracker({
       >
         {orderStatusLabels[displayedOrder.status]}
       </Chip>
-      {isActiveOrderStatus(displayedOrder.status) && (
-        <NotificationControl primary={!isOfflineSnapshot} />
-      )}
     </section>
   );
 }

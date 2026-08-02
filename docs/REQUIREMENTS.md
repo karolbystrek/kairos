@@ -156,12 +156,15 @@ current browser push subscription. New active orders are enrolled silently, and
 terminal orders are removed after their final notification delivery has been
 materialized. The API limits a subscription to ten contexts per order.
 
-The application exposes one notification control on Home and active order
-views. Disabling notifications durably retires the current subscription and all
-of its enrollments before removing the browser subscription. Clearing tracked
-orders removes the selected active-order enrollments but preserves the app-level
-notification preference for future orders; both actions require a network
-connection so the UI does not make a false backend-cleanup promise.
+The application exposes one persistent notification control in the top-right
+corner of every customer view. Its icon distinguishes enabled notifications
+from all off or unavailable states. On terminal order views, the home action
+appears immediately alongside it. Disabling notifications durably retires the
+current subscription and all of its enrollments before removing the browser
+subscription. Clearing tracked orders removes the selected active-order
+enrollments but preserves the app-level notification preference for future
+orders; both actions require a network connection so the UI does not make a
+false backend-cleanup promise.
 Browser-initiated subscription replacement is reconciled once from the service
 worker and idempotently retried on the next application start if needed.
 

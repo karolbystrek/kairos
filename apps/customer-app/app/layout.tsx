@@ -5,6 +5,7 @@ import { Providers } from "./providers";
 
 import { siteConfig } from "@/config/site";
 import { PWA_THEME_COLOR } from "@/src/pwa/manifest";
+import { NotificationControl } from "@/src/pwa/notification-control";
 
 export const metadata: Metadata = {
   title: {
@@ -51,7 +52,10 @@ export default function RootLayout({
             forcedTheme: "light",
           }}
         >
-          <main className="mx-auto max-w-xl px-6 py-10">{children}</main>
+          <main className="mx-auto max-w-xl px-6 pb-10 pt-20">
+            <NotificationControl />
+            {children}
+          </main>
         </Providers>
       </body>
     </html>

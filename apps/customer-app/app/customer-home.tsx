@@ -10,7 +10,6 @@ import {
   orderStatusLabels,
 } from "@/src/orders/order-status";
 import { consumeInstallationBootstrap } from "@/src/pwa/recently-tracked-orders";
-import { NotificationControl } from "@/src/pwa/notification-control";
 import { useCustomerNotifications } from "@/src/pwa/notification-provider";
 import {
   pruneTerminalTrackedOrders,
@@ -141,9 +140,6 @@ export function CustomerHome({
             Scan the QR code provided by the restaurant to open your order.
           </p>
         </div>
-        <div className="w-full max-w-sm text-left">
-          <NotificationControl />
-        </div>
       </section>
     );
   }
@@ -160,8 +156,6 @@ export function CustomerHome({
           <OrderSummaryCard key={order.trackingReference} order={order} />
         ))}
       </div>
-
-      <NotificationControl />
 
       <AlertDialog>
         <Button className="self-start" variant="secondary">
