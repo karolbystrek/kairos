@@ -7,3 +7,9 @@
 	--font-sans: "font", sans-serif;
 	--font-mono: "monospace", monospace;
 }
+
+@media (prefers-reduced-motion: reduce) {
+	.swipe-order-card {
+		transition: none !important;
+	}
+}

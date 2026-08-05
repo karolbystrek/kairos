@@ -23,10 +23,10 @@ import {
 import { migrateLegacyRecentlyTrackedOrders } from "@/src/pwa/recently-tracked-orders";
 import { updateApplicationBadge } from "@/src/pwa/badge";
 import {
-  clearTrackedOrders,
   pruneTerminalTrackedOrders,
   readNotificationMetadata,
   readTrackedOrders,
+  removeTrackedOrder,
   type SerializedPushSubscription,
   updateNotificationMetadata,
 } from "@/src/pwa/storage";
@@ -41,12 +41,12 @@ export type NotificationState =
   | "unsupported";
 
 type CustomerNotificationContextValue = {
-  clearOrders: () => Promise<boolean>;
   disable: () => Promise<void>;
   enable: () => Promise<void>;
   enrollOrder: (trackingReference: string) => Promise<void>;
   message: string | null;
   state: NotificationState;
+  stopTrackingOrder: (trackingReference: string) => Promise<boolean>;
 };
 
 const CustomerNotificationContext =
@@ -278,56 +278,63 @@ export function CustomerPwaProvider({
     [state, synchronize],
   );
 
-  const clearOrders = useCallback(async (): Promise<boolean> => {
-    const orders = await readTrackedOrders();
-    const trackingReferences = orders.map(
-      ({ trackingReference }) => trackingReference,
-    );
+  const stopTrackingOrder = useCallback(
+    async (trackingReference: string): Promise<boolean> => {
+      const metadata = await readNotificationMetadata();
+      const isEnrolled = (metadata.enrolledTrackingReferences ?? []).includes(
+        trackingReference,
+      );
 
-    if (
-      trackingReferences.length > 0 &&
-      (await readNotificationMetadata()).notificationsEnabled === true
-    ) {
-      if (!navigator.onLine) {
-        setMessage(
-          "Connect to the internet before clearing notification-enabled orders.",
-        );
-
-        return false;
-      }
-      try {
-        const registration = await navigator.serviceWorker.ready;
-        const subscription = await registration.pushManager.getSubscription();
-
-        if (subscription) {
-          await removePushEnrollments(
-            serializePushSubscription(subscription),
-            trackingReferences,
+      if (metadata.notificationsEnabled === true && isEnrolled) {
+        if (!navigator.onLine) {
+          setMessage(
+            "Connect to the internet before stopping notification-enabled tracking.",
           );
-        }
-      } catch (error) {
-        setMessage(notificationErrorMessage(error));
 
+          return false;
+        }
+        try {
+          const registration = await navigator.serviceWorker.ready;
+          const subscription = await registration.pushManager.getSubscription();
+
+          if (!subscription) {
+            throw new Error("The browser Push subscription is unavailable.");
+          }
+          await removePushEnrollments(serializePushSubscription(subscription), [
+            trackingReference,
+          ]);
+        } catch (error) {
+          setMessage(notificationErrorMessage(error));
+
+          return false;
+        }
+      }
+      const removedLocally = await removeTrackedOrder(
+        trackingReference,
+        "suppressed",
+      );
+
+      if (!removedLocally) {
         return false;
       }
-    }
-    await clearTrackedOrders();
-    await updateApplicationBadge(0);
-    setMessage(null);
+      await updateApplicationBadge();
+      setMessage(null);
 
-    return true;
-  }, []);
+      return true;
+    },
+    [],
+  );
 
   const value = useMemo<CustomerNotificationContextValue>(
     () => ({
-      clearOrders,
       disable,
       enable,
       enrollOrder,
       message,
       state,
+      stopTrackingOrder,
     }),
-    [clearOrders, disable, enable, enrollOrder, message, state],
+    [disable, enable, enrollOrder, message, state, stopTrackingOrder],
   );
 
   return (

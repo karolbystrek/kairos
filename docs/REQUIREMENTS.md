@@ -27,6 +27,23 @@ REST and SSE tracking remains the primary experience.
 
 Both frontends use Next.js 16, React 19, TypeScript, Tailwind CSS 4, and HeroUI 3. They remain separate because they serve different audiences and have different authentication, PWA, caching, and release concerns. The customer application uses a custom TypeScript service worker built with Serwist in configurator mode and owns its offline snapshots in IndexedDB.
 
+Both frontends share one coherent, Apple-inspired web design language while
+retaining browser-native behavior. They use the same semantic visual system,
+interaction principles, and quality standard; differences in information
+density reflect the customer and staff tasks rather than different brand or
+role-specific styling. The **Kairos** name is the only visual-brand artifact
+that must be preserved during the redesign. Icons, colors, typography,
+materials, and other visual assets may be replaced.
+
+Both frontends provide Light, Dark, and System appearance preferences, with
+System as the default. The staff panel is designed primarily for tablet use,
+especially 11- to 14-inch touch-and-pointer devices, while remaining complete
+and responsive on desktop and mobile. Mobile staff use is expected to be
+infrequent. Staff roles use the same interface language and workspace styling;
+capabilities still determine which operations are available. Product copy is
+English-only in the current scope, but layouts must tolerate longer future
+localized text without depending on short English labels.
+
 HeroUI is the component library for both applications. Zod validates frontend-owned form input and server-sent event payloads. Native `fetch` is the HTTP transport inside small handwritten REST request modules. SWR manages REST-backed client state in both frontends where caching, request deduplication, mutations, focus revalidation, or reconnect revalidation applies. React effects are reserved for synchronization with external systems rather than routine REST request orchestration.
 
 The Spring API retains domain authority. Frontend controls and redirects provide user experience, while the backend enforces authorization.
@@ -103,7 +120,8 @@ The customer application is installable as one globally branded **Kairos** web
 application while remaining fully usable without installation. Installation is
 browser- or operating-system-initiated; Kairos does not show its own install
 prompt in the current scope. The installed application uses standalone display
-mode, a light-only appearance, and no orientation lock. Android Chrome and iOS
+mode, the shared Light, Dark, or System appearance preference, and no
+orientation lock. Android Chrome and iOS
 Safari are the required installation targets, while desktop browsers must
 continue to provide the ordinary web experience.
 
@@ -132,12 +150,26 @@ API. Selecting an entry opens its tracking page, where the normal authoritative
 REST and SSE flow resumes.
 
 After the one-time installation launch, opening the installed application
-directly reopens the most recently tracked order when its stored status is
-`IN_PREPARATION` or `READY`. When no readable active collection exists, it opens
-Home. Home displays a centered empty state when IndexedDB is empty, corrupt,
-unavailable, or inaccessible, and offers one confirmed action to clear all
-locally tracked orders. Terminal tracking views provide a home icon; active
-tracking views do not.
+directly restores the last stable destination. It reopens that order only when
+its stored status is `IN_PREPARATION` or `READY`; otherwise it opens Home. Home
+displays a centered scanner action when IndexedDB is empty, corrupt, unavailable,
+or inaccessible. Active and terminal tracking views provide a quiet Home action.
+
+Home labels its active local collection **Your orders**. Swiping an order card
+left reveals a **Stop tracking** action, and the same action remains available
+through an accessible per-card overflow menu. Stopping tracking removes only
+that order's local snapshot and notification enrollment, updates the application
+badge, and does not prevent a later explicit scan or reopening from tracking the
+active order again.
+
+Home opens a dedicated scanner view only after a direct customer action. The
+scanner prefers the rear camera, allows switching when multiple cameras are
+available, decodes locally, and accepts only customer-origin URLs whose exact
+path is `/orders/<UUID>`. Invalid codes leave scanning active with an inline
+error. Every camera track stops after success, cancellation, navigation, or
+unmount. Camera failure directs the customer to the device Camera app. A valid
+code scanned offline remains only in memory and can be retried after connectivity
+returns; it is not added to **Your orders** until the order loads successfully.
 
 Order REST endpoints are network-only in the service worker. The application
 shell and a dedicated offline route are precached, while application code
@@ -158,13 +190,13 @@ materialized. The API limits a subscription to ten contexts per order.
 
 The application exposes one persistent notification control in the top-right
 corner of every customer view. Its icon distinguishes enabled notifications
-from all off or unavailable states. On terminal order views, the home action
-appears immediately alongside it. Disabling notifications durably retires the
-current subscription and all of its enrollments before removing the browser
-subscription. Clearing tracked orders removes the selected active-order
-enrollments but preserves the app-level notification preference for future
-orders; both actions require a network connection so the UI does not make a
-false backend-cleanup promise.
+from all off or unavailable states. On order views, the Home action appears
+immediately alongside it. Disabling notifications durably retires the current
+subscription and all of its enrollments before removing the browser
+subscription. Stopping tracking removes the selected active-order enrollment
+but preserves the app-level notification preference for future orders. Both
+disabling notifications and stopping notification-enabled tracking require a
+network connection so the UI does not make a false backend-cleanup promise.
 Browser-initiated subscription replacement is reconciled once from the service
 worker and idempotently retried on the next application start if needed.
 
@@ -204,6 +236,11 @@ The staff panel must:
 * keep messages and administrative summaries user-oriented by omitting routine
   background-refresh narration, arbitrary backend error details, internal
   integration or credential identifiers, and raw permission tokens.
+
+The staff experience keeps the active queue visually primary. Administrative
+capabilities must not compete with frequent order creation, QR presentation,
+or valid order transitions merely because they are available to the signed-in
+account.
 
 ### 3.4 External Integration API and webhooks
 
@@ -647,6 +684,22 @@ health succeeds, and verify the internal and external paths.
 ## 9. Verification and Acceptance Criteria
 
 * Both frontends build and lint independently.
+* Both frontends expose Light, Dark, and System appearance choices, default to
+  System, maintain semantic contrast in both resolved appearances, and remain
+  usable with reduced motion, increased contrast, keyboard navigation, screen
+  readers, and enlarged text at a WCAG 2.2 AA target.
+* Both frontends use one coherent visual and interaction system. Staff roles do
+  not receive different visual styling, while authorization and capabilities
+  continue to control available operations.
+* The customer view makes the current order state understandable at a glance,
+  with a target recognition time below one second in ordinary usability
+  evaluation.
+* On the primary tablet layout, staff can create an automatically labelled
+  order and reveal its customer QR code through one obvious primary action,
+  and can perform a valid order transition through one obvious action.
+* The complete staff interface adapts across tablet, desktop, and mobile widths
+  without hiding an essential operation; tablet is the primary design target
+  and mobile use is secondary.
 * Pull-request and `main` CI runs lint, type-check, optional configured frontend
   tests, production frontend builds, and the complete API test suite. A manual
   `main` workflow repeats those checks before it may publish images.
@@ -682,10 +735,16 @@ health succeeds, and verify the internal and external paths.
 * Each browser or installed-app context independently retains active, explicit
   IndexedDB order snapshots in most-recently-opened order and removes terminal
   orders without allowing a stale response to resurrect them.
-* Home renders local active-order summaries without opening SSE, opens the
-  latest locally active order on subsequent installed launches, tolerates
-  unavailable or invalid local storage, and can clear the collection and its
-  backend enrollments after confirmation.
+* Home renders local active-order summaries without opening SSE, restores the
+  last stable Home or active-order destination on subsequent installed launches,
+  and tolerates unavailable or invalid local storage.
+* The in-app scanner accepts only exact customer-origin order URLs, keeps
+  scanning after invalid codes, stops every camera track on exit, supports
+  camera switching, retains valid offline scans only in memory for retry, and
+  provides device-Camera guidance when browser camera access fails.
+* Stopping one tracked order through swipe disclosure or its accessible overflow
+  menu removes only that local snapshot and backend enrollment, updates the
+  badge, and permits explicit retracking later.
 * The generated service worker precaches only the application shell and offline
   route, applies `NetworkOnly` to tracked-order REST, and shows an explicitly
   labeled last-known IndexedDB snapshot when navigation or REST is unavailable.
@@ -697,7 +756,7 @@ health succeeds, and verify the internal and external paths.
   replaces browser-rotated subscriptions idempotently, and enforces ten
   subscription contexts per order.
 * Disabling notifications removes the complete backend subscription before the
-  browser subscription. Clearing local orders removes their enrollments while
+  browser subscription. Stopping order tracking removes its enrollment while
   preserving the app-level preference. Neither flow reports success while
   offline.
 * `READY`, `COMPLETED`, and `CANCELED` generate privacy-minimal versioned push
@@ -726,10 +785,11 @@ The current walking vertical slice is implemented for local development:
 * on-screen customer QR codes and anonymous tracking through REST;
 * customer-only SSE invalidation through Redis Pub/Sub with REST
   reconciliation;
-* customer PWA manifest, order-aware first-launch, active-only IndexedDB
-  snapshots, generated Serwist service worker, explicit offline fallback,
-  app-level notification consent and controls, application badges, and
-  monotonic privacy-preserving push handling, with the final regular, maskable,
+* customer PWA manifest, order-aware first-launch, last-destination restoration,
+  active-only IndexedDB snapshots, in-app QR scanning, per-order tracking
+  removal, generated Serwist service worker, explicit offline fallback,
+  app-level notification consent and controls, application badges, and monotonic
+  privacy-preserving push handling, with the final regular, maskable,
   Apple-touch, and favicon assets supplied and device acceptance still
   outstanding;
 * administrator-managed External Integrations, API Keys, and webhook
@@ -768,8 +828,8 @@ The customer PWA now supplies the referenced 192×192 and 512×512 regular
 icons, 512×512 maskable icon, 180×180 Apple touch icon, and multi-resolution
 favicon. Completing installability acceptance requires checking installation
 and standalone launch behavior on Android Chrome and iOS Safari. The manifest
-and launch behavior must not be redesigned while completing that acceptance
-gap.
+identity and one-time order-aware installation bootstrap must not be redesigned
+while completing that acceptance gap.
 
 The next External Integration increment publishes an OpenAPI document, rendered
 public reference documentation, and formal automated public-contract checks.

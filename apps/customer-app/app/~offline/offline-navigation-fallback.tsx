@@ -1,12 +1,18 @@
 "use client";
 
-import { Alert, Chip, Spinner } from "@heroui/react";
+import { Alert, Button, Chip, Spinner } from "@heroui/react";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { orderStatusLabels } from "@/src/orders/order-status";
-import { readTrackedOrder, type StoredTrackedOrder } from "@/src/pwa/storage";
+import {
+  readTrackedOrder,
+  rememberLastStableDestination,
+  type StoredTrackedOrder,
+} from "@/src/pwa/storage";
 
 export function OfflineNavigationFallback() {
+  const router = useRouter();
   const [snapshot, setSnapshot] = useState<
     StoredTrackedOrder | null | undefined
   >(undefined);
@@ -44,6 +50,33 @@ export function OfflineNavigationFallback() {
 
   return (
     <section className="flex flex-col items-start gap-4">
+      <Button
+        isIconOnly
+        aria-label="Go to Your orders"
+        className="fixed right-16 top-4 z-50"
+        variant="secondary"
+        onPress={() => {
+          void rememberLastStableDestination({ kind: "home" }).then(() => {
+            router.push("/");
+          });
+        }}
+      >
+        <svg
+          aria-hidden="true"
+          fill="none"
+          height="20"
+          viewBox="0 0 24 24"
+          width="20"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M3 10.75 12 3l9 7.75V21a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1V10.75Z"
+            stroke="currentColor"
+            strokeLinejoin="round"
+            strokeWidth="1.75"
+          />
+        </svg>
+      </Button>
       <p className="text-sm text-warning">
         You&apos;re offline. Showing the status from{" "}
         {new Date(snapshot.updatedAt).toLocaleString()}.

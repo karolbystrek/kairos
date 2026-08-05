@@ -44,9 +44,23 @@ const pushEventSchema = z
   })
   .strict();
 
+const stableCustomerDestinationSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("home") }).strict(),
+  z
+    .object({
+      kind: z.literal("order"),
+      trackingReference: z.string().min(1),
+    })
+    .strict(),
+]);
+
 export type StoredTrackedOrder = z.infer<typeof storedOrderSchema>;
 
 export type StoredPushEvent = z.infer<typeof pushEventSchema>;
+
+export type StableCustomerDestination = z.infer<
+  typeof stableCustomerDestinationSchema
+>;
 
 export type NotificationMetadata = {
   enrolledTrackingReferences?: string[];
@@ -177,6 +191,45 @@ export async function readTrackedOrder(
     });
   } catch {
     return null;
+  }
+}
+
+export async function readLastStableDestination(): Promise<StableCustomerDestination | null> {
+  try {
+    return await withDatabase(async (database) => {
+      const transaction = database.transaction(METADATA_STORE, "readonly");
+      const value = await requestResult(
+        transaction.objectStore(METADATA_STORE).get("last-destination"),
+      );
+      const result = stableCustomerDestinationSchema.safeParse(value);
+
+      return result.success ? result.data : null;
+    });
+  } catch {
+    return null;
+  }
+}
+
+export async function rememberLastStableDestination(
+  destination: StableCustomerDestination,
+): Promise<void> {
+  const parsed = stableCustomerDestinationSchema.safeParse(destination);
+
+  if (!parsed.success) {
+    return;
+  }
+
+  try {
+    await withDatabase(async (database) => {
+      const transaction = database.transaction(METADATA_STORE, "readwrite");
+
+      transaction
+        .objectStore(METADATA_STORE)
+        .put(parsed.data, "last-destination");
+      await transactionComplete(transaction);
+    });
+  } catch {
+    // Launch restoration is best effort and never blocks order tracking.
   }
 }
 
@@ -318,7 +371,7 @@ export async function removeTrackedOrder(
   trackingReference: string,
   mode: "suppressed" | "terminal",
   status?: OrderStatus,
-): Promise<void> {
+): Promise<boolean> {
   try {
     await withDatabase(async (database) => {
       const transaction = database.transaction(
@@ -342,8 +395,10 @@ export async function removeTrackedOrder(
       });
       await transactionComplete(transaction);
     });
+
+    return true;
   } catch {
-    // Best effort local cleanup.
+    return false;
   }
 }
 

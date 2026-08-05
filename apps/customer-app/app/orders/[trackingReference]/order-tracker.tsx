@@ -22,7 +22,7 @@ import { useCustomerNotifications } from "@/src/pwa/notification-provider";
 import {
   readTrackedOrder,
   rememberTrackedOrder,
-  removeTrackedOrder,
+  rememberLastStableDestination,
   type StoredTrackedOrder,
 } from "@/src/pwa/storage";
 
@@ -110,6 +110,7 @@ export function OrderTracker({
   );
   const [offlineLookupComplete, setOfflineLookupComplete] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
+  const leavingForHome = useRef(false);
   const previousTransition = useRef<string | null>(null);
   const {
     data: order,
@@ -173,6 +174,13 @@ export function OrderTracker({
       updatedAt: order.updatedAt,
     }).then(async () => {
       await updateApplicationBadge();
+      if (!leavingForHome.current) {
+        await rememberLastStableDestination(
+          isActiveOrderStatus(order.status)
+            ? { kind: "order", trackingReference }
+            : { kind: "home" },
+        );
+      }
       if (isActiveOrderStatus(order.status)) {
         await enrollOrder(trackingReference);
       }
@@ -238,39 +246,34 @@ export function OrderTracker({
       )}
       <div className="flex w-full items-start justify-between gap-4">
         <h1 className="text-3xl font-semibold">Order {displayedOrder.label}</h1>
-        {!isActiveOrderStatus(displayedOrder.status) && (
-          <Button
-            isIconOnly
-            aria-label="Go to recently tracked orders"
-            className="fixed right-16 top-4 z-50"
-            variant="secondary"
-            onPress={() => {
-              void removeTrackedOrder(
-                trackingReference,
-                "terminal",
-                displayedOrder.status,
-              ).then(() => {
-                router.push("/");
-              });
-            }}
+        <Button
+          isIconOnly
+          aria-label="Go to Your orders"
+          className="fixed right-16 top-4 z-50"
+          variant="secondary"
+          onPress={() => {
+            leavingForHome.current = true;
+            void rememberLastStableDestination({ kind: "home" }).then(() => {
+              router.push("/");
+            });
+          }}
+        >
+          <svg
+            aria-hidden="true"
+            fill="none"
+            height="20"
+            viewBox="0 0 24 24"
+            width="20"
+            xmlns="http://www.w3.org/2000/svg"
           >
-            <svg
-              aria-hidden="true"
-              fill="none"
-              height="20"
-              viewBox="0 0 24 24"
-              width="20"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M3 10.75 12 3l9 7.75V21a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1V10.75Z"
-                stroke="currentColor"
-                strokeLinejoin="round"
-                strokeWidth="1.75"
-              />
-            </svg>
-          </Button>
-        )}
+            <path
+              d="M3 10.75 12 3l9 7.75V21a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1V10.75Z"
+              stroke="currentColor"
+              strokeLinejoin="round"
+              strokeWidth="1.75"
+            />
+          </svg>
+        </Button>
       </div>
       <Chip
         color={displayedOrder.status === "READY" ? "success" : "default"}
