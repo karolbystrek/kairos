@@ -8,7 +8,7 @@ import pl.karolbystrek.kairos.api.account.application.model.StaffAccessContext;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
 import pl.karolbystrek.kairos.api.account.domain.AccountStatus;
 import pl.karolbystrek.kairos.api.account.domain.TenantRole;
-import pl.karolbystrek.kairos.api.account.domain.assignment.AssignmentStatus;
+import pl.karolbystrek.kairos.api.account.application.port.StaffLocationDirectory;
 import pl.karolbystrek.kairos.api.account.infrastructure.persistence.AccountRepository;
 import pl.karolbystrek.kairos.api.account.infrastructure.persistence.LocationAssignmentRepository;
 
@@ -20,6 +20,7 @@ public class StaffAccessService {
 
     private final AccountRepository accountRepository;
     private final LocationAssignmentRepository assignmentRepository;
+    private final StaffLocationDirectory locationDirectory;
 
     @Transactional(readOnly = true)
     public StaffAccessContext resolve(StaffPrincipal principal) {
@@ -40,7 +41,7 @@ public class StaffAccessService {
             ? accountRepository.findForUpdateById(principal.accountId())
             : accountRepository.findById(principal.accountId()))
             .orElseThrow(() -> new StaffAccessDeniedException("The staff account is not eligible"));
-        if (account.getStatus() != AccountStatus.ACTIVE
+        if (account.getStatus() != AccountStatus.ENABLED
             || !account.getTenantId().equals(principal.tenantId())
             || account.getTenantRole() != principal.tenantRole()) {
             throw new StaffAccessDeniedException("The staff account is not eligible");
@@ -59,15 +60,18 @@ public class StaffAccessService {
         }
 
         var activeAssignment = assignment
-            .filter(candidate -> candidate.getStatus() == AssignmentStatus.ACTIVE)
             .filter(candidate -> Objects.equals(candidate.getTenantId(), account.getTenantId()))
-            .orElseThrow(() -> new StaffAccessDeniedException("An active location assignment is required"));
+            .orElseThrow(() -> new StaffAccessDeniedException("A location assignment is required"));
+        var location = locationDirectory.findById(activeAssignment.getLocationId())
+            .filter(candidate -> candidate.tenantId().equals(account.getTenantId()))
+            .filter(candidate -> candidate.isEnabled())
+            .orElseThrow(() -> new StaffAccessDeniedException("An enabled assigned location is required"));
 
         return new StaffAccessContext(
             account.getId(),
             account.getTenantId(),
             account.getTenantRole(),
-            activeAssignment.getLocationId(),
+            location.id(),
             activeAssignment.getRole()
         );
     }

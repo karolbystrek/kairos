@@ -129,10 +129,14 @@ class ConcurrentOrderCreationIntegrationTests extends RedisListenerIsolatedInteg
 
     private UUID insertLocation(UUID tenantId) {
         var locationId = UUID.randomUUID();
+        var name = "Test location " + locationId;
         jdbcTemplate.update(
-                "INSERT INTO locations (id, tenant_id) VALUES (?, ?)",
+                "INSERT INTO locations (id, tenant_id, name, normalized_name, live_normalized_name) VALUES (?, ?, ?, ?, ?)",
                 locationId,
-                tenantId
+                tenantId,
+                name,
+                name.toLowerCase(java.util.Locale.ROOT),
+                name.toLowerCase(java.util.Locale.ROOT)
         );
         return locationId;
     }
@@ -143,12 +147,13 @@ class ConcurrentOrderCreationIntegrationTests extends RedisListenerIsolatedInteg
         jdbcTemplate.update(
                 """
                 INSERT INTO accounts (
-                    id, tenant_id, username, tenant_role, status, created_at, updated_at
-                ) VALUES (?, ?, ?, 'ADMIN', 'ACTIVE', ?, ?)
+                    id, tenant_id, username, email, tenant_role, status, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, 'ADMIN', 'ENABLED', ?, ?)
                 """,
                 accountId,
                 tenantId,
                 "concurrent-admin-" + accountId,
+                "concurrent-admin-" + accountId + "@example.com",
                 now,
                 now
         );

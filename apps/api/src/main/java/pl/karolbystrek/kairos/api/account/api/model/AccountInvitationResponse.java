@@ -1,0 +1,29 @@
+package pl.karolbystrek.kairos.api.account.api.model;
+
+import pl.karolbystrek.kairos.api.account.application.model.AccountInvitationView;
+import pl.karolbystrek.kairos.api.account.domain.assignment.AssignmentRole;
+
+import java.time.Instant;
+import java.util.UUID;
+
+public record AccountInvitationResponse(
+    UUID id,
+    UUID locationId,
+    String locationName,
+    AssignmentRole role,
+    String issuedByUsername,
+    Instant createdAt,
+    Instant expiresAt
+) {
+    public static AccountInvitationResponse from(AccountInvitationView invitation) {
+        return new AccountInvitationResponse(
+            invitation.id(),
+            invitation.locationId(),
+            invitation.locationName(),
+            invitation.role(),
+            invitation.issuedByUsername(),
+            invitation.createdAt(),
+            invitation.expiresAt()
+        );
+    }
+}

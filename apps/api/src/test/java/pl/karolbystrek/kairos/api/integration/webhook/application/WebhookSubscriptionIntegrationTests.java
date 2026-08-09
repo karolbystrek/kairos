@@ -14,6 +14,8 @@ import pl.karolbystrek.kairos.api.integration.domain.ExternalIntegrationStatus;
 import pl.karolbystrek.kairos.api.integration.testsupport.IntegrationTestFixture;
 import pl.karolbystrek.kairos.api.integration.testsupport.MutableTestClock;
 import pl.karolbystrek.kairos.api.integration.testsupport.MutableTestClockConfiguration;
+import pl.karolbystrek.kairos.api.location.application.LocationService;
+import pl.karolbystrek.kairos.api.location.domain.LocationStatus;
 import pl.karolbystrek.kairos.api.order.domain.OrderEventType;
 import pl.karolbystrek.kairos.api.integration.webhook.domain.WebhookSubscriptionStatus;
 import pl.karolbystrek.kairos.api.order.application.OrderService;
@@ -45,6 +47,9 @@ class WebhookSubscriptionIntegrationTests extends RedisListenerIsolatedIntegrati
 
     @Autowired
     private OrderService orderService;
+
+    @Autowired
+    private LocationService locationService;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -238,6 +243,47 @@ class WebhookSubscriptionIntegrationTests extends RedisListenerIsolatedIntegrati
                 Long.class,
                 issued.subscription().id()
         )).isZero();
+    }
+
+    @Test
+    void doesNotMaterializeOrReplayFanoutAcrossALocationDisabledInterval() {
+        var issued = createSubscription(Set.of(OrderEventType.ORDER_CANCELED));
+        subscriptionService.changeStatus(
+            tenant.administrator(),
+            issued.subscription().id(),
+            WebhookSubscriptionStatus.ENABLED
+        );
+        var order = orderService.createOrder(
+            tenant.administrator(),
+            tenant.firstLocationId(),
+            null
+        );
+        clock.advance(Duration.ofSeconds(1));
+        orderService.updateStatus(
+            tenant.administrator(),
+            order.id(),
+            OrderStatus.CANCELED
+        );
+        locationService.updateStatus(
+            tenant.administrator(),
+            tenant.firstLocationId(),
+            LocationStatus.DISABLED
+        );
+
+        assertThat(fanoutService.fanOutAvailable()).isEqualTo(2);
+        assertThat(jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM webhook_deliveries WHERE subscription_id = ?",
+            Long.class,
+            issued.subscription().id()
+        )).isZero();
+
+        clock.advance(Duration.ofSeconds(1));
+        locationService.updateStatus(
+            tenant.administrator(),
+            tenant.firstLocationId(),
+            LocationStatus.ENABLED
+        );
+        assertThat(fanoutService.fanOutAvailable()).isZero();
     }
 
     private pl.karolbystrek.kairos.api.integration.webhook.application.model.IssuedWebhookSubscriptionView

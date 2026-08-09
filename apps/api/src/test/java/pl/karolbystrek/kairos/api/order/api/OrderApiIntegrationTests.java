@@ -66,19 +66,23 @@ class OrderApiIntegrationTests extends RedisListenerIsolatedIntegrationTest {
         var now = Instant.parse("2026-07-24T12:00:00Z");
         jdbcTemplate.update("INSERT INTO tenants (id) VALUES (?)", tenantId);
         jdbcTemplate.update(
-                "INSERT INTO locations (id, tenant_id) VALUES (?, ?)",
+                "INSERT INTO locations (id, tenant_id, name, normalized_name, live_normalized_name) VALUES (?, ?, ?, ?, ?)",
                 locationId,
-                tenantId
+                tenantId,
+                "Test location",
+                "test location",
+                "test location"
         );
         jdbcTemplate.update(
                 """
                 INSERT INTO accounts (
-                    id, tenant_id, username, tenant_role, status, created_at, updated_at
-                ) VALUES (?, ?, ?, 'ADMIN', 'ACTIVE', ?, ?)
+                    id, tenant_id, username, email, tenant_role, status, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, 'ADMIN', 'ENABLED', ?, ?)
                 """,
                 accountId,
                 tenantId,
                 "order-api-admin-" + accountId,
+                "order-api-admin-" + accountId + "@example.com",
                 now,
                 now
         );

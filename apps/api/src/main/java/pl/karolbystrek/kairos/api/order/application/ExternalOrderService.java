@@ -108,6 +108,7 @@ public class ExternalOrderService {
         var requestFingerprint = creationFingerprint(locationId, customLabel);
         var location = locationRepository.findForUpdateById(locationId)
                 .filter(candidate -> candidate.getTenantId().equals(principal.tenantId()))
+                .filter(candidate -> candidate.isEnabled())
                 .orElseThrow(() -> new ResourceNotFoundException("Location was not found"));
 
         var replay = orderRepository

@@ -29,7 +29,7 @@ public class Account {
     @Column(nullable = false, unique = true, length = 120)
     private String username;
 
-    @Column(unique = true, length = 254)
+    @Column(nullable = false, unique = true, length = 254)
     private String email;
 
     @Column(name = "password_hash", length = 255)
@@ -49,10 +49,13 @@ public class Account {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @Column(name = "archived_at")
+    private Instant archivedAt;
+
     public static Account provisionMember(
         @NonNull UUID tenantId,
         @NonNull String username,
-        String email,
+        @NonNull String email,
         @NonNull String passwordHash,
         @NonNull Instant now
     ) {
@@ -98,14 +101,55 @@ public class Account {
         account.email = email;
         account.passwordHash = passwordHash;
         account.tenantRole = tenantRole;
-        account.status = AccountStatus.ACTIVE;
+        account.status = AccountStatus.ENABLED;
         account.createdAt = now;
         account.updatedAt = now;
         return account;
     }
 
-    public void changeStatus(@NonNull AccountStatus target, @NonNull Instant now) {
+    public void enable(@NonNull Instant now) {
+        requireNotArchived();
+        changeStatus(AccountStatus.ENABLED, now);
+    }
+
+    public void disable(@NonNull Instant now) {
+        requireNotArchived();
+        changeStatus(AccountStatus.DISABLED, now);
+    }
+
+    public void archive(@NonNull Instant now) {
+        if (isArchived()) {
+            return;
+        }
+        status = AccountStatus.ARCHIVED;
+        passwordHash = null;
+        archivedAt = now;
+        updatedAt = now;
+    }
+
+    public boolean isEnabled() {
+        return status == AccountStatus.ENABLED;
+    }
+
+    public boolean isDisabled() {
+        return status == AccountStatus.DISABLED;
+    }
+
+    public boolean isArchived() {
+        return status == AccountStatus.ARCHIVED;
+    }
+
+    private void changeStatus(AccountStatus target, Instant now) {
+        if (status == target) {
+            return;
+        }
         status = target;
         updatedAt = now;
+    }
+
+    private void requireNotArchived() {
+        if (isArchived()) {
+            throw new IllegalStateException("Archived accounts cannot be changed");
+        }
     }
 }

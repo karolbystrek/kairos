@@ -1,6 +1,8 @@
 package pl.karolbystrek.kairos.api.integration.webhook.infrastructure.persistence;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Lock;
 import pl.karolbystrek.kairos.api.integration.webhook.domain.WebhookSubscriptionLocationAccess;
 import pl.karolbystrek.kairos.api.integration.webhook.domain.WebhookSubscriptionLocationAccessId;
 
@@ -18,4 +20,11 @@ public interface WebhookSubscriptionLocationAccessRepository
     );
 
     long deleteAllBySubscriptionId(UUID subscriptionId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    List<WebhookSubscriptionLocationAccess> findAllForUpdateByLocationId(UUID locationId);
+
+    long deleteAllByLocationId(UUID locationId);
+
+    boolean existsBySubscriptionId(UUID subscriptionId);
 }

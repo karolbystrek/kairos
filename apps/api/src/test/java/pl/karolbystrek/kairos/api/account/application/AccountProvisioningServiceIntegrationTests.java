@@ -4,15 +4,14 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
+import pl.karolbystrek.kairos.api.account.application.exception.AccountNotFoundException;
 import pl.karolbystrek.kairos.api.account.application.exception.StaffAccessDeniedException;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
 import pl.karolbystrek.kairos.api.account.domain.AccountStatus;
 import pl.karolbystrek.kairos.api.account.domain.assignment.AssignmentRole;
 import pl.karolbystrek.kairos.api.account.domain.TenantRole;
 import pl.karolbystrek.kairos.api.account.infrastructure.persistence.AccountRepository;
-import pl.karolbystrek.kairos.api.account.infrastructure.persistence.LocationAssignmentRepository;
 import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
 
 import java.time.Instant;
@@ -27,170 +26,79 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class AccountProvisioningServiceIntegrationTests extends RedisListenerIsolatedIntegrationTest {
 
     private static final Instant FIXTURE_TIME = Instant.parse("2026-07-20T12:00:00Z");
-    private static final String INITIAL_PASSWORD = "SecurePass-12";
-
     @Autowired
     private AccountProvisioningService provisioningService;
+
+    @Autowired
+    private AccountInvitationService invitationService;
 
     @Autowired
     private AccountRepository accountRepository;
 
     @Autowired
-    private LocationAssignmentRepository assignmentRepository;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-
-    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     @Test
-    void administratorProvisionsNormalizedManagersAndOperatorsInsideItsTenant() {
+    void listsOnlyAccountsManageableByTheCurrentAdministratorOrManager() {
         var tenantId = insertTenant();
-        var locationId = insertLocation(tenantId);
-        var administratorId = insertAccount(tenantId, "admin", TenantRole.ADMIN, AccountStatus.ACTIVE);
-        var administrator = principal(administratorId, tenantId, TenantRole.ADMIN);
+        var firstLocationId = insertLocation(tenantId);
+        var secondLocationId = insertLocation(tenantId);
+        var administratorId = insertAccount(tenantId, "list.admin", TenantRole.ADMIN, AccountStatus.ENABLED);
+        var managerId = insertAccount(tenantId, "list.manager", TenantRole.MEMBER, AccountStatus.ENABLED);
+        insertAssignment(managerId, tenantId, firstLocationId, AssignmentRole.MANAGER);
+        var ownOperatorId = insertAccount(tenantId, "list.own", TenantRole.MEMBER, AccountStatus.ENABLED);
+        insertAssignment(ownOperatorId, tenantId, firstLocationId, AssignmentRole.OPERATOR);
+        var otherOperatorId = insertAccount(tenantId, "list.other", TenantRole.MEMBER, AccountStatus.ENABLED);
+        insertAssignment(otherOperatorId, tenantId, secondLocationId, AssignmentRole.OPERATOR);
 
-        var manager = provisioningService.provision(
-            administrator,
-            locationId,
-            "  Shift.Manager  ",
-            "  MANAGER@EXAMPLE.COM  ",
-            INITIAL_PASSWORD,
-            AssignmentRole.MANAGER
-        );
-        var operator = provisioningService.provision(
-            administrator,
-            locationId,
-            "Counter.Device.1",
-            null,
-            INITIAL_PASSWORD,
-            AssignmentRole.OPERATOR
-        );
-
-        assertThat(manager.tenantId()).isEqualTo(tenantId);
-        assertThat(manager.locationId()).isEqualTo(locationId);
-        assertThat(manager.username()).isEqualTo("shift.manager");
-        assertThat(manager.email()).isEqualTo("manager@example.com");
-        assertThat(manager.role()).isEqualTo(AssignmentRole.MANAGER);
-        assertThat(operator.role()).isEqualTo(AssignmentRole.OPERATOR);
-
-        var persisted = accountRepository.findById(manager.id()).orElseThrow();
-        assertThat(persisted.getTenantRole()).isEqualTo(TenantRole.MEMBER);
-        assertThat(persisted.getStatus()).isEqualTo(AccountStatus.ACTIVE);
-        assertThat(persisted.getPasswordHash()).isNotEqualTo(INITIAL_PASSWORD);
-        assertThat(passwordEncoder.matches(INITIAL_PASSWORD, persisted.getPasswordHash())).isTrue();
-        assertThat(assignmentRepository.findByIdAccountId(manager.id()).orElseThrow().getLocationId())
-            .isEqualTo(locationId);
-    }
-
-    @Test
-    void managerProvisionsOnlyOperatorsForItsOwnActiveLocation() {
-        var tenantId = insertTenant();
-        var assignedLocationId = insertLocation(tenantId);
-        var otherLocationId = insertLocation(tenantId);
-        var managerId = insertAccount(tenantId, "manager", TenantRole.MEMBER, AccountStatus.ACTIVE);
-        insertAssignment(managerId, tenantId, assignedLocationId, AssignmentRole.MANAGER, "ACTIVE");
-        var manager = principal(managerId, tenantId, TenantRole.MEMBER);
-
-        var operator = provisioningService.provision(
-            manager,
-            assignedLocationId,
-            "device.one",
-            null,
-            INITIAL_PASSWORD,
-            AssignmentRole.OPERATOR
-        );
-
-        assertThat(operator.locationId()).isEqualTo(assignedLocationId);
-        assertThat(operator.role()).isEqualTo(AssignmentRole.OPERATOR);
-        assertThatThrownBy(() -> provisioningService.provision(
-            manager,
-            assignedLocationId,
-            "another.manager",
-            null,
-            INITIAL_PASSWORD,
-            AssignmentRole.MANAGER
-        )).isInstanceOf(StaffAccessDeniedException.class);
-        assertThatThrownBy(() -> provisioningService.provision(
-            manager,
-            otherLocationId,
-            "other.device",
-            null,
-            INITIAL_PASSWORD,
-            AssignmentRole.OPERATOR
+        assertThat(provisioningService.listManageable(
+            principal(administratorId, tenantId, TenantRole.ADMIN)
+        ))
+            .extracting(account -> account.username())
+            .containsExactly("list.manager", "list.other", "list.own");
+        assertThat(provisioningService.listManageable(
+            principal(managerId, tenantId, TenantRole.MEMBER)
+        ))
+            .extracting(account -> account.username())
+            .containsExactly("list.own");
+        assertThatThrownBy(() -> provisioningService.listManageable(
+            principal(ownOperatorId, tenantId, TenantRole.MEMBER)
         )).isInstanceOf(StaffAccessDeniedException.class);
     }
 
     @Test
-    void operatorAndCrossTenantAdministratorCannotProvisionAccounts() {
+    void disablingManagedAccountRevokesItsSessionsAndPendingInvitations() {
         var tenantId = insertTenant();
         var locationId = insertLocation(tenantId);
-        var operatorId = insertAccount(tenantId, "operator", TenantRole.MEMBER, AccountStatus.ACTIVE);
-        insertAssignment(operatorId, tenantId, locationId, AssignmentRole.OPERATOR, "ACTIVE");
-
-        var otherTenantId = insertTenant();
-        var otherLocationId = insertLocation(otherTenantId);
-        var administratorId = insertAccount(tenantId, "admin", TenantRole.ADMIN, AccountStatus.ACTIVE);
-
-        assertThatThrownBy(() -> provisioningService.provision(
-            principal(operatorId, tenantId, TenantRole.MEMBER),
-            locationId,
-            "operator.created",
-            null,
-            INITIAL_PASSWORD,
-            AssignmentRole.OPERATOR
-        )).isInstanceOf(StaffAccessDeniedException.class);
-        assertThatThrownBy(() -> provisioningService.provision(
-            principal(administratorId, tenantId, TenantRole.ADMIN),
-            otherLocationId,
-            "cross.tenant",
-            null,
-            INITIAL_PASSWORD,
-            AssignmentRole.OPERATOR
-        )).isInstanceOf(StaffAccessDeniedException.class);
-    }
-
-    @Test
-    void suspendedManagerCannotProvisionAccounts() {
-        var tenantId = insertTenant();
-        var locationId = insertLocation(tenantId);
-        var managerId = insertAccount(tenantId, "suspended.manager", TenantRole.MEMBER, AccountStatus.ACTIVE);
-        insertAssignment(managerId, tenantId, locationId, AssignmentRole.MANAGER, "SUSPENDED");
-
-        assertThatThrownBy(() -> provisioningService.provision(
+        var administratorId = insertAccount(tenantId, "admin.revoke", TenantRole.ADMIN, AccountStatus.ENABLED);
+        var managerId = insertAccount(tenantId, "manager.revoke", TenantRole.MEMBER, AccountStatus.ENABLED);
+        insertAssignment(managerId, tenantId, locationId, AssignmentRole.MANAGER);
+        var invitation = invitationService.create(
             principal(managerId, tenantId, TenantRole.MEMBER),
             locationId,
-            "suspended.created",
-            null,
-            INITIAL_PASSWORD,
             AssignmentRole.OPERATOR
-        )).isInstanceOf(StaffAccessDeniedException.class);
-    }
+        );
+        var sessionId = insertSession(managerId);
 
-    @Test
-    void disablingManagedAccountRevokesItsRefreshSessions() {
-        var tenantId = insertTenant();
-        var locationId = insertLocation(tenantId);
-        var administratorId = insertAccount(tenantId, "admin.revoke", TenantRole.ADMIN, AccountStatus.ACTIVE);
-        var operatorId = insertAccount(tenantId, "device.revoke", TenantRole.MEMBER, AccountStatus.ACTIVE);
-        insertAssignment(operatorId, tenantId, locationId, AssignmentRole.OPERATOR, "ACTIVE");
-        var sessionId = insertSession(operatorId);
-
-        var disabled = provisioningService.changeStatus(
+        var disabled = provisioningService.updateStatus(
             principal(administratorId, tenantId, TenantRole.ADMIN),
-            operatorId,
+            managerId,
             AccountStatus.DISABLED
         );
 
         assertThat(disabled.status()).isEqualTo(AccountStatus.DISABLED);
-        assertThat(accountRepository.findById(operatorId).orElseThrow().getStatus())
+        assertThat(accountRepository.findById(managerId).orElseThrow().getStatus())
             .isEqualTo(AccountStatus.DISABLED);
         assertThat(jdbcTemplate.queryForObject(
             "SELECT revoked_at IS NOT NULL FROM sessions WHERE id = ?",
             Boolean.class,
             sessionId
         )).isTrue();
+        assertThat(jdbcTemplate.queryForMap(
+            "SELECT state, revocation_reason FROM account_invitations WHERE id = ?",
+            invitation.invitation().id()
+        )).containsEntry("state", "REVOKED")
+            .containsEntry("revocation_reason", "ISSUER_DISABLED");
     }
 
     @Test
@@ -198,24 +106,106 @@ class AccountProvisioningServiceIntegrationTests extends RedisListenerIsolatedIn
         var tenantId = insertTenant();
         var locationId = insertLocation(tenantId);
         var otherLocationId = insertLocation(tenantId);
-        var managerId = insertAccount(tenantId, "status.manager", TenantRole.MEMBER, AccountStatus.ACTIVE);
-        insertAssignment(managerId, tenantId, locationId, AssignmentRole.MANAGER, "ACTIVE");
-        var ownOperatorId = insertAccount(tenantId, "own.operator", TenantRole.MEMBER, AccountStatus.ACTIVE);
-        insertAssignment(ownOperatorId, tenantId, locationId, AssignmentRole.OPERATOR, "ACTIVE");
-        var otherOperatorId = insertAccount(tenantId, "other.operator", TenantRole.MEMBER, AccountStatus.ACTIVE);
-        insertAssignment(otherOperatorId, tenantId, otherLocationId, AssignmentRole.OPERATOR, "ACTIVE");
-        var peerManagerId = insertAccount(tenantId, "peer.manager", TenantRole.MEMBER, AccountStatus.ACTIVE);
-        insertAssignment(peerManagerId, tenantId, locationId, AssignmentRole.MANAGER, "ACTIVE");
+        var managerId = insertAccount(tenantId, "status.manager", TenantRole.MEMBER, AccountStatus.ENABLED);
+        insertAssignment(managerId, tenantId, locationId, AssignmentRole.MANAGER);
+        var ownOperatorId = insertAccount(tenantId, "own.operator", TenantRole.MEMBER, AccountStatus.ENABLED);
+        insertAssignment(ownOperatorId, tenantId, locationId, AssignmentRole.OPERATOR);
+        var otherOperatorId = insertAccount(tenantId, "other.operator", TenantRole.MEMBER, AccountStatus.ENABLED);
+        insertAssignment(otherOperatorId, tenantId, otherLocationId, AssignmentRole.OPERATOR);
+        var peerManagerId = insertAccount(tenantId, "peer.manager", TenantRole.MEMBER, AccountStatus.ENABLED);
+        insertAssignment(peerManagerId, tenantId, locationId, AssignmentRole.MANAGER);
         var manager = principal(managerId, tenantId, TenantRole.MEMBER);
 
-        assertThat(provisioningService.changeStatus(manager, ownOperatorId, AccountStatus.DISABLED).status())
+        assertThat(provisioningService.updateStatus(manager, ownOperatorId, AccountStatus.DISABLED).status())
             .isEqualTo(AccountStatus.DISABLED);
-        assertThatThrownBy(() -> provisioningService.changeStatus(
+        assertThatThrownBy(() -> provisioningService.updateStatus(
             manager, otherOperatorId, AccountStatus.DISABLED
-        )).isInstanceOf(StaffAccessDeniedException.class);
-        assertThatThrownBy(() -> provisioningService.changeStatus(
+        )).isInstanceOf(AccountNotFoundException.class);
+        assertThatThrownBy(() -> provisioningService.updateStatus(
             manager, peerManagerId, AccountStatus.DISABLED
-        )).isInstanceOf(StaffAccessDeniedException.class);
+        )).isInstanceOf(AccountNotFoundException.class);
+    }
+
+    @Test
+    void deletingManagedAccountArchivesItAndRemovesEveryAuthenticator() {
+        var tenantId = insertTenant();
+        var locationId = insertLocation(tenantId);
+        var administratorId = insertAccount(
+            tenantId,
+            "delete.admin",
+            TenantRole.ADMIN,
+            AccountStatus.ENABLED
+        );
+        var managerId = insertAccount(
+            tenantId,
+            "delete.manager",
+            TenantRole.MEMBER,
+            AccountStatus.ENABLED
+        );
+        insertAssignment(managerId, tenantId, locationId, AssignmentRole.MANAGER);
+        var invitation = invitationService.create(
+            principal(managerId, tenantId, TenantRole.MEMBER),
+            locationId,
+            AssignmentRole.OPERATOR
+        );
+        var sessionId = insertSession(managerId);
+        jdbcTemplate.update(
+            """
+                INSERT INTO external_identities (
+                    id, account_id, provider, subject, created_at, updated_at
+                ) VALUES (?, ?, 'example', ?, ?, ?)
+                """,
+            UUID.randomUUID(),
+            managerId,
+            "subject-" + managerId,
+            FIXTURE_TIME,
+            FIXTURE_TIME
+        );
+        var administrator = principal(
+            administratorId,
+            tenantId,
+            TenantRole.ADMIN
+        );
+
+        provisioningService.delete(administrator, managerId);
+        provisioningService.delete(administrator, managerId);
+
+        assertThat(jdbcTemplate.queryForMap(
+            "SELECT status, password_hash, archived_at FROM accounts WHERE id = ?",
+            managerId
+        )).containsEntry("status", "ARCHIVED")
+            .containsEntry("password_hash", null);
+        assertThat(jdbcTemplate.queryForObject(
+            "SELECT archived_at IS NOT NULL FROM accounts WHERE id = ?",
+            Boolean.class,
+            managerId
+        )).isTrue();
+        assertThat(jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM external_identities WHERE account_id = ?",
+            Integer.class,
+            managerId
+        )).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+            "SELECT revoked_at IS NOT NULL FROM sessions WHERE id = ?",
+            Boolean.class,
+            sessionId
+        )).isTrue();
+        assertThat(jdbcTemplate.queryForMap(
+            "SELECT state, revocation_reason FROM account_invitations WHERE id = ?",
+            invitation.invitation().id()
+        )).containsEntry("state", "REVOKED")
+            .containsEntry("revocation_reason", "ISSUER_ARCHIVED");
+        assertThat(jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM location_assignments WHERE account_id = ?",
+            Integer.class,
+            managerId
+        )).isOne();
+        assertThat(provisioningService.listManageable(administrator)).isEmpty();
+        assertThatThrownBy(() -> provisioningService.updateStatus(
+            administrator,
+            managerId,
+            AccountStatus.ENABLED
+        )).isInstanceOf(AccountNotFoundException.class);
     }
 
     private UUID insertTenant() {
@@ -226,10 +216,14 @@ class AccountProvisioningServiceIntegrationTests extends RedisListenerIsolatedIn
 
     private UUID insertLocation(UUID tenantId) {
         var locationId = UUID.randomUUID();
+        var name = "Test location " + locationId;
         jdbcTemplate.update(
-            "INSERT INTO locations (id, tenant_id) VALUES (?, ?)",
+            "INSERT INTO locations (id, tenant_id, name, normalized_name, live_normalized_name) VALUES (?, ?, ?, ?, ?)",
             locationId,
-            tenantId
+            tenantId,
+            name,
+            name.toLowerCase(java.util.Locale.ROOT),
+            name.toLowerCase(java.util.Locale.ROOT)
         );
         return locationId;
     }
@@ -246,11 +240,12 @@ class AccountProvisioningServiceIntegrationTests extends RedisListenerIsolatedIn
                 INSERT INTO accounts (
                     id, tenant_id, username, email, password_hash,
                     tenant_role, status, created_at, updated_at
-                ) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
             accountId,
             tenantId,
             username,
+            username + "@example.com",
             "fixture-password-hash",
             tenantRole.name(),
             status.name(),
@@ -264,20 +259,18 @@ class AccountProvisioningServiceIntegrationTests extends RedisListenerIsolatedIn
         UUID accountId,
         UUID tenantId,
         UUID locationId,
-        AssignmentRole role,
-        String status
+        AssignmentRole role
     ) {
         jdbcTemplate.update(
             """
                 INSERT INTO location_assignments (
-                    account_id, location_id, tenant_id, role, status, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    account_id, location_id, tenant_id, role, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
                 """,
             accountId,
             locationId,
             tenantId,
             role.name(),
-            status,
             FIXTURE_TIME,
             FIXTURE_TIME
         );

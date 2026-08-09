@@ -20,13 +20,31 @@ public final class IntegrationTestFixture {
         var tenantId = UUID.randomUUID();
         var firstLocationId = UUID.randomUUID();
         var secondLocationId = UUID.randomUUID();
+        var now = Instant.parse("2026-07-26T10:00:00Z");
         jdbcTemplate.update("INSERT INTO tenants (id) VALUES (?)", tenantId);
         jdbcTemplate.update(
-                "INSERT INTO locations (id, tenant_id) VALUES (?, ?), (?, ?)",
+                """
+                INSERT INTO locations (
+                    id, tenant_id, name, normalized_name, live_normalized_name,
+                    created_at, updated_at, last_enabled_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?), (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
                 firstLocationId,
                 tenantId,
+                "First location",
+                "first location",
+                "first location",
+                now,
+                now,
+                now,
                 secondLocationId,
-                tenantId
+                tenantId,
+                "Second location",
+                "second location",
+                "second location",
+                now,
+                now,
+                now
         );
         var administrator = createAccount(tenantId, TenantRole.ADMIN, null, null);
         var manager = createAccount(
@@ -55,12 +73,13 @@ public final class IntegrationTestFixture {
         jdbcTemplate.update(
                 """
                 INSERT INTO accounts (
-                    id, tenant_id, username, tenant_role, status, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, 'ACTIVE', ?, ?)
+                    id, tenant_id, username, email, tenant_role, status, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, 'ENABLED', ?, ?)
                 """,
                 accountId,
                 tenantId,
                 "integration-test-" + accountId,
+                "integration-test-" + accountId + "@example.com",
                 tenantRole.name(),
                 now,
                 now
@@ -69,8 +88,8 @@ public final class IntegrationTestFixture {
             jdbcTemplate.update(
                     """
                     INSERT INTO location_assignments (
-                        account_id, location_id, tenant_id, role, status, created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, 'ACTIVE', ?, ?)
+                        account_id, location_id, tenant_id, role, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?)
                     """,
                     accountId,
                     locationId,

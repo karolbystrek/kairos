@@ -59,20 +59,24 @@ class OrderServiceIntegrationTests extends RedisListenerIsolatedIntegrationTest 
         locationId = UUID.randomUUID();
         jdbcTemplate.update("INSERT INTO tenants (id) VALUES (?)", tenantId);
         jdbcTemplate.update(
-            "INSERT INTO locations (id, tenant_id) VALUES (?, ?)",
+            "INSERT INTO locations (id, tenant_id, name, normalized_name, live_normalized_name) VALUES (?, ?, ?, ?, ?)",
             locationId,
-            tenantId
+            tenantId,
+            "Test location",
+            "test location",
+            "test location"
         );
         var now = Instant.now();
         jdbcTemplate.update(
             """
             INSERT INTO accounts (
-                id, tenant_id, username, tenant_role, status, created_at, updated_at
-            ) VALUES (?, ?, ?, 'ADMIN', 'ACTIVE', ?, ?)
+                id, tenant_id, username, email, tenant_role, status, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, 'ADMIN', 'ENABLED', ?, ?)
             """,
             accountId,
             tenantId,
             "admin-" + accountId,
+            "admin-" + accountId + "@example.com",
             now,
             now
         );
@@ -147,9 +151,12 @@ class OrderServiceIntegrationTests extends RedisListenerIsolatedIntegrationTest 
         var secondLocationId = UUID.randomUUID();
         var tenantId = principal.tenantId();
         jdbcTemplate.update(
-                "INSERT INTO locations (id, tenant_id) VALUES (?, ?)",
+                "INSERT INTO locations (id, tenant_id, name, normalized_name, live_normalized_name) VALUES (?, ?, ?, ?, ?)",
                 secondLocationId,
-                tenantId
+                tenantId,
+                "Second location",
+                "second location",
+                "second location"
         );
 
         var firstLocationOrder = orderService.createOrder(principal, locationId, null);

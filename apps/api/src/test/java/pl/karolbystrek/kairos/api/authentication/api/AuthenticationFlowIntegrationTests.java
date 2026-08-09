@@ -20,7 +20,6 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import pl.karolbystrek.kairos.api.account.domain.AccountStatus;
 import pl.karolbystrek.kairos.api.account.domain.assignment.AssignmentRole;
-import pl.karolbystrek.kairos.api.account.domain.assignment.AssignmentStatus;
 import pl.karolbystrek.kairos.api.account.domain.TenantRole;
 import pl.karolbystrek.kairos.api.authentication.application.RefreshCredentialService;
 import pl.karolbystrek.kairos.api.authentication.infrastructure.config.AuthenticationProperties;
@@ -110,9 +109,9 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
 
         var activeUsername = "active-" + suffix;
         var activeId = insertAccount(
-            tenantId, activeUsername, passwordHash, TenantRole.MEMBER, AccountStatus.ACTIVE
+            tenantId, activeUsername, passwordHash, TenantRole.MEMBER, AccountStatus.ENABLED
         );
-        insertAssignment(activeId, tenantId, locationId, AssignmentRole.OPERATOR, AssignmentStatus.ACTIVE);
+        insertAssignment(activeId, tenantId, locationId, AssignmentRole.OPERATOR);
 
         var disabledUsername = "disabled-" + suffix;
         insertAccount(
@@ -121,19 +120,19 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
 
         var passwordlessUsername = "passwordless-" + suffix;
         insertAccount(
-            tenantId, passwordlessUsername, null, TenantRole.ADMIN, AccountStatus.ACTIVE
+            tenantId, passwordlessUsername, null, TenantRole.ADMIN, AccountStatus.ENABLED
         );
 
         var unassignedUsername = "unassigned-" + suffix;
         insertAccount(
-            tenantId, unassignedUsername, passwordHash, TenantRole.MEMBER, AccountStatus.ACTIVE
+            tenantId, unassignedUsername, passwordHash, TenantRole.MEMBER, AccountStatus.ENABLED
         );
 
-        var suspendedUsername = "suspended-" + suffix;
-        var suspendedId = insertAccount(
-            tenantId, suspendedUsername, passwordHash, TenantRole.MEMBER, AccountStatus.ACTIVE
+        var ineligibleUsername = "ineligible-" + suffix;
+        var ineligibleId = insertAccount(
+            tenantId, ineligibleUsername, passwordHash, TenantRole.MEMBER, AccountStatus.DISABLED
         );
-        insertAssignment(suspendedId, tenantId, locationId, AssignmentRole.OPERATOR, AssignmentStatus.SUSPENDED);
+        insertAssignment(ineligibleId, tenantId, locationId, AssignmentRole.OPERATOR);
 
         var csrf = bootstrapCsrf("192.0.2.20");
         var responses = List.of(
@@ -142,7 +141,7 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
             invalidLogin(disabledUsername, PASSWORD, csrf, "192.0.2.23"),
             invalidLogin(passwordlessUsername, PASSWORD, csrf, "192.0.2.24"),
             invalidLogin(unassignedUsername, PASSWORD, csrf, "192.0.2.25"),
-            invalidLogin(suspendedUsername, PASSWORD, csrf, "192.0.2.26")
+            invalidLogin(ineligibleUsername, PASSWORD, csrf, "192.0.2.26")
         );
 
         assertThat(responses).containsOnly(responses.getFirst());
@@ -491,9 +490,9 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
             username,
             passwordEncoder.encode(PASSWORD),
             TenantRole.MEMBER,
-            AccountStatus.ACTIVE
+            AccountStatus.ENABLED
         );
-        insertAssignment(accountId, tenantId, locationId, AssignmentRole.OPERATOR, AssignmentStatus.ACTIVE);
+        insertAssignment(accountId, tenantId, locationId, AssignmentRole.OPERATOR);
         return new AccountFixture(tenantId, locationId, accountId, username);
     }
 
@@ -506,9 +505,12 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
     private UUID insertLocation(UUID tenantId) {
         var locationId = UUID.randomUUID();
         jdbcTemplate.update(
-            "INSERT INTO locations (id, tenant_id) VALUES (?, ?)",
+            "INSERT INTO locations (id, tenant_id, name, normalized_name, live_normalized_name) VALUES (?, ?, ?, ?, ?)",
             locationId,
-            tenantId
+            tenantId,
+            "Test location",
+            "test location",
+            "test location"
         );
         return locationId;
     }
@@ -527,11 +529,12 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
                 INSERT INTO accounts (
                     id, tenant_id, username, email, password_hash,
                     tenant_role, status, created_at, updated_at
-                ) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
             accountId,
             tenantId,
             username,
+            username + "@example.com",
             passwordHash,
             role.name(),
             status.name(),
@@ -545,21 +548,19 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
         UUID accountId,
         UUID tenantId,
         UUID locationId,
-        AssignmentRole role,
-        AssignmentStatus status
+        AssignmentRole role
     ) {
         var now = Instant.now();
         jdbcTemplate.update(
             """
                 INSERT INTO location_assignments (
-                    account_id, location_id, tenant_id, role, status, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    account_id, location_id, tenant_id, role, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
                 """,
             accountId,
             locationId,
             tenantId,
             role.name(),
-            status.name(),
             now,
             now
         );

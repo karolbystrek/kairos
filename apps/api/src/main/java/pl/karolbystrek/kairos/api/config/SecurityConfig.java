@@ -51,6 +51,9 @@ public class SecurityConfig {
         source.registerCorsConfiguration("/tenant-registrations/**", panelConfiguration);
         source.registerCorsConfiguration("/locations/**", panelConfiguration);
         source.registerCorsConfiguration("/accounts/**", panelConfiguration);
+        source.registerCorsConfiguration("/account-invitations/**", panelConfiguration);
+        source.registerCorsConfiguration("/account-invitation-previews/**", panelConfiguration);
+        source.registerCorsConfiguration("/account-invitation-redemptions/**", panelConfiguration);
         source.registerCorsConfiguration("/orders/**", panelConfiguration);
         source.registerCorsConfiguration("/external-integrations/**", panelConfiguration);
         source.registerCorsConfiguration("/api-keys/**", panelConfiguration);
@@ -68,7 +71,6 @@ public class SecurityConfig {
                 "HEAD",
                 "POST",
                 "PUT",
-                "PATCH",
                 "DELETE",
                 "OPTIONS"
         ));
@@ -135,7 +137,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST,
                                 "/auth/v1/login",
                                 "/auth/v1/refresh",
-                                "/tenant-registrations/v1"
+                                "/tenant-registrations/v1",
+                                "/account-invitation-previews/v1",
+                                "/account-invitation-redemptions/v1"
                         ).permitAll()
                         .requestMatchers(
                                 "/customer-notifications/v1/subscription",

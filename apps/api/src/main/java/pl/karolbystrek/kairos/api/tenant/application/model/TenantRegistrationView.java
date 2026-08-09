@@ -6,7 +6,6 @@ import java.util.UUID;
 
 public record TenantRegistrationView(
     @NonNull UUID tenantId,
-    @NonNull UUID locationId,
     @NonNull UUID administratorAccountId,
     @NonNull String username
 ) {

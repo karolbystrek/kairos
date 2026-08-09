@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import pl.karolbystrek.kairos.api.account.application.exception.AccountConflictException;
+import pl.karolbystrek.kairos.api.account.application.exception.InvalidAccountRequestException;
 import pl.karolbystrek.kairos.api.account.domain.Account;
 import pl.karolbystrek.kairos.api.account.infrastructure.persistence.AccountRepository;
 
@@ -62,9 +63,10 @@ public class AccountCreationService {
         boolean administrator
     ) {
         var normalizedUsername = username.strip().toLowerCase(Locale.ROOT);
-        var normalizedEmail = email == null || email.isBlank()
-            ? null
-            : email.strip().toLowerCase(Locale.ROOT);
+        if (email == null || email.isBlank()) {
+            throw new InvalidAccountRequestException("Email is required");
+        }
+        var normalizedEmail = email.strip().toLowerCase(Locale.ROOT);
         requireAvailableIdentifiers(normalizedUsername, normalizedEmail);
 
         var now = clock.instant();
@@ -98,7 +100,7 @@ public class AccountCreationService {
 
     private void requireAvailableIdentifiers(String username, String email) {
         if (accountRepository.existsByUsername(username)
-            || (email != null && accountRepository.existsByEmail(email))) {
+            || accountRepository.existsByEmail(email)) {
             throw new AccountConflictException(
                 "An account with the supplied identity already exists"
             );

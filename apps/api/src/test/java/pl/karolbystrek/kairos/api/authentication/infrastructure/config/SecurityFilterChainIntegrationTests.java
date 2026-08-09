@@ -160,10 +160,20 @@ class SecurityFilterChainIntegrationTests extends RedisListenerIsolatedIntegrati
     void restrictsCredentialedCorsToTheOwningFrontendAndBrowserResourceFamily() throws Exception {
         assertCorsAllowed("http://localhost:3000", "/tracked-orders/v1/reference", "GET");
         assertCorsAllowed("http://localhost:3001", "/orders/v1", "POST");
+        assertCorsAllowed(
+                "http://localhost:3001",
+                "/account-invitation-redemptions/v1",
+                "POST"
+        );
         assertCorsAllowed("http://localhost:3000", "/auth/v1/csrf", "GET");
         assertCorsAllowed("http://localhost:3001", "/auth/v1/csrf", "GET");
 
         assertCorsRejected("http://localhost:3000", "/orders/v1", "POST");
+        assertCorsRejected(
+                "http://localhost:3000",
+                "/account-invitation-previews/v1",
+                "POST"
+        );
         assertCorsRejected("http://localhost:3001", "/tracked-orders/v1/reference", "GET");
         assertCorsRejected("http://localhost:3001", "/external/orders/v1", "GET");
         assertCorsRejected("https://unknown.example.org", "/orders/v1", "GET");

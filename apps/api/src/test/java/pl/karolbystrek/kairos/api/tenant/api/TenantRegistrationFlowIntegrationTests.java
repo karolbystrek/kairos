@@ -23,6 +23,8 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -51,7 +53,7 @@ class TenantRegistrationFlowIntegrationTests extends RedisListenerIsolatedIntegr
     private ObjectMapper objectMapper;
 
     @Test
-    void registersOneTenantLocationAndAdministratorWithoutCreatingASession() throws Exception {
+    void registersOneTenantAndAdministratorWithoutALocationOrSession() throws Exception {
         var suffix = UUID.randomUUID().toString();
         var csrf = bootstrapCsrf("192.0.2.101");
 
@@ -70,12 +72,10 @@ class TenantRegistrationFlowIntegrationTests extends RedisListenerIsolatedIntegr
 
         var response = objectMapper.readTree(result.getResponse().getContentAsByteArray());
         var tenantId = UUID.fromString(response.get("tenantId").asText());
-        var locationId = UUID.fromString(response.get("locationId").asText());
         var administratorId = UUID.fromString(response.get("administratorAccountId").asText());
 
         assertThat(count("tenants", "id", tenantId)).isOne();
-        assertThat(count("locations", "id", locationId)).isOne();
-        assertThat(count("locations", "tenant_id", tenantId)).isOne();
+        assertThat(count("locations", "tenant_id", tenantId)).isZero();
 
         var account = jdbcTemplate.queryForMap(
             """
@@ -89,7 +89,7 @@ class TenantRegistrationFlowIntegrationTests extends RedisListenerIsolatedIntegr
         assertThat(account.get("username")).isEqualTo("admin." + suffix);
         assertThat(account.get("email")).isEqualTo("admin." + suffix + "@example.com");
         assertThat(account.get("tenant_role")).isEqualTo("ADMIN");
-        assertThat(account.get("status")).isEqualTo("ACTIVE");
+        assertThat(account.get("status")).isEqualTo("ENABLED");
         assertThat(passwordEncoder.matches(PASSWORD, (String) account.get("password_hash"))).isTrue();
         assertThat(count("location_assignments", "account_id", administratorId)).isZero();
         assertThat(count("sessions", "account_id", administratorId)).isZero();
@@ -201,7 +201,7 @@ class TenantRegistrationFlowIntegrationTests extends RedisListenerIsolatedIntegr
     }
 
     @Test
-    void rollsBackTenantAndLocationWhenAnIdentifierConflicts() throws Exception {
+    void rollsBackTenantWhenAnIdentifierConflicts() throws Exception {
         var suffix = UUID.randomUUID().toString();
         var csrf = bootstrapCsrf("192.0.2.110");
         var username = "rollback." + suffix;
@@ -217,7 +217,6 @@ class TenantRegistrationFlowIntegrationTests extends RedisListenerIsolatedIntegr
         ).andExpect(status().isCreated());
 
         var tenantCount = countAll("tenants");
-        var locationCount = countAll("locations");
 
         register(
             registrationJson(
@@ -230,11 +229,10 @@ class TenantRegistrationFlowIntegrationTests extends RedisListenerIsolatedIntegr
         ).andExpect(status().isConflict());
 
         assertThat(countAll("tenants")).isEqualTo(tenantCount);
-        assertThat(countAll("locations")).isEqualTo(locationCount);
     }
 
     @Test
-    void registeredAdministratorCanSignInAndProvisionBothLocationRoles() throws Exception {
+    void registeredAdministratorCanManageTheFirstLocationAndInviteBothRoles() throws Exception {
         var suffix = UUID.randomUUID().toString();
         var username = "usable.admin." + suffix;
         var csrf = bootstrapCsrf("192.0.2.112");
@@ -249,10 +247,6 @@ class TenantRegistrationFlowIntegrationTests extends RedisListenerIsolatedIntegr
         )
             .andExpect(status().isCreated())
             .andReturn();
-        var locationId = objectMapper.readTree(
-            registration.getResponse().getContentAsByteArray()
-        ).get("locationId").asText();
-
         var login = mockMvc.perform(withCsrf(
                 apiPost("/auth/v1/login")
                     .secure(true)
@@ -274,27 +268,40 @@ class TenantRegistrationFlowIntegrationTests extends RedisListenerIsolatedIntegr
                 .secure(true)
                 .cookie(access))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$[0].id").value(locationId));
+            .andExpect(jsonPath("$.length()").value(0));
+
+        var createdLocation = mockMvc.perform(withCsrf(
+                apiPost("/locations/v1")
+                    .secure(true)
+                    .cookie(access)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {"name":"  Main restaurant  "}
+                        """),
+                rotatedCsrf,
+                "192.0.2.112"
+            ))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.name").value("Main restaurant"))
+            .andExpect(jsonPath("$.status").value("ENABLED"))
+            .andReturn();
+        var locationId = objectMapper.readTree(
+            createdLocation.getResponse().getContentAsByteArray()
+        ).get("id").asText();
 
         for (var role : List.of("MANAGER", "OPERATOR")) {
             mockMvc.perform(withCsrf(
-                    apiPost("/accounts/v1")
+                    apiPost("/account-invitations/v1")
                         .secure(true)
                         .cookie(access)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                             {
                               "locationId": "%s",
-                              "username": "%s.%s",
-                              "email": null,
-                              "password": "%s",
                               "role": "%s"
                             }
                             """.formatted(
                                 locationId,
-                                role.toLowerCase(),
-                                suffix,
-                                PASSWORD,
                                 role
                             )),
                     rotatedCsrf,
@@ -302,7 +309,88 @@ class TenantRegistrationFlowIntegrationTests extends RedisListenerIsolatedIntegr
                 ))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.role").value(role))
-                .andExpect(jsonPath("$.locationId").value(locationId));
+                .andExpect(jsonPath("$.locationId").value(locationId))
+                .andExpect(jsonPath("$.invitationLink").isString());
+        }
+
+        mockMvc.perform(apiGet("/accounts/v1")
+                .secure(true)
+                .cookie(access))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.length()").value(0));
+
+        mockMvc.perform(withCsrf(
+                apiPost("/accounts/v1")
+                    .secure(true)
+                    .cookie(access)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{}"),
+                rotatedCsrf,
+                "192.0.2.112"
+            ))
+            .andExpect(status().isMethodNotAllowed());
+
+        var activeOrderId = UUID.randomUUID();
+        jdbcTemplate.update(
+            """
+                INSERT INTO orders (
+                    id, location_id, tracking_reference, label, status,
+                    created_at, updated_at
+                ) VALUES (?, ?, ?, '1', 'IN_PREPARATION', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """,
+            activeOrderId,
+            UUID.fromString(locationId),
+            UUID.randomUUID()
+        );
+
+        mockMvc.perform(withCsrf(
+                apiPut("/locations/v1/{locationId}/status", locationId)
+                    .secure(true)
+                    .cookie(access)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {"status":"DISABLED"}
+                        """),
+                rotatedCsrf,
+                "192.0.2.112"
+            ))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.type").value(
+                "urn:kairos:problem:location-active-orders"
+            ));
+        assertThat(jdbcTemplate.queryForObject(
+            "SELECT status FROM locations WHERE id = ?",
+            String.class,
+            UUID.fromString(locationId)
+        )).isEqualTo("ENABLED");
+
+        jdbcTemplate.update(
+            "UPDATE orders SET status = 'COMPLETED', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            activeOrderId
+        );
+        mockMvc.perform(withCsrf(
+                apiPut("/locations/v1/{locationId}/status", locationId)
+                    .secure(true)
+                    .cookie(access)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {"status":"DISABLED"}
+                        """),
+                rotatedCsrf,
+                "192.0.2.112"
+            ))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("DISABLED"));
+
+        for (var attempt = 0; attempt < 2; attempt++) {
+            mockMvc.perform(withCsrf(
+                    apiDelete("/locations/v1/{locationId}", locationId)
+                        .secure(true)
+                        .cookie(access),
+                    rotatedCsrf,
+                    "192.0.2.112"
+                ))
+                .andExpect(status().isNoContent());
         }
     }
 
@@ -357,6 +445,14 @@ class TenantRegistrationFlowIntegrationTests extends RedisListenerIsolatedIntegr
 
     private static MockHttpServletRequestBuilder apiPost(String path, Object... uriVariables) {
         return post(API_CONTEXT_PATH + path, uriVariables).contextPath(API_CONTEXT_PATH);
+    }
+
+    private static MockHttpServletRequestBuilder apiPut(String path, Object... uriVariables) {
+        return put(API_CONTEXT_PATH + path, uriVariables).contextPath(API_CONTEXT_PATH);
+    }
+
+    private static MockHttpServletRequestBuilder apiDelete(String path, Object... uriVariables) {
+        return delete(API_CONTEXT_PATH + path, uriVariables).contextPath(API_CONTEXT_PATH);
     }
 
     private static MockHttpServletRequestBuilder client(

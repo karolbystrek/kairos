@@ -42,6 +42,11 @@ public interface CustomerOrderRepository
             Instant endExclusive
     );
 
+    boolean existsByLocationIdAndStatusIn(
+        UUID locationId,
+        Collection<OrderStatus> statuses
+    );
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<CustomerOrder> findForUpdateById(UUID orderId);
 

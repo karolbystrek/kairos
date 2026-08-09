@@ -10,6 +10,7 @@ import pl.karolbystrek.kairos.api.integration.webhook.domain.WebhookSubscription
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.Collection;
 
 public interface WebhookSubscriptionRepository extends JpaRepository<WebhookSubscription, UUID> {
 
@@ -30,6 +31,12 @@ public interface WebhookSubscriptionRepository extends JpaRepository<WebhookSubs
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<WebhookSubscription> findForUpdateByIdAndTenantId(UUID id, UUID tenantId);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    List<WebhookSubscription> findAllForUpdateByTenantIdAndIdIn(
+        UUID tenantId,
+        Collection<UUID> ids
+    );
+
     @Query(value = """
             SELECT subscription.*
             FROM webhook_subscriptions subscription
@@ -39,13 +46,18 @@ public interface WebhookSubscriptionRepository extends JpaRepository<WebhookSubs
             JOIN webhook_subscription_location_access location_access
               ON location_access.subscription_id = subscription.id
              AND location_access.tenant_id = subscription.tenant_id
+            JOIN locations location
+              ON location.id = location_access.location_id
+             AND location.tenant_id = location_access.tenant_id
             JOIN webhook_subscription_event_types event_selection
               ON event_selection.subscription_id = subscription.id
             WHERE subscription.tenant_id = :tenantId
               AND subscription.status = 'ENABLED'
               AND integration.status = 'ENABLED'
+              AND location.status = 'ENABLED'
               AND subscription.last_enabled_at <= :occurredAt
               AND integration.last_enabled_at <= :occurredAt
+              AND location.last_enabled_at <= :occurredAt
               AND location_access.location_id = :locationId
               AND event_selection.event_type = :eventType
             ORDER BY subscription.created_at, subscription.id

@@ -1,13 +1,18 @@
 package pl.karolbystrek.kairos.api.account.api;
 
+import java.net.URI;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import pl.karolbystrek.kairos.api.account.application.exception.AccountConflictException;
+import pl.karolbystrek.kairos.api.account.application.exception.AccountInvitationNotFoundException;
+import pl.karolbystrek.kairos.api.account.application.exception.AccountInvitationUnavailableException;
 import pl.karolbystrek.kairos.api.account.application.exception.AccountNotFoundException;
 import pl.karolbystrek.kairos.api.account.application.exception.InvalidAccountRequestException;
 import pl.karolbystrek.kairos.api.account.application.exception.StaffAccessDeniedException;
+import pl.karolbystrek.kairos.api.account.application.exception.SignedInRedemptionException;
 
 @RestControllerAdvice(basePackageClasses = AccountController.class)
 class AccountExceptionHandler {
@@ -29,6 +34,28 @@ class AccountExceptionHandler {
 
     @ExceptionHandler(StaffAccessDeniedException.class)
     ProblemDetail handleAccessDenied(StaffAccessDeniedException exception) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, exception.getMessage());
+    }
+
+    @ExceptionHandler(AccountInvitationNotFoundException.class)
+    ProblemDetail handleInvalidInvitation(AccountInvitationNotFoundException exception) {
+        var problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, exception.getMessage());
+        problem.setType(URI.create("urn:kairos:problem:account-invitation-invalid"));
+        return problem;
+    }
+
+    @ExceptionHandler(AccountInvitationUnavailableException.class)
+    ProblemDetail handleUnavailableInvitation(AccountInvitationUnavailableException exception) {
+        var problem = ProblemDetail.forStatusAndDetail(HttpStatus.GONE, exception.getMessage());
+        problem.setType(URI.create(
+            "urn:kairos:problem:account-invitation-"
+                + exception.reason().name().toLowerCase(java.util.Locale.ROOT)
+        ));
+        return problem;
+    }
+
+    @ExceptionHandler(SignedInRedemptionException.class)
+    ProblemDetail handleSignedInRedemption(SignedInRedemptionException exception) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, exception.getMessage());
     }
 }

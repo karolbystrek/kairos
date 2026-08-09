@@ -361,9 +361,11 @@ public class WebhookSubscriptionManagementService {
         }
         var locations = locationRepository.findAllById(locationIds);
         if (locations.size() != locationIds.size()
-                || locations.stream().anyMatch(location -> !tenantId.equals(location.getTenantId()))) {
+                || locations.stream().anyMatch(location ->
+                    !tenantId.equals(location.getTenantId()) || !location.isEnabled()
+                )) {
             throw new InvalidIntegrationRequestException(
-                    "Every webhook location must belong to the administrator's tenant"
+                    "Every webhook location must be enabled in the administrator's tenant"
             );
         }
     }

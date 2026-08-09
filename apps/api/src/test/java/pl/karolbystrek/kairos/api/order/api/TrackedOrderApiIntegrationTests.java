@@ -75,9 +75,12 @@ class TrackedOrderApiIntegrationTests extends RedisListenerIsolatedIntegrationTe
         var now = Instant.parse("2026-07-24T12:00:00Z");
         jdbcTemplate.update("INSERT INTO tenants (id) VALUES (?)", tenantId);
         jdbcTemplate.update(
-                "INSERT INTO locations (id, tenant_id) VALUES (?, ?)",
+                "INSERT INTO locations (id, tenant_id, name, normalized_name, live_normalized_name) VALUES (?, ?, ?, ?, ?)",
                 locationId,
-                tenantId
+                tenantId,
+                "Test location",
+                "test location",
+                "test location"
         );
         jdbcTemplate.update(
                 """

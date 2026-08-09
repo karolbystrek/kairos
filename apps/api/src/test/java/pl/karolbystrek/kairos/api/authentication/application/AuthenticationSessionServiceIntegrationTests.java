@@ -53,12 +53,13 @@ class AuthenticationSessionServiceIntegrationTests extends RedisListenerIsolated
         jdbcTemplate.update(
             """
             INSERT INTO accounts (
-                id, tenant_id, username, tenant_role, status, created_at, updated_at
-            ) VALUES (?, ?, ?, 'ADMIN', 'ACTIVE', ?, ?)
+                id, tenant_id, username, email, tenant_role, status, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, 'ADMIN', 'ENABLED', ?, ?)
             """,
             accountId,
             tenantId,
             "session-" + accountId,
+            "session-" + accountId + "@example.com",
             now,
             now
         );
@@ -134,20 +135,24 @@ class AuthenticationSessionServiceIntegrationTests extends RedisListenerIsolated
         var operatorId = UUID.randomUUID();
         var now = Instant.now();
         jdbcTemplate.update(
-            "INSERT INTO locations (id, tenant_id) VALUES (?, ?)",
+            "INSERT INTO locations (id, tenant_id, name, normalized_name, live_normalized_name) VALUES (?, ?, ?, ?, ?)",
             locationId,
-            principal.tenantId()
+            principal.tenantId(),
+            "Test location",
+            "test location",
+            "test location"
         );
         jdbcTemplate.update(
             """
             INSERT INTO accounts (
-                id, tenant_id, username, password_hash,
+                id, tenant_id, username, email, password_hash,
                 tenant_role, status, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, 'MEMBER', 'ACTIVE', ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, 'MEMBER', 'ENABLED', ?, ?)
             """,
             operatorId,
             principal.tenantId(),
             "race-operator-" + operatorId,
+            "race-operator-" + operatorId + "@example.com",
             "fixture-password-hash",
             now,
             now
@@ -155,8 +160,8 @@ class AuthenticationSessionServiceIntegrationTests extends RedisListenerIsolated
         jdbcTemplate.update(
             """
             INSERT INTO location_assignments (
-                account_id, location_id, tenant_id, role, status, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, 'ACTIVE', ?, ?)
+                account_id, location_id, tenant_id, role, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?)
             """,
             operatorId,
             locationId,
@@ -184,7 +189,7 @@ class AuthenticationSessionServiceIntegrationTests extends RedisListenerIsolated
         var disablement = CompletableFuture.runAsync(() -> {
             ready.countDown();
             await(start);
-            provisioningService.changeStatus(principal, operatorId, AccountStatus.DISABLED);
+            provisioningService.updateStatus(principal, operatorId, AccountStatus.DISABLED);
         });
 
         assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();

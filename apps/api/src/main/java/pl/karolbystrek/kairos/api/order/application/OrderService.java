@@ -115,6 +115,7 @@ public class OrderService {
     private Location requireAccessibleLocation(StaffAccessContext access, UUID locationId) {
         var location = requireLocation(locationId);
         access.requireLocationAccess(location.getTenantId(), location.getId());
+        requireEnabledLocation(location);
         return location;
     }
 
@@ -122,7 +123,14 @@ public class OrderService {
         var location = locationRepository.findForUpdateById(locationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Location was not found"));
         access.requireLocationAccess(location.getTenantId(), location.getId());
+        requireEnabledLocation(location);
         return location;
+    }
+
+    private static void requireEnabledLocation(Location location) {
+        if (!location.isEnabled()) {
+            throw new ResourceNotFoundException("Location was not found");
+        }
     }
 
     private static Set<OrderStatus> activeStatusFilter(OrderStatus status) {

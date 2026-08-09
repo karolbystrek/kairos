@@ -45,12 +45,13 @@ public class CurrentAccountService {
         capabilities.add("MANAGE_ORDERS");
         if (access.isTenantAdmin()) {
             capabilities.add("VIEW_TENANT_ORDERS");
-            capabilities.add("PROVISION_MANAGERS");
-            capabilities.add("PROVISION_OPERATORS");
+            capabilities.add("MANAGE_LOCATIONS");
+            capabilities.add("INVITE_MANAGERS");
+            capabilities.add("INVITE_OPERATORS");
             capabilities.add("MANAGE_EXTERNAL_INTEGRATIONS");
         }
         else if (access.assignmentRole() == AssignmentRole.MANAGER) {
-            capabilities.add("PROVISION_OPERATORS");
+            capabilities.add("INVITE_OPERATORS");
         }
 
         return new CurrentAccountView(

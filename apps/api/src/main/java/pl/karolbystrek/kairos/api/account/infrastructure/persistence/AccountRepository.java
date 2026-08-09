@@ -6,6 +6,8 @@ import org.springframework.data.jpa.repository.Lock;
 import pl.karolbystrek.kairos.api.account.domain.Account;
 
 import java.util.Optional;
+import java.util.Collection;
+import java.util.List;
 import java.util.UUID;
 
 public interface AccountRepository extends JpaRepository<Account, UUID> {
@@ -18,4 +20,7 @@ public interface AccountRepository extends JpaRepository<Account, UUID> {
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<Account> findForUpdateById(UUID accountId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    List<Account> findAllForUpdateByIdIn(Collection<UUID> accountIds);
 }

@@ -22,6 +22,7 @@ import pl.karolbystrek.kairos.api.authentication.infrastructure.persistence.Refr
 import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
+import java.util.Collection;
 
 @Service
 @RequiredArgsConstructor
@@ -148,6 +149,15 @@ public class AuthenticationSessionService implements AccountSessionRevoker {
     @Transactional
     public void revokeAll(UUID accountId) {
         sessionRepository.revokeAllForAccount(accountId, clock.instant());
+    }
+
+    @Override
+    @Transactional
+    public void revokeAll(Collection<UUID> accountIds) {
+        if (accountIds == null || accountIds.isEmpty()) {
+            return;
+        }
+        sessionRepository.revokeAllForAccounts(accountIds, clock.instant());
     }
 
     private IssuedSession grant(

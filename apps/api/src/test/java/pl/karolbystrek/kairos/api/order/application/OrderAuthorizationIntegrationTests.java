@@ -52,28 +52,33 @@ class OrderAuthorizationIntegrationTests extends RedisListenerIsolatedIntegratio
         jdbcTemplate.update("INSERT INTO tenants (id) VALUES (?)", tenantId);
         jdbcTemplate.update("INSERT INTO tenants (id) VALUES (?)", otherTenantId);
         jdbcTemplate.update(
-            "INSERT INTO locations (id, tenant_id) VALUES (?, ?)",
+            "INSERT INTO locations (id, tenant_id, name, normalized_name, live_normalized_name) VALUES (?, ?, ?, ?, ?)",
             locationId,
-            tenantId
+            tenantId,
+            "Test location",
+            "test location",
+            "test location"
         );
         jdbcTemplate.update(
-            "INSERT INTO locations (id, tenant_id) VALUES (?, ?)",
+            "INSERT INTO locations (id, tenant_id, name, normalized_name, live_normalized_name) VALUES (?, ?, ?, ?, ?)",
             otherLocationId,
-            otherTenantId
+            otherTenantId,
+            "Other location",
+            "other location",
+            "other location"
         );
 
-        admin = insertAccount(tenantId, TenantRole.ADMIN, "ACTIVE", null, null, null);
-        manager = insertAccount(tenantId, TenantRole.MEMBER, "ACTIVE", locationId, "MANAGER", "ACTIVE");
-        operator = insertAccount(tenantId, TenantRole.MEMBER, "ACTIVE", locationId, "OPERATOR", "ACTIVE");
+        admin = insertAccount(tenantId, TenantRole.ADMIN, "ENABLED", null, null);
+        manager = insertAccount(tenantId, TenantRole.MEMBER, "ENABLED", locationId, "MANAGER");
+        operator = insertAccount(tenantId, TenantRole.MEMBER, "ENABLED", locationId, "OPERATOR");
         suspendedManager = insertAccount(
             tenantId,
             TenantRole.MEMBER,
-            "ACTIVE",
+            "DISABLED",
             locationId,
-            "MANAGER",
-            "SUSPENDED"
+            "MANAGER"
         );
-        otherAdmin = insertAccount(otherTenantId, TenantRole.ADMIN, "ACTIVE", null, null, null);
+        otherAdmin = insertAccount(otherTenantId, TenantRole.ADMIN, "ENABLED", null, null);
     }
 
     @Test
@@ -130,20 +135,20 @@ class OrderAuthorizationIntegrationTests extends RedisListenerIsolatedIntegratio
         TenantRole tenantRole,
         String accountStatus,
         UUID assignedLocationId,
-        String assignmentRole,
-        String assignmentStatus
+        String assignmentRole
     ) {
         var accountId = UUID.randomUUID();
         var now = Instant.now();
         jdbcTemplate.update(
             """
             INSERT INTO accounts (
-                id, tenant_id, username, tenant_role, status, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                id, tenant_id, username, email, tenant_role, status, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             accountId,
             accountTenantId,
             "account-" + accountId,
+            "account-" + accountId + "@example.com",
             tenantRole.name(),
             accountStatus,
             now,
@@ -153,14 +158,13 @@ class OrderAuthorizationIntegrationTests extends RedisListenerIsolatedIntegratio
             jdbcTemplate.update(
                 """
                 INSERT INTO location_assignments (
-                    account_id, location_id, tenant_id, role, status, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    account_id, location_id, tenant_id, role, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
                 """,
                 accountId,
                 assignedLocationId,
                 accountTenantId,
                 assignmentRole,
-                assignmentStatus,
                 now,
                 now
             );

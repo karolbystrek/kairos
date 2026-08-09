@@ -5,14 +5,42 @@ CREATE TABLE tenants
 
 CREATE TABLE locations
 (
-    id        UUID PRIMARY KEY,
-    tenant_id UUID        NOT NULL REFERENCES tenants (id),
-    time_zone VARCHAR(64) NOT NULL DEFAULT 'UTC',
+    id              UUID PRIMARY KEY,
+    tenant_id       UUID                     NOT NULL REFERENCES tenants (id),
+    name            VARCHAR(120)             NOT NULL,
+    normalized_name VARCHAR(120)             NOT NULL,
+    live_normalized_name VARCHAR(120),
+    time_zone       VARCHAR(64)              NOT NULL DEFAULT 'UTC',
+    status          VARCHAR(32)              NOT NULL DEFAULT 'ENABLED',
+    created_at      TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_enabled_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    archived_at     TIMESTAMP WITH TIME ZONE,
+    CONSTRAINT locations_name_not_blank_check CHECK (TRIM(name) <> ''),
+    CONSTRAINT locations_name_stripped_check CHECK (name = TRIM(name)),
+    CONSTRAINT locations_normalized_name_check CHECK (
+        TRIM(normalized_name) <> '' AND normalized_name = LOWER(TRIM(name))
+        ),
+    CONSTRAINT locations_live_normalized_name_check CHECK (
+        (status = 'ARCHIVED' AND live_normalized_name IS NULL)
+            OR (status <> 'ARCHIVED' AND live_normalized_name = normalized_name)
+        ),
     CONSTRAINT locations_time_zone_not_blank_check CHECK (TRIM(time_zone) <> ''),
-    CONSTRAINT locations_id_tenant_key UNIQUE (id, tenant_id)
+    CONSTRAINT locations_time_zone_utc_check CHECK (time_zone = 'UTC'),
+    CONSTRAINT locations_status_check CHECK (status IN ('ENABLED', 'DISABLED', 'ARCHIVED')),
+    CONSTRAINT locations_archive_check CHECK (
+        (status = 'ARCHIVED' AND archived_at IS NOT NULL)
+            OR (status <> 'ARCHIVED' AND archived_at IS NULL)
+        ),
+    CONSTRAINT locations_updated_at_check CHECK (updated_at >= created_at),
+    CONSTRAINT locations_last_enabled_check CHECK (
+        last_enabled_at >= created_at AND last_enabled_at <= updated_at
+        ),
+    CONSTRAINT locations_id_tenant_key UNIQUE (id, tenant_id),
+    CONSTRAINT locations_tenant_live_name_key UNIQUE (tenant_id, live_normalized_name)
 );
 
-CREATE INDEX locations_tenant_id_idx ON locations (tenant_id);
+CREATE INDEX locations_tenant_status_idx ON locations (tenant_id, status, normalized_name, id);
 
 CREATE TABLE external_integrations
 (
@@ -207,26 +235,105 @@ CREATE TABLE accounts
     id            UUID PRIMARY KEY,
     tenant_id     UUID                     NOT NULL REFERENCES tenants (id),
     username      VARCHAR(120)             NOT NULL UNIQUE,
-    email         VARCHAR(254) UNIQUE,
+    email         VARCHAR(254) NOT NULL UNIQUE,
     password_hash VARCHAR(255),
     tenant_role   VARCHAR(32)              NOT NULL,
     status        VARCHAR(32)              NOT NULL,
     created_at    TIMESTAMP WITH TIME ZONE NOT NULL,
     updated_at    TIMESTAMP WITH TIME ZONE NOT NULL,
+    archived_at   TIMESTAMP WITH TIME ZONE,
     CONSTRAINT accounts_username_not_blank_check CHECK (TRIM(username) <> ''),
     CONSTRAINT accounts_username_normalized_check CHECK (username = LOWER(TRIM(username))),
     CONSTRAINT accounts_email_check CHECK (
-        email IS NULL OR (TRIM(email) <> '' AND email = LOWER(TRIM(email)))
+        TRIM(email) <> '' AND email = LOWER(TRIM(email))
         ),
     CONSTRAINT accounts_password_hash_not_blank_check CHECK (
         password_hash IS NULL OR TRIM(password_hash) <> ''
         ),
     CONSTRAINT accounts_id_tenant_key UNIQUE (id, tenant_id),
     CONSTRAINT accounts_tenant_role_check CHECK (tenant_role IN ('ADMIN', 'MEMBER')),
-    CONSTRAINT accounts_status_check CHECK (status IN ('ACTIVE', 'DISABLED'))
+    CONSTRAINT accounts_status_check CHECK (status IN ('ENABLED', 'DISABLED', 'ARCHIVED')),
+    CONSTRAINT accounts_archive_check CHECK (
+        (status = 'ARCHIVED' AND archived_at IS NOT NULL AND password_hash IS NULL)
+            OR (status <> 'ARCHIVED' AND archived_at IS NULL)
+        ),
+    CONSTRAINT accounts_updated_at_check CHECK (updated_at >= created_at)
 );
 
 CREATE INDEX accounts_tenant_id_idx ON accounts (tenant_id);
+
+CREATE TABLE account_invitations
+(
+    id                   UUID PRIMARY KEY,
+    tenant_id            UUID                     NOT NULL,
+    location_id          UUID                     NOT NULL,
+    issued_by_account_id UUID                     NOT NULL,
+    assignment_role      VARCHAR(32)              NOT NULL,
+    token_hash           VARCHAR(64)              NOT NULL UNIQUE,
+    state                VARCHAR(32)              NOT NULL,
+    revocation_reason    VARCHAR(32),
+    revoked_at           TIMESTAMP WITH TIME ZONE,
+    redeemed_account_id  UUID,
+    redeemed_at          TIMESTAMP WITH TIME ZONE,
+    expires_at           TIMESTAMP WITH TIME ZONE NOT NULL,
+    created_at           TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at           TIMESTAMP WITH TIME ZONE NOT NULL,
+    CONSTRAINT account_invitations_location_tenant_fk
+        FOREIGN KEY (location_id, tenant_id)
+            REFERENCES locations (id, tenant_id),
+    CONSTRAINT account_invitations_issuer_tenant_fk
+        FOREIGN KEY (issued_by_account_id, tenant_id)
+            REFERENCES accounts (id, tenant_id),
+    CONSTRAINT account_invitations_redeemed_account_tenant_fk
+        FOREIGN KEY (redeemed_account_id, tenant_id)
+            REFERENCES accounts (id, tenant_id),
+    CONSTRAINT account_invitations_assignment_role_check
+        CHECK (assignment_role IN ('MANAGER', 'OPERATOR')),
+    CONSTRAINT account_invitations_token_hash_check
+        CHECK (token_hash ~ '^[0-9a-f]{64}$'),
+    CONSTRAINT account_invitations_state_check
+        CHECK (state IN ('PENDING', 'REDEEMED', 'REVOKED')),
+    CONSTRAINT account_invitations_expiry_check
+        CHECK (expires_at = created_at + INTERVAL '7' DAY),
+    CONSTRAINT account_invitations_updated_at_check
+        CHECK (updated_at >= created_at),
+    CONSTRAINT account_invitations_terminal_time_check CHECK (
+        (revoked_at IS NULL OR (revoked_at >= created_at AND updated_at = revoked_at))
+        AND (redeemed_at IS NULL OR (redeemed_at >= created_at AND updated_at = redeemed_at))
+        ),
+    CONSTRAINT account_invitations_lifecycle_check CHECK (
+        (state = 'PENDING'
+            AND revocation_reason IS NULL
+            AND revoked_at IS NULL
+            AND redeemed_account_id IS NULL
+            AND redeemed_at IS NULL)
+        OR (state = 'REVOKED'
+            AND revocation_reason IS NOT NULL
+            AND revoked_at IS NOT NULL
+            AND redeemed_account_id IS NULL
+            AND redeemed_at IS NULL)
+        OR (state = 'REDEEMED'
+            AND revocation_reason IS NULL
+            AND revoked_at IS NULL
+            AND redeemed_account_id IS NOT NULL
+            AND redeemed_at IS NOT NULL)
+        ),
+    CONSTRAINT account_invitations_revocation_reason_check
+        CHECK (revocation_reason IS NULL OR revocation_reason IN (
+            'STAFF_REVOKED',
+            'ISSUER_DISABLED',
+            'ISSUER_ARCHIVED',
+            'LOCATION_DISABLED',
+            'LOCATION_ARCHIVED'
+            ))
+);
+
+CREATE INDEX account_invitations_tenant_pending_idx
+    ON account_invitations (tenant_id, state, expires_at, created_at DESC);
+CREATE INDEX account_invitations_location_pending_idx
+    ON account_invitations (tenant_id, location_id, assignment_role, state, expires_at, created_at DESC);
+CREATE INDEX account_invitations_issuer_pending_idx
+    ON account_invitations (issued_by_account_id, state, expires_at);
 
 CREATE TABLE external_identities
 (
@@ -251,7 +358,6 @@ CREATE TABLE location_assignments
     location_id UUID                     NOT NULL,
     tenant_id   UUID                     NOT NULL,
     role        VARCHAR(32)              NOT NULL,
-    status      VARCHAR(32)              NOT NULL,
     created_at  TIMESTAMP WITH TIME ZONE NOT NULL,
     updated_at  TIMESTAMP WITH TIME ZONE NOT NULL,
     PRIMARY KEY (account_id, location_id),
@@ -262,8 +368,7 @@ CREATE TABLE location_assignments
     CONSTRAINT location_assignments_location_tenant_fk
         FOREIGN KEY (location_id, tenant_id)
             REFERENCES locations (id, tenant_id),
-    CONSTRAINT location_assignments_role_check CHECK (role IN ('MANAGER', 'OPERATOR')),
-    CONSTRAINT location_assignments_status_check CHECK (status IN ('ACTIVE', 'SUSPENDED'))
+    CONSTRAINT location_assignments_role_check CHECK (role IN ('MANAGER', 'OPERATOR'))
 );
 
 CREATE INDEX location_assignments_location_id_idx

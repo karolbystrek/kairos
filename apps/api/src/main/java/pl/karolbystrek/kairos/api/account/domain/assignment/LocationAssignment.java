@@ -30,17 +30,13 @@ public class LocationAssignment {
     @Column(nullable = false, length = 32)
     private AssignmentRole role;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 32)
-    private AssignmentStatus status;
-
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    public static LocationAssignment active(
+    public static LocationAssignment assign(
         @NonNull UUID accountId,
         @NonNull UUID locationId,
         @NonNull UUID tenantId,
@@ -51,7 +47,6 @@ public class LocationAssignment {
         assignment.id = new LocationAssignmentId(accountId, locationId);
         assignment.tenantId = tenantId;
         assignment.role = role;
-        assignment.status = AssignmentStatus.ACTIVE;
         assignment.createdAt = now;
         assignment.updatedAt = now;
         return assignment;

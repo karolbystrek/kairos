@@ -6,7 +6,6 @@ import java.util.UUID;
 
 public record TenantRegistrationResponse(
     UUID tenantId,
-    UUID locationId,
     UUID administratorAccountId,
     String username
 ) {
@@ -14,7 +13,6 @@ public record TenantRegistrationResponse(
     public static TenantRegistrationResponse from(TenantRegistrationView registration) {
         return new TenantRegistrationResponse(
             registration.tenantId(),
-            registration.locationId(),
             registration.administratorAccountId(),
             registration.username()
         );

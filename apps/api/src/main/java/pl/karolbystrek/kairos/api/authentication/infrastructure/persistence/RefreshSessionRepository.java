@@ -11,6 +11,7 @@ import pl.karolbystrek.kairos.api.authentication.domain.RefreshSession;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.Collection;
 
 public interface RefreshSessionRepository extends JpaRepository<RefreshSession, UUID> {
 
@@ -34,7 +35,7 @@ public interface RefreshSessionRepository extends JpaRepository<RefreshSession, 
         @Param("revokedAt") Instant revokedAt
     );
 
-    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Modifying(flushAutomatically = true)
     @Query("""
         update RefreshSession session
         set session.revokedAt = :revokedAt
@@ -43,6 +44,18 @@ public interface RefreshSessionRepository extends JpaRepository<RefreshSession, 
         """)
     int revokeAllForAccount(
         @Param("accountId") UUID accountId,
+        @Param("revokedAt") Instant revokedAt
+    );
+
+    @Modifying(flushAutomatically = true)
+    @Query("""
+        update RefreshSession session
+        set session.revokedAt = :revokedAt
+        where session.accountId in :accountIds
+          and session.revokedAt is null
+        """)
+    int revokeAllForAccounts(
+        @Param("accountIds") Collection<UUID> accountIds,
         @Param("revokedAt") Instant revokedAt
     );
 

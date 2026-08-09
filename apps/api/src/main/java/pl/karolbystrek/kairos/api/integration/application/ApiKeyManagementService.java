@@ -223,9 +223,11 @@ public class ApiKeyManagementService {
         var requestedIds = Set.copyOf(locationIds);
         var locations = locationRepository.findAllById(requestedIds);
         if (locations.size() != requestedIds.size()
-                || locations.stream().anyMatch(location -> !location.getTenantId().equals(tenantId))) {
+                || locations.stream().anyMatch(location ->
+                    !location.getTenantId().equals(tenantId) || !location.isEnabled()
+                )) {
             throw new InvalidIntegrationRequestException(
-                    "Every API Key location must belong to the current tenant"
+                    "Every API Key location must be enabled in the current tenant"
             );
         }
         return requestedIds;

@@ -139,4 +139,12 @@ public class ApiKey {
             revokedAt = now;
         }
     }
+
+    public boolean removeLocationAccess(@NonNull UUID locationId, @NonNull Instant now) {
+        var removed = locationAccess.removeIf(access -> access.getLocationId().equals(locationId));
+        if (removed && locationAccess.isEmpty()) {
+            revoke(now);
+        }
+        return removed;
+    }
 }
