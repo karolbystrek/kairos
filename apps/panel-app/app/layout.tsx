@@ -18,8 +18,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "white" },
-    { media: "(prefers-color-scheme: dark)", color: "black" },
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#000000" },
   ],
 };
 
@@ -31,8 +31,16 @@ export default function RootLayout({
   return (
     <html suppressHydrationWarning lang="en">
       <body className="min-h-screen bg-background text-foreground antialiased">
-        <Providers themeProps={{ attribute: "class", defaultTheme: "light" }}>
-          <main className="mx-auto max-w-5xl px-6 py-10">{children}</main>
+        <Providers
+          themeProps={{
+            attribute: "class",
+            defaultTheme: "system",
+            enableSystem: true,
+          }}
+        >
+          <main className="mx-auto min-h-screen max-w-[var(--content-panel)] px-5 pb-24 pt-5 sm:px-7 sm:pb-10 sm:pt-6 lg:px-10">
+            {children}
+          </main>
         </Providers>
       </body>
     </html>

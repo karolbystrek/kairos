@@ -1,5 +1,6 @@
-import { Alert, Button, Input, Label, Surface, TextField } from "@heroui/react";
-import { useState } from "react";
+import { Alert, Button, Input, Label, TextField, Tooltip } from "@heroui/react";
+import { Check as CheckIcon, Copy as CopyIcon } from "lucide-react";
+import { useEffect, useState } from "react";
 
 export type PendingOneTimeSecret = {
   title: string;
@@ -19,6 +20,14 @@ export function OneTimeSecret({
     "idle",
   );
 
+  useEffect(() => {
+    if (copyStatus !== "copied") return;
+
+    const timeout = window.setTimeout(() => setCopyStatus("idle"), 2500);
+
+    return () => window.clearTimeout(timeout);
+  }, [copyStatus]);
+
   async function copySecret() {
     try {
       await navigator.clipboard.writeText(secret.value);
@@ -29,11 +38,10 @@ export function OneTimeSecret({
   }
 
   return (
-    <Surface className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+    <section className="mx-auto flex w-full max-w-3xl flex-col gap-5">
       <div>
-        <p className="text-sm font-medium text-warning">One-time secret</p>
-        <h2 className="text-2xl font-semibold">{secret.title}</h2>
-        <p className="mt-2 text-muted">{secret.description}</p>
+        <h2 className="page-title">{secret.title}</h2>
+        <p className="mt-2 secondary-text">{secret.description}</p>
       </div>
 
       <Alert status="warning">
@@ -41,32 +49,51 @@ export function OneTimeSecret({
         <Alert.Content>
           <Alert.Title>Copy this secret now</Alert.Title>
           <Alert.Description>
-            Kairos will not show it again. Integration management stays locked
-            until you confirm that you saved it.
+            Kairos will not show it again. This view stays locked until you
+            confirm that you saved it.
           </Alert.Description>
         </Alert.Content>
       </Alert>
 
       <TextField fullWidth isReadOnly value={secret.value}>
         <Label>Secret</Label>
-        <Input className="font-mono" />
+        <div className="relative">
+          <Input className="pr-12 font-mono" />
+          <Tooltip delay={500}>
+            <Tooltip.Trigger>
+              <Button
+                isIconOnly
+                aria-label={
+                  copyStatus === "copied" ? "Secret copied" : "Copy secret"
+                }
+                className="absolute right-1 top-1/2 -translate-y-1/2 rounded-md"
+                size="sm"
+                variant="tertiary"
+                onPress={copySecret}
+              >
+                {copyStatus === "copied" ? (
+                  <CheckIcon size={18} />
+                ) : (
+                  <CopyIcon size={18} />
+                )}
+              </Button>
+            </Tooltip.Trigger>
+            <Tooltip.Content>
+              {copyStatus === "copied" ? "Copied" : "Copy secret"}
+            </Tooltip.Content>
+          </Tooltip>
+        </div>
       </TextField>
 
-      {copyStatus === "copied" && (
-        <p className="text-sm text-success">Secret copied to the clipboard.</p>
-      )}
       {copyStatus === "failed" && (
         <p className="text-sm text-danger">
           Clipboard access failed. Select and copy the secret manually.
         </p>
       )}
 
-      <div className="flex flex-wrap gap-3">
-        <Button variant="secondary" onPress={copySecret}>
-          Copy secret
-        </Button>
-        <Button onPress={onConfirmed}>I copied it</Button>
+      <div className="flex justify-end">
+        <Button onPress={onConfirmed}>Confirm</Button>
       </div>
-    </Surface>
+    </section>
   );
 }

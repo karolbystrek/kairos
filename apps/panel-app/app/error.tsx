@@ -1,5 +1,6 @@
 "use client";
 
+import { Alert, Button } from "@heroui/react";
 import { useEffect } from "react";
 
 export default function Error({
@@ -16,16 +17,19 @@ export default function Error({
   }, [error]);
 
   return (
-    <div>
-      <h2>Something went wrong!</h2>
-      <button
-        onClick={
-          // Attempt to recover by trying to re-render the segment
-          () => reset()
-        }
-      >
-        Try again
-      </button>
+    <div className="flex min-h-[70vh] items-center justify-center">
+      <Alert className="max-w-lg" status="danger">
+        <Alert.Indicator />
+        <Alert.Content>
+          <Alert.Title>The staff workspace could not load</Alert.Title>
+          <Alert.Description>
+            No order action was submitted. Try loading the workspace again.
+          </Alert.Description>
+          <Button className="mt-4" size="sm" variant="danger" onPress={reset}>
+            Try again
+          </Button>
+        </Alert.Content>
+      </Alert>
     </div>
   );
 }

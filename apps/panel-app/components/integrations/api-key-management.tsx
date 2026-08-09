@@ -4,14 +4,14 @@ import type { PendingOneTimeSecret } from "./one-time-secret";
 
 import {
   Alert,
+  AlertDialog,
   Button,
-  Chip,
   Input,
   Label,
+  Modal,
   Radio,
   RadioGroup,
   Spinner,
-  Surface,
   TextField,
 } from "@heroui/react";
 import { useState } from "react";
@@ -56,11 +56,15 @@ export function ApiKeyManagement({
   onSecretIssued: (secret: PendingOneTimeSecret) => void;
 }) {
   const { mutate: mutateCache } = useSWRConfig();
+  const enabledLocations = locations.filter(
+    (location) => location.status === "ENABLED",
+  );
   const [name, setName] = useState("");
   const [accessMode, setAccessMode] = useState<"READ" | "WRITE">("READ");
   const [selectedLocationIds, setSelectedLocationIds] = useState<string[]>([]);
   const [expiration, setExpiration] = useState("");
   const [selectedApiKeyId, setSelectedApiKeyId] = useState<string>();
+  const [apiKeyToRevoke, setApiKeyToRevoke] = useState<ApiKey>();
   const [pendingAction, setPendingAction] = useState<string>();
   const [actionError, setActionError] = useState<unknown>();
 
@@ -92,7 +96,7 @@ export function ApiKeyManagement({
     },
   );
 
-  const error = apiKeysError ?? versionsError ?? actionError;
+  const error = apiKeysError ?? actionError;
 
   function toggleLocation(locationId: string) {
     setSelectedLocationIds((current) =>
@@ -119,7 +123,7 @@ export function ApiKeyManagement({
       });
 
       onSecretIssued({
-        title: `API Key issued for ${result.apiKey.name}`,
+        title: `API Key issued: ${result.apiKey.name}`,
         description:
           "Store this credential in the external system that will call the Kairos API.",
         value: result.secret,
@@ -147,8 +151,8 @@ export function ApiKeyManagement({
     }
   }
 
-  async function revoke(apiKey: ApiKey) {
-    if (pendingAction) return;
+  async function revoke(apiKey: ApiKey): Promise<boolean> {
+    if (pendingAction) return false;
 
     setActionError(undefined);
     setPendingAction(`revoke-${apiKey.id}`);
@@ -159,8 +163,12 @@ export function ApiKeyManagement({
       await mutateApiKeys((current) => replaceApiKey(current, revoked), {
         revalidate: false,
       });
+
+      return true;
     } catch (caught) {
       setActionError(caught);
+
+      return false;
     } finally {
       setPendingAction(undefined);
     }
@@ -205,7 +213,6 @@ export function ApiKeyManagement({
         ],
         { revalidate: false },
       );
-      setSelectedApiKeyId(apiKey.id);
     } catch (caught) {
       setActionError(caught);
     } finally {
@@ -214,7 +221,7 @@ export function ApiKeyManagement({
   }
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-6">
       {Boolean(error) && (
         <Alert status="danger">
           <Alert.Indicator />
@@ -227,12 +234,12 @@ export function ApiKeyManagement({
         </Alert>
       )}
 
-      <section className="flex flex-col gap-4">
+      <section className="flex flex-col gap-3">
         <div>
           <h3 className="text-xl font-semibold">Issue API Key</h3>
           <p className="text-sm text-muted">
-            Order and location access cannot be changed. Issue a new API Key
-            with the access you need instead.
+            Access cannot be changed later. Issue a replacement when its
+            permissions need to change.
           </p>
         </div>
 
@@ -247,7 +254,7 @@ export function ApiKeyManagement({
             onChange={setName}
           >
             <Label>Name</Label>
-            <Input placeholder="Kitchen POS" />
+            <Input placeholder="API key name" />
           </TextField>
 
           <RadioGroup
@@ -278,15 +285,14 @@ export function ApiKeyManagement({
             </Radio>
           </RadioGroup>
 
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-3">
             <p className="text-sm font-medium">Locations</p>
-            <div className="flex flex-wrap gap-2">
-              {locations.map((location) => (
+            <div className="flex flex-wrap gap-3">
+              {enabledLocations.map((location) => (
                 <Button
                   key={location.id}
                   aria-pressed={selectedLocationIds.includes(location.id)}
                   isDisabled={Boolean(pendingAction)}
-                  size="sm"
                   variant={
                     selectedLocationIds.includes(location.id)
                       ? "primary"
@@ -294,7 +300,7 @@ export function ApiKeyManagement({
                   }
                   onPress={() => toggleLocation(location.id)}
                 >
-                  {location.id}
+                  {location.name}
                 </Button>
               ))}
             </div>
@@ -315,30 +321,40 @@ export function ApiKeyManagement({
 
           <Button
             className="self-start"
+            isDisabled={enabledLocations.length === 0}
             isPending={pendingAction === "issue"}
             type="submit"
           >
-            {pendingAction === "issue" ? "Issuing…" : "Issue API Key"}
+            {pendingAction === "issue" ? "Issuing…" : "Issue"}
           </Button>
         </form>
       </section>
 
-      <section className="flex flex-col gap-4">
+      <section className="flex flex-col gap-3">
         <h3 className="text-xl font-semibold">API Keys</h3>
 
         {areApiKeysLoading ? (
           <Spinner aria-label="Loading API Keys" />
         ) : apiKeys.length === 0 ? (
-          <p className="text-muted">No API Keys have been issued.</p>
+          <p className="text-muted">No keys issued.</p>
         ) : (
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="border-t border-separator">
             {apiKeys.map((apiKey) => (
-              <Surface key={apiKey.id} className="flex flex-col gap-4">
+              <article
+                key={apiKey.id}
+                className="flex flex-col gap-3 border-b border-separator py-4"
+              >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <h4 className="font-semibold">{apiKey.name}</h4>
-                  <Chip color={apiKey.revokedAt ? "danger" : "success"}>
+                  <span
+                    className={
+                      apiKey.revokedAt
+                        ? "text-sm text-danger"
+                        : "text-sm font-medium text-accent"
+                    }
+                  >
                     {apiKey.revokedAt ? "Revoked" : "Active"}
-                  </Chip>
+                  </span>
                 </div>
 
                 <div>
@@ -351,7 +367,14 @@ export function ApiKeyManagement({
                 <div>
                   <p className="text-sm font-medium">Locations</p>
                   <p className="break-all text-sm text-muted">
-                    {apiKey.locationIds.join(", ")}
+                    {apiKey.locationIds
+                      .map(
+                        (locationId) =>
+                          locations.find(
+                            (location) => location.id === locationId,
+                          )?.name ?? "Unavailable location",
+                      )
+                      .join(", ")}
                   </p>
                 </div>
 
@@ -367,89 +390,149 @@ export function ApiKeyManagement({
                   )}
                 </div>
 
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-3">
                   <Button
-                    size="sm"
                     variant="secondary"
                     onPress={() => setSelectedApiKeyId(apiKey.id)}
                   >
-                    View versions
+                    Versions
                   </Button>
                   <Button
                     isDisabled={Boolean(apiKey.revokedAt)}
                     isPending={pendingAction === `rotate-${apiKey.id}`}
-                    size="sm"
                     variant="secondary"
                     onPress={() => rotate(apiKey)}
                   >
-                    Rotate secret
+                    Rotate
                   </Button>
                   <Button
                     isDisabled={Boolean(apiKey.revokedAt)}
                     isPending={pendingAction === `revoke-${apiKey.id}`}
-                    size="sm"
                     variant="danger"
-                    onPress={() => revoke(apiKey)}
+                    onPress={() => setApiKeyToRevoke(apiKey)}
                   >
                     Revoke
                   </Button>
                 </div>
-              </Surface>
+              </article>
             ))}
           </div>
         )}
       </section>
 
-      {selectedApiKey && (
-        <section className="flex flex-col gap-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h3 className="text-xl font-semibold">
-                {selectedApiKey.name} versions
-              </h3>
-              <p className="text-sm text-muted">
-                After rotation, the old secret remains valid until the time
-                shown below.
-              </p>
-            </div>
-            <Button
-              size="sm"
-              variant="ghost"
-              onPress={() => setSelectedApiKeyId(undefined)}
-            >
-              Close
-            </Button>
-          </div>
+      <AlertDialog
+        isOpen={Boolean(apiKeyToRevoke)}
+        onOpenChange={(open) => {
+          if (!open) setApiKeyToRevoke(undefined);
+        }}
+      >
+        <AlertDialog.Backdrop>
+          <AlertDialog.Container>
+            <AlertDialog.Dialog className="sm:max-w-[420px]">
+              <AlertDialog.CloseTrigger />
+              <AlertDialog.Header>
+                <AlertDialog.Icon status="danger" />
+                <AlertDialog.Heading>
+                  Revoke {apiKeyToRevoke?.name}?
+                </AlertDialog.Heading>
+              </AlertDialog.Header>
+              <AlertDialog.Body>
+                Every secret version for this key will stop authenticating
+                immediately. This cannot be undone.
+              </AlertDialog.Body>
+              <AlertDialog.Footer>
+                <Button slot="close" variant="tertiary">
+                  Cancel
+                </Button>
+                <Button
+                  isPending={
+                    pendingAction === `revoke-${apiKeyToRevoke?.id ?? ""}`
+                  }
+                  variant="danger"
+                  onPress={() => {
+                    if (!apiKeyToRevoke) return;
 
-          {areVersionsLoading ? (
-            <Spinner aria-label="Loading API Key versions" />
-          ) : versions.length === 0 ? (
-            <p className="text-muted">No versions found.</p>
-          ) : (
-            <div className="flex flex-col gap-2">
-              {versions.map((version) => (
-                <Surface
-                  key={version.id}
-                  className="flex flex-wrap items-center justify-between gap-3"
+                    void revoke(apiKeyToRevoke).then((revoked) => {
+                      if (revoked) setApiKeyToRevoke(undefined);
+                    });
+                  }}
                 >
-                  <p className="text-sm text-muted">
-                    Issued {formatIntegrationDateTime(version.issuedAt)}
-                  </p>
-                  <Chip color={version.retiredAt ? "default" : "success"}>
-                    {version.retiredAt
-                      ? "Retired"
-                      : version.validUntil
-                        ? `Valid until ${formatIntegrationDateTime(
-                            version.validUntil,
-                          )}`
-                        : "Current"}
-                  </Chip>
-                </Surface>
-              ))}
-            </div>
-          )}
-        </section>
-      )}
+                  Revoke
+                </Button>
+              </AlertDialog.Footer>
+            </AlertDialog.Dialog>
+          </AlertDialog.Container>
+        </AlertDialog.Backdrop>
+      </AlertDialog>
+
+      <Modal
+        isOpen={Boolean(selectedApiKey)}
+        onOpenChange={(open) => {
+          if (!open) setSelectedApiKeyId(undefined);
+        }}
+      >
+        <Modal.Backdrop>
+          <Modal.Container placement="center" size="md">
+            <Modal.Dialog>
+              <Modal.CloseTrigger />
+              <Modal.Header>
+                <Modal.Heading>{selectedApiKey?.name} versions</Modal.Heading>
+              </Modal.Header>
+              <Modal.Body className="flex flex-col gap-4">
+                <p className="text-sm text-muted">
+                  After rotation, the previous secret remains valid until the
+                  time shown below.
+                </p>
+                {versionsError ? (
+                  <Alert status="danger">
+                    <Alert.Indicator />
+                    <Alert.Content>
+                      <Alert.Title>Versions unavailable</Alert.Title>
+                      <Alert.Description>
+                        {getIntegrationErrorMessage(versionsError)}
+                      </Alert.Description>
+                    </Alert.Content>
+                  </Alert>
+                ) : areVersionsLoading ? (
+                  <div className="flex min-h-32 items-center justify-center">
+                    <Spinner aria-label="Loading API Key versions" />
+                  </div>
+                ) : versions.length === 0 ? (
+                  <p className="text-muted">No versions found.</p>
+                ) : (
+                  <div className="border-t border-separator">
+                    {versions.map((version) => (
+                      <div
+                        key={version.id}
+                        className="flex flex-wrap items-center justify-between gap-3 border-b border-separator py-3"
+                      >
+                        <p className="text-sm text-muted">
+                          Issued {formatIntegrationDateTime(version.issuedAt)}
+                        </p>
+                        <span
+                          className={
+                            version.retiredAt
+                              ? "text-sm secondary-text"
+                              : "text-sm font-medium text-accent"
+                          }
+                        >
+                          {version.retiredAt
+                            ? "Retired"
+                            : version.validUntil
+                              ? `Valid until ${formatIntegrationDateTime(
+                                  version.validUntil,
+                                )}`
+                              : "Current"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Modal.Body>
+            </Modal.Dialog>
+          </Modal.Container>
+        </Modal.Backdrop>
+      </Modal>
     </div>
   );
 }

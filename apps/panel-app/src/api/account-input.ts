@@ -15,10 +15,6 @@ export const requiredEmailInputSchema = z
   .email("Email must be valid")
   .transform((email) => email.toLowerCase());
 
-export const optionalEmailInputSchema = z
-  .union([z.literal(""), requiredEmailInputSchema])
-  .transform((email) => email || null);
-
 export const passwordInputSchema = z
   .string()
   .min(12, "Password must contain at least 12 characters")

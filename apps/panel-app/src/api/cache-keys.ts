@@ -3,6 +3,12 @@ export const staffCachePrefix = "staff";
 export const staffLocationsKey = (accountId: string) =>
   [staffCachePrefix, accountId, "locations"] as const;
 
+export const staffAccountsKey = (accountId: string) =>
+  [staffCachePrefix, accountId, "managed-accounts"] as const;
+
+export const staffInvitationsKey = (accountId: string) =>
+  [staffCachePrefix, accountId, "account-invitations"] as const;
+
 export const staffIntegrationsKey = (accountId: string) =>
   [staffCachePrefix, accountId, "external-integrations"] as const;
 

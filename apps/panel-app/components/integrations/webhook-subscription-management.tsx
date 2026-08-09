@@ -9,14 +9,20 @@ import type {
 
 import {
   Alert,
+  AlertDialog,
   Button,
-  Chip,
   Input,
   Label,
   Spinner,
-  Surface,
   TextField,
+  Tooltip,
 } from "@heroui/react";
+import {
+  Ban as DisableIcon,
+  Check as CheckIcon,
+  Pencil as EditIcon,
+  Trash2 as TrashIcon,
+} from "lucide-react";
 import { useState } from "react";
 import useSWR from "swr";
 
@@ -57,6 +63,21 @@ type SubscriptionDraft = {
   eventTypes: WebhookEventType[];
 };
 
+type WebhookConfirmation =
+  | {
+      kind: "disable";
+      subscription: WebhookSubscription;
+    }
+  | {
+      kind: "delete";
+      subscription: WebhookSubscription;
+    }
+  | {
+      kind: "retire";
+      subscription: WebhookSubscription;
+      versionId: string;
+    };
+
 function replaceSubscription(
   subscriptions: WebhookSubscription[] | undefined,
   updated: WebhookSubscription,
@@ -95,7 +116,7 @@ function SubscriptionFields({
         onChange={(name) => onChange({ ...draft, name })}
       >
         <Label>Name</Label>
-        <Input placeholder="Order updates" />
+        <Input placeholder="Webhook name" />
       </TextField>
 
       <TextField
@@ -112,20 +133,19 @@ function SubscriptionFields({
         <Input
           autoCapitalize="none"
           autoComplete="off"
-          placeholder="https://pos.example.com/kairos/events"
+          placeholder="https://example.com/webhooks"
           spellCheck={false}
         />
       </TextField>
 
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-3">
         <p className="text-sm font-medium">Locations</p>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-3">
           {locations.map((location) => (
             <Button
               key={location.id}
               aria-pressed={draft.locationIds.includes(location.id)}
               isDisabled={isDisabled}
-              size="sm"
               variant={
                 draft.locationIds.includes(location.id)
                   ? "primary"
@@ -138,21 +158,20 @@ function SubscriptionFields({
                 })
               }
             >
-              {location.id}
+              {location.name}
             </Button>
           ))}
         </div>
       </div>
 
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-3">
         <p className="text-sm font-medium">Events</p>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-3">
           {webhookEventTypes.map((eventType) => (
             <Button
               key={eventType}
               aria-pressed={draft.eventTypes.includes(eventType)}
               isDisabled={isDisabled}
-              size="sm"
               variant={
                 draft.eventTypes.includes(eventType) ? "primary" : "secondary"
               }
@@ -198,7 +217,7 @@ function WebhookEditor({
   }
 
   return (
-    <Surface className="flex flex-col gap-4">
+    <section className="flex flex-col gap-4 border-y border-separator py-5">
       <div>
         <h4 className="font-semibold">Edit {subscription.name}</h4>
         <p className="text-sm text-muted">
@@ -212,16 +231,16 @@ function WebhookEditor({
           locations={locations}
           onChange={setDraft}
         />
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-3">
           <Button isPending={isPending} type="submit">
-            {isPending ? "Saving…" : "Save changes"}
+            {isPending ? "Saving…" : "Save"}
           </Button>
           <Button isDisabled={isPending} variant="secondary" onPress={onCancel}>
             Cancel
           </Button>
         </div>
       </form>
-    </Surface>
+    </section>
   );
 }
 
@@ -236,13 +255,17 @@ export function WebhookSubscriptionManagement({
   locations: Location[];
   onSecretIssued: (secret: PendingOneTimeSecret) => void;
 }) {
+  const enabledLocations = locations.filter(
+    (location) => location.status === "ENABLED",
+  );
   const [draft, setDraft] = useState<SubscriptionDraft>({
     name: "",
     destinationUrl: "",
     locationIds: [],
-    eventTypes: [],
+    eventTypes: [...webhookEventTypes],
   });
   const [editedSubscriptionId, setEditedSubscriptionId] = useState<string>();
+  const [confirmation, setConfirmation] = useState<WebhookConfirmation>();
   const [pendingAction, setPendingAction] = useState<string>();
   const [actionError, setActionError] = useState<unknown>();
 
@@ -294,7 +317,7 @@ export function WebhookSubscriptionManagement({
         name: "",
         destinationUrl: "",
         locationIds: [],
-        eventTypes: [],
+        eventTypes: [...webhookEventTypes],
       });
     } catch (caught) {
       setActionError(caught);
@@ -327,10 +350,11 @@ export function WebhookSubscriptionManagement({
     }
   }
 
-  async function changeStatus(subscription: WebhookSubscription) {
-    if (pendingAction) return;
-
-    const status = subscription.status === "ENABLED" ? "DISABLED" : "ENABLED";
+  async function changeStatus(
+    subscription: WebhookSubscription,
+    status: "DISABLED" | "ENABLED",
+  ): Promise<boolean> {
+    if (pendingAction) return false;
 
     setActionError(undefined);
     setPendingAction(`status-${subscription.id}`);
@@ -345,15 +369,19 @@ export function WebhookSubscriptionManagement({
         (current) => replaceSubscription(current, updated),
         { revalidate: false },
       );
+
+      return true;
     } catch (caught) {
       setActionError(caught);
+
+      return false;
     } finally {
       setPendingAction(undefined);
     }
   }
 
-  async function archive(subscription: WebhookSubscription) {
-    if (pendingAction) return;
+  async function archive(subscription: WebhookSubscription): Promise<boolean> {
+    if (pendingAction) return false;
 
     setActionError(undefined);
     setPendingAction(`archive-${subscription.id}`);
@@ -368,8 +396,12 @@ export function WebhookSubscriptionManagement({
       if (editedSubscriptionId === subscription.id) {
         setEditedSubscriptionId(undefined);
       }
+
+      return true;
     } catch (caught) {
       setActionError(caught);
+
+      return false;
     } finally {
       setPendingAction(undefined);
     }
@@ -417,8 +449,11 @@ export function WebhookSubscriptionManagement({
     }
   }
 
-  async function retire(subscription: WebhookSubscription, versionId: string) {
-    if (pendingAction) return;
+  async function retire(
+    subscription: WebhookSubscription,
+    versionId: string,
+  ): Promise<boolean> {
+    if (pendingAction) return false;
 
     setActionError(undefined);
     setPendingAction(`retire-${versionId}`);
@@ -439,15 +474,62 @@ export function WebhookSubscriptionManagement({
         (current) => replaceSubscription(current, updated),
         { revalidate: false },
       );
+
+      return true;
     } catch (caught) {
       setActionError(caught);
+
+      return false;
     } finally {
       setPendingAction(undefined);
     }
   }
 
+  async function confirmDestructiveAction() {
+    if (!confirmation) return;
+
+    const completed =
+      confirmation.kind === "disable"
+        ? await changeStatus(confirmation.subscription, "DISABLED")
+        : confirmation.kind === "delete"
+          ? await archive(confirmation.subscription)
+          : await retire(confirmation.subscription, confirmation.versionId);
+
+    if (completed) setConfirmation(undefined);
+  }
+
+  const confirmationTitle = confirmation
+    ? confirmation.kind === "disable"
+      ? `Disable ${confirmation.subscription.name}?`
+      : confirmation.kind === "delete"
+        ? `Delete ${confirmation.subscription.name}?`
+        : `Retire this secret for ${confirmation.subscription.name}?`
+    : "";
+  const confirmationDescription = confirmation
+    ? confirmation.kind === "disable"
+      ? "Webhook deliveries will pause until this subscription is enabled again."
+      : confirmation.kind === "delete"
+        ? "The webhook will be removed and future deliveries will stop. This cannot be undone."
+        : "This secret version will stop validating signatures immediately. Confirm that the recipient no longer uses it."
+    : "";
+  const confirmationLabel = confirmation
+    ? confirmation.kind === "disable"
+      ? "Disable"
+      : confirmation.kind === "delete"
+        ? "Delete"
+        : "Retire"
+    : "Confirm";
+  const isConfirmationPending = confirmation
+    ? pendingAction ===
+      (confirmation.kind === "disable"
+        ? `status-${confirmation.subscription.id}`
+        : confirmation.kind === "delete"
+          ? `archive-${confirmation.subscription.id}`
+          : `retire-${confirmation.versionId}`)
+    : false;
+
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-6">
       {Boolean(error) && (
         <Alert status="danger">
           <Alert.Indicator />
@@ -460,9 +542,9 @@ export function WebhookSubscriptionManagement({
         </Alert>
       )}
 
-      <section className="flex flex-col gap-4">
+      <section className="flex flex-col gap-3">
         <div>
-          <h3 className="text-xl font-semibold">Create webhook subscription</h3>
+          <h3 className="text-xl font-semibold">New webhook</h3>
           <p className="text-sm text-muted">
             New subscriptions start disabled so the recipient can be configured
             before delivery begins.
@@ -471,40 +553,46 @@ export function WebhookSubscriptionManagement({
         <form className="flex max-w-3xl flex-col gap-4" onSubmit={create}>
           <SubscriptionFields
             draft={draft}
-            isDisabled={Boolean(pendingAction)}
-            locations={locations}
+            isDisabled={Boolean(pendingAction) || enabledLocations.length === 0}
+            locations={enabledLocations}
             onChange={setDraft}
           />
           <Button
             className="self-start"
+            isDisabled={enabledLocations.length === 0}
             isPending={pendingAction === "create"}
             type="submit"
           >
-            {pendingAction === "create" ? "Creating…" : "Create subscription"}
+            {pendingAction === "create" ? "Creating…" : "Create"}
           </Button>
         </form>
       </section>
 
-      <section className="flex flex-col gap-4">
-        <h3 className="text-xl font-semibold">Webhook subscriptions</h3>
+      <section className="flex flex-col gap-3">
+        <h3 className="text-xl font-semibold">Webhooks</h3>
 
         {areSubscriptionsLoading ? (
           <Spinner aria-label="Loading webhook subscriptions" />
         ) : subscriptions.length === 0 ? (
-          <p className="text-muted">No webhook subscriptions configured.</p>
+          <p className="text-muted">No webhooks configured.</p>
         ) : (
-          <div className="grid gap-4 xl:grid-cols-2">
+          <div className="border-t border-separator">
             {subscriptions.map((subscription) => (
-              <Surface key={subscription.id} className="flex flex-col gap-4">
+              <article
+                key={subscription.id}
+                className="flex flex-col gap-3 border-b border-separator py-4"
+              >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <h4 className="font-semibold">{subscription.name}</h4>
-                  <Chip
-                    color={
-                      subscription.status === "ENABLED" ? "success" : "default"
+                  <span
+                    className={
+                      subscription.status === "ENABLED"
+                        ? "text-sm font-medium text-accent"
+                        : "text-sm secondary-text"
                     }
                   >
                     {subscription.status === "ENABLED" ? "Enabled" : "Disabled"}
-                  </Chip>
+                  </span>
                 </div>
 
                 <div>
@@ -517,59 +605,112 @@ export function WebhookSubscriptionManagement({
                 <div>
                   <p className="text-sm font-medium">Locations</p>
                   <p className="break-all text-sm text-muted">
-                    {subscription.locationIds.join(", ")}
+                    {subscription.locationIds
+                      .map(
+                        (locationId) =>
+                          locations.find(
+                            (location) => location.id === locationId,
+                          )?.name ?? "Unavailable location",
+                      )
+                      .join(", ")}
                   </p>
                 </div>
 
-                <div className="flex flex-wrap gap-2">
-                  {subscription.eventTypes.map((eventType) => (
-                    <Chip key={eventType}>{webhookEventLabels[eventType]}</Chip>
-                  ))}
-                </div>
+                <p className="text-sm secondary-text">
+                  {subscription.eventTypes
+                    .map((eventType) => webhookEventLabels[eventType])
+                    .join(", ")}
+                </p>
 
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onPress={() => setEditedSubscriptionId(subscription.id)}
-                  >
-                    Edit
-                  </Button>
-                  <Button
-                    isPending={pendingAction === `status-${subscription.id}`}
-                    size="sm"
-                    variant="secondary"
-                    onPress={() => changeStatus(subscription)}
-                  >
-                    {subscription.status === "ENABLED" ? "Disable" : "Enable"}
-                  </Button>
+                <div className="flex flex-wrap gap-3">
+                  <Tooltip delay={500}>
+                    <Tooltip.Trigger>
+                      <Button
+                        isIconOnly
+                        aria-label={`Edit webhook ${subscription.name}`}
+                        className="rounded-md"
+                        variant="tertiary"
+                        onPress={() => setEditedSubscriptionId(subscription.id)}
+                      >
+                        <EditIcon size={17} />
+                      </Button>
+                    </Tooltip.Trigger>
+                    <Tooltip.Content>Edit</Tooltip.Content>
+                  </Tooltip>
+                  <Tooltip delay={500}>
+                    <Tooltip.Trigger>
+                      <Button
+                        isIconOnly
+                        aria-label={`${
+                          subscription.status === "ENABLED"
+                            ? "Disable"
+                            : "Enable"
+                        } webhook ${subscription.name}`}
+                        className="rounded-md"
+                        isPending={
+                          pendingAction === `status-${subscription.id}`
+                        }
+                        variant={
+                          subscription.status === "ENABLED"
+                            ? "danger"
+                            : "secondary"
+                        }
+                        onPress={() => {
+                          if (subscription.status === "ENABLED") {
+                            setConfirmation({ kind: "disable", subscription });
+                          } else {
+                            void changeStatus(subscription, "ENABLED");
+                          }
+                        }}
+                      >
+                        {subscription.status === "ENABLED" ? (
+                          <DisableIcon size={20} />
+                        ) : (
+                          <CheckIcon size={20} />
+                        )}
+                      </Button>
+                    </Tooltip.Trigger>
+                    <Tooltip.Content>
+                      {subscription.status === "ENABLED" ? "Disable" : "Enable"}
+                    </Tooltip.Content>
+                  </Tooltip>
                   <Button
                     isPending={pendingAction === `rotate-${subscription.id}`}
-                    size="sm"
                     variant="secondary"
                     onPress={() => rotate(subscription)}
                   >
-                    Rotate signing secret
+                    Rotate
                   </Button>
-                  <Button
-                    isPending={pendingAction === `archive-${subscription.id}`}
-                    size="sm"
-                    variant="danger"
-                    onPress={() => archive(subscription)}
-                  >
-                    Archive
-                  </Button>
+                  <Tooltip delay={500}>
+                    <Tooltip.Trigger>
+                      <Button
+                        isIconOnly
+                        aria-label={`Delete webhook ${subscription.name}`}
+                        className="rounded-md"
+                        isPending={
+                          pendingAction === `archive-${subscription.id}`
+                        }
+                        variant="danger"
+                        onPress={() =>
+                          setConfirmation({ kind: "delete", subscription })
+                        }
+                      >
+                        <TrashIcon size={20} />
+                      </Button>
+                    </Tooltip.Trigger>
+                    <Tooltip.Content>Delete</Tooltip.Content>
+                  </Tooltip>
                 </div>
 
                 <div className="border-t border-separator pt-3">
                   <p className="mb-2 text-sm font-medium">
                     Signing-secret versions
                   </p>
-                  <div className="flex flex-col gap-2">
+                  <div className="flex flex-col gap-3">
                     {subscription.signingSecretVersions.map((version) => (
                       <div
                         key={version.id}
-                        className="flex flex-wrap items-center justify-between gap-2"
+                        className="flex flex-wrap items-center justify-between gap-3"
                       >
                         <div>
                           <p className="text-xs text-muted">
@@ -590,18 +731,23 @@ export function WebhookSubscriptionManagement({
                         {version.validUntil && !version.retiredAt && (
                           <Button
                             isPending={pendingAction === `retire-${version.id}`}
-                            size="sm"
                             variant="danger"
-                            onPress={() => retire(subscription, version.id)}
+                            onPress={() =>
+                              setConfirmation({
+                                kind: "retire",
+                                subscription,
+                                versionId: version.id,
+                              })
+                            }
                           >
-                            Retire now
+                            Retire
                           </Button>
                         )}
                       </div>
                     ))}
                   </div>
                 </div>
-              </Surface>
+              </article>
             ))}
           </div>
         )}
@@ -611,12 +757,48 @@ export function WebhookSubscriptionManagement({
         <WebhookEditor
           key={editedSubscription.id}
           isPending={pendingAction === `save-${editedSubscription.id}`}
-          locations={locations}
+          locations={enabledLocations}
           subscription={editedSubscription}
           onCancel={() => setEditedSubscriptionId(undefined)}
           onSave={(input) => save(editedSubscription, input)}
         />
       )}
+
+      <AlertDialog
+        isOpen={Boolean(confirmation)}
+        onOpenChange={(open) => {
+          if (!open) setConfirmation(undefined);
+        }}
+      >
+        <AlertDialog.Backdrop>
+          <AlertDialog.Container>
+            <AlertDialog.Dialog className="sm:max-w-[440px]">
+              <AlertDialog.CloseTrigger />
+              <AlertDialog.Header>
+                <AlertDialog.Icon
+                  status={
+                    confirmation?.kind === "disable" ? "warning" : "danger"
+                  }
+                />
+                <AlertDialog.Heading>{confirmationTitle}</AlertDialog.Heading>
+              </AlertDialog.Header>
+              <AlertDialog.Body>{confirmationDescription}</AlertDialog.Body>
+              <AlertDialog.Footer>
+                <Button slot="close" variant="tertiary">
+                  Cancel
+                </Button>
+                <Button
+                  isPending={isConfirmationPending}
+                  variant="danger"
+                  onPress={() => void confirmDestructiveAction()}
+                >
+                  {confirmationLabel}
+                </Button>
+              </AlertDialog.Footer>
+            </AlertDialog.Dialog>
+          </AlertDialog.Container>
+        </AlertDialog.Backdrop>
+      </AlertDialog>
     </div>
   );
 }

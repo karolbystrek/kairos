@@ -150,7 +150,7 @@ export function TenantRegistrationForm({
         </TextField>
 
         <Button fullWidth isPending={isMutating} type="submit">
-          {isMutating ? "Registering…" : "Register tenant"}
+          {isMutating ? "Creating account…" : "Create account"}
         </Button>
       </form>
     </div>

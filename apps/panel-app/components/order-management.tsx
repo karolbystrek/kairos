@@ -1,31 +1,43 @@
+import type { FormEvent } from "react";
+
 import {
   Alert,
+  AlertDialog,
   Button,
-  Chip,
   Input,
   Label,
-  Radio,
-  RadioGroup,
+  ListBox,
+  Modal,
+  Select,
   Spinner,
   TextField,
+  Tooltip,
 } from "@heroui/react";
+import {
+  ArrowRight as ArrowRightIcon,
+  Clock3 as ClockIcon,
+  Plus as PlusIcon,
+  X as CloseIcon,
+} from "lucide-react";
 import Image from "next/image";
 import QRCode from "qrcode";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 import useSWRMutation from "swr/mutation";
 
+import { PanelCard } from "@/components/panel-card";
+import { LocationCreationModal } from "@/components/location-creation-modal";
 import { ApiError } from "@/src/api/api-fetch";
 import { staffCachePrefix, staffLocationsKey } from "@/src/api/cache-keys";
-import { listLocations } from "@/src/api/locations";
+import { listLocations, type Location } from "@/src/api/locations";
 import {
   createOrder as createOrderRequest,
   createOrderInputSchema,
   listOrders,
   updateOrderStatus,
+  type CreateOrderInput,
   type OrderStatus,
   type StaffOrder,
-  type CreateOrderInput,
 } from "@/src/api/orders";
 import { customerAppUrl } from "@/src/config/public-environment";
 
@@ -34,12 +46,14 @@ const tenantOrderScope = "tenant";
 const ordersKey = (accountId: string, scope: string) =>
   [staffCachePrefix, accountId, "orders", scope] as const;
 
-const statusLabels: Record<OrderStatus, string> = {
-  IN_PREPARATION: "In preparation",
-  READY: "Ready",
-  COMPLETED: "Completed",
-  CANCELED: "Canceled",
-};
+const laneDetails = {
+  IN_PREPARATION: {
+    label: "In preparation",
+  },
+  READY: {
+    label: "Ready",
+  },
+} as const;
 
 const nextStatuses: Partial<Record<OrderStatus, OrderStatus>> = {
   IN_PREPARATION: "READY",
@@ -64,7 +78,7 @@ function getErrorMessage(error: unknown): string {
       case 404:
         return "The selected order or location is no longer available.";
       case 409:
-        return "The order changed before this action was completed. Review its current status and try again.";
+        return "The order changed before this action completed. Review its current status and try again.";
       default:
         return error.message;
     }
@@ -95,6 +109,79 @@ function updateOrderMutation(
   return updateOrderStatus(arg.orderId, arg.status);
 }
 
+function elapsedTime(createdAt: string, now: number): string {
+  const minutes = Math.max(
+    0,
+    Math.floor((now - new Date(createdAt).getTime()) / 60_000),
+  );
+
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes} min`;
+
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+
+  return remainingMinutes > 0
+    ? `${hours} hr ${remainingMinutes} min`
+    : `${hours} hr`;
+}
+
+function useMinuteClock() {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setNow(Date.now()), 60_000);
+
+    return () => window.clearInterval(interval);
+  }, []);
+
+  return now;
+}
+
+function LocationSelect({
+  label,
+  locations,
+  onChange,
+  selectedId,
+  showAll,
+}: {
+  label: string;
+  locations: Location[];
+  onChange: (locationId?: string) => void;
+  selectedId?: string;
+  showAll: boolean;
+}) {
+  const items = showAll
+    ? [{ id: "all", name: "All locations" }, ...locations]
+    : locations;
+
+  return (
+    <Select
+      aria-label={label}
+      className="w-full sm:max-w-xs"
+      selectedKey={selectedId ?? "all"}
+      onSelectionChange={(key) =>
+        onChange(key === "all" || key === null ? undefined : String(key))
+      }
+    >
+      <Label>{label}</Label>
+      <Select.Trigger>
+        <Select.Value />
+        <Select.Indicator />
+      </Select.Trigger>
+      <Select.Popover>
+        <ListBox items={items}>
+          {(item) => (
+            <ListBox.Item id={item.id} textValue={item.name}>
+              {item.name}
+            </ListBox.Item>
+          )}
+        </ListBox>
+      </Select.Popover>
+    </Select>
+  );
+}
+
 function OrderQrCode({
   accountId,
   order,
@@ -109,7 +196,7 @@ function OrderQrCode({
     isLoading,
   } = useSWR(
     [staffCachePrefix, accountId, "order-qr", trackingUrl] as const,
-    ([, , , url]) => QRCode.toDataURL(url, { margin: 1, width: 240 }),
+    ([, , , url]) => QRCode.toDataURL(url, { margin: 2, width: 640 }),
     {
       revalidateOnFocus: false,
       revalidateOnReconnect: false,
@@ -117,47 +204,140 @@ function OrderQrCode({
     },
   );
 
-  return (
-    <section className="flex flex-col items-start gap-4">
-      <div>
-        <h2 className="text-2xl font-semibold">Customer QR code</h2>
-        <p className="text-muted">Order {order.label}</p>
-      </div>
-      {error ? (
-        <Alert status="danger">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Title>QR code unavailable</Alert.Title>
-            <Alert.Description>
-              The customer QR code could not be generated.
-            </Alert.Description>
-          </Alert.Content>
-        </Alert>
-      ) : isLoading || !qrCode ? (
+  if (error) {
+    return (
+      <Alert status="danger">
+        <Alert.Indicator />
+        <Alert.Content>
+          <Alert.Title>QR code unavailable</Alert.Title>
+          <Alert.Description>
+            The customer QR code could not be generated.
+          </Alert.Description>
+        </Alert.Content>
+      </Alert>
+    );
+  }
+
+  if (isLoading || !qrCode) {
+    return (
+      <div className="flex min-h-72 items-center justify-center">
         <Spinner aria-label="Generating QR code" />
-      ) : (
-        <Image
-          unoptimized
-          alt={`Tracking QR code for order ${order.label}`}
-          height={240}
-          src={qrCode}
-          width={240}
-        />
-      )}
-    </section>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex w-full justify-center">
+      <Image
+        unoptimized
+        alt={`Tracking QR code for order ${order.label}`}
+        className="h-auto w-full max-w-[30rem]"
+        height={640}
+        src={qrCode}
+        width={640}
+      />
+    </div>
+  );
+}
+
+function OrderCard({
+  isUpdating,
+  locationName,
+  now,
+  onCancel,
+  onShowQr,
+  onTransition,
+  order,
+  showLocation,
+}: {
+  isUpdating: boolean;
+  locationName?: string;
+  now: number;
+  onCancel: (order: StaffOrder) => void;
+  onShowQr: (order: StaffOrder) => void;
+  onTransition: (order: StaffOrder, status: OrderStatus) => void;
+  order: StaffOrder;
+  showLocation: boolean;
+}) {
+  const nextStatus = nextStatuses[order.status];
+  const nextStatusLabel = nextStatus === "READY" ? "Ready" : "Complete";
+  const nextStatusAccessibilityLabel =
+    nextStatus === "READY"
+      ? `Mark order ${order.label} ready`
+      : `Complete order ${order.label}`;
+
+  return (
+    <PanelCard
+      accessibilityLabel={`Show QR code for order ${order.label}`}
+      metadata={
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 secondary-text">
+          {showLocation && locationName && (
+            <span className="break-words">{locationName}</span>
+          )}
+          <span className="flex shrink-0 items-center gap-1.5">
+            <ClockIcon size={15} />
+            {elapsedTime(order.createdAt, now)}
+          </span>
+        </div>
+      }
+      title={order.label}
+      trailing={
+        <>
+          {nextStatus && (
+            <Button
+              aria-label={nextStatusAccessibilityLabel}
+              isDisabled={isUpdating}
+              size="lg"
+              variant="primary"
+              onPress={() => onTransition(order, nextStatus)}
+            >
+              {nextStatusLabel}
+              <ArrowRightIcon size={18} />
+            </Button>
+          )}
+          <Tooltip delay={500}>
+            <Tooltip.Trigger>
+              <Button
+                isIconOnly
+                aria-label={`Cancel order ${order.label}`}
+                className="rounded-md"
+                isDisabled={isUpdating}
+                size="lg"
+                variant="danger"
+                onPress={() => onCancel(order)}
+              >
+                <CloseIcon size={20} />
+              </Button>
+            </Tooltip.Trigger>
+            <Tooltip.Content>Cancel order</Tooltip.Content>
+          </Tooltip>
+        </>
+      }
+      onPress={() => onShowQr(order)}
+    />
   );
 }
 
 export function OrderManagement({
   accountId,
+  canManageLocations,
   canViewTenantOrders,
+  onRequestedLocationApplied,
+  requestedLocationId,
 }: {
   accountId: string;
+  canManageLocations: boolean;
   canViewTenantOrders: boolean;
+  onRequestedLocationApplied?: () => void;
+  requestedLocationId?: string;
 }) {
+  const now = useMinuteClock();
   const [selectedLocationId, setSelectedLocationId] = useState<string>();
-  const [selectedOrderId, setSelectedOrderId] = useState<string>();
-  const [labelMode, setLabelMode] = useState<"AUTO" | "CUSTOM">("AUTO");
+  const [createLocationId, setCreateLocationId] = useState<string>();
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isCreateLocationOpen, setIsCreateLocationOpen] = useState(false);
+  const [qrOrder, setQrOrder] = useState<StaffOrder>();
+  const [cancelOrder, setCancelOrder] = useState<StaffOrder>();
   const [customLabel, setCustomLabel] = useState("");
   const [customLabelError, setCustomLabelError] = useState<string>();
 
@@ -170,15 +350,20 @@ export function OrderManagement({
     shouldRetryOnError,
   });
 
-  const locationId = locations.some(
-    (location) => location.id === selectedLocationId,
+  const enabledLocations = locations.filter(
+    (location) => location.status === "ENABLED",
+  );
+
+  const effectiveSelectedLocationId = requestedLocationId ?? selectedLocationId;
+  const locationId = enabledLocations.some(
+    (location) => location.id === effectiveSelectedLocationId,
   )
-    ? selectedLocationId
+    ? effectiveSelectedLocationId
     : canViewTenantOrders
       ? undefined
-      : locations[0]?.id;
+      : enabledLocations[0]?.id;
   const currentOrdersKey =
-    locations.length > 0
+    enabledLocations.length > 0
       ? ordersKey(accountId, locationId ?? tenantOrderScope)
       : null;
 
@@ -191,10 +376,7 @@ export function OrderManagement({
     currentOrdersKey,
     ([, , , scope]) =>
       listOrders(scope === tenantOrderScope ? undefined : scope),
-    {
-      errorRetryCount: 3,
-      shouldRetryOnError,
-    },
+    { errorRetryCount: 3, shouldRetryOnError },
   );
 
   const {
@@ -205,7 +387,6 @@ export function OrderManagement({
   } = useSWRMutation(currentOrdersKey, createOrderMutation, {
     throwOnError: false,
   });
-
   const {
     error: updateOrderError,
     isMutating: isUpdatingOrder,
@@ -215,17 +396,35 @@ export function OrderManagement({
     throwOnError: false,
   });
 
-  const selectedOrder = orders.find((order) => order.id === selectedOrderId);
+  const ordersByStatus = useMemo(
+    () => ({
+      IN_PREPARATION: orders.filter(
+        (order) => order.status === "IN_PREPARATION",
+      ),
+      READY: orders.filter((order) => order.status === "READY"),
+    }),
+    [orders],
+  );
+  const locationNames = useMemo(
+    () => new Map(locations.map((location) => [location.id, location.name])),
+    [locations],
+  );
   const error =
     locationsError ?? ordersError ?? createOrderError ?? updateOrderError;
 
-  async function createOrder() {
-    if (!locationId) return;
+  function openCreate() {
+    resetCreateOrder();
+    setCreateLocationId(locationId ?? enabledLocations[0]?.id);
+    setIsCreateOpen(true);
+  }
 
-    const input =
-      labelMode === "AUTO"
-        ? ({ mode: "AUTO" } as const)
-        : ({ mode: "CUSTOM", label: customLabel } as const);
+  async function createOrder(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!createLocationId || isCreatingOrder) return;
+
+    const input = customLabel.trim()
+      ? ({ mode: "CUSTOM", label: customLabel } as const)
+      : ({ mode: "AUTO" } as const);
     const validation = createOrderInputSchema.safeParse(input);
 
     if (!validation.success) {
@@ -236,7 +435,7 @@ export function OrderManagement({
 
     setCustomLabelError(undefined);
     const order = await triggerCreateOrder({
-      locationId,
+      locationId: createLocationId,
       input: validation.data,
     });
 
@@ -249,14 +448,20 @@ export function OrderManagement({
       ],
       { revalidate: false },
     );
-    setSelectedOrderId(order.id);
+    setCustomLabel("");
+    setIsCreateOpen(false);
+    setQrOrder(order);
     void mutateOrders(undefined, { throwOnError: false });
   }
 
-  async function updateStatus(order: StaffOrder, status: OrderStatus) {
+  async function updateStatus(
+    order: StaffOrder,
+    status: OrderStatus,
+  ): Promise<boolean> {
+    resetUpdateOrder();
     const updated = await triggerUpdateOrder({ orderId: order.id, status });
 
-    if (!updated) return;
+    if (!updated) return false;
 
     const isTerminal =
       updated.status === "COMPLETED" || updated.status === "CANCELED";
@@ -270,21 +475,41 @@ export function OrderManagement({
             ),
       { revalidate: false },
     );
-    if (isTerminal && selectedOrderId === updated.id) {
-      setSelectedOrderId(undefined);
-    }
+    if (isTerminal && qrOrder?.id === updated.id) setQrOrder(undefined);
     void mutateOrders(undefined, { throwOnError: false });
+
+    return true;
   }
 
   function selectLocation(nextLocationId?: string) {
     setSelectedLocationId(nextLocationId);
-    setSelectedOrderId(undefined);
+    onRequestedLocationApplied?.();
     resetCreateOrder();
     resetUpdateOrder();
   }
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center gap-4">
+        <h1 className="page-title">Orders</h1>
+        {enabledLocations.length > 0 && (
+          <Tooltip delay={500}>
+            <Tooltip.Trigger>
+              <Button
+                isIconOnly
+                aria-label="New order"
+                className="rounded-md"
+                size="lg"
+                onPress={openCreate}
+              >
+                <PlusIcon size={20} />
+              </Button>
+            </Tooltip.Trigger>
+            <Tooltip.Content>New order</Tooltip.Content>
+          </Tooltip>
+        )}
+      </div>
+
       {error && (
         <Alert status="danger">
           <Alert.Indicator />
@@ -297,161 +522,249 @@ export function OrderManagement({
 
       {areLocationsLoading ? (
         <Spinner aria-label="Loading locations" />
-      ) : locations.length === 0 ? (
-        <p className="text-muted">No locations are available.</p>
+      ) : enabledLocations.length === 0 ? (
+        <div className="flex flex-col items-start gap-4 py-12">
+          <div>
+            <h2 className="section-title">No location</h2>
+            <p className="mt-2 secondary-text">
+              Create a location before managing orders.
+            </p>
+          </div>
+          {canManageLocations && (
+            <Button onPress={() => setIsCreateLocationOpen(true)}>
+              <PlusIcon size={18} />
+              Create location
+            </Button>
+          )}
+        </div>
       ) : (
         <>
-          <section className="flex flex-col gap-3">
-            <h2 className="text-2xl font-semibold">Location</h2>
-            <div className="flex flex-wrap gap-2">
-              {canViewTenantOrders && (
-                <Button
-                  variant={locationId === undefined ? "primary" : "secondary"}
-                  onPress={() => selectLocation()}
-                >
-                  All locations
-                </Button>
-              )}
-              {locations.map((location) => (
-                <Button
-                  key={location.id}
-                  variant={location.id === locationId ? "primary" : "secondary"}
-                  onPress={() => selectLocation(location.id)}
-                >
-                  {location.id}
-                </Button>
-              ))}
-            </div>
-          </section>
-
-          {locationId ? (
-            <section className="flex flex-col gap-3">
-              <h2 className="text-2xl font-semibold">Create order</h2>
-              <RadioGroup
-                isDisabled={isCreatingOrder}
-                name="order-label-mode"
-                orientation="horizontal"
-                value={labelMode}
-                onChange={(value) => {
-                  setLabelMode(value === "CUSTOM" ? "CUSTOM" : "AUTO");
-                  setCustomLabelError(undefined);
-                }}
-              >
-                <Label>Label</Label>
-                <Radio value="AUTO">
-                  <Radio.Content>
-                    <Radio.Control>
-                      <Radio.Indicator />
-                    </Radio.Control>
-                    Auto
-                  </Radio.Content>
-                </Radio>
-                <Radio value="CUSTOM">
-                  <Radio.Content>
-                    <Radio.Control>
-                      <Radio.Indicator />
-                    </Radio.Control>
-                    Custom
-                  </Radio.Content>
-                </Radio>
-              </RadioGroup>
-              {labelMode === "CUSTOM" && (
-                <TextField
-                  fullWidth
-                  className="max-w-sm"
-                  isDisabled={isCreatingOrder}
-                  isInvalid={Boolean(customLabelError)}
-                  maxLength={64}
-                  name="custom-order-label"
-                  value={customLabel}
-                  onChange={(value) => {
-                    setCustomLabel(value);
-                    setCustomLabelError(undefined);
-                  }}
-                >
-                  <Label>Custom label</Label>
-                  <Input placeholder="Table 4" />
-                </TextField>
-              )}
-              {customLabelError && (
-                <p className="text-sm text-danger">{customLabelError}</p>
-              )}
-              <Button
-                className="self-start"
-                isDisabled={isCreatingOrder}
-                variant="primary"
-                onPress={createOrder}
-              >
-                {isCreatingOrder ? "Creating…" : "Create"}
-              </Button>
-            </section>
-          ) : (
-            <section className="flex flex-col gap-2">
-              <h2 className="text-2xl font-semibold">Create order</h2>
-              <p className="text-muted">
-                Select a location before creating an order.
-              </p>
-            </section>
+          {canViewTenantOrders && (
+            <LocationSelect
+              showAll
+              label="Queue location"
+              locations={enabledLocations}
+              selectedId={locationId}
+              onChange={selectLocation}
+            />
           )}
 
-          {selectedOrder && (
-            <OrderQrCode accountId={accountId} order={selectedOrder} />
-          )}
-
-          <section className="flex flex-col gap-3">
-            <h2 className="text-2xl font-semibold">Orders</h2>
-            {areOrdersLoading ? (
+          {areOrdersLoading ? (
+            <div className="flex min-h-80 items-center justify-center">
               <Spinner aria-label="Loading orders" />
-            ) : orders.length === 0 ? (
-              <p className="text-muted">
-                {locationId
-                  ? "No orders at this location."
-                  : "No orders across this tenant."}
-              </p>
-            ) : (
-              orders.map((order) => {
-                const nextStatus = nextStatuses[order.status];
+            </div>
+          ) : (
+            <div className="grid gap-10 md:grid-cols-2 md:gap-0 md:divide-x md:divide-separator">
+              {(["IN_PREPARATION", "READY"] as const).map((status) => {
+                const lane = laneDetails[status];
+                const laneOrders = ordersByStatus[status];
 
                 return (
-                  <article
-                    key={order.id}
-                    className="flex flex-wrap items-center justify-between gap-3 border-t border-separator py-4"
+                  <section
+                    key={status}
+                    className="border-t border-separator pt-5 md:border-t-0 md:px-6 md:first:pl-0 md:last:pr-0"
                   >
-                    <div className="flex items-center gap-3">
-                      <strong>{order.label}</strong>
-                      <Chip>{statusLabels[order.status]}</Chip>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        variant="secondary"
-                        onPress={() => setSelectedOrderId(order.id)}
-                      >
-                        Show QR
-                      </Button>
-                      {nextStatus && (
-                        <Button
-                          isDisabled={isUpdatingOrder}
-                          variant="primary"
-                          onPress={() => updateStatus(order, nextStatus)}
-                        >
-                          Mark {statusLabels[nextStatus].toLowerCase()}
-                        </Button>
-                      )}
-                      <Button
-                        isDisabled={isUpdatingOrder}
-                        variant="danger"
-                        onPress={() => updateStatus(order, "CANCELED")}
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  </article>
+                    <header className="flex items-start justify-between gap-3 pb-3">
+                      <div>
+                        <h2 className="section-title">{lane.label}</h2>
+                      </div>
+                      <span className="text-sm tabular-nums secondary-text">
+                        {laneOrders.length}
+                      </span>
+                    </header>
+                    {laneOrders.length === 0 ? (
+                      <p className="py-10 text-sm secondary-text">
+                        {status === "READY"
+                          ? "No orders waiting for pickup"
+                          : "No orders being prepared"}
+                      </p>
+                    ) : (
+                      <div>
+                        {laneOrders.map((order) => (
+                          <OrderCard
+                            key={order.id}
+                            isUpdating={isUpdatingOrder}
+                            locationName={locationNames.get(order.locationId)}
+                            now={now}
+                            order={order}
+                            showLocation={locationId === undefined}
+                            onCancel={(selectedOrder) => {
+                              resetUpdateOrder();
+                              setCancelOrder(selectedOrder);
+                            }}
+                            onShowQr={setQrOrder}
+                            onTransition={(selectedOrder, nextStatus) => {
+                              void updateStatus(selectedOrder, nextStatus);
+                            }}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </section>
                 );
-              })
-            )}
-          </section>
+              })}
+            </div>
+          )}
         </>
       )}
+
+      <Modal isOpen={isCreateOpen} onOpenChange={setIsCreateOpen}>
+        <Modal.Backdrop>
+          <Modal.Container placement="center" size="lg">
+            <Modal.Dialog>
+              <Modal.CloseTrigger />
+              <Modal.Header>
+                <Modal.Heading>New order</Modal.Heading>
+              </Modal.Header>
+              <form onSubmit={createOrder}>
+                <Modal.Body className="flex flex-col gap-5">
+                  {createOrderError && (
+                    <Alert status="danger">
+                      <Alert.Indicator />
+                      <Alert.Content>
+                        <Alert.Title>Order could not be created</Alert.Title>
+                        <Alert.Description>
+                          {getErrorMessage(createOrderError)}
+                        </Alert.Description>
+                      </Alert.Content>
+                    </Alert>
+                  )}
+                  {canViewTenantOrders && (
+                    <LocationSelect
+                      label="Location"
+                      locations={enabledLocations}
+                      selectedId={createLocationId}
+                      showAll={false}
+                      onChange={setCreateLocationId}
+                    />
+                  )}
+                  <TextField
+                    fullWidth
+                    isDisabled={isCreatingOrder}
+                    isInvalid={Boolean(customLabelError)}
+                    maxLength={32}
+                    name="custom-order-label"
+                    value={customLabel}
+                    onChange={(value) => {
+                      setCustomLabel(value);
+                      setCustomLabelError(undefined);
+                    }}
+                  >
+                    <Label>Order label (optional)</Label>
+                    <Input placeholder="Default: automatic" />
+                  </TextField>
+                  {customLabelError && (
+                    <p className="text-sm text-danger">{customLabelError}</p>
+                  )}
+                </Modal.Body>
+                <Modal.Footer>
+                  <Button slot="close" variant="tertiary">
+                    Cancel
+                  </Button>
+                  <Button isPending={isCreatingOrder} type="submit">
+                    <PlusIcon size={18} />
+                    {isCreatingOrder ? "Creating…" : "Create"}
+                  </Button>
+                </Modal.Footer>
+              </form>
+            </Modal.Dialog>
+          </Modal.Container>
+        </Modal.Backdrop>
+      </Modal>
+
+      {canManageLocations && (
+        <LocationCreationModal
+          accountId={accountId}
+          isOpen={isCreateLocationOpen}
+          onCreated={(location) => {
+            setSelectedLocationId(location.id);
+            onRequestedLocationApplied?.();
+          }}
+          onOpenChange={setIsCreateLocationOpen}
+        />
+      )}
+
+      <Modal
+        isOpen={Boolean(qrOrder)}
+        onOpenChange={(open) => {
+          if (!open) setQrOrder(undefined);
+        }}
+      >
+        <Modal.Backdrop>
+          <Modal.Container placement="center" size="lg">
+            <Modal.Dialog>
+              <Modal.CloseTrigger />
+              <Modal.Header className="justify-center px-16 pb-2">
+                <Modal.Heading className="text-center text-lg font-medium tracking-normal secondary-text">
+                  {qrOrder?.label}
+                </Modal.Heading>
+              </Modal.Header>
+              <Modal.Body className="flex items-center justify-center px-6 pb-8 pt-2 sm:px-10">
+                {qrOrder && (
+                  <OrderQrCode accountId={accountId} order={qrOrder} />
+                )}
+              </Modal.Body>
+            </Modal.Dialog>
+          </Modal.Container>
+        </Modal.Backdrop>
+      </Modal>
+
+      <AlertDialog
+        isOpen={Boolean(cancelOrder)}
+        onOpenChange={(open) => {
+          if (!open) setCancelOrder(undefined);
+        }}
+      >
+        <AlertDialog.Backdrop>
+          <AlertDialog.Container>
+            <AlertDialog.Dialog className="sm:max-w-[420px]">
+              <AlertDialog.CloseTrigger />
+              <AlertDialog.Header>
+                <AlertDialog.Icon status="danger" />
+                <AlertDialog.Heading>
+                  Cancel order {cancelOrder?.label}?
+                </AlertDialog.Heading>
+              </AlertDialog.Header>
+              <AlertDialog.Body>
+                <p>
+                  The customer will see that this order was canceled. This
+                  cannot be undone.
+                </p>
+                {updateOrderError && (
+                  <Alert className="mt-4" status="danger">
+                    <Alert.Indicator />
+                    <Alert.Content>
+                      <Alert.Title>Order could not be canceled</Alert.Title>
+                      <Alert.Description>
+                        {getErrorMessage(updateOrderError)}
+                      </Alert.Description>
+                    </Alert.Content>
+                  </Alert>
+                )}
+              </AlertDialog.Body>
+              <AlertDialog.Footer>
+                <Button slot="close" variant="tertiary">
+                  Keep order
+                </Button>
+                <Button
+                  isPending={isUpdatingOrder}
+                  variant="danger"
+                  onPress={() => {
+                    if (!cancelOrder) return;
+                    void updateStatus(cancelOrder, "CANCELED").then(
+                      (didUpdate) => {
+                        if (didUpdate) setCancelOrder(undefined);
+                      },
+                    );
+                  }}
+                >
+                  Cancel order
+                </Button>
+              </AlertDialog.Footer>
+            </AlertDialog.Dialog>
+          </AlertDialog.Container>
+        </AlertDialog.Backdrop>
+      </AlertDialog>
     </div>
   );
 }

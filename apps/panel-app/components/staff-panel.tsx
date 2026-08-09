@@ -5,13 +5,25 @@ import type { TenantRegistration } from "@/src/api/tenant-registrations";
 
 import {
   Alert,
+  AlertDialog,
   Button,
   Input,
   Label,
   Spinner,
   Tabs,
   TextField,
+  Tooltip,
 } from "@heroui/react";
+import {
+  ArrowRight as ArrowRightIcon,
+  ChevronLeft as BackIcon,
+  ClipboardList as OrdersIcon,
+  LogOut as SignOutIcon,
+  MapPin as LocationsIcon,
+  Users as TeamIcon,
+  Workflow as IntegrationIcon,
+  X as CloseIcon,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
 import useSWRMutation from "swr/mutation";
@@ -19,7 +31,10 @@ import { ZodError } from "zod";
 
 import { OrderManagement } from "@/components/order-management";
 import { AccountManagement } from "@/components/account-management";
+import { BrandWordmark } from "@/components/brand-wordmark";
 import { IntegrationManagement } from "@/components/integration-management";
+import { LocationManagement } from "@/components/location-management";
+import { PanelAppearanceMenu } from "@/components/panel-appearance-menu";
 import { TenantRegistrationForm } from "@/components/tenant-registration-form";
 import { subscribeToAuthenticationRequired } from "@/src/api/auth-coordination";
 import { ApiError } from "@/src/api/api-fetch";
@@ -34,6 +49,42 @@ import { isStaffCacheKey } from "@/src/api/cache-keys";
 
 const currentAccountKey = ["authentication", "current-account"] as const;
 const logoutKey = ["authentication", "logout"] as const;
+
+function DismissibleNotice({
+  description,
+  onDismiss,
+  status,
+  title,
+}: {
+  description: string;
+  onDismiss: () => void;
+  status: "danger" | "success" | "warning";
+  title: string;
+}) {
+  return (
+    <Alert status={status}>
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Title>{title}</Alert.Title>
+        <Alert.Description>{description}</Alert.Description>
+      </Alert.Content>
+      <Tooltip delay={500}>
+        <Tooltip.Trigger>
+          <Button
+            isIconOnly
+            aria-label="Dismiss notification"
+            className="notice-dismiss rounded-md"
+            variant="tertiary"
+            onPress={onDismiss}
+          >
+            <CloseIcon size={18} />
+          </Button>
+        </Tooltip.Trigger>
+        <Tooltip.Content>Dismiss</Tooltip.Content>
+      </Tooltip>
+    </Alert>
+  );
+}
 
 function loginMutation(
   _key: typeof currentAccountKey,
@@ -77,12 +128,16 @@ function LoginForm({
   error,
   initialUsername,
   isPending,
+  onDismissConfirmation,
+  onDismissError,
   onSubmit,
 }: {
   confirmation?: string;
   error?: Error;
   initialUsername?: string;
   isPending: boolean;
+  onDismissConfirmation: () => void;
+  onDismissError: () => void;
   onSubmit: (credentials: LoginCredentials) => Promise<void>;
 }) {
   const [username, setUsername] = useState(initialUsername ?? "");
@@ -99,23 +154,21 @@ function LoginForm({
   return (
     <div className="flex flex-col gap-5">
       {confirmation && (
-        <Alert status="success">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Title>Tenant registered</Alert.Title>
-            <Alert.Description>{confirmation}</Alert.Description>
-          </Alert.Content>
-        </Alert>
+        <DismissibleNotice
+          description={confirmation}
+          status="success"
+          title="Tenant registered"
+          onDismiss={onDismissConfirmation}
+        />
       )}
 
       {error && (
-        <Alert status="danger">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Title>Sign-in failed</Alert.Title>
-            <Alert.Description>{getLoginErrorMessage(error)}</Alert.Description>
-          </Alert.Content>
-        </Alert>
+        <DismissibleNotice
+          description={getLoginErrorMessage(error)}
+          status="danger"
+          title="Sign-in failed"
+          onDismiss={onDismissError}
+        />
       )}
 
       <form className="flex flex-col gap-4" onSubmit={submit}>
@@ -132,7 +185,6 @@ function LoginForm({
           <Input
             autoCapitalize="none"
             autoComplete="username"
-            placeholder="panel.username"
             spellCheck={false}
           />
         </TextField>
@@ -153,6 +205,7 @@ function LoginForm({
 
         <Button fullWidth isPending={isPending} type="submit">
           {isPending ? "Signing in…" : "Sign in"}
+          {!isPending && <ArrowRightIcon size={18} />}
         </Button>
       </form>
     </div>
@@ -162,78 +215,97 @@ function LoginForm({
 function SignedOutPanel({
   loginError,
   isLoggingIn,
+  onDismissLoginError,
   onSignIn,
 }: {
   loginError?: Error;
   isLoggingIn: boolean;
+  onDismissLoginError: () => void;
   onSignIn: (credentials: LoginCredentials) => Promise<void>;
 }) {
   const [selectedView, setSelectedView] = useState<"login" | "register">(
     "login",
   );
   const [registration, setRegistration] = useState<TenantRegistration>();
+  const [showRegistrationNotice, setShowRegistrationNotice] = useState(false);
 
   function registered(result: TenantRegistration) {
     setRegistration(result);
+    setShowRegistrationNotice(true);
     setSelectedView("login");
   }
 
   return (
-    <div className="flex min-h-[60vh] items-center justify-center">
-      <div className="flex w-full max-w-xl flex-col gap-6">
-        <h1 className="text-3xl font-semibold">Kairos Staff Panel</h1>
+    <div className="flex min-h-[calc(100vh-5rem)] items-center justify-center py-8">
+      <div className="w-full max-w-md">
+        <div className="mb-8 text-center">
+          <BrandWordmark />
+        </div>
 
-        <Tabs
-          selectedKey={selectedView}
-          onSelectionChange={(key) =>
-            setSelectedView(key === "register" ? "register" : "login")
-          }
-        >
-          <Tabs.ListContainer>
-            <Tabs.List aria-label="Authentication">
-              <Tabs.Tab id="login">
-                Sign in
-                <Tabs.Indicator />
-              </Tabs.Tab>
-              <Tabs.Tab id="register">
-                Register tenant
-                <Tabs.Indicator />
-              </Tabs.Tab>
-            </Tabs.List>
-          </Tabs.ListContainer>
-          <Tabs.Panel className="pt-5" id="login">
-            <LoginForm
-              key={registration?.username ?? "login"}
-              confirmation={
-                registration
-                  ? "Sign in with the administrator account below."
-                  : undefined
-              }
-              error={loginError}
-              initialUsername={registration?.username}
-              isPending={isLoggingIn}
-              onSubmit={onSignIn}
-            />
-          </Tabs.Panel>
-          <Tabs.Panel className="pt-5" id="register">
-            <TenantRegistrationForm onRegistered={registered} />
-          </Tabs.Panel>
-        </Tabs>
+        <div>
+          {selectedView === "login" ? (
+            <>
+              <div className="mb-6">
+                <h1 className="text-2xl font-semibold tracking-tight">
+                  Welcome back
+                </h1>
+              </div>
+              <LoginForm
+                key={registration?.username ?? "login"}
+                confirmation={
+                  registration && showRegistrationNotice
+                    ? "Sign in with the administrator account below."
+                    : undefined
+                }
+                error={loginError}
+                initialUsername={registration?.username}
+                isPending={isLoggingIn}
+                onDismissConfirmation={() => setShowRegistrationNotice(false)}
+                onDismissError={onDismissLoginError}
+                onSubmit={onSignIn}
+              />
+              <div className="mt-7 border-t border-separator pt-5 text-center">
+                <Button
+                  variant="tertiary"
+                  onPress={() => setSelectedView("register")}
+                >
+                  Set up a new restaurant
+                  <ArrowRightIcon size={18} />
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="mb-5 flex items-center gap-3">
+                <Button
+                  isIconOnly
+                  aria-label="Back to sign in"
+                  size="lg"
+                  variant="tertiary"
+                  onPress={() => setSelectedView("login")}
+                >
+                  <BackIcon size={20} />
+                </Button>
+                <h1 className="text-2xl font-semibold tracking-tight">
+                  Create your account
+                </h1>
+              </div>
+              <TenantRegistrationForm onRegistered={registered} />
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
-function accountScope(account: CurrentAccount): string {
-  if (account.tenantRole === "ADMIN") return "Tenant administrator";
-
-  const role = account.assignment?.role === "MANAGER" ? "Manager" : "Operator";
-
-  return role;
-}
-
 export function StaffPanel() {
   const { mutate: mutateCache } = useSWRConfig();
+  const [selectedWorkspace, setSelectedWorkspace] = useState("orders");
+  const [requestedOrderLocationId, setRequestedOrderLocationId] =
+    useState<string>();
+  const [isSignOutConfirmationOpen, setIsSignOutConfirmationOpen] =
+    useState(false);
   const {
     data: account,
     error: accountError,
@@ -256,6 +328,7 @@ export function StaffPanel() {
   const {
     error: logoutError,
     isMutating: isLoggingOut,
+    reset: resetLogout,
     trigger: triggerLogout,
   } = useSWRMutation(logoutKey, logoutMutation, {
     throwOnError: false,
@@ -285,6 +358,7 @@ export function StaffPanel() {
 
     if (!didLogout) return;
 
+    setIsSignOutConfirmationOpen(false);
     await mutateAccount(undefined, { revalidate: false });
     await mutateCache(isStaffCacheKey, undefined, { revalidate: false });
   }
@@ -298,6 +372,7 @@ export function StaffPanel() {
       <SignedOutPanel
         isLoggingIn={isLoggingIn}
         loginError={loginError}
+        onDismissLoginError={resetLogin}
         onSignIn={signIn}
       />
     );
@@ -336,27 +411,38 @@ export function StaffPanel() {
     );
   }
 
-  const canProvisionAccounts = account.capabilities.includes(
-    "PROVISION_OPERATORS",
-  );
+  const canManageAccounts = account.capabilities.includes("INVITE_OPERATORS");
+  const canManageLocations = account.capabilities.includes("MANAGE_LOCATIONS");
   const canManageIntegrations = account.capabilities.includes(
     "MANAGE_EXTERNAL_INTEGRATIONS",
   );
+  const utilities = (
+    <div className="panel-workspace-utilities flex shrink-0 items-center gap-2">
+      <PanelAppearanceMenu />
+      <Tooltip delay={500}>
+        <Tooltip.Trigger>
+          <Button
+            isIconOnly
+            aria-label={isLoggingOut ? "Signing out" : "Sign out"}
+            className="rounded-md"
+            isPending={isLoggingOut}
+            size="lg"
+            variant="tertiary"
+            onPress={() => {
+              resetLogout();
+              setIsSignOutConfirmationOpen(true);
+            }}
+          >
+            <SignOutIcon size={20} />
+          </Button>
+        </Tooltip.Trigger>
+        <Tooltip.Content>Sign out</Tooltip.Content>
+      </Tooltip>
+    </div>
+  );
 
   return (
-    <div className="flex flex-col gap-8">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-semibold">Kairos Staff Panel</h1>
-          <p className="text-muted">
-            {account.username} · {accountScope(account)}
-          </p>
-        </div>
-        <Button isPending={isLoggingOut} variant="secondary" onPress={signOut}>
-          {isLoggingOut ? "Signing out…" : "Sign out"}
-        </Button>
-      </header>
-
+    <div className="flex flex-col gap-6">
       {accountError && (
         <Alert status="warning">
           <Alert.Indicator />
@@ -369,50 +455,83 @@ export function StaffPanel() {
         </Alert>
       )}
 
-      {logoutError && (
-        <Alert status="danger">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Title>Sign-out failed</Alert.Title>
-            <Alert.Description>
-              {getErrorMessage(logoutError)}
-            </Alert.Description>
-          </Alert.Content>
-        </Alert>
-      )}
-
-      {canProvisionAccounts || canManageIntegrations ? (
-        <Tabs>
-          <Tabs.ListContainer>
-            <Tabs.List aria-label="Staff workspace">
-              <Tabs.Tab id="orders">
-                Orders
-                <Tabs.Indicator />
-              </Tabs.Tab>
-              {canProvisionAccounts && (
-                <Tabs.Tab id="accounts">
-                  Accounts
+      {canManageAccounts || canManageLocations || canManageIntegrations ? (
+        <Tabs
+          selectedKey={selectedWorkspace}
+          onSelectionChange={(key) => setSelectedWorkspace(String(key))}
+        >
+          <div className="panel-workspace-controls">
+            <div aria-hidden="true" className="panel-workspace-spacer" />
+            <Tabs.ListContainer className="mobile-navigation panel-navigation">
+              <Tabs.List
+                aria-label="Staff workspace"
+                className="w-full justify-around sm:w-auto"
+              >
+                <Tabs.Tab id="orders">
+                  <span className="tab-motion-content">
+                    <OrdersIcon size={18} />
+                    <span>Orders</span>
+                  </span>
                   <Tabs.Indicator />
                 </Tabs.Tab>
-              )}
-              {canManageIntegrations && (
-                <Tabs.Tab id="integrations">
-                  Integrations
-                  <Tabs.Indicator />
-                </Tabs.Tab>
-              )}
-            </Tabs.List>
-          </Tabs.ListContainer>
+                {canManageLocations && (
+                  <Tabs.Tab id="locations">
+                    <span className="tab-motion-content">
+                      <LocationsIcon size={18} />
+                      <span>Locations</span>
+                    </span>
+                    <Tabs.Indicator />
+                  </Tabs.Tab>
+                )}
+                {canManageAccounts && (
+                  <Tabs.Tab id="accounts">
+                    <span className="tab-motion-content">
+                      <TeamIcon size={18} />
+                      <span>Accounts</span>
+                    </span>
+                    <Tabs.Indicator />
+                  </Tabs.Tab>
+                )}
+                {canManageIntegrations && (
+                  <Tabs.Tab id="integrations">
+                    <span className="tab-motion-content">
+                      <IntegrationIcon size={18} />
+                      <span>Integrations</span>
+                    </span>
+                    <Tabs.Indicator />
+                  </Tabs.Tab>
+                )}
+              </Tabs.List>
+            </Tabs.ListContainer>
+            {utilities}
+          </div>
           <Tabs.Panel className="pt-6" id="orders">
             <OrderManagement
               key={`orders-${account.accountId}`}
               accountId={account.accountId}
+              canManageLocations={canManageLocations}
               canViewTenantOrders={account.capabilities.includes(
                 "VIEW_TENANT_ORDERS",
               )}
+              requestedLocationId={requestedOrderLocationId}
+              onRequestedLocationApplied={() =>
+                setRequestedOrderLocationId(undefined)
+              }
             />
           </Tabs.Panel>
-          {canProvisionAccounts && (
+          {canManageLocations && (
+            <Tabs.Panel className="pt-6" id="locations">
+              <LocationManagement
+                key={`locations-${account.accountId}`}
+                accountId={account.accountId}
+                onViewOrders={(locationId) => {
+                  setRequestedOrderLocationId(locationId);
+                  setSelectedWorkspace("orders");
+                }}
+              />
+            </Tabs.Panel>
+          )}
+          {canManageAccounts && (
             <Tabs.Panel className="pt-6" id="accounts">
               <AccountManagement
                 key={`accounts-${account.accountId}`}
@@ -430,14 +549,70 @@ export function StaffPanel() {
           )}
         </Tabs>
       ) : (
-        <OrderManagement
-          key={account.accountId}
-          accountId={account.accountId}
-          canViewTenantOrders={account.capabilities.includes(
-            "VIEW_TENANT_ORDERS",
-          )}
-        />
+        <>
+          <div className="flex justify-end">{utilities}</div>
+          <OrderManagement
+            key={account.accountId}
+            accountId={account.accountId}
+            canManageLocations={false}
+            canViewTenantOrders={account.capabilities.includes(
+              "VIEW_TENANT_ORDERS",
+            )}
+          />
+        </>
       )}
+
+      <AlertDialog
+        isOpen={isSignOutConfirmationOpen}
+        onOpenChange={(open) => {
+          if (isLoggingOut) return;
+
+          setIsSignOutConfirmationOpen(open);
+          if (!open) resetLogout();
+        }}
+      >
+        <AlertDialog.Backdrop>
+          <AlertDialog.Container>
+            <AlertDialog.Dialog className="sm:max-w-[420px]">
+              <AlertDialog.CloseTrigger />
+              <AlertDialog.Header>
+                <AlertDialog.Icon status="warning" />
+                <AlertDialog.Heading>Sign out?</AlertDialog.Heading>
+              </AlertDialog.Header>
+              <AlertDialog.Body className="flex flex-col gap-4">
+                <p>You will need to sign in again to manage orders.</p>
+                {logoutError && (
+                  <Alert status="danger">
+                    <Alert.Indicator />
+                    <Alert.Content>
+                      <Alert.Title>Sign-out failed</Alert.Title>
+                      <Alert.Description>
+                        {getErrorMessage(logoutError)}
+                      </Alert.Description>
+                    </Alert.Content>
+                  </Alert>
+                )}
+              </AlertDialog.Body>
+              <AlertDialog.Footer>
+                <Button
+                  isDisabled={isLoggingOut}
+                  slot="close"
+                  variant="tertiary"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  isPending={isLoggingOut}
+                  variant="danger"
+                  onPress={() => void signOut()}
+                >
+                  Sign out
+                </Button>
+              </AlertDialog.Footer>
+            </AlertDialog.Dialog>
+          </AlertDialog.Container>
+        </AlertDialog.Backdrop>
+      </AlertDialog>
     </div>
   );
 }

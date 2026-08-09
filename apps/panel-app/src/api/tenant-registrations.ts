@@ -31,7 +31,6 @@ const tenantRegistrationInputSchema = z
 
 const tenantRegistrationSchema = z.object({
   tenantId: z.uuid(),
-  locationId: z.uuid(),
   administratorAccountId: z.uuid(),
   username: z.string(),
 });

@@ -1,46 +1,51 @@
 import { z } from "zod";
 
-import {
-  optionalEmailInputSchema,
-  passwordInputSchema,
-  usernameInputSchema,
-} from "./account-input";
-import { request } from "./api-fetch";
+import { apiFetch, request } from "./api-fetch";
 
 export const assignmentRoleSchema = z.enum(["MANAGER", "OPERATOR"]);
-
-const provisionAccountInputSchema = z.object({
-  username: usernameInputSchema,
-  email: optionalEmailInputSchema,
-  password: passwordInputSchema,
-  role: assignmentRoleSchema,
-});
 
 const managedAccountSchema = z.object({
   id: z.uuid(),
   tenantId: z.uuid(),
   locationId: z.uuid(),
   username: z.string(),
-  email: z.string().nullable(),
+  email: z.string(),
   role: assignmentRoleSchema,
-  status: z.enum(["ACTIVE", "DISABLED"]),
+  status: z.enum(["ENABLED", "DISABLED"]),
   createdAt: z.iso.datetime({ offset: true }),
   updatedAt: z.iso.datetime({ offset: true }),
 });
 
+const managedAccountsSchema = z.array(managedAccountSchema);
+
 export type AssignmentRole = z.infer<typeof assignmentRoleSchema>;
-export type ProvisionAccountInput = z.input<typeof provisionAccountInputSchema>;
 export type ManagedAccount = z.infer<typeof managedAccountSchema>;
 
-export function provisionAccount(
-  locationId: string,
-  account: ProvisionAccountInput,
-): Promise<ManagedAccount> {
-  const input = provisionAccountInputSchema.parse(account);
+export function listManagedAccounts(): Promise<ManagedAccount[]> {
+  return request("/api/accounts/v1", managedAccountsSchema);
+}
 
-  return request("/api/accounts/v1", managedAccountSchema, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ locationId, ...input }),
+export function updateManagedAccountStatus(
+  accountId: string,
+  status: "ENABLED" | "DISABLED",
+): Promise<ManagedAccount> {
+  return request(
+    `/api/accounts/v1/${encodeURIComponent(accountId)}/status`,
+    managedAccountSchema,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    },
+  );
+}
+
+export async function deleteManagedAccount(
+  accountId: string,
+): Promise<boolean> {
+  await apiFetch(`/api/accounts/v1/${encodeURIComponent(accountId)}`, {
+    method: "DELETE",
   });
+
+  return true;
 }

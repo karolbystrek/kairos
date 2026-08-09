@@ -1,59 +1,99 @@
+"use client";
+
 import type { FormEvent } from "react";
 import type { CurrentAccount } from "@/src/api/authentication";
 
 import {
   Alert,
+  AlertDialog,
+  Badge,
   Button,
-  Chip,
   Input,
-  Label,
+  ListBox,
+  Modal,
+  Radio,
+  RadioGroup,
+  Select,
   Spinner,
+  Label,
   TextField,
+  Tooltip,
 } from "@heroui/react";
-import { useState } from "react";
+import {
+  ArrowRight as ArrowRightIcon,
+  Ban as DisableIcon,
+  Check as CheckIcon,
+  Plus as PlusIcon,
+  Trash2 as DeleteIcon,
+  UserRoundPlus as InvitationIcon,
+} from "lucide-react";
+import { useEffect, useState } from "react";
 import useSWR from "swr";
 import useSWRMutation from "swr/mutation";
-import { ZodError } from "zod";
 
+import { OneTimeSecret } from "@/components/integrations/one-time-secret";
+import { PanelCard } from "@/components/panel-card";
+import { PanelDetailHeader } from "@/components/panel-detail-header";
 import {
-  provisionAccount,
+  createAccountInvitation,
+  listAccountInvitations,
+  revokeAccountInvitation,
+  type AccountInvitation,
+  type CreatedAccountInvitation,
+  type CreateAccountInvitationInput,
+} from "@/src/api/account-invitations";
+import {
+  deleteManagedAccount,
+  listManagedAccounts,
+  updateManagedAccountStatus,
   type AssignmentRole,
   type ManagedAccount,
-  type ProvisionAccountInput,
 } from "@/src/api/accounts";
 import { ApiError } from "@/src/api/api-fetch";
-import { staffCachePrefix, staffLocationsKey } from "@/src/api/cache-keys";
-import { listLocations } from "@/src/api/locations";
+import {
+  staffAccountsKey,
+  staffInvitationsKey,
+  staffLocationsKey,
+} from "@/src/api/cache-keys";
+import { listLocations, type Location } from "@/src/api/locations";
 
-type ProvisionMutationInput = {
-  locationId: string;
-  account: ProvisionAccountInput;
+type StatusMutationInput = {
+  accountId: string;
+  status: "ENABLED" | "DISABLED";
 };
 
-const accountProvisioningKey = (accountId: string) =>
-  [staffCachePrefix, accountId, "account-provisioning"] as const;
+function createInvitationMutation(
+  _key: ReturnType<typeof staffInvitationsKey>,
+  { arg }: { arg: CreateAccountInvitationInput },
+): Promise<CreatedAccountInvitation> {
+  return createAccountInvitation(arg);
+}
 
-function provisionAccountMutation(
-  _key: ReturnType<typeof accountProvisioningKey>,
-  { arg }: { arg: ProvisionMutationInput },
+function revokeInvitationMutation(
+  _key: ReturnType<typeof staffInvitationsKey>,
+  { arg }: { arg: string },
+): Promise<boolean> {
+  return revokeAccountInvitation(arg);
+}
+
+function statusMutation(
+  _key: ReturnType<typeof staffAccountsKey>,
+  { arg }: { arg: StatusMutationInput },
 ): Promise<ManagedAccount> {
-  return provisionAccount(arg.locationId, arg.account);
+  return updateManagedAccountStatus(arg.accountId, arg.status);
+}
+
+function deleteMutation(
+  _key: ReturnType<typeof staffAccountsKey>,
+  { arg }: { arg: string },
+): Promise<boolean> {
+  return deleteManagedAccount(arg);
 }
 
 function getErrorMessage(error: unknown): string {
-  if (error instanceof ZodError) {
-    return error.issues[0]?.message ?? "The submitted values are not valid.";
-  }
+  if (error instanceof ApiError) return error.message;
 
-  if (error instanceof ApiError) {
-    if (error.status === 409) {
-      return "That username or email is already in use.";
-    }
-
-    return error.message;
-  }
-
-  return "Account provisioning could not be completed. Check your connection and try again.";
+  return "Account management could not be completed. Check your connection and try again.";
 }
 
 function shouldRetryOnError(error: Error): boolean {
@@ -64,14 +104,71 @@ function shouldRetryOnError(error: Error): boolean {
   );
 }
 
+function LocationSelect({
+  locations,
+  onChange,
+  selectedId,
+}: {
+  locations: Location[];
+  onChange: (locationId: string) => void;
+  selectedId?: string;
+}) {
+  return (
+    <Select
+      fullWidth
+      aria-label="Location"
+      className="min-w-0 max-w-full"
+      selectedKey={selectedId}
+      onSelectionChange={(key) => {
+        if (key !== null) onChange(String(key));
+      }}
+    >
+      <Label>Location</Label>
+      <Select.Trigger className="min-w-0 max-w-full">
+        <Select.Value className="min-w-0" />
+        <Select.Indicator />
+      </Select.Trigger>
+      <Select.Popover>
+        <ListBox items={locations}>
+          {(location) => (
+            <ListBox.Item id={location.id} textValue={location.name}>
+              {location.name}
+            </ListBox.Item>
+          )}
+        </ListBox>
+      </Select.Popover>
+    </Select>
+  );
+}
+
+function formatDateTime(value: string): string {
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
+}
+
 export function AccountManagement({ account }: { account: CurrentAccount }) {
   const isAdministrator = account.tenantRole === "ADMIN";
+  const [selectedAccountId, setSelectedAccountId] = useState<string>();
+  const [accountToDisable, setAccountToDisable] = useState<ManagedAccount>();
+  const [accountToDelete, setAccountToDelete] = useState<ManagedAccount>();
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isInvitationsOpen, setIsInvitationsOpen] = useState(false);
+  const [invitationToRevoke, setInvitationToRevoke] =
+    useState<AccountInvitation>();
+  const [createdInvitation, setCreatedInvitation] =
+    useState<CreatedAccountInvitation>();
   const [selectedLocationId, setSelectedLocationId] = useState<string>();
   const [role, setRole] = useState<AssignmentRole>("OPERATOR");
-  const [username, setUsername] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [createdAccount, setCreatedAccount] = useState<ManagedAccount>();
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setNow(Date.now()), 60_000);
+
+    return () => window.clearInterval(interval);
+  }, []);
 
   const {
     data: locations = [],
@@ -81,188 +178,745 @@ export function AccountManagement({ account }: { account: CurrentAccount }) {
     errorRetryCount: 3,
     shouldRetryOnError,
   });
-
+  const enabledLocations = locations.filter(
+    (location) => location.status === "ENABLED",
+  );
   const {
-    error: provisioningError,
-    isMutating,
-    reset,
-    trigger: triggerProvisioning,
+    data: accounts = [],
+    error: accountsError,
+    isLoading: areAccountsLoading,
+    mutate: mutateAccounts,
+  } = useSWR(staffAccountsKey(account.accountId), listManagedAccounts, {
+    errorRetryCount: 3,
+    shouldRetryOnError,
+  });
+  const {
+    data: invitations = [],
+    error: invitationsError,
+    isLoading: areInvitationsLoading,
+    mutate: mutateInvitations,
+  } = useSWR(staffInvitationsKey(account.accountId), listAccountInvitations, {
+    errorRetryCount: 3,
+    shouldRetryOnError,
+  });
+  const {
+    error: creationError,
+    isMutating: isCreating,
+    reset: resetCreation,
+    trigger: triggerCreation,
   } = useSWRMutation(
-    accountProvisioningKey(account.accountId),
-    provisionAccountMutation,
+    staffInvitationsKey(account.accountId),
+    createInvitationMutation,
     { throwOnError: false },
   );
+  const {
+    error: revocationError,
+    isMutating: isRevoking,
+    reset: resetRevocation,
+    trigger: triggerRevocation,
+  } = useSWRMutation(
+    staffInvitationsKey(account.accountId),
+    revokeInvitationMutation,
+    { throwOnError: false },
+  );
+  const {
+    error: statusError,
+    isMutating: isChangingStatus,
+    reset: resetStatus,
+    trigger: triggerStatus,
+  } = useSWRMutation(staffAccountsKey(account.accountId), statusMutation, {
+    throwOnError: false,
+  });
+  const {
+    error: deletionError,
+    isMutating: isDeleting,
+    reset: resetDeletion,
+    trigger: triggerDeletion,
+  } = useSWRMutation(staffAccountsKey(account.accountId), deleteMutation, {
+    throwOnError: false,
+  });
 
   const assignedLocationId = account.assignment?.locationId;
   const locationId = isAdministrator
-    ? locations.some((location) => location.id === selectedLocationId)
+    ? enabledLocations.some((location) => location.id === selectedLocationId)
       ? selectedLocationId
-      : locations[0]?.id
+      : enabledLocations[0]?.id
     : assignedLocationId;
   const selectedRole = isAdministrator ? role : "OPERATOR";
-  const error = locationsError ?? provisioningError;
+  const selectedAccount =
+    accounts.find((candidate) => candidate.id === selectedAccountId) ??
+    accounts[0];
+  const locationNames = new Map(
+    locations.map((location) => [location.id, location.name]),
+  );
+  const pendingInvitations = invitations.filter(
+    (invitation) => new Date(invitation.expiresAt).getTime() > now,
+  );
+  const collectionError = locationsError ?? accountsError ?? statusError;
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
+  async function submitInvitation(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!locationId || isMutating) return;
-
-    reset();
-    setCreatedAccount(undefined);
-    const result = await triggerProvisioning({
+    if (!locationId || isCreating) return;
+    resetCreation();
+    const created = await triggerCreation({
       locationId,
-      account: {
-        username,
-        email,
-        password,
-        role: selectedRole,
-      },
+      role: selectedRole,
     });
 
-    if (!result) return;
+    if (!created) return;
+    setCreatedInvitation(created);
+    await mutateInvitations((current) => [created, ...(current ?? [])], {
+      revalidate: false,
+    });
+    void mutateInvitations(undefined, { throwOnError: false });
+  }
 
-    setCreatedAccount(result);
-    setUsername("");
-    setEmail("");
-    setPassword("");
+  async function revokeInvitation(): Promise<void> {
+    if (!invitationToRevoke) return;
+    resetRevocation();
+    const revoked = await triggerRevocation(invitationToRevoke.id);
+
+    if (!revoked) return;
+    await mutateInvitations(
+      (current) =>
+        (current ?? []).filter(
+          (invitation) => invitation.id !== invitationToRevoke.id,
+        ),
+      { revalidate: false },
+    );
+    setInvitationToRevoke(undefined);
+    void mutateInvitations(undefined, { throwOnError: false });
+  }
+
+  async function changeStatus(
+    managedAccount: ManagedAccount,
+  ): Promise<boolean> {
+    resetStatus();
+    const updated = await triggerStatus({
+      accountId: managedAccount.id,
+      status: managedAccount.status === "ENABLED" ? "DISABLED" : "ENABLED",
+    });
+
+    if (!updated) return false;
+    await mutateAccounts(
+      (current) =>
+        (current ?? [updated]).map((candidate) =>
+          candidate.id === updated.id ? updated : candidate,
+        ),
+      { revalidate: false },
+    );
+    if (updated.status === "DISABLED") {
+      void mutateInvitations(undefined, { throwOnError: false });
+    }
+
+    return true;
+  }
+
+  async function removeAccount(): Promise<boolean> {
+    if (!accountToDelete) return false;
+
+    resetDeletion();
+    const deleted = await triggerDeletion(accountToDelete.id);
+
+    if (!deleted) return false;
+    await mutateAccounts(
+      (current) =>
+        (current ?? []).filter(
+          (candidate) => candidate.id !== accountToDelete.id,
+        ),
+      { revalidate: false },
+    );
+    setSelectedAccountId(undefined);
+    setAccountToDelete(undefined);
+    setDeleteConfirmation("");
+    void mutateAccounts(undefined, { throwOnError: false });
+    void mutateInvitations(undefined, { throwOnError: false });
+
+    return true;
+  }
+
+  function openCreate() {
+    resetCreation();
+    setCreatedInvitation(undefined);
+    setSelectedLocationId(locationId ?? enabledLocations[0]?.id);
+    setRole("OPERATOR");
+    setIsCreateOpen(true);
   }
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h2 className="text-2xl font-semibold">Provision account</h2>
-        <p className="text-muted">
-          Create credentials for an existing tenant location.
-        </p>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-4">
+          <h1 className="page-title">Accounts</h1>
+          <Tooltip delay={500}>
+            <Tooltip.Trigger>
+              <Button
+                isIconOnly
+                aria-label="New account"
+                className="rounded-md"
+                isDisabled={enabledLocations.length === 0}
+                size="lg"
+                onPress={openCreate}
+              >
+                <PlusIcon size={20} />
+              </Button>
+            </Tooltip.Trigger>
+            <Tooltip.Content>New account</Tooltip.Content>
+          </Tooltip>
+        </div>
+        <Tooltip delay={500}>
+          <Tooltip.Trigger>
+            <Badge.Anchor>
+              <Button
+                isIconOnly
+                aria-label={
+                  pendingInvitations.length > 0
+                    ? `Invitations, ${pendingInvitations.length} pending`
+                    : "Invitations"
+                }
+                className="rounded-md"
+                size="lg"
+                variant="secondary"
+                onPress={() => setIsInvitationsOpen(true)}
+              >
+                <InvitationIcon size={20} />
+              </Button>
+              {pendingInvitations.length > 0 && (
+                <Badge color="accent" size="sm">
+                  {pendingInvitations.length}
+                </Badge>
+              )}
+            </Badge.Anchor>
+          </Tooltip.Trigger>
+          <Tooltip.Content>Invitations</Tooltip.Content>
+        </Tooltip>
       </div>
 
-      {error && (
+      {collectionError && (
         <Alert status="danger">
           <Alert.Indicator />
           <Alert.Content>
             <Alert.Title>Account request failed</Alert.Title>
-            <Alert.Description>{getErrorMessage(error)}</Alert.Description>
-          </Alert.Content>
-        </Alert>
-      )}
-
-      {createdAccount && (
-        <Alert status="success">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Title>Account created</Alert.Title>
             <Alert.Description>
-              {createdAccount.username} ·{" "}
-              {createdAccount.role === "MANAGER" ? "Manager" : "Operator"}
-              {createdAccount.email ? ` · ${createdAccount.email}` : ""}
+              {getErrorMessage(collectionError)}
             </Alert.Description>
           </Alert.Content>
         </Alert>
       )}
 
-      {areLocationsLoading ? (
-        <Spinner aria-label="Loading locations" />
-      ) : locations.length === 0 || !locationId ? (
-        <p className="text-muted">
-          Account provisioning requires an available location.
-        </p>
-      ) : (
-        <>
-          <section className="flex flex-col gap-3">
-            <h3 className="text-lg font-semibold">Location</h3>
-            {isAdministrator ? (
-              <div className="flex flex-wrap gap-2">
-                {locations.map((location) => (
-                  <Button
-                    key={location.id}
-                    variant={
-                      location.id === locationId ? "primary" : "secondary"
-                    }
-                    onPress={() => setSelectedLocationId(location.id)}
-                  >
-                    {location.id}
-                  </Button>
-                ))}
-              </div>
-            ) : (
-              <Chip>{locationId}</Chip>
-            )}
-          </section>
-
-          <section className="flex flex-col gap-3">
-            <h3 className="text-lg font-semibold">Role</h3>
-            {isAdministrator ? (
-              <div className="flex flex-wrap gap-2">
-                {(["MANAGER", "OPERATOR"] as const).map((availableRole) => (
-                  <Button
-                    key={availableRole}
-                    variant={
-                      availableRole === selectedRole ? "primary" : "secondary"
-                    }
-                    onPress={() => setRole(availableRole)}
-                  >
-                    {availableRole === "MANAGER" ? "Manager" : "Operator"}
-                  </Button>
-                ))}
-              </div>
-            ) : (
-              <Chip>Operator</Chip>
-            )}
-          </section>
-
-          <form className="flex max-w-xl flex-col gap-4" onSubmit={submit}>
-            <TextField
-              fullWidth
-              isRequired
-              isDisabled={isMutating}
-              maxLength={120}
-              name="username"
-              value={username}
-              onChange={setUsername}
-            >
-              <Label>Username</Label>
-              <Input
-                autoCapitalize="none"
-                autoComplete="off"
-                spellCheck={false}
-              />
-            </TextField>
-
-            <TextField
-              fullWidth
-              isDisabled={isMutating}
-              maxLength={254}
-              name="email"
-              type="email"
-              value={email}
-              onChange={setEmail}
-            >
-              <Label>Email (optional)</Label>
-              <Input
-                autoCapitalize="none"
-                autoComplete="off"
-                spellCheck={false}
-              />
-            </TextField>
-
-            <TextField
-              fullWidth
-              isRequired
-              isDisabled={isMutating}
-              name="password"
-              type="password"
-              value={password}
-              onChange={setPassword}
-            >
-              <Label>Initial password</Label>
-              <Input autoComplete="new-password" />
-            </TextField>
-
-            <Button isPending={isMutating} type="submit">
-              {isMutating ? "Creating…" : "Create account"}
-            </Button>
-          </form>
-        </>
+      {!areLocationsLoading && enabledLocations.length === 0 && (
+        <Alert status="warning">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Title>Account invitations unavailable</Alert.Title>
+            <Alert.Description>
+              Create a location before inviting an account.
+            </Alert.Description>
+          </Alert.Content>
+        </Alert>
       )}
+
+      {areLocationsLoading || areAccountsLoading ? (
+        <div className="flex min-h-80 items-center justify-center">
+          <Spinner aria-label="Loading accounts" />
+        </div>
+      ) : accounts.length === 0 ? (
+        <div className="py-12">
+          <h2 className="section-title">No managed accounts yet</h2>
+          <p className="mt-2 max-w-sm secondary-text">
+            {isAdministrator
+              ? "Invite a manager or operator to an existing location."
+              : "Invite an operator to your location."}
+          </p>
+        </div>
+      ) : (
+        <div className="grid gap-6 md:grid-cols-[minmax(220px,0.65fr)_minmax(0,1.35fr)]">
+          <section className="border-t border-separator pt-2 md:border-r md:border-t-0 md:pr-6 md:pt-0">
+            {accounts.map((managedAccount) => (
+              <PanelCard
+                key={managedAccount.id}
+                accessibilityLabel={`View account ${managedAccount.username}`}
+                isSelected={managedAccount.id === selectedAccount?.id}
+                metadata={
+                  <span
+                    className={
+                      managedAccount.status === "ENABLED"
+                        ? "text-accent"
+                        : "secondary-text"
+                    }
+                  >
+                    {managedAccount.status === "ENABLED"
+                      ? "Enabled"
+                      : "Disabled"}
+                  </span>
+                }
+                title={managedAccount.username}
+                trailing={<ArrowRightIcon size={17} />}
+                onPress={() => setSelectedAccountId(managedAccount.id)}
+              />
+            ))}
+          </section>
+
+          {selectedAccount && (
+            <section className="min-w-0">
+              <PanelDetailHeader
+                eyebrow="Account"
+                title={selectedAccount.username}
+                trailingActions={
+                  <>
+                    <Tooltip delay={500}>
+                      <Tooltip.Trigger>
+                        <Button
+                          isIconOnly
+                          aria-label={`${selectedAccount.status === "ENABLED" ? "Disable" : "Enable"} account ${selectedAccount.username}`}
+                          className="shrink-0 rounded-md"
+                          isPending={isChangingStatus}
+                          variant={
+                            selectedAccount.status === "ENABLED"
+                              ? "danger"
+                              : "secondary"
+                          }
+                          onPress={() => {
+                            if (selectedAccount.status === "ENABLED") {
+                              setAccountToDisable(selectedAccount);
+                            } else {
+                              void changeStatus(selectedAccount);
+                            }
+                          }}
+                        >
+                          {selectedAccount.status === "ENABLED" ? (
+                            <DisableIcon size={20} />
+                          ) : (
+                            <CheckIcon size={20} />
+                          )}
+                        </Button>
+                      </Tooltip.Trigger>
+                      <Tooltip.Content>
+                        {selectedAccount.status === "ENABLED"
+                          ? "Disable"
+                          : "Enable"}
+                      </Tooltip.Content>
+                    </Tooltip>
+                    <Tooltip delay={500}>
+                      <Tooltip.Trigger>
+                        <Button
+                          isIconOnly
+                          aria-label={`Delete account ${selectedAccount.username}`}
+                          className="shrink-0 rounded-md"
+                          variant="danger"
+                          onPress={() => {
+                            resetDeletion();
+                            setDeleteConfirmation("");
+                            setAccountToDelete(selectedAccount);
+                          }}
+                        >
+                          <DeleteIcon size={20} />
+                        </Button>
+                      </Tooltip.Trigger>
+                      <Tooltip.Content>Delete</Tooltip.Content>
+                    </Tooltip>
+                  </>
+                }
+              />
+
+              <dl className="mt-8 grid gap-5 border-t border-separator pt-6 sm:grid-cols-2">
+                <div>
+                  <dt className="text-xs font-medium uppercase tracking-[0.12em] text-muted">
+                    Role
+                  </dt>
+                  <dd className="mt-1 font-medium">
+                    {selectedAccount.role === "MANAGER"
+                      ? "Manager"
+                      : "Operator"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-medium uppercase tracking-[0.12em] text-muted">
+                    Location
+                  </dt>
+                  <dd className="mt-1 font-medium">
+                    {locationNames.get(selectedAccount.locationId) ??
+                      "Unavailable"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-medium uppercase tracking-[0.12em] text-muted">
+                    Email
+                  </dt>
+                  <dd className="mt-1 break-words font-medium">
+                    {selectedAccount.email}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-medium uppercase tracking-[0.12em] text-muted">
+                    Created
+                  </dt>
+                  <dd className="mt-1 font-medium">
+                    {new Date(selectedAccount.createdAt).toLocaleDateString()}
+                  </dd>
+                </div>
+              </dl>
+            </section>
+          )}
+        </div>
+      )}
+
+      <Modal
+        isOpen={isCreateOpen}
+        onOpenChange={(open) => {
+          setIsCreateOpen(open);
+          if (!open) setCreatedInvitation(undefined);
+        }}
+      >
+        <Modal.Backdrop>
+          <Modal.Container placement="center" size="lg">
+            <Modal.Dialog className="min-w-0">
+              <Modal.CloseTrigger />
+              <Modal.Header>
+                <Modal.Heading>
+                  {createdInvitation ? "Invitation link" : "New account"}
+                </Modal.Heading>
+              </Modal.Header>
+              {createdInvitation ? (
+                <Modal.Body className="min-w-0 max-w-full pb-6">
+                  <OneTimeSecret
+                    secret={{
+                      title: "Share this invitation",
+                      description: `${createdInvitation.role === "MANAGER" ? "Manager" : "Operator"} · ${createdInvitation.locationName}`,
+                      value: createdInvitation.invitationLink,
+                    }}
+                    onConfirmed={() => setIsCreateOpen(false)}
+                  />
+                </Modal.Body>
+              ) : (
+                <form
+                  className="min-w-0 max-w-full"
+                  onSubmit={submitInvitation}
+                >
+                  <Modal.Body className="flex min-w-0 max-w-full flex-col gap-4">
+                    {creationError && (
+                      <Alert status="danger">
+                        <Alert.Indicator />
+                        <Alert.Content>
+                          <Alert.Title>
+                            Invitation could not be created
+                          </Alert.Title>
+                          <Alert.Description>
+                            {getErrorMessage(creationError)}
+                          </Alert.Description>
+                        </Alert.Content>
+                      </Alert>
+                    )}
+                    {isAdministrator ? (
+                      <LocationSelect
+                        locations={enabledLocations}
+                        selectedId={locationId}
+                        onChange={setSelectedLocationId}
+                      />
+                    ) : (
+                      <div className="min-w-0 max-w-full">
+                        <p className="text-sm font-medium">Location</p>
+                        <p className="mt-1 break-words text-sm text-muted">
+                          {
+                            locations.find(
+                              (location) => location.id === locationId,
+                            )?.name
+                          }
+                        </p>
+                      </div>
+                    )}
+                    {isAdministrator && (
+                      <RadioGroup
+                        className="min-w-0 max-w-full"
+                        name="account-role"
+                        orientation="horizontal"
+                        value={role}
+                        onChange={(value) =>
+                          setRole(value === "MANAGER" ? "MANAGER" : "OPERATOR")
+                        }
+                      >
+                        <Label>Role</Label>
+                        <Radio value="OPERATOR">
+                          <Radio.Content>
+                            <Radio.Control>
+                              <Radio.Indicator />
+                            </Radio.Control>
+                            Operator
+                          </Radio.Content>
+                        </Radio>
+                        <Radio value="MANAGER">
+                          <Radio.Content>
+                            <Radio.Control>
+                              <Radio.Indicator />
+                            </Radio.Control>
+                            Manager
+                          </Radio.Content>
+                        </Radio>
+                      </RadioGroup>
+                    )}
+                  </Modal.Body>
+                  <Modal.Footer className="max-w-full flex-wrap">
+                    <Button slot="close" variant="tertiary">
+                      Cancel
+                    </Button>
+                    <Button isPending={isCreating} type="submit">
+                      <PlusIcon size={18} />
+                      {isCreating ? "Creating…" : "Create invitation"}
+                    </Button>
+                  </Modal.Footer>
+                </form>
+              )}
+            </Modal.Dialog>
+          </Modal.Container>
+        </Modal.Backdrop>
+      </Modal>
+
+      <Modal isOpen={isInvitationsOpen} onOpenChange={setIsInvitationsOpen}>
+        <Modal.Backdrop>
+          <Modal.Container placement="center" size="lg">
+            <Modal.Dialog className="max-h-[min(90vh,760px)] sm:max-w-3xl">
+              <Modal.CloseTrigger />
+              <Modal.Header>
+                <Modal.Heading>Pending invitations</Modal.Heading>
+              </Modal.Header>
+              <Modal.Body className="pb-6">
+                {areInvitationsLoading ? (
+                  <div className="flex min-h-48 items-center justify-center">
+                    <Spinner aria-label="Loading invitations" />
+                  </div>
+                ) : invitationsError ? (
+                  <Alert status="danger">
+                    <Alert.Indicator />
+                    <Alert.Content>
+                      <Alert.Title>Invitations could not load</Alert.Title>
+                      <Alert.Description>
+                        {getErrorMessage(invitationsError)}
+                      </Alert.Description>
+                      <Button
+                        className="mt-3"
+                        size="sm"
+                        variant="danger"
+                        onPress={() => void mutateInvitations()}
+                      >
+                        Retry
+                      </Button>
+                    </Alert.Content>
+                  </Alert>
+                ) : pendingInvitations.length === 0 ? (
+                  <p className="py-12 text-center secondary-text">
+                    No pending invitations
+                  </p>
+                ) : (
+                  <ul className="divide-y divide-separator">
+                    {pendingInvitations.map((invitation) => (
+                      <li
+                        key={invitation.id}
+                        className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between"
+                      >
+                        <div className="min-w-0">
+                          <p className="font-semibold">
+                            {invitation.role === "MANAGER"
+                              ? "Manager"
+                              : "Operator"}
+                            <span className="font-normal text-muted">
+                              {" "}
+                              · {invitation.locationName}
+                            </span>
+                          </p>
+                          <p className="mt-1 text-sm text-muted">
+                            Created by {invitation.issuedByUsername} on{" "}
+                            {formatDateTime(invitation.createdAt)}
+                          </p>
+                          <p className="mt-1 text-sm text-muted">
+                            Expires {formatDateTime(invitation.expiresAt)}
+                          </p>
+                        </div>
+                        <Tooltip delay={500}>
+                          <Tooltip.Trigger>
+                            <Button
+                              isIconOnly
+                              aria-label={`Revoke ${invitation.role === "MANAGER" ? "manager" : "operator"} invitation for ${invitation.locationName}`}
+                              className="shrink-0 self-end rounded-md sm:self-auto"
+                              variant="danger"
+                              onPress={() => {
+                                resetRevocation();
+                                setInvitationToRevoke(invitation);
+                              }}
+                            >
+                              <DisableIcon size={20} />
+                            </Button>
+                          </Tooltip.Trigger>
+                          <Tooltip.Content>Revoke</Tooltip.Content>
+                        </Tooltip>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Modal.Body>
+            </Modal.Dialog>
+          </Modal.Container>
+        </Modal.Backdrop>
+      </Modal>
+
+      <AlertDialog
+        isOpen={Boolean(invitationToRevoke)}
+        onOpenChange={(open) => {
+          if (!open && !isRevoking) setInvitationToRevoke(undefined);
+        }}
+      >
+        <AlertDialog.Backdrop>
+          <AlertDialog.Container>
+            <AlertDialog.Dialog className="sm:max-w-[440px]">
+              <AlertDialog.CloseTrigger />
+              <AlertDialog.Header>
+                <AlertDialog.Icon status="danger" />
+                <AlertDialog.Heading>Revoke invitation?</AlertDialog.Heading>
+              </AlertDialog.Header>
+              <AlertDialog.Body className="flex flex-col gap-4">
+                <p>
+                  The{" "}
+                  {invitationToRevoke?.role === "MANAGER"
+                    ? "manager"
+                    : "operator"}{" "}
+                  invitation for {invitationToRevoke?.locationName} will stop
+                  working immediately.
+                </p>
+                {revocationError && (
+                  <Alert status="danger">
+                    <Alert.Indicator />
+                    <Alert.Content>
+                      <Alert.Title>Invitation could not be revoked</Alert.Title>
+                      <Alert.Description>
+                        {getErrorMessage(revocationError)}
+                      </Alert.Description>
+                    </Alert.Content>
+                  </Alert>
+                )}
+              </AlertDialog.Body>
+              <AlertDialog.Footer>
+                <Button isDisabled={isRevoking} slot="close" variant="tertiary">
+                  Cancel
+                </Button>
+                <Button
+                  isPending={isRevoking}
+                  variant="danger"
+                  onPress={() => void revokeInvitation()}
+                >
+                  Revoke
+                </Button>
+              </AlertDialog.Footer>
+            </AlertDialog.Dialog>
+          </AlertDialog.Container>
+        </AlertDialog.Backdrop>
+      </AlertDialog>
+
+      <AlertDialog
+        isOpen={Boolean(accountToDisable)}
+        onOpenChange={(open) => {
+          if (!open) setAccountToDisable(undefined);
+        }}
+      >
+        <AlertDialog.Backdrop>
+          <AlertDialog.Container>
+            <AlertDialog.Dialog className="sm:max-w-[420px]">
+              <AlertDialog.CloseTrigger />
+              <AlertDialog.Header>
+                <AlertDialog.Icon status="warning" />
+                <AlertDialog.Heading>
+                  Disable {accountToDisable?.username}?
+                </AlertDialog.Heading>
+              </AlertDialog.Header>
+              <AlertDialog.Body>
+                This account will be signed out, its pending invitations will be
+                revoked, and it cannot access the panel until enabled again.
+              </AlertDialog.Body>
+              <AlertDialog.Footer>
+                <Button slot="close" variant="tertiary">
+                  Cancel
+                </Button>
+                <Button
+                  isPending={isChangingStatus}
+                  variant="danger"
+                  onPress={() => {
+                    if (!accountToDisable) return;
+                    void changeStatus(accountToDisable).then((changed) => {
+                      if (changed) setAccountToDisable(undefined);
+                    });
+                  }}
+                >
+                  Disable
+                </Button>
+              </AlertDialog.Footer>
+            </AlertDialog.Dialog>
+          </AlertDialog.Container>
+        </AlertDialog.Backdrop>
+      </AlertDialog>
+
+      <AlertDialog
+        isOpen={Boolean(accountToDelete)}
+        onOpenChange={(open) => {
+          if (!open && !isDeleting) {
+            setAccountToDelete(undefined);
+            setDeleteConfirmation("");
+            resetDeletion();
+          }
+        }}
+      >
+        <AlertDialog.Backdrop>
+          <AlertDialog.Container>
+            <AlertDialog.Dialog className="sm:max-w-[460px]">
+              <AlertDialog.CloseTrigger />
+              <AlertDialog.Header>
+                <AlertDialog.Icon status="danger" />
+                <AlertDialog.Heading>
+                  Delete {accountToDelete?.username}?
+                </AlertDialog.Heading>
+              </AlertDialog.Header>
+              <AlertDialog.Body className="flex flex-col gap-4">
+                <p>
+                  This account will be signed out, disappear from Accounts, lose
+                  its pending invitations, and never regain access.
+                </p>
+                <TextField
+                  fullWidth
+                  isRequired
+                  isDisabled={isDeleting}
+                  name="delete-account-confirmation"
+                  value={deleteConfirmation}
+                  onChange={setDeleteConfirmation}
+                >
+                  <Label>Type {accountToDelete?.username} to confirm</Label>
+                  <Input autoComplete="off" />
+                </TextField>
+                {deletionError && (
+                  <Alert status="danger">
+                    <Alert.Indicator />
+                    <Alert.Content>
+                      <Alert.Title>Account could not be deleted</Alert.Title>
+                      <Alert.Description>
+                        {getErrorMessage(deletionError)}
+                      </Alert.Description>
+                    </Alert.Content>
+                  </Alert>
+                )}
+              </AlertDialog.Body>
+              <AlertDialog.Footer>
+                <Button isDisabled={isDeleting} slot="close" variant="tertiary">
+                  Cancel
+                </Button>
+                <Button
+                  isDisabled={deleteConfirmation !== accountToDelete?.username}
+                  isPending={isDeleting}
+                  variant="danger"
+                  onPress={() => void removeAccount()}
+                >
+                  Delete
+                </Button>
+              </AlertDialog.Footer>
+            </AlertDialog.Dialog>
+          </AlertDialog.Container>
+        </AlertDialog.Backdrop>
+      </AlertDialog>
     </div>
   );
 }
