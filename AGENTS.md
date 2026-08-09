@@ -27,7 +27,7 @@ compose.yaml      Local PostgreSQL, Redis, and applications
 ```
 
 - Both frontends: Next.js 16, React 19, TypeScript, Tailwind CSS 4, HeroUI 3,
-  Zod, native `fetch`, and SWR.
+  Lucide React, Zod, native `fetch`, and SWR.
 - Customer PWA: Serwist service worker, IndexedDB offline snapshots, and Web
   Push.
 - API: Java 25, Spring Boot 4, Spring Security, and Spring MVC.
@@ -67,6 +67,8 @@ compose.yaml      Local PostgreSQL, Redis, and applications
 ### Frontend
 
 - Always use HeroUI (`@heroui/react`) for UI components.
+- Use Lucide React for interface icons; do not add handwritten inline SVG icon
+  components.
 - Reserve React effects for synchronization with external systems such as
   EventSource or browser APIs; do not use effects for routine REST request
   orchestration.

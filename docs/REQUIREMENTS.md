@@ -2,7 +2,7 @@
 
 ## 1. Purpose and Scope
 
-Kairos is a multi-tenant virtual pager system for restaurants. A tenant represents a customer organization, such as an independent restaurant or restaurant chain, and owns one or more physical locations. A customer scans a QR code assigned to an order and opens a lightweight web application that displays the current order state and receives real-time updates. Restaurant staff manage orders through a separate administrative panel. External systems, initially point-of-sale systems, can create and update orders through a versioned REST API and receive webhooks.
+Kairos is a multi-tenant virtual pager system for restaurants. A tenant represents a customer organization, such as an independent restaurant or restaurant chain, and owns zero or more physical locations. A newly registered tenant has no location until its tenant administrator creates one. A customer scans a QR code assigned to an order and opens a lightweight web application that displays the current order state and receives real-time updates. Restaurant staff manage orders through a separate administrative panel. External systems, initially point-of-sale systems, can create and update orders through a versioned REST API and receive webhooks.
 
 Kairos replaces failure-prone physical restaurant pagers without requiring a
 customer to install a chain-specific native application for a short-lived
@@ -25,7 +25,11 @@ REST and SSE tracking remains the primary experience.
 
 ### 2.1 Frontend applications
 
-Both frontends use Next.js 16, React 19, TypeScript, Tailwind CSS 4, and HeroUI 3. They remain separate because they serve different audiences and have different authentication, PWA, caching, and release concerns. The customer application uses a custom TypeScript service worker built with Serwist in configurator mode and owns its offline snapshots in IndexedDB.
+Both frontends use Next.js 16, React 19, TypeScript, Tailwind CSS 4, HeroUI 3,
+and Lucide React. They remain separate because they serve different audiences
+and have different authentication, PWA, caching, and release concerns. The
+customer application uses a custom TypeScript service worker built with Serwist
+in configurator mode and owns its offline snapshots in IndexedDB.
 
 Both frontends share one coherent, Apple-inspired web design language while
 retaining browser-native behavior. They use the same semantic visual system,
@@ -35,14 +39,90 @@ role-specific styling. The **Kairos** name is the only visual-brand artifact
 that must be preserved during the redesign. Icons, colors, typography,
 materials, and other visual assets may be replaced.
 
+The visible standalone **Kairos** wordmark uses one shared monospace brand
+role in both frontends while interface and body text remain in the system
+font. On the anonymous staff sign-in and onboarding surface, the wordmark is
+centered and visually dominant without a descriptor or explanatory sign-in
+sentence beneath it.
+
+The shared visual character is direct, neutral, and hospitality-oriented
+without restaurant-themed decoration. Light appearance uses a true white page,
+light-gray secondary regions, and one restrained light-blue selection/accent;
+dark appearance uses black, dark gray, and the equivalent blue. Semantic error
+or destructive color is reserved for the states that require it. Hierarchy
+comes primarily from typography, alignment, spacing, and separators rather
+than visible containers. Routine content must not be wrapped in cards, bordered
+boxes, or decorative materials. Elevation is reserved for genuinely floating
+layers such as menus and modal sheets.
+
+Both frontends use one CSS-defined foundation before component styling: a
+4-point spacing basis with 4, 8, 12, 16, 24, 32, and 48-pixel steps; 32-pixel
+compact, 40-pixel regular, and 44-pixel touch control sizes; small 6-pixel,
+medium 10-pixel, and large 14-pixel corner radii; a restrained system-font type
+scale; and one-pixel separators. Pill geometry is limited to controls whose
+meaning requires it. Staff controls retain comfortable touch targets while
+queue content remains compact enough for an operational tablet workspace.
+Text inputs and selectors use the regular control height by default. When an
+input and actions share an inline control row, that row owns one semantic height
+for every peer so their alignment can be changed centrally without per-control
+overrides.
+
 Both frontends provide Light, Dark, and System appearance preferences, with
-System as the default. The staff panel is designed primarily for tablet use,
+System as the default. Each browser stores its own preference; appearance is
+not account data and does not synchronize between devices. The appearance
+trigger keeps the same rounded icon-control geometry while its menu is open and
+uses one valid interactive element rather than nested controls. The staff panel is
+designed primarily for tablet use,
 especially 11- to 14-inch touch-and-pointer devices, while remaining complete
 and responsive on desktop and mobile. Mobile staff use is expected to be
 infrequent. Staff roles use the same interface language and workspace styling;
 capabilities still determine which operations are available. Product copy is
 English-only in the current scope, but layouts must tolerate longer future
 localized text without depending on short English labels.
+
+Neither frontend uses a persistent global top bar. Customer pages
+place only the utilities relevant to that page in a quiet trailing control
+group; the tracking view aligns Home, Notifications, and Appearance on one
+level. On tablet and desktop, staff workspace navigation is a flat, rounded
+segmented control centered independently of the trailing Appearance and Sign
+out utilities on the same level. It uses only a solid secondary background and
+selected segment, without glass effects, decorative borders, or shadows.
+
+Interactive staff cards across Orders, Locations, Accounts, and Integrations
+use one reusable Panel Card anatomy: a direct full-card target, primary identity,
+supporting metadata, and an optional trailing accessory or action group. They
+share the medium corner scale, page surface at rest, one-pixel separators, and
+an 8-pixel inter-card rhythm with immediate hover, keyboard-focus, and pressed
+feedback. Selected collection
+cards add the restrained blue selection surface without a decorative leading
+edge. Cards keep identity and compact accessories inline across phone, tablet,
+and desktop widths; essential text reflows instead of being removed.
+
+Routine interactive surfaces in both frontends use one shared short motion
+system: a restrained scale lift on precise-pointer hover, immediate compression
+while pressed, and a subtle spring-like return on release. Stateful spatial
+transitions that communicate a changed location or support direct manipulation
+remain purposeful exceptions. Customer order rows use the same medium corner
+scale and interaction treatment as staff cards while preserving the customer
+swipe-to-remove gesture. Pointer capture begins only after horizontal swipe
+intent is established so an ordinary tap remains native link navigation.
+Reduced-motion preferences retain non-spatial state feedback while suppressing
+the interaction scaling.
+
+Transient notices in both frontends use the shared flat secondary surface and
+medium corner scale. Their status indicator is centered against the complete
+text block, and dismissible notices keep a trailing, icon-only Close action in
+a stable column on desktop and mobile.
+
+Action controls are icon-first where a familiar symbol communicates their
+meaning, including Home, Scan, Notifications, Appearance, QR, More, Close, and
+Switch camera. Primary workflow transitions, authentication, and destructive
+confirmations retain concise visible text, usually paired with an icon, because
+those actions do not have an unambiguous universal symbol. Every icon-only
+control has an accessible name and, where pointer input is expected, a tooltip.
+Both frontends source interface glyphs from Lucide React so repeated actions
+share one stroke, proportion, and optical language. Application code does not
+define handwritten inline SVG icon components.
 
 HeroUI is the component library for both applications. Zod validates frontend-owned form input and server-sent event payloads. Native `fetch` is the HTTP transport inside small handwritten REST request modules. SWR manages REST-backed client state in both frontends where caching, request deduplication, mutations, focus revalidation, or reconnect revalidation applies. React effects are reserved for synchronization with external systems rather than routine REST request orchestration.
 
@@ -103,9 +183,12 @@ The customer application must:
 * rely on the browser's native `EventSource` reconnection and fetch the current state through REST whenever the stream opens or reopens;
 * poll REST approximately every 15 seconds while the event stream is disconnected, and stop fallback polling when it reconnects;
 * reconcile through REST on focus and browser connectivity restoration;
-* present an active order primarily by its label and status, show a status
-  timestamp only when the displayed data is explicitly stale, and rely on
-  automatic reconciliation rather than an always-visible manual refresh;
+* make an active order's current status the dominant content and its immutable
+  label a quieter identifier, express the current state once as a centered
+  message without a duplicate status label, decorative status symbol, or
+  explanatory paragraph, show a status timestamp only when the displayed data
+  is explicitly stale, and rely on automatic reconciliation rather than an
+  always-visible manual refresh;
 * provide clear terminal views for completed, canceled, or unknown orders;
 * keep completed and canceled tracking references readable without an expiration
   policy in the current scope;
@@ -152,8 +235,12 @@ REST and SSE flow resumes.
 After the one-time installation launch, opening the installed application
 directly restores the last stable destination. It reopens that order only when
 its stored status is `IN_PREPARATION` or `READY`; otherwise it opens Home. Home
-displays a centered scanner action when IndexedDB is empty, corrupt, unavailable,
-or inaccessible. Active and terminal tracking views provide a quiet Home action.
+displays only one horizontally and vertically centered scanner action when
+IndexedDB is empty, corrupt, unavailable, or inaccessible. Its label
+and icon scale together as the empty page's clear primary focus, with the large
+label above an oversized, still-dominant QR icon. The control has no resting
+container and reveals its button surface on hover, keyboard focus, or press.
+Active and terminal tracking views provide a quiet Home action.
 
 Home labels its active local collection **Your orders**. Swiping an order card
 left reveals a **Stop tracking** action, and the same action remains available
@@ -161,6 +248,9 @@ through an accessible per-card overflow menu. Stopping tracking removes only
 that order's local snapshot and notification enrollment, updates the application
 badge, and does not prevent a later explicit scan or reopening from tracking the
 active order again.
+
+Each Home order row is itself the direct navigation target for that order and
+does not depend on explanatory copy telling the customer to select it.
 
 Home opens a dedicated scanner view only after a direct customer action. The
 scanner prefers the rear camera, allows switching when multiple cameras are
@@ -190,7 +280,9 @@ materialized. The API limits a subscription to ten contexts per order.
 
 The application exposes one persistent notification control in the top-right
 corner of every customer view. Its icon distinguishes enabled notifications
-from all off or unavailable states. On order views, the Home action appears
+from all off or unavailable states: a normal bell offers notification enabling,
+while a crossed bell indicates that notifications are currently enabled and
+the action will disable them. On order views, the Home action appears
 immediately alongside it. Disabling notifications durably retires the current
 subscription and all of its enrollments before removing the browser
 subscription. Stopping tracking removes the selected active-order enrollment
@@ -199,6 +291,11 @@ disabling notifications and stopping notification-enabled tracking require a
 network connection so the UI does not make a false backend-cleanup promise.
 Browser-initiated subscription replacement is reconciled once from the service
 worker and idempotently retried on the next application start if needed.
+
+Transient in-app notification guidance aligns to the customer content width and
+uses the same flat secondary surface and corner scale as the rest of the
+interface. Every such message provides a trailing, icon-only Dismiss action
+that clears the current message without changing notification settings.
 
 Background notifications are generated for `READY`, `COMPLETED`, and `CANCELED`
 transitions only. Their title is the global Kairos brand, their body describes
@@ -221,7 +318,7 @@ claim existing clients; an update activates through the browser lifecycle.
 
 The staff panel must:
 
-* allow an anonymous visitor to register a tenant, its first location, and its first administrator through the dedicated onboarding flow;
+* allow an anonymous visitor to register a tenant and its first administrator through the dedicated onboarding flow;
 * require an authenticated internal account;
 * show only locations and orders accessible to the account;
 * allow tenant administrators to switch between locations or view an aggregate queue;
@@ -229,9 +326,17 @@ The staff panel must:
 * offer automatic labels by default and allow a custom label before creation;
 * display and refresh only active order queues by location;
 * allow only valid order transitions permitted by the account's role;
-* allow tenant administrators to provision location managers and operators within their tenant;
-* allow a location manager to provision operators only for the manager's assigned location;
+* allow tenant administrators to issue account invitations for location
+  managers and operators within their tenant;
+* allow a location manager to issue operator account invitations only for the
+  manager's assigned location;
+* list manageable member accounts and allow their current status to be changed
+  or the account to be deleted through irreversible archival within the same
+  tenant and location authorization rules used for provisioning;
 * allow tenant administrators to manage External Integrations, API Keys, and webhook subscriptions;
+* allow tenant administrators to create, rename, disable, and delete their
+  tenant's locations, with Delete presented as a destructive operation while
+  retaining the location internally as archived;
 * provide clear feedback for stale data, rejected transitions, expired sessions, and network failures;
 * keep messages and administrative summaries user-oriented by omitting routine
   background-refresh narration, arbitrary backend error details, internal
@@ -241,6 +346,170 @@ The staff experience keeps the active queue visually primary. Administrative
 capabilities must not compete with frequent order creation, QR presentation,
 or valid order transitions merely because they are available to the signed-in
 account.
+
+Orders, Locations, Accounts, and Integrations use one adaptive tab-style
+navigation system: a centered rounded segmented control on tablet and desktop and bottom
+navigation on narrow mobile layouts. Only authorized destinations are present,
+but the shell and visual treatment do not vary by role. Appearance and Sign out
+remain direct trailing utilities on the same level rather than peer workspace
+destinations or commands nested in an account menu. Sign out requires an
+explicit confirmation before the browser session is ended.
+
+Locations appears between Orders and Accounts for a tenant administrator and
+is absent for managers and operators. The Locations collection includes enabled
+and disabled locations and omits archived locations. Operational selectors and
+new Account Invitation, API Key, and webhook-subscription forms offer only
+enabled locations.
+
+The active queue uses adjacent **In preparation** and **Ready** sections on
+tablet and desktop and the same two sections stacked vertically on mobile.
+These sections use headings, counts, whitespace, and a shared separator rather
+than large rounded lane containers. Order creation begins from one compact,
+icon-only plus action immediately beside the **Orders** title. Its focused
+sheet contains one optional label field whose
+placeholder communicates the automatic default; leaving it empty requests an
+automatic label and entering text requests a custom label, without a separate
+mode selector. Successful creation continues directly into a large,
+dismissible customer QR sheet; explicitly requesting an existing order's QR
+uses the same presentation. The underlying queue remains visible to preserve
+context. The Orders, Locations, Accounts, and Integrations creation actions
+share one 44-pixel icon-control geometry, accessible name, and pointer tooltip beside
+their respective page titles on every layout. The queue-location selector
+remains an independent filter beneath the page header.
+
+When a tenant has no enabled location, whether none have been created or every
+existing location is disabled, Orders replaces its queue and creation control
+with a direct message and **Create location** button. The button opens the same
+focused location-creation modal used by the Locations destination without
+changing the selected workspace destination. Successful creation closes the
+modal, keeps Orders visible, and selects the new enabled location for the first
+order.
+
+The customer-QR sheet contains only the centered order label, a dominant QR
+code, and the essential close control. It does not repeat queue status, elapsed
+time, explanatory copy, or a redundant footer action.
+
+Canceling an order requires a concise confirmation that identifies the order
+and distinguishes keeping it from the terminal destructive action.
+
+Each active-order card shows its elapsed waiting time, updated approximately
+once per minute. The duration is supporting information: order label and next
+valid action remain more prominent. Creator attribution is not shown. The
+complete compact card remains a direct target for opening its customer QR code,
+without a duplicate QR control. One trailing action group exposes two large
+controls directly: the next valid status, labeled **Ready** or **Complete**, and
+cancel. Cancel retains its order-specific confirmation rather than being hidden
+in an overflow menu.
+
+Locations, Accounts, and External Integrations use responsive
+collection-and-detail navigation. New member-account access begins in a focused account-invitation
+sheet that captures only the fixed location and manager or operator role;
+the invited person supplies account identity and credentials when redeeming
+the resulting link. The Accounts collection contains only non-archived created
+accounts. A
+trailing icon-only **Invitations** control opens a
+focused HeroUI modal for unredeemed Account Invitations and their actions
+without making invitations a peer workspace destination. The control remains
+available with a zero count so its location does not change with state, has an
+accessible name and pointer tooltip, and shows its positive pending count in a
+HeroUI badge while omitting the badge at zero. The
+modal is centered on tablet and desktop and adapts to a near-full-screen sheet
+on mobile. Selecting an existing account opens its detail surface; an
+integration detail uses a compact segmented control to switch between API Keys
+and Webhooks. Account and integration details share one header anatomy: the
+resource-type eyebrow and title or inline title editor remain leading, while a
+regular-sized icon action rail remains trailing in a stable order. Integration
+identity is read-only in the normal detail view and becomes editable only
+through the Edit control in that rail; edit mode exposes direct confirm and
+cancel controls in place of the title.
+Contextual action labels omit a repeated entity name when the selected detail
+already makes the target unambiguous. The new-integration sheet keeps its
+single name field visually unlabeled and uses the direct **Enter integration
+name** placeholder while retaining an assistive-technology label.
+
+Account and integration collection cards use the shared Panel Card directly,
+including its comfortable padding, minimum touch size, rounded geometry,
+separator rhythm, focus and pressed feedback, and responsive reflow. They use
+the restrained blue selection surface for the open resource with a stronger
+blue-tinted hover state. Each card shows the resource status beneath its name;
+the detail header does not duplicate that status. The selected account's
+icon-only status action remains in the shared trailing header rail, exposes an
+accessible name and pointer tooltip, and retains confirmation before disabling
+access. A following icon-only Delete action remains available for an enabled or
+disabled manageable account.
+
+The Locations collection follows the same anatomy. Its enabled cards appear
+first in display-name order, followed by disabled cards in display-name order,
+with stable identity as the deterministic tie-breaker. Each card shows the
+location status beneath its name. Selecting one opens a detail surface whose
+stable action rail contains Edit, Disable or Enable, and Delete. Delete remains
+visible but unavailable until the location is disabled. The detail uses no
+time-zone editor or unrelated operational fields.
+
+If confirmed location disablement is rejected because the location still has
+active orders, the location remains enabled and the panel explains that those
+orders must be completed or canceled first. A direct **View orders** action
+opens Orders filtered to that location.
+
+Accounts and Integrations remain available when the tenant has no enabled
+location. Account Invitation creation is unavailable with guidance to create
+or enable a location. External Integrations may still be created, while API Key
+and webhook-subscription creation remains unavailable until an enabled location
+exists.
+
+Integration credential and webhook forms use neutral, task-specific
+placeholders rather than suggesting a restaurant, point-of-sale product, or
+other example identity.
+
+Repeated administrative actions use one shared visual vocabulary across the
+panel: Edit uses the pencil, Disable uses the prohibited-state symbol, Enable
+uses the check, and Delete uses the trash symbol. Their compact icon-only
+controls share the same size, corner treatment, accessible naming, and pointer
+tooltip. Focused confirmation dialogs retain explicit text labels for
+consequential actions.
+
+Location, Account, External Integration, and Webhook Subscription share one
+administrative lifecycle vocabulary: `ENABLED`, `DISABLED`, and `ARCHIVED`.
+Enable changes a disabled resource to enabled, Disable changes an enabled
+resource to disabled, and the UI action Delete irreversibly archives the
+resource without physically deleting its identity or history. Each feature
+keeps its own status type rather than depending on one cross-feature enum, but
+database values, REST representations, frontend schemas, variables, and method
+names use the same vocabulary. Domain aggregates expose `enable()`, `disable()`,
+`archive()`, `isEnabled()`, `isDisabled()`, and `isArchived()` as applicable;
+application and frontend request functions use `update...Status` naming.
+Orders, Account Invitations, credentials, sessions, and delivery workers retain
+their distinct domain-specific state machines.
+
+Panel actions that immediately remove access, stop delivery, invalidate a
+credential, retire an active secret version, cancel an order, or remove a
+resource require a focused confirmation before the request is sent. This
+includes disabling locations, accounts, integrations, and enabled webhook
+subscriptions; revoking API Keys; retiring overlapping webhook secrets; and
+deleting locations, accounts, integrations, or webhook subscriptions.
+Re-enabling a resource and other non-destructive transitions do not add an
+unnecessary confirmation step.
+
+Location re-enabling is a deliberate exception because it changes every
+assigned non-archived member account to `ENABLED`. Its focused confirmation
+explains that effect before the request is sent. Location Delete is available only while the
+location is disabled, requires the administrator to type the exact location
+name, and explains that the location and assigned accounts disappear from
+ordinary management and cannot be restored while historical orders remain
+readable.
+
+Account Delete requires a focused destructive confirmation and the exact,
+case-sensitive username before it can be submitted. The confirmation explains
+that the account will be signed out, disappear from ordinary Accounts, lose its
+pending invitations, and never regain access. A failed request keeps the dialog
+and entered confirmation value in place, while success clears the selection if
+the archived account was open and revalidates account and invitation state.
+
+Disabling an integration requires confirmation and explains the immediate
+credential and webhook effect. The archival operation is presented to staff as
+**Delete**, requires a separate destructive confirmation, and remains disabled
+until the administrator types the integration name exactly. The API continues
+to archive the resource internally.
 
 ### 3.4 External Integration API and webhooks
 
@@ -256,7 +525,15 @@ locations, and an optional immutable expiration. `orders:write` includes
 `orders:read`. Keys can be revoked immediately and irreversibly. Rotation
 creates a new secret version while the immediately preceding version remains
 valid for a deployment-configured 24-hour grace period. The full high-entropy
-secret is revealed once and only a non-reversible hash is stored.
+secret is revealed once and only a non-reversible hash is stored. One-time
+secret presentation keeps the copy control beside the secret, temporarily
+replaces it with a completion mark after copying, and uses a right-aligned
+**Confirm** action to leave the locked state. API Key version history opens in
+a focused modal rather than expanding inside integration configuration.
+
+An API Key's location grants cannot be edited through API Key management.
+Irreversible Location Delete is the sole cascade that removes an archived
+location from an existing key; a key left without a location is revoked.
 
 The versioned external order API supports cursor-paginated listing, direct
 lookup, idempotent creation, and idempotent desired-state updates. Authorization
@@ -270,7 +547,9 @@ identity, default to 50 results, and accept at most 100. A same-state status
 request changes no history and emits no event.
 
 Webhook subscriptions independently select at least one location and supported
-order event type. A new subscription is disabled until its one-time signing
+order event type. Creation starts with every supported event type selected so
+the administrator can remove only events the recipient does not need. A new
+subscription is disabled until its one-time signing
 secret has been copied and the recipient configured. Each delivery uses a
 CloudEvents 1.0 structured JSON body containing a complete external order
 snapshot, `urn:kairos:orders` as its source, and `orders/{orderId}` as its
@@ -313,6 +592,11 @@ The target authentication model supports:
 * linking an external provider identity to a Kairos account and its owning tenant;
 * the same application authorization model regardless of login method.
 
+Local login does not disclose whether an account exists or why it is
+ineligible. Unknown usernames, incorrect passwords, passwordless accounts,
+disabled or archived accounts, and otherwise ineligible assignments return the
+same public invalid-credentials response and create no session.
+
 After either login method, Spring issues a short-lived signed access JWT and a
 rotating refresh credential. Browser credentials are transported in `Secure`,
 `HttpOnly`, `SameSite=Lax`, host-only cookies issued by the API. Local browser
@@ -351,11 +635,185 @@ when available, recheck the current account after acquiring it, and perform at
 most one refresh plus one replay of the original request. An authorization
 `403` never starts refresh. Login and anonymous tenant registration do not
 start automatic recovery; registration also does not acquire the
-authentication-cookie lock.
+authentication-cookie lock. Anonymous invitation redemption follows the same
+no-recovery behavior.
 
-Public tenant onboarding is the only anonymous account-creation flow. It atomically creates one tenant, its first location, and its first active administrator. The administrator requires a normalized, globally unique email address in addition to its normalized username and BCrypt-hashed password. Registration does not issue authentication cookies or sign the administrator in. During rapid development, tenants, locations, accounts, and orders have no separate display-name fields; accounts are presented by username and the other concepts by their full stable identifiers.
+Public tenant onboarding remains the distinct flow for creating one tenant and
+its first enabled administrator atomically. It creates no location. The
+administrator requires a normalized, globally
+unique email address in addition to its normalized username and BCrypt-hashed
+password. Registration does not issue authentication cookies or sign the
+administrator in. Sign-in is the default anonymous panel view; **Set up a new
+restaurant** is its secondary path into onboarding. Tenants and orders have no
+separate display-name fields; accounts are presented by username and locations
+by their display names while stable identifiers remain their authoritative
+identity.
 
-Standalone accounts are provisioned rather than self-registered. Each account belongs directly to one tenant. A tenant administrator has tenant-wide access; a location manager or operator has at most one location assignment. Location operator accounts are device-oriented, and a location uses a separate account for each panel device that needs independent credentials or revocation. Tenant administrators may provision managers and operators, while location managers may provision only operators for their own location.
+A **Location** is an enabled, disabled, or archived physical restaurant owned by
+one tenant. A tenant may remain without any enabled locations, including before
+its first location is created or after its last one is disabled or archived.
+Only a tenant administrator manages the location lifecycle. The editable
+location property in this increment is its
+display name; its IANA time zone remains fixed at `UTC`. Enabled and disabled
+location names are unique within a tenant after trimming and case
+normalization. An archived location releases its name for reuse.
+
+Disabling a location makes the location and everything scoped to it ineligible
+for operational use. Every non-archived manager or operator account assigned to
+that location is persistently changed to `DISABLED`; tenant-administrator and
+archived accounts are never included in this cascade. Every refresh session for
+an affected account is revoked, and every pending Account Invitation that
+targets the location or was issued by an affected account is revoked. A location
+with an `IN_PREPARATION` or `READY` order cannot be disabled; the administrator
+must complete or cancel every active order first.
+
+Re-enabling a location persistently changes every non-archived account assigned
+to it to `ENABLED`, including an account that was disabled independently before
+the location was disabled. This deliberately favors one simple bulk lifecycle
+over remembering or restoring prior account states. Archived accounts remain
+archived, and pending invitations are not restored; staff issue new invitations
+when needed.
+
+Location disablement makes only that location ineffective within a
+multi-location API Key or webhook subscription. The credential or subscription
+and its other enabled-location grants remain usable. A configuration whose only
+location is disabled remains stored but cannot perform location-scoped work or
+receive new deliveries until that location is re-enabled.
+
+Deleting a location archives it internally rather than physically removing its
+identity or historical records. It also archives every non-archived assigned
+member account, revokes their sessions and pending invitations, and removes those accounts from
+the ordinary Accounts collection. Completed and canceled orders retain their
+location association and remain anonymously readable through their existing
+customer tracking references after location disablement or archival.
+
+Only a disabled location can be deleted. Deletion is an irreversible archival
+transition and an archived location cannot be restored. Archived member
+accounts retain and reserve their normalized usernames and email addresses for
+unambiguous historical attribution, while their local password credentials and
+external authenticators are removed. They cannot authenticate or be restored.
+
+Archiving a location permanently removes it from API Key location grants and
+webhook subscription location selections. An API Key left without any location
+grant is revoked, and a webhook subscription left without any location
+selection is archived. Multi-location configurations retain their other
+location relationships and lifecycle state.
+
+An **Account Invitation** is a separate, single-use bearer capability that
+authorizes creation of one person-oriented manager or operator account. It is
+not an incomplete account and reserves no username or email. It records the
+owning tenant, fixed location and assignment role, and issuing account. Anyone
+who possesses its link can attempt to redeem it, and the person who completes
+the first successful redemption becomes the account owner. Redemption collects
+the person's username, required email, and password and atomically creates an
+enabled member account with an assignment to the enabled location while
+consuming the invitation. No further administrator approval is required.
+
+An invitation expires exactly seven days after issuance. Opening its
+registration page neither reserves it nor extends that deadline. Multiple
+pending invitations may target the same location and role. The full link is
+returned only when the invitation is created, with a direct Copy action in the
+panel; Kairos does not email it and persists only the SHA-256 hash of a token
+containing 32 cryptographically random bytes encoded as unpadded Base64url. A
+lost link is not recoverable and has no replacement operation. Staff issue
+another invitation through the ordinary creation flow and explicitly revoke
+the old one. The panel link uses
+`/account-registration#invitation=<token>` so the secret is not sent
+in the initial navigation URL, gateway logs, or referrer; the client reads the
+fragment and supplies the token only in the API request body.
+
+Expiration is derived from the authoritative `expiresAt` whenever invitations
+are listed, previewed, or redeemed. PostgreSQL persists only `PENDING`,
+`REDEEMED`, or `REVOKED`; a pending row whose deadline has elapsed is
+effectively expired and cannot be redeemed. No background worker materializes
+an `EXPIRED` state, and reads do not update the row merely to record the passage
+of time. The exact audit time remains the stored deadline.
+
+Pending invitations are omitted from the account collection and managed
+through the dedicated focused surface opened from Accounts. Tenant
+administrators may inspect or revoke every pending invitation in their tenant.
+Managers may do the same for operator invitations to their own enabled location
+regardless of which authorized manager issued them. Redemption
+rechecks that the issuing account is enabled and remains authorized for the
+fixed location and role; losing that authority makes its outstanding
+invitations unusable. Disabling an issuing account revokes its pending
+invitations in the same transaction and records an internal reason, while the
+redemption-time check still protects future role or assignment changes.
+Invalid registration input and username or email conflicts do not consume an
+invitation, while concurrent redemption is
+serialized so exactly one successful submission can create an account. An
+existing account cannot redeem an invitation to gain another location or role.
+
+The pending-invitations modal stays shallow rather than opening a nested detail
+view. Each row shows role, location, creator, creation time, and absolute
+expiration time, with creation time distinguishing otherwise identical
+invitations. A trailing icon-only Revoke action uses the panel's established
+prohibited-state symbol, an accessible name, and a pointer tooltip. Revocation
+requires focused confirmation identifying the role and location because it
+makes an already shared link unusable. Redeemed, revoked, and expired
+invitations disappear from this modal after revalidation; redeemed accounts
+then appear in the normal Accounts collection. Terminal invitation metadata
+remains in PostgreSQL for audit but has no history interface in this increment.
+
+The modal retains its structure while loading, uses a labelled progress
+indicator, shows **No pending invitations** without duplicating the creation
+action, and keeps failures in context with a user-oriented message and Retry.
+Opening moves focus to its heading or first meaningful control, closing returns
+focus to the **Invitations** control, and every row action remains operable by touch,
+pointer, keyboard, and assistive technology. Mobile adaptation preserves the
+same information and actions without horizontal scrolling.
+
+The invitation count and modal use account-scoped SWR state. They revalidate
+after creation or revocation and on focus and reconnect, and determine pending
+eligibility against the server-provided timestamps. This increment adds no live
+staff event stream for invitation changes.
+
+The anonymous redemption form displays the fixed location and role as
+read-only context and requires username, email, password, and password
+confirmation. A browser already signed in to the panel must explicitly sign
+out before redeeming the invitation, and the link is preserved across that
+step; the API also rejects redemption while a valid staff session is present.
+Redemption retains normal CSRF protection and performs no automatic session
+refresh. Successful redemption immediately issues the normal Kairos browser
+session and opens the Orders workspace for the account's assigned location.
+Known unusable links distinguish expired, revoked, and already redeemed states
+without exposing account identity, while malformed or unknown tokens produce
+only **This invitation is not valid**.
+
+Invitation creation transitions its focused sheet into the same locked
+one-time-secret presentation used for other panel credentials, with direct
+Copy and Confirm actions. The sheet may be closed without copying, but the
+secret cannot be recovered afterward. Staff must use the ordinary invitation
+creation flow for another link and revoke the previous invitation explicitly.
+
+Each account belongs directly to one tenant and represents one staff person,
+who may use that account on multiple devices. A tenant administrator has
+tenant-wide access; a location manager or operator has at most one location
+assignment. Tenant administrators may issue manager or operator invitations
+for locations in their tenant. Location managers may issue only operator
+invitations for their own enabled location, and operators cannot issue
+invitations. Additional tenant-administrator invitations remain outside this
+increment.
+
+Deleting a manageable member Account is an irreversible archival operation,
+not physical row deletion. It removes the account from ordinary management,
+removes its authenticators, revokes every refresh session and pending
+invitation it issued, and retains its stable identity, username, email, and
+historical attribution. Archived usernames and email addresses remain reserved,
+and an archived account cannot authenticate, be enabled, or be restored. Delete
+may transition an enabled or disabled account directly to archived and applies
+all shutdown effects atomically.
+
+Account Delete uses the same authorization boundary as account status
+management. A tenant administrator may delete a manageable member account in
+its tenant. A location manager may delete only an operator assigned to that
+manager's enabled location. An administrator account, the acting account, a
+peer manager, and another location's operator are never valid targets.
+
+Every account email is required, normalized, and globally unique but remains
+unverified in this increment. An unverified email is account data rather than
+proof of identity and cannot authorize password recovery, OAuth2/OIDC linking,
+or another security-sensitive operation.
 
 The tenant-registration endpoint is anonymous but retains normal CSRF protection because it is invoked from the browser panel origin. The current local slice does not implement application-level rate limiting for tenant registration, login, or refresh. Before public deployment, a dedicated API gateway in front of Spring must enforce request throttling for these routes, preserve a trustworthy client-address boundary, and prevent direct access that bypasses the gateway. Spring remains the authentication authority and does not duplicate the gateway's request-rate counters.
 
@@ -405,6 +863,13 @@ Integration and subscription fan-out eligibility is bounded by the start of
 their current enabled interval, so delayed outbox processing cannot replay
 events missed while either one was disabled.
 
+Location disablement or archival likewise prevents new location-scoped External
+Integration operations and future fan-out without canceling a webhook or
+customer-push delivery already materialized under captured configuration.
+Location fan-out eligibility is
+bounded by the start of its current enabled interval, so re-enabling does not
+replay events missed while the location was disabled.
+
 ### 4.4 Tenant isolation
 
 All tenant-owned data is protected at both application and database levels. PostgreSQL Row Level Security provides defense in depth. Every transaction accessing tenant-owned rows must establish tenant and location access from a verified account or External Integration credential.
@@ -418,16 +883,47 @@ Each location stores an IANA time-zone identifier initialized to `UTC`. The curr
 The database schema must include tables covering the following concepts. Names and nonessential columns are implementation decisions.
 
 * **Tenants:** stable identity and integration configuration.
-* **Locations:** physical restaurant belonging to one tenant, with operational information and a time-zone identifier initialized to `UTC`.
-* **Accounts:** stable identity, direct ownership by one tenant, normalized local login identifier and credential hash when applicable, optional normalized globally unique email except where the onboarding contract requires it, tenant-level role, and account state.
+* **Locations:** physical restaurant belonging to one tenant, with a required
+  trimmed human-readable display name, enabled, disabled, or archived status,
+  operational information, and an IANA time-zone identifier fixed at
+  `UTC` in this increment. Delete archives the row rather than physically
+  removing its stable identity or historical relationships.
+* **Accounts:** stable person identity, direct ownership by one tenant,
+  normalized local login identifier and credential hash when applicable,
+  required normalized globally unique email, tenant-level role, and account
+  status. Member-account statuses are enabled, disabled, and archived;
+  archived identities remain available for historical attribution but not
+  ordinary account management or authentication.
+* **Account Invitations:** separate authority to create one member account,
+  including stable identity, direct tenant ownership, fixed target location and
+  manager or operator role, issuing account, SHA-256 hash of a single-use
+  32-byte random Base64url bearer credential, `PENDING`, `REDEEMED`, or
+  `REVOKED` lifecycle state and internal revocation reason, seven-day absolute
+  expiry, and timestamps. Expiration is derived from the deadline rather than
+  persisted as a fourth lifecycle state. An invitation contains no account
+  username, email, or password and is not itself an account. Multiple pending
+  invitations may share a target location and role. Terminal metadata is
+  retained indefinitely in the current pre-deployment scope without a
+  recoverable bearer secret; a deliberate security-event retention policy
+  replaces that default before public deployment.
 * **External identities:** provider and immutable provider subject linked to an account.
-* **Location assignments:** relationship between a non-admin account and its accessible location, including a manager or operator role and assignment state. The current account model permits at most one assignment per account; the relationship remains normalized so that this cardinality can be changed explicitly in a future migration.
+* **Location assignments:** relationship between a non-admin account and its
+  accessible location, including a manager or operator role. The assignment has
+  no independent lifecycle status; effective access requires both its Account
+  and Location to be enabled. The current account model permits at most one
+  assignment per account; the relationship remains normalized so that this
+  cardinality can be changed explicitly in a future migration. Archiving an
+  Account retains the assignment as its historical account-to-location
+  relationship.
 * **Orders:** public tracking identity, owning location, immutable customer-visible text label, current state, and lifecycle timestamps. Tenant ownership is derived through the location.
 * **Order history:** order association, resulting state, acceptance time, and the initiator category and identity when known; records are append-only and have an unambiguous order. Initiator categories distinguish users, external integrations, and system actions without coupling history to one authentication mechanism.
 * **Automatic order-label allocation:** when a custom label is omitted, the concurrency-safe decimal label is one greater than the count of all orders created for the location during the current UTC date. Custom-labeled orders advance this daily ordinal. No separate numbering date, numeric value, label source, or allocation state is stored on the order; the allocated text is persisted only in its label.
 * **Refresh sessions:** account/session association, hashed rotating credential, expiry, and revocation state.
 * **External Integrations:** tenant association, normalized name, and enabled, disabled, or archived lifecycle state.
-* **API Keys and versions:** immutable scopes, expiration and location grants on the stable named key; hashed one-time secret material and overlap validity on each version.
+* **API Keys and versions:** immutable scopes, expiration and location grants on
+  the stable named key, except for the removal of an archived Location by the
+  Location Delete cascade; hashed one-time secret material and overlap validity
+  on each version.
 * **Webhook subscriptions:** integration association, normalized name, destination, enabled/disabled/archive state, selected locations, and selected event types.
 * **Webhook signing-secret versions:** encrypted recoverable signing material, rotation overlap, and retirement state. Encryption keys are externally managed and never generated by the application or image.
 * **Order outbox events:** immutable event identity, order/location and tracking association, exact serialized webhook payload, resulting order state, occurrence time, and independent webhook and customer-push fan-out state.
@@ -445,6 +941,11 @@ The database schema must include tables covering the following concepts. Names a
 * **External order creation identity:** integration-and-location-scoped idempotency value and canonical creation-input fingerprint associated with the created order.
 
 Tenant ownership may be direct or derived through an unambiguous relationship such as order to location to tenant. Tables must carry enough association for RLS enforcement and efficient access checks without duplicating ownership data by default. Secrets, passwords, refresh credentials, and API keys must never be stored in plaintext.
+
+The pre-deployment account model does not grandfather accounts without email.
+The consolidated initial migration requires a normalized email for every
+account; local development data is recreated manually when applying that
+pre-deployment schema change.
 
 Order labels are trimmed, single-line text with a maximum of 32 characters. Automatic labeling is requested by omitting the custom label and uses the order's one-based creation ordinal among all orders at its location during the current UTC date. A provided blank label is invalid. Labels preserve casing, may contain ordinary Unicode text, and are not unique; staff remain responsible for avoiding ambiguous duplicates. Labels cannot be edited after order creation.
 
@@ -584,8 +1085,14 @@ GET    /api/auth/v1/me
 POST   /api/tenant-registrations/v1
 
 GET    /api/locations/v1
-POST   /api/accounts/v1
+GET    /api/accounts/v1
 PATCH  /api/accounts/v1/{accountId}/status
+
+GET    /api/account-invitations/v1
+POST   /api/account-invitations/v1
+DELETE /api/account-invitations/v1/{invitationId}
+POST   /api/account-invitation-previews/v1
+POST   /api/account-invitation-redemptions/v1
 
 GET    /api/orders/v1
 POST   /api/orders/v1
@@ -600,6 +1107,59 @@ POST   /api/customer-notifications/v1/subscription-replacement
 DELETE /api/customer-notifications/v1/subscription
 DELETE /api/customer-notifications/v1/enrollments
 ```
+
+The accepted Locations and unified administrative-lifecycle increment changes
+and extends that browser contract as follows:
+
+```text
+GET    /api/locations/v1
+POST   /api/locations/v1
+PUT    /api/locations/v1/{locationId}
+PUT    /api/locations/v1/{locationId}/status
+DELETE /api/locations/v1/{locationId}
+
+GET    /api/accounts/v1
+PUT    /api/accounts/v1/{accountId}/status
+DELETE /api/accounts/v1/{accountId}
+```
+
+Location creation accepts only the display name and returns the new enabled
+representation with `201`. Rename accepts only the display name. The location
+status operation accepts only `ENABLED` or `DISABLED`; archival remains the
+Delete operation. Rename and status return the updated representation with
+`200`, while Delete returns `204`. Repeating the current normalized name or
+status and repeating a successful Delete are idempotent.
+
+Every location mutation requires tenant-administrator authority and locks the
+tenant-scoped location before checking or changing it. Cross-tenant targets are
+indistinguishable from an unknown target. Rename and status operations also
+treat an archived target as unknown, while repeating Delete for an archived
+location in the caller's tenant remains idempotently successful. Name
+conflicts, attempting to delete an enabled location, and attempting to disable
+a location with an active order produce safe `409` responses. The active-order
+conflict has a stable problem type so the panel can offer its direct **View
+orders** recovery. Each successful disable, enable, or Delete transition and
+all of its account, session, invitation, credential-grant, and subscription
+side effects commit atomically; a rejected transition changes nothing.
+
+Account status accepts only `ENABLED` or `DISABLED` and returns the updated
+representation. Delete accepts an enabled or disabled manageable member
+account, archives it atomically with its authentication and invitation side
+effects, and returns `204`. Account lists omit archived accounts, a repeated
+Delete for an archived account in the caller's management scope is idempotent,
+and status operations treat archived, cross-tenant, and otherwise unmanageable
+targets as unknown.
+
+The invitation list, creation, and revocation operations are authenticated and
+scoped by the caller's account-management authority. Preview and redemption are
+anonymous, accept the bearer token only in their validated request bodies,
+retain normal browser CSRF protection, and never log those bodies. Preview
+returns only the location name, fixed role, and safe invitation state needed by
+the registration page. Redemption removes the token fragment from browser
+history after success or a terminal response. Validation failures return `400`,
+an available invitation with conflicting username or email returns `409`, a
+known expired, revoked, or redeemed invitation returns `410`, an unknown token
+returns `404`, and a valid existing staff session receives `403`.
 
 The authenticated administrator management families are
 `/api/external-integrations/v1`, `/api/api-keys/v1`,
@@ -688,6 +1248,8 @@ health succeeds, and verify the internal and external paths.
   System, maintain semantic contrast in both resolved appearances, and remain
   usable with reduced motion, increased contrast, keyboard navigation, screen
   readers, and enlarged text at a WCAG 2.2 AA target.
+* A locally selected appearance survives a reload in the same browser without
+  becoming account data or synchronizing to another browser.
 * Both frontends use one coherent visual and interaction system. Staff roles do
   not receive different visual styling, while authorization and capabilities
   continue to control available operations.
@@ -697,6 +1259,22 @@ health succeeds, and verify the internal and external paths.
 * On the primary tablet layout, staff can create an automatically labelled
   order and reveal its customer QR code through one obvious primary action,
   and can perform a valid order transition through one obvious action.
+* Tablet and desktop queues present **In preparation** and **Ready** as adjacent
+  lanes; mobile preserves the same model as stacked sections. Queue navigation,
+  selection, and actions remain operable with touch, pointer, and keyboard.
+* Queue cards expose an approximately minute-granularity elapsed waiting time
+  without making an absolute timestamp or continuously animated timer primary.
+* Selecting an active-order card opens its customer QR code. The card keeps only
+  the inline **Ready** or **Complete** and cancel controls, with no duplicate QR
+  button or narrow-width action stack.
+* Routine controls, menus, selection rows, and cards in both frontends use the
+  same short hover lift, held-press compression, and spring-like release, while
+  reduced-motion preferences retain non-spatial feedback without scaling.
+* New-order and customer-QR sheets preserve the queue as visible context,
+  restore focus to their invoking control when dismissed, and do not lose
+  entered custom-label text after a recoverable failure.
+* Canceling an order requires an order-specific confirmation and remains
+  visually and semantically distinct from its non-destructive alternative.
 * The complete staff interface adapts across tablet, desktop, and mobile widths
   without hiding an essential operation; tablet is the primary design target
   and mobile use is secondary.
@@ -713,14 +1291,89 @@ health succeeds, and verify the internal and external paths.
 * Automatic labels use the one-based count of all orders at the location for the UTC date under concurrent creation; custom labels are validated, advance that ordinal, and may duplicate existing labels.
 * Staff order-list operations return only `IN_PREPARATION` and `READY` orders.
 * Local login, invalid credentials, token expiry, refresh rotation, logout, and cookie/CSRF behavior are covered by tests.
-* Anonymous tenant registration requires CSRF, creates exactly one related tenant, location, and active administrator in one transaction, requires and normalizes the administrator email, and creates no session.
-* Registration conflicts roll back the tenant and location, and successful registration returns to sign-in without automatic authentication.
+* Anonymous tenant registration requires CSRF, creates exactly one tenant and
+  enabled administrator in one transaction, creates no location, requires and
+  normalizes the administrator email, and creates no session.
+* Authorized account listing returns only manageable member accounts in the
+  current tenant and, for a manager, only operators assigned to that manager's
+  location.
+* Location, Account, External Integration, and Webhook Subscription lifecycle
+  representations consistently use `ENABLED`, `DISABLED`, and `ARCHIVED`, while
+  each feature retains its own status type and unrelated domain state machines
+  remain unchanged.
+* A tenant administrator can create and rename locations with normalized,
+  non-archived tenant-unique display names, disable or enable a location with
+  its complete atomic account and invitation cascade, and irreversibly delete a
+  disabled location through archival. Managers and operators cannot access
+  Location management.
+* Location disablement is rejected without side effects while the location has
+  an active order. Enabled-location selectors omit disabled and archived
+  locations, while the Locations collection shows enabled and disabled
+  locations and omits archived ones.
+* Orders shows the same no-enabled-location state when no location exists or
+  every location is disabled. Its **Create location** action reuses the focused
+  Locations modal in place and selects the newly enabled location after
+  successful creation.
+* Location Enable changes every assigned non-archived member account to
+  `ENABLED`, even if it had been disabled independently; archived accounts
+  remain archived. Location Delete archives every assigned non-archived account
+  and preserves terminal customer tracking and historical attribution.
+* An authorized administrator or manager can delete the same manageable member
+  Accounts whose statuses they may manage. Delete accepts an enabled or disabled
+  account, requires exact-username confirmation, archives it atomically, revokes
+  its authenticators, sessions, and pending invitations, retains its historical
+  assignment and reserved identity, and removes it from ordinary account lists.
+* The Accounts collection contains only created accounts. A trailing icon-only
+  **Invitations** control with an accessible tooltip and a positive-count-only
+  HeroUI badge opens a responsive focused
+  modal containing manageable unredeemed Account Invitations and their actions
+  without adding a peer workspace destination. It has complete empty, loading,
+  failure, keyboard, focus-restoration, enlarged-text, and mobile states.
+* Registration conflicts roll back the tenant and administrator, and successful registration returns to sign-in without automatic authentication.
 * When implemented, OAuth2/OIDC login creates or links the correct account and
   tenant ownership without deriving authorization from provider email.
 * A tenant administrator can access all locations in the tenant but none in another tenant.
-* A location manager can access and manage orders only in its assigned location and can provision operator accounts only for that location.
-* A location operator can list, create, read, and update orders only in its assigned location and cannot provision accounts.
-* Multiple panel devices at one location can use separate operator accounts with independently revocable credentials and sessions.
+* A tenant administrator can issue manager or operator account invitations only
+  for locations in its tenant. A location manager can issue only operator
+  invitations for its own enabled location, and a location operator cannot issue
+  invitations.
+* A valid account invitation fixes the tenant, location, and role, and its first
+  successful redemption atomically creates one enabled person-oriented member
+  account and location assignment without further approval. It never creates or
+  reserves an incomplete account before redemption.
+* An invitation expires seven days after issuance, stores only a SHA-256 hash
+  of its once-revealed 32-byte random bearer token, may be revoked by an
+  authorized account manager, and remains unconsumed after invalid or conflicting
+  registration input. Multiple invitations for one location and role are
+  allowed, but concurrent claims of one invitation create exactly one account.
+  Expiration is derived during list, preview, and redemption from `expiresAt`;
+  no worker or write-on-read materializes an `EXPIRED` lifecycle state.
+* Each pending row identifies the fixed role and location, creator, creation
+  time, and absolute expiration time. Its direct icon-only Revoke action
+  requires confirmation, and terminal invitations leave the modal while their
+  secret-free metadata is retained indefinitely for audit without a history UI
+  in the current pre-deployment scope.
+* Redemption requires the issuer to remain enabled and authorized. A signed-in
+  browser and the API both require explicit sign-out before redemption, while
+  successful redemption immediately creates the normal browser session and
+  opens the assigned Orders workspace.
+* Disabling an issuer atomically revokes its pending invitations with an
+  internal reason, while redemption still rechecks current issuer authority.
+  The invitation modal uses account-scoped SWR revalidation rather than a live
+  staff event stream.
+* Invitation links keep the bearer token in the panel URL fragment, submit it
+  only in an API request body protected by CSRF, and never expose it through
+  gateway URLs, analytics, logs, referrers, or error reports. Known terminal
+  states receive specific identity-free guidance while unknown tokens remain
+  indistinguishable.
+* Invitation redemption creates only a new account and cannot add access to an
+  existing account. Required globally unique email remains unverified and is
+  not trusted for recovery or external-identity linking.
+* A location manager can access and manage orders only in its assigned location.
+* A location operator can list, create, read, and update orders only in its assigned location.
+* One person-oriented operator account can be used on that staff member's
+  multiple panel devices with shared account status and independently rotating
+  browser sessions; different staff members use separate accounts.
 * Location-scoped API Keys cannot access an unassigned location, and direct order lookup outside a key's grants does not disclose that the order exists.
 * Unauthenticated, unauthorized, cross-tenant, and cross-location staff or External Integration access is rejected, including when accessing data directly through repositories protected by RLS.
 * Customer tracking works without an account, receives validated SSE invalidations only for the possessed tracking reference, and reconciles through REST after events and reconnects.
@@ -781,7 +1434,11 @@ The current walking vertical slice is implemented for local development:
 
 * persisted labeled-order creation and controlled transitions;
 * authenticated, tenant- and location-authorized staff operations;
-* public tenant onboarding and scoped manager/operator provisioning;
+* public tenant onboarding for the first administrator without creating a
+  location, followed by scoped manager/operator Account Invitations,
+  including authenticated pending-invitation management, one-time fragment
+  links, anonymous preview and redemption, required globally unique member
+  email, concurrency-safe account creation, and immediate session issuance;
 * on-screen customer QR codes and anonymous tracking through REST;
 * customer-only SSE invalidation through Redis Pub/Sub with REST
   reconciliation;
@@ -794,6 +1451,13 @@ The current walking vertical slice is implemented for local development:
   outstanding;
 * administrator-managed External Integrations, API Keys, and webhook
   subscriptions;
+* administrator-managed Locations with normalized names, enabled, disabled,
+  and archived lifecycle state, atomic Account and invitation cascades,
+  integration-grant cleanup, zero-enabled-location Orders recovery, and
+  disabled-interval webhook fan-out boundaries;
+* enabled, disabled, and archived member Accounts with statusless retained
+  Location Assignments, nondisclosing authentication eligibility, and
+  irreversible Account Delete;
 * versioned external order commands with idempotent creation and desired-state
   updates;
 * one channel-neutral transactional order outbox with Spring API background
@@ -843,14 +1507,28 @@ issuer, audience, and the provider's immutable subject. Whether linking begins
 from an authenticated account or a future administrator-created setup flow
 remains an open product decision.
 
+The implemented staff-account increment replaces direct manager and operator
+provisioning with scoped Account Invitations. Anonymous invitation redemption
+keeps first-administrator tenant onboarding separate, and manager and operator
+accounts are person-oriented identities with required email addresses. Direct
+member creation through `POST /api/accounts/v1` is not available.
+
+The implemented administrative-lifecycle increment provides
+tenant-administrator Location management, removes first-location creation from
+tenant registration, adds the reusable zero-enabled-location creation flow in
+Orders, standardizes the managed-resource lifecycle vocabulary, adds Account
+archival through Delete, and applies the Location cascades and contracts
+specified above across the schema, API, panel, and automated verification.
+
 Before any public deployment:
 
 * establish a verified tenant and location database security context and enable
   PostgreSQL Row Level Security for every tenant-owned or ownership-derived
   table;
 * introduce a non-bypassable API gateway that preserves a trustworthy client
-  address and rate-limits login, refresh, tenant registration, External
-  Integration access, and future recovery or linking routes;
+  address and rate-limits login, refresh, tenant registration, invitation
+  redemption, External Integration access, and future recovery or linking
+  routes;
 * provide externally managed JWT signing keys, webhook-secret encryption keys,
   VAPID signing keys, and push-subscription encryption keys, with documented
   rotation procedures, security-event retention, monitoring, and dependency
@@ -861,9 +1539,9 @@ Before any public deployment:
 
 Deferred operational and product work includes live staff queue
 synchronization, order archives and search, printable QR artifacts,
-cancellation confirmation, tracking-reference expiration, account listing and
-session-management UI, additional administrators and locations, invitations,
-setup links, email verification, recovery, CAPTCHA, MFA, passkeys, webhook DLQ
+tracking-reference expiration, session-management UI, additional
+administrators, email verification, recovery, CAPTCHA, MFA,
+passkeys, webhook DLQ
 inspection and alerts, automatic webhook retry or redelivery, strict delivery
 ordering, application-owned install prompts, and native mobile variants. Any of
 these requires an explicitly approved increment and synchronized changes to
