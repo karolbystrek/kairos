@@ -1,9 +1,10 @@
 "use client";
 
-import { Alert, Button, Chip, Spinner } from "@heroui/react";
+import { Alert, Spinner } from "@heroui/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { CustomerToolbar } from "@/components/customer-toolbar";
 import { orderStatusLabels } from "@/src/orders/order-status";
 import {
   readTrackedOrder,
@@ -30,64 +31,67 @@ export function OfflineNavigationFallback() {
   }, []);
 
   if (snapshot === undefined) {
-    return <Spinner aria-label="Loading saved order status" />;
+    return (
+      <section className="flex min-h-[calc(100svh-3rem)] flex-col">
+        <CustomerToolbar />
+        <div className="flex flex-1 items-center justify-center">
+          <Spinner aria-label="Loading saved order status" />
+        </div>
+      </section>
+    );
   }
 
   if (!snapshot) {
     return (
-      <Alert status="warning">
-        <Alert.Indicator />
-        <Alert.Content>
-          <Alert.Title>You are offline</Alert.Title>
-          <Alert.Description>
-            No saved status is available for this order. Reconnect to check its
-            status.
-          </Alert.Description>
-        </Alert.Content>
-      </Alert>
+      <section className="flex min-h-[calc(100svh-3rem)] flex-col">
+        <CustomerToolbar
+          onHome={() => {
+            void rememberLastStableDestination({ kind: "home" }).then(() => {
+              router.push("/");
+            });
+          }}
+        />
+        <div className="flex flex-1 items-center justify-center">
+          <Alert className="w-full" status="warning">
+            <Alert.Indicator />
+            <Alert.Content>
+              <Alert.Title>You are offline</Alert.Title>
+              <Alert.Description>
+                No saved status is available for this order. Reconnect to check
+                its status.
+              </Alert.Description>
+            </Alert.Content>
+          </Alert>
+        </div>
+      </section>
     );
   }
 
   return (
-    <section className="flex flex-col items-start gap-4">
-      <Button
-        isIconOnly
-        aria-label="Go to Your orders"
-        className="fixed right-16 top-4 z-50"
-        variant="secondary"
-        onPress={() => {
+    <section className="flex min-h-[calc(100svh-3rem)] flex-col">
+      <CustomerToolbar
+        onHome={() => {
           void rememberLastStableDestination({ kind: "home" }).then(() => {
             router.push("/");
           });
         }}
-      >
-        <svg
-          aria-hidden="true"
-          fill="none"
-          height="20"
-          viewBox="0 0 24 24"
-          width="20"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M3 10.75 12 3l9 7.75V21a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1V10.75Z"
-            stroke="currentColor"
-            strokeLinejoin="round"
-            strokeWidth="1.75"
-          />
-        </svg>
-      </Button>
-      <p className="text-sm text-warning">
-        You&apos;re offline. Showing the status from{" "}
-        {new Date(snapshot.updatedAt).toLocaleString()}.
-      </p>
-      <h1 className="text-3xl font-semibold">Order {snapshot.label}</h1>
-      <Chip
-        color={snapshot.status === "READY" ? "success" : "default"}
-        size="lg"
-      >
-        {orderStatusLabels[snapshot.status]}
-      </Chip>
+      />
+      <Alert className="mt-4" status="warning">
+        <Alert.Indicator />
+        <Alert.Content>
+          <Alert.Title>You’re offline</Alert.Title>
+          <Alert.Description>
+            Last known status from{" "}
+            {new Date(snapshot.updatedAt).toLocaleString()}.
+          </Alert.Description>
+        </Alert.Content>
+      </Alert>
+      <div className="flex flex-1 flex-col items-center justify-center py-12 text-center">
+        <p className="text-sm secondary-text">Order {snapshot.label}</p>
+        <h1 className="status-title mt-4 max-w-[14ch]">
+          {orderStatusLabels[snapshot.status]}
+        </h1>
+      </div>
     </section>
   );
 }

@@ -1,11 +1,12 @@
 "use client";
 
-import { Alert, Button, Chip, Spinner } from "@heroui/react";
+import { Alert, Spinner } from "@heroui/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 import useSWRSubscription from "swr/subscription";
 
+import { CustomerToolbar } from "@/components/customer-toolbar";
 import {
   ApiError,
   getTrackedOrder,
@@ -13,10 +14,7 @@ import {
   type CustomerOrder,
 } from "@/src/api/orders";
 import { apiUrl } from "@/src/api/api-url";
-import {
-  isActiveOrderStatus,
-  orderStatusLabels,
-} from "@/src/orders/order-status";
+import { isActiveOrderStatus } from "@/src/orders/order-status";
 import { updateApplicationBadge } from "@/src/pwa/badge";
 import { useCustomerNotifications } from "@/src/pwa/notification-provider";
 import {
@@ -45,6 +43,13 @@ function getTrackingErrorMessage(error: unknown): string {
 function isActive(order: CustomerOrder | undefined): boolean {
   return isActiveOrderStatus(order?.status);
 }
+
+const statusCopy = {
+  IN_PREPARATION: "We’re preparing your order",
+  READY: "Ready for pickup",
+  COMPLETED: "Order complete",
+  CANCELED: "Order canceled",
+} as const;
 
 function useOrderEventStream({
   enabled,
@@ -133,6 +138,12 @@ export function OrderTracker({
   const isOrderActive = isActive(order);
   const displayedOrder = order ?? offlineOrder;
   const isOfflineSnapshot = !order && offlineOrder !== null;
+  const goHome = () => {
+    leavingForHome.current = true;
+    void rememberLastStableDestination({ kind: "home" }).then(() => {
+      router.push("/");
+    });
+  };
 
   useEffect(() => {
     const synchronizeConnectivity = () => {
@@ -216,71 +227,63 @@ export function OrderTracker({
   });
 
   if ((isLoading || (error && !offlineLookupComplete)) && !displayedOrder) {
-    return <Spinner aria-label="Loading order" />;
+    return (
+      <section className="flex min-h-[calc(100svh-3rem)] flex-col">
+        <CustomerToolbar onHome={goHome} />
+        <div className="flex flex-1 items-center justify-center">
+          <Spinner aria-label="Loading order" />
+        </div>
+      </section>
+    );
   }
 
   if (!displayedOrder) {
     return (
-      <Alert status="danger">
-        <Alert.Indicator />
-        <Alert.Content>
-          <Alert.Title>Order unavailable</Alert.Title>
-          <Alert.Description>
-            {!isOnline && offlineLookupComplete
-              ? "You're offline and no saved status is available for this order. Reconnect to check its status."
-              : getTrackingErrorMessage(error)}
-          </Alert.Description>
-        </Alert.Content>
-      </Alert>
+      <section className="flex min-h-[calc(100svh-3rem)] flex-col">
+        <CustomerToolbar onHome={goHome} />
+        <div className="flex flex-1 items-center justify-center">
+          <Alert className="w-full" status="danger">
+            <Alert.Indicator />
+            <Alert.Content>
+              <Alert.Title>Order unavailable</Alert.Title>
+              <Alert.Description>
+                {!isOnline && offlineLookupComplete
+                  ? "You're offline and no saved status is available for this order. Reconnect to check its status."
+                  : getTrackingErrorMessage(error)}
+              </Alert.Description>
+            </Alert.Content>
+          </Alert>
+        </div>
+      </section>
     );
   }
 
   return (
-    <section className="flex flex-col items-start gap-4">
+    <section className="flex min-h-[calc(100svh-3rem)] flex-col">
+      <CustomerToolbar onHome={goHome} />
       {(error || isOfflineSnapshot) && (
-        <p className="text-sm text-warning">
-          {!isOnline
-            ? `You're offline. Showing the status from ${new Date(displayedOrder.updatedAt).toLocaleString()}.`
-            : `Status may be out of date. Showing the status from ${new Date(displayedOrder.updatedAt).toLocaleString()}.`}
-        </p>
+        <Alert className="mt-4" status="warning">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Title>
+              {isOnline ? "Status may be outdated" : "You’re offline"}
+            </Alert.Title>
+            <Alert.Description>
+              Last known status from{" "}
+              {new Date(displayedOrder.updatedAt).toLocaleString()}.
+            </Alert.Description>
+          </Alert.Content>
+        </Alert>
       )}
-      <div className="flex w-full items-start justify-between gap-4">
-        <h1 className="text-3xl font-semibold">Order {displayedOrder.label}</h1>
-        <Button
-          isIconOnly
-          aria-label="Go to Your orders"
-          className="fixed right-16 top-4 z-50"
-          variant="secondary"
-          onPress={() => {
-            leavingForHome.current = true;
-            void rememberLastStableDestination({ kind: "home" }).then(() => {
-              router.push("/");
-            });
-          }}
-        >
-          <svg
-            aria-hidden="true"
-            fill="none"
-            height="20"
-            viewBox="0 0 24 24"
-            width="20"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              d="M3 10.75 12 3l9 7.75V21a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1V10.75Z"
-              stroke="currentColor"
-              strokeLinejoin="round"
-              strokeWidth="1.75"
-            />
-          </svg>
-        </Button>
-      </div>
-      <Chip
-        color={displayedOrder.status === "READY" ? "success" : "default"}
-        size="lg"
+      <div
+        aria-live="polite"
+        className="flex flex-1 flex-col items-center justify-center py-12 text-center sm:py-16"
       >
-        {orderStatusLabels[displayedOrder.status]}
-      </Chip>
+        <p className="text-sm secondary-text">Order {displayedOrder.label}</p>
+        <h1 className="status-title mt-4 max-w-[14ch]">
+          {statusCopy[displayedOrder.status]}
+        </h1>
+      </div>
     </section>
   );
 }

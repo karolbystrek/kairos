@@ -2,7 +2,8 @@
 
 import type QrScanner from "qr-scanner";
 
-import { Alert, Button, Spinner } from "@heroui/react";
+import { Alert, Button, Spinner, Tooltip } from "@heroui/react";
+import { SwitchCamera, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -22,27 +23,6 @@ type PendingOrder = Extract<
   ScanResultResolution,
   { kind: "wait-for-connectivity" }
 >;
-
-function SwitchCameraIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      fill="none"
-      height="20"
-      viewBox="0 0 24 24"
-      width="20"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <path
-        d="M4.5 8.5A8 8 0 0 1 18 5.2L20 7M19.5 15.5A8 8 0 0 1 6 18.8L4 17M20 3v4h-4M4 21v-4h4"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.75"
-      />
-    </svg>
-  );
-}
 
 export function OrderScanner() {
   const router = useRouter();
@@ -256,22 +236,31 @@ export function OrderScanner() {
   }
 
   return (
-    <section className="flex flex-col gap-5">
+    <section className="flex flex-col gap-6">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight">
-            Scan an order
-          </h1>
-          <p className="mt-1 text-sm text-muted">
+          <h1 className="page-title">Scan an order</h1>
+          <p className="mt-3 secondary-text">
             Point the camera at a Kairos QR code.
           </p>
         </div>
-        <Button size="sm" variant="tertiary" onPress={cancel}>
-          Cancel
-        </Button>
+        <Tooltip delay={500}>
+          <Tooltip.Trigger>
+            <Button
+              isIconOnly
+              aria-label="Close scanner"
+              className="rounded-md"
+              variant="tertiary"
+              onPress={cancel}
+            >
+              <X aria-hidden="true" size={20} />
+            </Button>
+          </Tooltip.Trigger>
+          <Tooltip.Content>Close scanner</Tooltip.Content>
+        </Tooltip>
       </div>
 
-      <div className="relative aspect-[3/4] max-h-[68vh] min-h-80 overflow-hidden rounded-2xl bg-black">
+      <div className="relative aspect-[3/4] max-h-[68vh] min-h-80 overflow-hidden rounded-[var(--radius-large)] bg-black">
         <video
           ref={videoRef}
           muted
@@ -288,7 +277,7 @@ export function OrderScanner() {
         {view === "scanning" && (
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute inset-[14%] rounded-2xl border-2 border-white/85 shadow-[0_0_0_999px_rgba(0,0,0,0.18)]"
+            className="pointer-events-none absolute inset-[14%] rounded-[var(--radius-medium)] border-2 border-white/90 shadow-[0_0_0_999px_rgba(0,0,0,0.22)]"
           />
         )}
       </div>
@@ -298,18 +287,24 @@ export function OrderScanner() {
           {inlineError}
         </p>
         {cameras.length > 1 && (
-          <Button
-            isIconOnly
-            aria-label="Switch camera"
-            isDisabled={isSwitchingCamera}
-            size="sm"
-            variant="secondary"
-            onPress={() => {
-              void switchCamera();
-            }}
-          >
-            <SwitchCameraIcon />
-          </Button>
+          <Tooltip delay={500}>
+            <Tooltip.Trigger>
+              <Button
+                isIconOnly
+                aria-label="Switch camera"
+                className="rounded-md"
+                isDisabled={isSwitchingCamera}
+                size="sm"
+                variant="secondary"
+                onPress={() => {
+                  void switchCamera();
+                }}
+              >
+                <SwitchCamera aria-hidden="true" size={20} />
+              </Button>
+            </Tooltip.Trigger>
+            <Tooltip.Content>Switch camera</Tooltip.Content>
+          </Tooltip>
         )}
       </div>
     </section>

@@ -2,11 +2,13 @@
 
 import type { PointerEvent as ReactPointerEvent } from "react";
 
-import { Alert, Button, Card, Chip, Dropdown, Spinner } from "@heroui/react";
+import { Alert, Button, Dropdown, Spinner, Tooltip } from "@heroui/react";
+import { Ellipsis, QrCode } from "lucide-react";
 import NextLink from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { CustomerToolbar } from "@/components/customer-toolbar";
 import { orderStatusLabels } from "@/src/orders/order-status";
 import { getTrackedOrderHref } from "@/src/orders/order-route";
 import { resolveInstalledLaunchHref } from "@/src/pwa/launch-destination";
@@ -31,44 +33,6 @@ function isStandaloneDisplayMode(): boolean {
   return (
     window.matchMedia("(display-mode: standalone)").matches ||
     navigatorWithStandalone.standalone === true
-  );
-}
-
-function QrScannerIcon({ size = 24 }: { size?: number }) {
-  return (
-    <svg
-      aria-hidden="true"
-      fill="none"
-      height={size}
-      viewBox="0 0 24 24"
-      width={size}
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <path
-        d="M4 9V5a1 1 0 0 1 1-1h4M15 4h4a1 1 0 0 1 1 1v4M20 15v4a1 1 0 0 1-1 1h-4M9 20H5a1 1 0 0 1-1-1v-4M8 8h3v3H8V8Zm5 0h3v3h-3V8Zm-5 5h3v3H8v-3Zm5 0h1.5v1.5H13V13Zm1.5 1.5H16V16h-1.5v-1.5Z"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.75"
-      />
-    </svg>
-  );
-}
-
-function MoreIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      fill="currentColor"
-      height="20"
-      viewBox="0 0 24 24"
-      width="20"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <circle cx="5" cy="12" r="1.5" />
-      <circle cx="12" cy="12" r="1.5" />
-      <circle cx="19" cy="12" r="1.5" />
-    </svg>
   );
 }
 
@@ -111,7 +75,6 @@ function OrderSummaryCard({
       startX: event.clientX,
       startY: event.clientY,
     };
-    event.currentTarget.setPointerCapture(event.pointerId);
   };
 
   const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -129,11 +92,14 @@ function OrderSummaryCard({
       }
       if (Math.abs(deltaY) >= Math.abs(deltaX)) {
         drag.current = null;
-        event.currentTarget.releasePointerCapture(event.pointerId);
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+          event.currentTarget.releasePointerCapture(event.pointerId);
+        }
 
         return;
       }
       currentDrag.horizontal = true;
+      event.currentTarget.setPointerCapture(event.pointerId);
       setIsDragging(true);
     }
 
@@ -165,7 +131,10 @@ function OrderSummaryCard({
         currentDrag.baseOffset + event.clientX - currentDrag.startX,
       ),
     );
-    const reveal = !canceled && finalOffset < -STOP_ACTION_WIDTH / 2;
+    const reveal =
+      currentDrag.horizontal &&
+      !canceled &&
+      finalOffset < -STOP_ACTION_WIDTH / 2;
 
     if (currentDrag.horizontal) {
       suppressNextClick.current = true;
@@ -180,7 +149,7 @@ function OrderSummaryCard({
   };
 
   return (
-    <div className="relative overflow-hidden rounded-xl">
+    <div className="relative overflow-hidden rounded-[var(--radius-medium)]">
       <Button
         className="absolute inset-y-0 right-0 h-full w-[132px] rounded-none"
         isDisabled={!isRevealed || isStopping}
@@ -200,58 +169,63 @@ function OrderSummaryCard({
         onPointerMove={handlePointerMove}
         onPointerUp={settleSwipe}
       >
-        <Card className="w-full">
-          <Card.Header className="flex-row items-center gap-2 p-0">
-            <NextLink
-              className="flex min-w-0 flex-1 items-center justify-between gap-4 rounded-l-xl px-4 py-4 no-underline outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset"
-              href={getTrackedOrderHref(order.trackingReference)}
-              onClick={(event) => {
-                if (suppressNextClick.current || isRevealed) {
-                  event.preventDefault();
-                  setIsRevealed(false);
-                  setOffset(0);
-                }
-              }}
-            >
-              <Card.Title className="min-w-0 break-words text-lg">
-                Order {order.label}
-              </Card.Title>
-              <Chip
-                color={order.status === "READY" ? "success" : "default"}
-                size="sm"
-              >
-                {orderStatusLabels[order.status]}
-              </Chip>
-            </NextLink>
-            <Dropdown>
-              <Dropdown.Trigger
-                aria-label={`More actions for order ${order.label}`}
-                className="mr-2 flex size-11 items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                isDisabled={isStopping}
-              >
-                <MoreIcon />
-              </Dropdown.Trigger>
-              <Dropdown.Popover placement="bottom end">
-                <Dropdown.Menu
-                  aria-label={`Actions for order ${order.label}`}
-                  onAction={(key) => {
-                    if (key === "stop-tracking") {
-                      onStopTracking();
-                    }
-                  }}
+        <div className="customer-order-entry flex w-full items-center gap-2">
+          <NextLink
+            className="flex min-w-0 flex-1 items-center justify-between gap-4 rounded-md px-3 py-5 no-underline outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset"
+            href={getTrackedOrderHref(order.trackingReference)}
+            onClick={(event) => {
+              if (suppressNextClick.current || isRevealed) {
+                event.preventDefault();
+                setIsRevealed(false);
+                setOffset(0);
+              }
+            }}
+          >
+            <div className="min-w-0">
+              <p className="text-xs font-medium uppercase tracking-[0.1em] secondary-text">
+                Order
+              </p>
+              <p className="mt-1 min-w-0 break-words text-xl font-semibold tracking-tight">
+                {order.label}
+              </p>
+            </div>
+            <span className="text-xs font-semibold uppercase tracking-[0.08em] text-accent">
+              {orderStatusLabels[order.status]}
+            </span>
+          </NextLink>
+          <Dropdown>
+            <Tooltip delay={500}>
+              <Tooltip.Trigger>
+                <Dropdown.Trigger
+                  aria-label={`More actions for order ${order.label}`}
+                  className="flex size-11 items-center justify-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset"
+                  isDisabled={isStopping}
                 >
-                  <Dropdown.Item
-                    id="stop-tracking"
-                    textValue="Stop tracking"
-                    variant="danger"
-                  >
-                    Stop tracking
-                  </Dropdown.Item>
-                </Dropdown.Menu>
-              </Dropdown.Popover>
-            </Dropdown>
-          </Card.Header>
-        </Card>
+                  <Ellipsis aria-hidden="true" size={20} />
+                </Dropdown.Trigger>
+              </Tooltip.Trigger>
+              <Tooltip.Content>More actions</Tooltip.Content>
+            </Tooltip>
+            <Dropdown.Popover placement="bottom end">
+              <Dropdown.Menu
+                aria-label={`Actions for order ${order.label}`}
+                onAction={(key) => {
+                  if (key === "stop-tracking") {
+                    onStopTracking();
+                  }
+                }}
+              >
+                <Dropdown.Item
+                  id="stop-tracking"
+                  textValue="Stop tracking"
+                  variant="danger"
+                >
+                  Stop tracking
+                </Dropdown.Item>
+              </Dropdown.Menu>
+            </Dropdown.Popover>
+          </Dropdown>
+        </div>
       </div>
     </div>
   );
@@ -352,47 +326,57 @@ export function CustomerHome({
 
   if (!homeState) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <Spinner aria-label="Loading your orders" />
-      </div>
+      <section className="flex min-h-[calc(100svh-3rem)] flex-col">
+        <CustomerToolbar />
+        <div className="flex flex-1 items-center justify-center">
+          <Spinner aria-label="Loading your orders" />
+        </div>
+      </section>
     );
   }
 
   if (homeState.orders.length === 0) {
     return (
-      <section className="flex flex-col gap-6">
-        <h1 className="text-3xl font-semibold tracking-tight">Your orders</h1>
-        <div className="flex min-h-[52vh] flex-col items-center justify-center gap-4 text-center">
+      <section className="relative min-h-[calc(100svh-3rem)]">
+        <CustomerToolbar className="absolute right-0 top-0 z-10" />
+        <div className="flex min-h-[calc(100svh-3rem)] items-center justify-center">
           <Button
-            aria-label="Scan an order"
-            className="h-auto min-h-32 w-44 flex-col gap-3 rounded-3xl py-6"
-            variant="primary"
+            aria-label="Scan QR code"
+            className="empty-scan-action"
+            variant="tertiary"
             onPress={openScanner}
           >
-            <QrScannerIcon size={40} />
-            <span className="text-base font-semibold">Scan an order</span>
+            <span className="empty-scan-action-label">Scan QR code</span>
+            <QrCode className="empty-scan-action-icon" size={128} />
           </Button>
-          <p className="max-w-xs text-sm text-muted">
-            Scan the QR code from the restaurant to start tracking.
-          </p>
         </div>
       </section>
     );
   }
 
   return (
-    <section className="flex flex-col gap-6">
-      <div className="flex items-start justify-between gap-4">
+    <section className="flex flex-col gap-8">
+      <div className="flex flex-col-reverse gap-6 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <h1 className="text-3xl font-semibold tracking-tight">Your orders</h1>
-          <p className="mt-1 text-muted">
-            Select an order for its latest status.
-          </p>
+          <h1 className="page-title">Your orders</h1>
         </div>
-        <Button size="sm" variant="secondary" onPress={openScanner}>
-          <QrScannerIcon size={18} />
-          Scan
-        </Button>
+        <div className="flex items-center gap-1 self-end sm:self-auto">
+          <Tooltip delay={500}>
+            <Tooltip.Trigger>
+              <Button
+                isIconOnly
+                aria-label="Scan another order"
+                className="rounded-md"
+                variant="tertiary"
+                onPress={openScanner}
+              >
+                <QrCode size={20} />
+              </Button>
+            </Tooltip.Trigger>
+            <Tooltip.Content>Scan another order</Tooltip.Content>
+          </Tooltip>
+          <CustomerToolbar />
+        </div>
       </div>
 
       {removalError && (
@@ -405,7 +389,7 @@ export function CustomerHome({
         </Alert>
       )}
 
-      <div aria-live="polite" className="flex flex-col gap-3">
+      <div aria-live="polite" className="flex flex-col gap-2">
         {homeState.orders.map((order) => (
           <OrderSummaryCard
             key={order.trackingReference}

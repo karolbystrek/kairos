@@ -42,6 +42,7 @@ export type NotificationState =
 
 type CustomerNotificationContextValue = {
   disable: () => Promise<void>;
+  dismissMessage: () => void;
   enable: () => Promise<void>;
   enrollOrder: (trackingReference: string) => Promise<void>;
   message: string | null;
@@ -60,6 +61,7 @@ export function CustomerPwaProvider({
   const [state, setState] = useState<NotificationState>("loading");
   const [message, setMessage] = useState<string | null>(null);
   const synchronizing = useRef<Promise<void> | null>(null);
+  const dismissMessage = useCallback(() => setMessage(null), []);
 
   const synchronize = useCallback(async () => {
     if (!supportsWebPush()) {
@@ -328,13 +330,22 @@ export function CustomerPwaProvider({
   const value = useMemo<CustomerNotificationContextValue>(
     () => ({
       disable,
+      dismissMessage,
       enable,
       enrollOrder,
       message,
       state,
       stopTrackingOrder,
     }),
-    [disable, enable, enrollOrder, message, state, stopTrackingOrder],
+    [
+      disable,
+      dismissMessage,
+      enable,
+      enrollOrder,
+      message,
+      state,
+      stopTrackingOrder,
+    ],
   );
 
   return (

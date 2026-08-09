@@ -5,7 +5,6 @@ import { Providers } from "./providers";
 
 import { siteConfig } from "@/config/site";
 import { PWA_THEME_COLOR } from "@/src/pwa/manifest";
-import { NotificationControl } from "@/src/pwa/notification-control";
 
 export const metadata: Metadata = {
   title: {
@@ -31,8 +30,11 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  colorScheme: "light",
-  themeColor: PWA_THEME_COLOR,
+  colorScheme: "light dark",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: PWA_THEME_COLOR },
+    { media: "(prefers-color-scheme: dark)", color: "#000000" },
+  ],
 };
 
 export default function RootLayout({
@@ -47,13 +49,11 @@ export default function RootLayout({
         <Providers
           themeProps={{
             attribute: "class",
-            defaultTheme: "light",
-            enableSystem: false,
-            forcedTheme: "light",
+            defaultTheme: "system",
+            enableSystem: true,
           }}
         >
-          <main className="mx-auto max-w-xl px-6 pb-10 pt-20">
-            <NotificationControl />
+          <main className="mx-auto min-h-svh max-w-[var(--content-customer)] px-5 pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-6 sm:pt-6">
             {children}
           </main>
         </Providers>
