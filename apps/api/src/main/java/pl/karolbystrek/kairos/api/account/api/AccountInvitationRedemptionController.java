@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import pl.karolbystrek.kairos.api.account.api.model.RedeemAccountInvitationRequest;
 import pl.karolbystrek.kairos.api.account.application.AccountInvitationService;
-import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
+import pl.karolbystrek.kairos.api.account.application.model.PanelPrincipal;
 import pl.karolbystrek.kairos.api.authentication.api.model.CurrentAccountResponse;
 import pl.karolbystrek.kairos.api.authentication.application.AuthenticationSessionService;
 import pl.karolbystrek.kairos.api.authentication.application.CurrentAccountService;
@@ -31,7 +31,7 @@ class AccountInvitationRedemptionController {
 
     @PostMapping
     CurrentAccountResponse redeem(
-        @AuthenticationPrincipal StaffPrincipal signedInAccount,
+        @AuthenticationPrincipal PanelPrincipal signedInAccount,
         @Valid @RequestBody RedeemAccountInvitationRequest request,
         HttpServletRequest servletRequest,
         HttpServletResponse servletResponse

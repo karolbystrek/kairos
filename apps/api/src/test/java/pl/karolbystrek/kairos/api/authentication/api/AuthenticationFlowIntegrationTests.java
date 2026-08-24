@@ -101,6 +101,31 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
     }
 
     @Test
+    void logsAPlatformOperatorIntoTheDiscriminatedOperatorAccountContract() throws Exception {
+        var username = "platform-" + UUID.randomUUID();
+        var accountId = insertPlatformOperator(username, AccountStatus.ENABLED);
+
+        var login = login(
+            username,
+            PASSWORD,
+            bootstrapCsrf("192.0.2.11"),
+            "192.0.2.11"
+        );
+
+        mockMvc.perform(apiGet("/auth/v1/me")
+                .secure(true)
+                .cookie(login.session().access()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.accountId").value(accountId.toString()))
+            .andExpect(jsonPath("$.username").value(username))
+            .andExpect(jsonPath("$.kind").value("PLATFORM_OPERATOR"))
+            .andExpect(jsonPath("$.capabilities[0]").value("MANAGE_TENANT_REGISTRATION_INVITATIONS"))
+            .andExpect(jsonPath("$.tenantId").doesNotExist())
+            .andExpect(jsonPath("$.tenantRole").doesNotExist())
+            .andExpect(jsonPath("$.assignment").doesNotExist());
+    }
+
+    @Test
     void returnsTheSamePublicFailureForUnknownWrongDisabledPasswordlessAndIneligibleAccounts() throws Exception {
         var tenantId = insertTenant();
         var locationId = insertLocation(tenantId);
@@ -544,6 +569,27 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
         return accountId;
     }
 
+    private UUID insertPlatformOperator(String username, AccountStatus status) {
+        var accountId = UUID.randomUUID();
+        var now = Instant.now();
+        jdbcTemplate.update(
+            """
+                INSERT INTO accounts (
+                    id, kind, username, email, password_hash,
+                    status, created_at, updated_at
+                ) VALUES (?, 'PLATFORM_OPERATOR', ?, ?, ?, ?, ?, ?)
+                """,
+            accountId,
+            username,
+            username + "@example.com",
+            passwordEncoder.encode(PASSWORD),
+            status.name(),
+            now,
+            now
+        );
+        return accountId;
+    }
+
     private void insertAssignment(
         UUID accountId,
         UUID tenantId,
@@ -642,6 +688,7 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
             .issuedAt(now.minus(10, ChronoUnit.MINUTES))
             .expiresAt(now.minus(5, ChronoUnit.MINUTES))
             .id(UUID.randomUUID().toString())
+            .claim("account_kind", "TENANT_ACCOUNT")
             .claim("tenant_id", account.tenantId().toString())
             .claim("tenant_role", TenantRole.MEMBER.name())
             .build();

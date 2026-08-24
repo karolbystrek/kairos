@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
@@ -40,33 +41,33 @@ class LegacyRouteRemovalIntegrationTests extends RedisListenerIsolatedIntegratio
         var trackingReference = UUID.randomUUID();
         var csrf = csrfCookie();
 
-        assertNotFound(get(API_CONTEXT_PATH + "/auth/csrf"), csrf);
-        assertNotFound(get(API_CONTEXT_PATH + "/locations"), csrf);
-        assertNotFound(get(API_CONTEXT_PATH + "/orders"), csrf);
-        assertNotFound(get(
+        assertDenied(get(API_CONTEXT_PATH + "/auth/csrf"), csrf);
+        assertDenied(get(API_CONTEXT_PATH + "/locations"), csrf);
+        assertDenied(get(API_CONTEXT_PATH + "/orders"), csrf);
+        assertDenied(get(
                 API_CONTEXT_PATH + "/tracked-orders/{trackingReference}",
                 trackingReference
         ), csrf);
-        assertNotFound(post(
+        assertDenied(post(
                 API_CONTEXT_PATH + "/locations/{locationId}/orders",
                 locationId
         ), csrf);
-        assertNotFound(patch(
+        assertDenied(patch(
                 API_CONTEXT_PATH + "/orders/{orderId}/status",
                 orderId
         ), csrf);
-        assertNotFound(post(
+        assertDenied(post(
                 API_CONTEXT_PATH + "/locations/{locationId}/accounts",
                 locationId
         ), csrf);
-        assertNotFound(patch(
+        assertDenied(patch(
                 API_CONTEXT_PATH + "/accounts/{accountId}/status",
                 accountId
         ), csrf);
-        assertNotFound(post(API_CONTEXT_PATH + "/tenant-registrations"), csrf);
+        assertDenied(post(API_CONTEXT_PATH + "/tenant-registrations"), csrf);
     }
 
-    private void assertNotFound(
+    private void assertDenied(
             MockHttpServletRequestBuilder request,
             Cookie csrf
     ) throws Exception {
@@ -78,14 +79,14 @@ class LegacyRouteRemovalIntegrationTests extends RedisListenerIsolatedIntegratio
         var staffAuthentication = new UsernamePasswordAuthenticationToken(
                 principal,
                 "credentials",
-                List.of()
+                List.of(new SimpleGrantedAuthority("ROLE_TENANT_ACCOUNT"))
         );
         mockMvc.perform(request
                         .contextPath(API_CONTEXT_PATH)
                         .with(authentication(staffAuthentication))
                         .cookie(csrf)
                         .header(CSRF_HEADER, csrf.getValue()))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isForbidden());
     }
 
     private Cookie csrfCookie() throws Exception {

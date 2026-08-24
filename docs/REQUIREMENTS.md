@@ -318,7 +318,9 @@ claim existing clients; an update activates through the browser lifecycle.
 
 The staff panel must:
 
-* allow an anonymous visitor to register a tenant and its first administrator through the dedicated onboarding flow;
+* allow only the anonymous holder of a valid Tenant Registration Invitation to
+  register a tenant and its first administrator through the dedicated
+  onboarding flow;
 * require an authenticated internal account;
 * show only locations and orders accessible to the account;
 * allow tenant administrators to switch between locations or view an aggregate queue;
@@ -346,6 +348,34 @@ The staff experience keeps the active queue visually primary. Administrative
 capabilities must not compete with frequent order creation, QR presentation,
 or valid order transitions merely because they are available to the signed-in
 account.
+
+The Platform Operator authenticates through the same anonymous sign-in page as
+tenant accounts but enters a separate operator workspace after authentication.
+Platform Operator Accounts are provisioned through a repository-owned one-shot
+operational command rather than a public registration path or
+environment-specific migration seed. Kairos places no product limit on their
+number, although one operator is expected to be the ordinary initial
+deployment.
+The operator workspace exposes only platform-specific capabilities and never
+shows restaurant orders, locations, member accounts, External Integrations, or
+other tenant-operational data.
+
+The initial operator workspace provides tenant provisioning through Tenant
+Registration Invitations. It can create an invitation, list pending
+invitations, and revoke a pending invitation. It cannot list, enter,
+impersonate, disable, archive, or otherwise manage created tenants and exposes
+no tenant operational data. Its navigation, page headers,
+creation action, responsive collection treatment, focused sheets, confirmation
+dialogs, interaction states, and Light, Dark, and System appearances reuse the
+same Apple-inspired visual language and component anatomy as the tenant
+administrator's Locations, Accounts, and Integrations destinations. The
+operator receives no separate super-administrator aesthetic. The information
+architecture must remain honest when only one operator destination exists and
+must not render a meaningless one-item tab control merely to imitate the tenant
+workspace. The initial workspace is a **Tenant invitations** page with the
+established title-adjacent Create action and pending-invitation collection;
+peer tab-style navigation appears only after another genuine operator
+destination is introduced.
 
 Orders, Locations, Accounts, and Integrations use one adaptive tab-style
 navigation system: a centered rounded segmented control on tablet and desktop and bottom
@@ -621,10 +651,13 @@ rotates CSRF state are followed by a fresh bootstrap. No password, access
 credential, refresh credential, provider token, current-account record, or
 CSRF token may be stored in browser-managed persistent storage.
 
-The access JWT contains the issuer, audience, account ID subject, tenant ID,
-tenant-level role, issue and expiry times, and unique token ID. It does not
-contain the mutable username, email, or location assignment. The API resolves
-the current assignment and current account eligibility from PostgreSQL.
+The access JWT contains the issuer, audience, account ID subject, immutable
+account kind, issue and expiry times, and unique token ID. A tenant-account
+token additionally requires its tenant ID and tenant-level role; a Platform
+Operator token must contain neither. The token does not contain the mutable
+username, email, or location assignment. The API resolves current account
+eligibility and, for a tenant Account, its current assignment from PostgreSQL.
+Malformed or contradictory principal claim shapes fail closed.
 
 Refresh credentials are opaque random values stored only as cryptographic
 hashes. Rotation locks the matching session, atomically consumes it, creates a
@@ -633,18 +666,99 @@ Reuse of a consumed credential revokes the complete family. Cooperating panel
 requests serialize authentication-cookie mutations with a browser Web Lock
 when available, recheck the current account after acquiring it, and perform at
 most one refresh plus one replay of the original request. An authorization
-`403` never starts refresh. Login and anonymous tenant registration do not
-start automatic recovery; registration also does not acquire the
-authentication-cookie lock. Anonymous invitation redemption follows the same
-no-recovery behavior.
+`403` never starts refresh. Login and anonymous invitation-gated tenant
+registration do not start automatic recovery; registration also does not
+acquire the authentication-cookie lock. Anonymous invitation redemption
+follows the same no-recovery behavior.
 
-Public tenant onboarding remains the distinct flow for creating one tenant and
-its first enabled administrator atomically. It creates no location. The
-administrator requires a normalized, globally
+Tenant onboarding is invite-only. An **Account** is the globally identifiable
+person-oriented identity that authenticates to the panel. Each Account has one
+immutable kind: `TENANT_ACCOUNT` or `PLATFORM_OPERATOR`. Username, required
+email, local credentials when present, lifecycle status, external identities,
+and refresh sessions belong to the common Account identity.
+
+A **Platform Operator** is the deployment-wide `PLATFORM_OPERATOR` Account
+kind. It is outside the tenant authorization model and therefore has no tenant
+ID, tenant role, or location assignment. The Platform Operator uses a minimal operator panel to
+issue **Tenant Registration Invitations** and has no restaurant-operational
+capabilities. One or more Platform Operator Accounts may be provisioned through
+the repository-owned one-shot command. Production migrations contain no
+environment-specific Account data. The Platform Operator
+uses the same sign-in page, credential verification, cookies, refresh-session
+rotation, and logout behavior as tenant Accounts, while its strongly typed
+authenticated principal and authorized resource families remain distinct.
+Kairos provides no public self-registration path and no deployment option that
+restores one.
+
+The common sign-in form does not ask the user to select an account kind or
+role. It accepts the same username and password fields for the Platform
+Operator and tenant accounts. The backend resolves one globally unambiguous
+identity, authenticates it without disclosing its kind on failure, and routes a
+successful principal to its authorized workspace.
+
+Authentication alone grants no common administrative data surface. The API
+explicitly authorizes the Platform Operator only for authentication and Tenant
+Registration Invitation management resource families and rejects it from
+every tenant browser resource family. Tenant accounts are likewise rejected
+from every operator resource family. A broad authenticated-request rule must
+not allow either principal kind to cross this boundary.
+
+A **Tenant Registration Invitation** is the sole authority to create one new
+tenant and its first enabled tenant administrator atomically. It is distinct
+from an **Account Invitation**, which authorizes creation of a manager or
+operator account inside an existing tenant. It is an unbound, single-use bearer
+capability: issuance reserves no tenant, username, or email, and the first
+successful redeemer supplies the account identity and becomes the first tenant
+administrator. An invitation has one fixed seven-day lifetime. The Platform
+Operator may list or revoke it while it remains pending, and successful
+redemption consumes it in the same transaction that creates the tenant and
+administrator.
+
+Every enabled Platform Operator may list and revoke every pending Tenant
+Registration Invitation, not only invitations it issued. Pending rows retain
+the issuing Account identity for attribution. The operator workspace provides
+no Platform Operator Account creation, status, credential, or profile
+management; those operations remain restricted to the trusted operational
+command.
+
+A Platform Operator Account may be `ENABLED` or `DISABLED` but is not archived
+or deleted in this increment. A repository-owned operational command performs
+provisioning, disablement, and re-enablement. Provisioning securely reads the
+username, required email, and password without accepting the plaintext password
+through process arguments, environment values, migration data, or committed
+files. Disabling an operator atomically revokes its refresh sessions and every
+pending Tenant Registration Invitation it issued without disrupting tenant
+operations.
+
+Kairos provides no Platform Operator password reset or recovery operation. If
+an operator loses its password, an infrastructure-authorized person provisions
+a replacement Platform Operator with a new globally unique username and email
+and then disables the inaccessible Account. The disabled Account remains
+retained with its identifiers reserved for audit. The operational command may
+disable the last enabled Platform Operator only after an explicit focused
+confirmation; doing so leaves tenant operations available, and another
+operator may be provisioned later.
+
+Issuance requires one short operator-only **Invitation label** so pending
+invitations remain distinguishable during revocation. The label is
+administrative context only: it is not a tenant display name, is not shown to
+the invitee, reserves no identity, and does not constrain redemption. The full
+link is returned only once through the same locked Copy-and-Confirm
+presentation used for other one-time credentials. Kairos stores only the
+SHA-256 hash of a token containing 32 cryptographically random bytes encoded as
+unpadded Base64url. The link uses
+`/tenant-registration#invitation=<token>`; the browser submits the token only
+in API request bodies and removes the fragment after successful redemption or
+a terminal response.
+
+Tenant registration creates no location. The first administrator requires a normalized, globally
 unique email address in addition to its normalized username and BCrypt-hashed
-password. Registration does not issue authentication cookies or sign the
-administrator in. Sign-in is the default anonymous panel view; **Set up a new
-restaurant** is its secondary path into onboarding. Tenants and orders have no
+password. The public sign-in surface does not advertise or link to tenant
+registration; an invitee enters onboarding only through the invitation link.
+Successful registration immediately issues the normal tenant-administrator
+browser session and opens the Orders workspace, whose no-enabled-location state
+provides the existing path to create the first location.
+Tenants and orders have no
 separate display-name fields; accounts are presented by username and locations
 by their display names while stable identifiers remain their authoritative
 identity.
@@ -772,7 +886,8 @@ The anonymous redemption form displays the fixed location and role as
 read-only context and requires username, email, password, and password
 confirmation. A browser already signed in to the panel must explicitly sign
 out before redeeming the invitation, and the link is preserved across that
-step; the API also rejects redemption while a valid staff session is present.
+step; the API also rejects redemption while any valid tenant-account or
+Platform Operator session is present.
 Redemption retains normal CSRF protection and performs no automatic session
 refresh. Successful redemption immediately issues the normal Kairos browser
 session and opens the Orders workspace for the account's assigned location.
@@ -786,8 +901,8 @@ Copy and Confirm actions. The sheet may be closed without copying, but the
 secret cannot be recovered afterward. Staff must use the ordinary invitation
 creation flow for another link and revoke the previous invitation explicitly.
 
-Each account belongs directly to one tenant and represents one staff person,
-who may use that account on multiple devices. A tenant administrator has
+Each `TENANT_ACCOUNT` belongs directly to one tenant and represents one staff
+person, who may use that Account on multiple devices. A tenant administrator has
 tenant-wide access; a location manager or operator has at most one location
 assignment. Tenant administrators may issue manager or operator invitations
 for locations in their tenant. Location managers may issue only operator
@@ -815,11 +930,28 @@ unverified in this increment. An unverified email is account data rather than
 proof of identity and cannot authorize password recovery, OAuth2/OIDC linking,
 or another security-sensitive operation.
 
-The tenant-registration endpoint is anonymous but retains normal CSRF protection because it is invoked from the browser panel origin. The current local slice does not implement application-level rate limiting for tenant registration, login, or refresh. Before public deployment, a dedicated API gateway in front of Spring must enforce request throttling for these routes, preserve a trustworthy client-address boundary, and prevent direct access that bypasses the gateway. Spring remains the authentication authority and does not duplicate the gateway's request-rate counters.
+The tenant-registration endpoint is anonymous but accepts a registration only
+with a valid Tenant Registration Invitation and retains normal CSRF protection
+because it is invoked from the browser panel origin. Removing the public
+registration control never substitutes for this server-side requirement. The
+current local slice does not implement application-level rate limiting for
+tenant registration, login, or refresh. Before public deployment, a dedicated
+API gateway in front of Spring must enforce request throttling for these routes,
+preserve a trustworthy client-address boundary, and prevent direct access that
+bypasses the gateway. Spring remains the authentication authority and does not
+duplicate the gateway's request-rate counters.
 
 One browser profile on the staff-panel origin represents one signed-in account because its tabs share the same authentication cookies. Same-account tabs may be used on a best-effort basis, but the panel does not promise immediate cross-tab interface synchronization. Different accounts in different tabs of one browser profile are unsupported; simultaneous accounts require separate browser profiles, private browsing contexts, or devices. The panel provides one primary operational workspace, including administrator location switching and aggregate views, rather than depending on browser tabs for core workflows.
 
-The authenticated principal carries the account identity, owning tenant, and tenant-level role needed for authorization. The backend resolves the current location assignment rather than embedding mutable assignment data in the JWT. The API derives tenant and location access from the authenticated account and never trusts a tenant or location identifier merely because it was supplied by the client.
+The common authenticated principal is discriminated by immutable Account kind.
+It is resolved immediately into either a strongly typed tenant principal that
+requires the Account identity, owning tenant, and tenant-level role, or a
+strongly typed Platform Operator principal that has no tenant context. Tenant
+feature interfaces accept only the tenant principal; Tenant Registration
+Invitation management accepts only the Platform Operator principal. The
+backend resolves the current location assignment rather than embedding mutable
+assignment data in the JWT and never trusts a tenant or location identifier
+merely because it was supplied by the client.
 
 The API provides operations for CSRF bootstrap, local login, session refresh,
 logout, logout-all, and retrieving the current account identity.
@@ -888,12 +1020,27 @@ The database schema must include tables covering the following concepts. Names a
   operational information, and an IANA time-zone identifier fixed at
   `UTC` in this increment. Delete archives the row rather than physically
   removing its stable identity or historical relationships.
-* **Accounts:** stable person identity, direct ownership by one tenant,
-  normalized local login identifier and credential hash when applicable,
-  required normalized globally unique email, tenant-level role, and account
-  status. Member-account statuses are enabled, disabled, and archived;
-  archived identities remain available for historical attribution but not
-  ordinary account management or authentication.
+* **Accounts:** stable person identity, immutable `TENANT_ACCOUNT` or
+  `PLATFORM_OPERATOR` kind, normalized globally unique local login identifier
+  and credential hash when applicable, required normalized globally unique
+  email, and Account status. A tenant Account requires direct ownership by one
+  tenant and a tenant-level role. A Platform Operator requires neither and may
+  not have a Location Assignment. Database check constraints reject every
+  mixed or incomplete kind, tenant, and role shape. Member-account statuses are
+  enabled, disabled, and archived; archived identities remain available for
+  historical attribution but not ordinary account management or
+  authentication.
+* **Tenant Registration Invitations:** platform-owned, unbound authority to
+  create one tenant and its first tenant-administrator Account, including
+  stable identity, required operator-only label, issuing Platform Operator
+  Account, SHA-256 hash of a single-use 32-byte random Base64url bearer
+  credential, `PENDING`, `REDEEMED`, or `REVOKED` lifecycle state, seven-day
+  absolute expiry, redemption outcome, and timestamps. Expiration is derived
+  from the deadline rather than persisted as another lifecycle state. The
+  invitation reserves no tenant, username, or email before redemption. The
+  bearer secret is never recoverable, while secret-free pending, redeemed,
+  revoked, and expired metadata is retained indefinitely for audit without an
+  automatic cleanup policy.
 * **Account Invitations:** separate authority to create one member account,
   including stable identity, direct tenant ownership, fixed target location and
   manager or operator role, issuing account, SHA-256 hash of a single-use
@@ -907,7 +1054,7 @@ The database schema must include tables covering the following concepts. Names a
   recoverable bearer secret; a deliberate security-event retention policy
   replaces that default before public deployment.
 * **External identities:** provider and immutable provider subject linked to an account.
-* **Location assignments:** relationship between a non-admin account and its
+* **Location assignments:** relationship between a non-admin tenant Account and its
   accessible location, including a manager or operator role. The assignment has
   no independent lifecycle status; effective access requires both its Account
   and Location to be enabled. The current account model permits at most one
@@ -1123,6 +1270,45 @@ PUT    /api/accounts/v1/{accountId}/status
 DELETE /api/accounts/v1/{accountId}
 ```
 
+The accepted invite-only tenant-onboarding increment adds and changes the
+browser contract as follows:
+
+```text
+GET    /api/tenant-registration-invitations/v1
+POST   /api/tenant-registration-invitations/v1
+DELETE /api/tenant-registration-invitations/v1/{invitationId}
+POST   /api/tenant-registration-invitation-previews/v1
+POST   /api/tenant-registrations/v1
+```
+
+The authentication responses become a discriminated union keyed by immutable
+Account kind. The tenant variant retains tenant ID, tenant role, assignment,
+and tenant capabilities; the Platform Operator variant omits every tenant field
+and exposes only its operator capabilities. Login, refresh, logout, logout-all,
+and current-Account lookup otherwise keep one shared browser contract and cookie
+model.
+
+Tenant Registration Invitation list, creation, and revocation require an
+enabled Platform Operator. List returns every pending, unexpired invitation to
+every enabled operator. Creation accepts only the required operator-only label,
+returns `201`, and reveals the complete fragment link exactly once. Revocation
+requires confirmation in the panel, returns `204`, and records the issuing and
+revoking Account identities separately when they differ. Tenant Accounts cannot
+access this family.
+
+Tenant Registration Invitation preview and tenant registration are anonymous,
+accept the bearer token only in their validated request bodies, retain normal
+browser CSRF protection, and never log those bodies. Preview reveals no
+operator-only label or Account identity. Registration requires username, email,
+password, password confirmation, and the token; locks and rechecks the
+invitation; and atomically creates the tenant and first `TENANT_ACCOUNT`, marks
+the invitation redeemed, and creates the normal refresh session. Validation or
+global username or email conflicts do not consume the invitation. Known
+expired, revoked, or redeemed links return identity-free terminal problems,
+unknown or malformed tokens remain indistinguishable, and any existing panel
+session receives `403`. The browser removes the token fragment after success or
+a terminal response.
+
 Location creation accepts only the display name and returns the new enabled
 representation with `201`. Rename accepts only the display name. The location
 status operation accepts only `ENABLED` or `DISABLED`; archival remains the
@@ -1150,7 +1336,7 @@ Delete for an archived account in the caller's management scope is idempotent,
 and status operations treat archived, cross-tenant, and otherwise unmanageable
 targets as unknown.
 
-The invitation list, creation, and revocation operations are authenticated and
+The Account Invitation list, creation, and revocation operations are authenticated and
 scoped by the caller's account-management authority. Preview and redemption are
 anonymous, accept the bearer token only in their validated request bodies,
 retain normal browser CSRF protection, and never log those bodies. Preview
@@ -1159,7 +1345,7 @@ the registration page. Redemption removes the token fragment from browser
 history after success or a terminal response. Validation failures return `400`,
 an available invitation with conflicting username or email returns `409`, a
 known expired, revoked, or redeemed invitation returns `410`, an unknown token
-returns `404`, and a valid existing staff session receives `403`.
+returns `404`, and any valid existing panel session receives `403`.
 
 The authenticated administrator management families are
 `/api/external-integrations/v1`, `/api/api-keys/v1`,
@@ -1291,9 +1477,44 @@ health succeeds, and verify the internal and external paths.
 * Automatic labels use the one-based count of all orders at the location for the UTC date under concurrent creation; custom labels are validated, advance that ordinal, and may duplicate existing labels.
 * Staff order-list operations return only `IN_PREPARATION` and `READY` orders.
 * Local login, invalid credentials, token expiry, refresh rotation, logout, and cookie/CSRF behavior are covered by tests.
-* Anonymous tenant registration requires CSRF, creates exactly one tenant and
-  enabled administrator in one transaction, creates no location, requires and
-  normalizes the administrator email, and creates no session.
+* `TENANT_ACCOUNT` and `PLATFORM_OPERATOR` are immutable Account kinds with
+  database-enforced kind, tenant, and tenant-role shapes. Username and email
+  uniqueness spans both kinds, and a Platform Operator cannot acquire a tenant,
+  tenant role, or Location Assignment.
+* Both Account kinds use the same sign-in form, nondisclosing credential
+  failure, secure cookies, rotating refresh sessions, logout operations, and
+  CSRF behavior. JWT and current-Account responses discriminate the kind;
+  malformed claim combinations fail closed, and the panel routes immediately
+  to the matching workspace.
+* The repository-owned operational command can provision any number of
+  Platform Operator Accounts without a public endpoint or environment-specific
+  migration seed, reading passwords only from a protected interactive source.
+  It can disable or re-enable an operator, including the final enabled operator
+  after explicit confirmation. Disablement revokes that Account's sessions and
+  pending Tenant Registration Invitations without disrupting tenant work.
+* Kairos provides no Platform Operator password reset. Replacing an inaccessible
+  operator requires provisioning a new globally unique Account and disabling
+  the old one, whose identifiers remain reserved.
+* Every enabled Platform Operator can create, list, and revoke every pending
+  Tenant Registration Invitation but cannot access tenant browser resource
+  families or tenant-operational data. Every tenant Account is denied the
+  operator resource families.
+* Tenant Registration Invitation issuance requires an operator-only label,
+  reveals one unbound seven-day fragment link once, and stores only the SHA-256
+  hash of its 32-byte random token. Its secret-free pending, redeemed, revoked,
+  or expired metadata is retained indefinitely for audit and has no automatic
+  cleanup policy.
+* Tenant Registration Invitation preview and registration retain CSRF, keep the
+  token out of navigation requests and logs, reject every existing panel
+  session, reveal no operator-only context, and distinguish known terminal
+  states without exposing Account identity while unknown tokens remain
+  indistinguishable.
+* A valid Tenant Registration Invitation creates exactly one tenant and enabled
+  tenant administrator in one transaction, creates no location, requires and
+  normalizes the administrator email, consumes the invitation exactly once
+  under concurrent redemption, creates the normal browser session, and opens
+  the Orders workspace. Invalid input and username or email conflicts roll back
+  without consuming the invitation.
 * Authorized account listing returns only manageable member accounts in the
   current tenant and, for a manager, only operators assigned to that manager's
   location.
@@ -1329,7 +1550,9 @@ health succeeds, and verify the internal and external paths.
   modal containing manageable unredeemed Account Invitations and their actions
   without adding a peer workspace destination. It has complete empty, loading,
   failure, keyboard, focus-restoration, enlarged-text, and mobile states.
-* Registration conflicts roll back the tenant and administrator, and successful registration returns to sign-in without automatic authentication.
+* The public sign-in page contains no self-registration action, and calling the
+  tenant-registration endpoint without a valid Tenant Registration Invitation
+  cannot create a tenant.
 * When implemented, OAuth2/OIDC login creates or links the correct account and
   tenant ownership without deriving authorization from provider email.
 * A tenant administrator can access all locations in the tenant but none in another tenant.
@@ -1434,8 +1657,10 @@ The current walking vertical slice is implemented for local development:
 
 * persisted labeled-order creation and controlled transitions;
 * authenticated, tenant- and location-authorized staff operations;
-* public tenant onboarding for the first administrator without creating a
-  location, followed by scoped manager/operator Account Invitations,
+* invite-only tenant onboarding through Platform Operator-issued Tenant
+  Registration Invitations, creating the first administrator without a
+  location and immediately issuing its session, followed by scoped
+  manager/operator Account Invitations,
   including authenticated pending-invitation management, one-time fragment
   links, anonymous preview and redemption, required globally unique member
   email, concurrency-safe account creation, and immediate session issuance;
@@ -1512,6 +1737,14 @@ provisioning with scoped Account Invitations. Anonymous invitation redemption
 keeps first-administrator tenant onboarding separate, and manager and operator
 accounts are person-oriented identities with required email addresses. Direct
 member creation through `POST /api/accounts/v1` is not available.
+
+The implemented authentication and onboarding increment replaces public tenant
+registration with the `PLATFORM_OPERATOR` Account kind, its trusted
+provisioning and lifecycle command, the role-specific operator workspace, and
+Tenant Registration Invitations specified above. It reuses the existing
+Account credential and refresh-session machinery and the proven one-time
+Account Invitation token mechanics while retaining separate tenant
+registration and member Account Invitation aggregates.
 
 The implemented administrative-lifecycle increment provides
 tenant-administrator Location management, removes first-location creation from

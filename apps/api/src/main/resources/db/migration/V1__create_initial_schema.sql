@@ -233,11 +233,12 @@ CREATE INDEX webhook_signing_secret_subscription_issued_idx
 CREATE TABLE accounts
 (
     id            UUID PRIMARY KEY,
-    tenant_id     UUID                     NOT NULL REFERENCES tenants (id),
+    kind          VARCHAR(32)              NOT NULL DEFAULT 'TENANT_ACCOUNT',
+    tenant_id     UUID REFERENCES tenants (id),
     username      VARCHAR(120)             NOT NULL UNIQUE,
     email         VARCHAR(254) NOT NULL UNIQUE,
     password_hash VARCHAR(255),
-    tenant_role   VARCHAR(32)              NOT NULL,
+    tenant_role   VARCHAR(32),
     status        VARCHAR(32)              NOT NULL,
     created_at    TIMESTAMP WITH TIME ZONE NOT NULL,
     updated_at    TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -251,16 +252,100 @@ CREATE TABLE accounts
         password_hash IS NULL OR TRIM(password_hash) <> ''
         ),
     CONSTRAINT accounts_id_tenant_key UNIQUE (id, tenant_id),
+    CONSTRAINT accounts_id_kind_key UNIQUE (id, kind),
+    CONSTRAINT accounts_kind_check CHECK (kind IN ('TENANT_ACCOUNT', 'PLATFORM_OPERATOR')),
     CONSTRAINT accounts_tenant_role_check CHECK (tenant_role IN ('ADMIN', 'MEMBER')),
     CONSTRAINT accounts_status_check CHECK (status IN ('ENABLED', 'DISABLED', 'ARCHIVED')),
     CONSTRAINT accounts_archive_check CHECK (
         (status = 'ARCHIVED' AND archived_at IS NOT NULL AND password_hash IS NULL)
             OR (status <> 'ARCHIVED' AND archived_at IS NULL)
         ),
+    CONSTRAINT accounts_kind_shape_check CHECK (
+        (kind = 'TENANT_ACCOUNT' AND tenant_id IS NOT NULL AND tenant_role IS NOT NULL)
+            OR (kind = 'PLATFORM_OPERATOR'
+                AND tenant_id IS NULL
+                AND tenant_role IS NULL
+                AND status IN ('ENABLED', 'DISABLED')
+                AND archived_at IS NULL)
+        ),
     CONSTRAINT accounts_updated_at_check CHECK (updated_at >= created_at)
 );
 
 CREATE INDEX accounts_tenant_id_idx ON accounts (tenant_id);
+
+CREATE TABLE tenant_registration_invitations
+(
+    id                    UUID PRIMARY KEY,
+    label                 VARCHAR(120)             NOT NULL,
+    issued_by_account_id  UUID                     NOT NULL,
+    issued_by_account_kind VARCHAR(32)              NOT NULL DEFAULT 'PLATFORM_OPERATOR',
+    token_hash            VARCHAR(64)              NOT NULL UNIQUE,
+    state                 VARCHAR(32)              NOT NULL,
+    revocation_reason     VARCHAR(32),
+    revoked_by_account_id UUID,
+    revoked_at            TIMESTAMP WITH TIME ZONE,
+    redeemed_tenant_id    UUID REFERENCES tenants (id),
+    redeemed_account_id   UUID,
+    redeemed_at           TIMESTAMP WITH TIME ZONE,
+    expires_at            TIMESTAMP WITH TIME ZONE NOT NULL,
+    created_at            TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at            TIMESTAMP WITH TIME ZONE NOT NULL,
+    CONSTRAINT tenant_registration_invitations_issuer_kind_fk
+        FOREIGN KEY (issued_by_account_id, issued_by_account_kind)
+            REFERENCES accounts (id, kind),
+    CONSTRAINT tenant_registration_invitations_issuer_kind_check
+        CHECK (issued_by_account_kind = 'PLATFORM_OPERATOR'),
+    CONSTRAINT tenant_registration_invitations_revoker_fk
+        FOREIGN KEY (revoked_by_account_id)
+            REFERENCES accounts (id),
+    CONSTRAINT tenant_registration_invitations_redeemed_account_tenant_fk
+        FOREIGN KEY (redeemed_account_id, redeemed_tenant_id)
+            REFERENCES accounts (id, tenant_id),
+    CONSTRAINT tenant_registration_invitations_label_check CHECK (
+        TRIM(label) <> '' AND label = TRIM(label)
+        ),
+    CONSTRAINT tenant_registration_invitations_token_hash_check
+        CHECK (token_hash ~ '^[0-9a-f]{64}$'),
+    CONSTRAINT tenant_registration_invitations_state_check
+        CHECK (state IN ('PENDING', 'REDEEMED', 'REVOKED')),
+    CONSTRAINT tenant_registration_invitations_revocation_reason_check
+        CHECK (revocation_reason IS NULL OR revocation_reason IN (
+            'OPERATOR_REVOKED',
+            'ISSUER_DISABLED'
+            )),
+    CONSTRAINT tenant_registration_invitations_expiry_check
+        CHECK (expires_at = created_at + INTERVAL '7' DAY),
+    CONSTRAINT tenant_registration_invitations_updated_at_check
+        CHECK (updated_at >= created_at),
+    CONSTRAINT tenant_registration_invitations_lifecycle_check CHECK (
+        (state = 'PENDING'
+            AND revocation_reason IS NULL
+            AND revoked_by_account_id IS NULL
+            AND revoked_at IS NULL
+            AND redeemed_tenant_id IS NULL
+            AND redeemed_account_id IS NULL
+            AND redeemed_at IS NULL)
+        OR (state = 'REVOKED'
+            AND revocation_reason IS NOT NULL
+            AND revoked_at IS NOT NULL
+            AND redeemed_tenant_id IS NULL
+            AND redeemed_account_id IS NULL
+            AND redeemed_at IS NULL
+            AND (revocation_reason = 'ISSUER_DISABLED' OR revoked_by_account_id IS NOT NULL))
+        OR (state = 'REDEEMED'
+            AND revocation_reason IS NULL
+            AND revoked_by_account_id IS NULL
+            AND revoked_at IS NULL
+            AND redeemed_tenant_id IS NOT NULL
+            AND redeemed_account_id IS NOT NULL
+            AND redeemed_at IS NOT NULL)
+        )
+);
+
+CREATE INDEX tenant_registration_invitations_pending_idx
+    ON tenant_registration_invitations (state, expires_at, created_at DESC);
+CREATE INDEX tenant_registration_invitations_issuer_pending_idx
+    ON tenant_registration_invitations (issued_by_account_id, state, expires_at);
 
 CREATE TABLE account_invitations
 (

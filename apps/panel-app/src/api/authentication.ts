@@ -14,14 +14,27 @@ const locationAssignmentSchema = z.object({
   role: z.enum(["MANAGER", "OPERATOR"]),
 });
 
-export const currentAccountSchema = z.object({
+const tenantAccountSchema = z.object({
   accountId: z.uuid(),
   username: z.string(),
+  kind: z.literal("TENANT_ACCOUNT"),
   tenantId: z.uuid(),
   tenantRole: z.enum(["ADMIN", "MEMBER"]),
   assignment: locationAssignmentSchema.nullable(),
   capabilities: z.array(z.string()),
 });
+
+const platformOperatorAccountSchema = z.object({
+  accountId: z.uuid(),
+  username: z.string(),
+  kind: z.literal("PLATFORM_OPERATOR"),
+  capabilities: z.array(z.string()),
+});
+
+export const currentAccountSchema = z.discriminatedUnion("kind", [
+  tenantAccountSchema,
+  platformOperatorAccountSchema,
+]);
 
 const loginCredentialsSchema = z.object({
   username: z
@@ -41,6 +54,10 @@ const loginCredentialsSchema = z.object({
 });
 
 export type CurrentAccount = z.infer<typeof currentAccountSchema>;
+export type TenantAccount = z.infer<typeof tenantAccountSchema>;
+export type PlatformOperatorAccount = z.infer<
+  typeof platformOperatorAccountSchema
+>;
 export type LoginCredentials = z.input<typeof loginCredentialsSchema>;
 
 export function getCurrentAccount(): Promise<CurrentAccount> {

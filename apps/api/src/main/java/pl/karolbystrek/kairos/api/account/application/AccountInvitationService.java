@@ -16,6 +16,7 @@ import pl.karolbystrek.kairos.api.account.application.model.AccountInvitationVie
 import pl.karolbystrek.kairos.api.account.application.model.CreatedAccountInvitation;
 import pl.karolbystrek.kairos.api.account.application.model.StaffAccessContext;
 import pl.karolbystrek.kairos.api.account.application.model.StaffLocation;
+import pl.karolbystrek.kairos.api.account.application.model.PanelPrincipal;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
 import pl.karolbystrek.kairos.api.account.application.port.StaffLocationDirectory;
 import pl.karolbystrek.kairos.api.account.domain.assignment.AssignmentRole;
@@ -26,6 +27,7 @@ import pl.karolbystrek.kairos.api.account.domain.invitation.AccountInvitationRev
 import pl.karolbystrek.kairos.api.account.infrastructure.persistence.AccountInvitationRepository;
 import pl.karolbystrek.kairos.api.account.infrastructure.persistence.AccountRepository;
 import pl.karolbystrek.kairos.api.account.infrastructure.persistence.LocationAssignmentRepository;
+import pl.karolbystrek.kairos.api.authentication.application.OneTimeBearerTokenService;
 
 import java.time.Clock;
 import java.util.List;
@@ -41,7 +43,7 @@ public class AccountInvitationService {
     private final StaffLocationDirectory locationDirectory;
     private final StaffAccessService staffAccessService;
     private final AccountCreationService accountCreationService;
-    private final AccountInvitationTokenService tokenService;
+    private final OneTimeBearerTokenService tokenService;
     private final Clock clock;
 
     @Transactional
@@ -185,7 +187,7 @@ public class AccountInvitationService {
 
     @Transactional
     public StaffPrincipal redeem(
-        StaffPrincipal signedInAccount,
+        PanelPrincipal signedInAccount,
         String presentedToken,
         String username,
         String email,

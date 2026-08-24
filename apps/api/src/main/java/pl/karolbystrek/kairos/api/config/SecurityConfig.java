@@ -1,6 +1,7 @@
 package pl.karolbystrek.kairos.api.config;
 
 import jakarta.servlet.DispatcherType;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -18,7 +19,7 @@ import org.springframework.security.web.authentication.session.NullAuthenticated
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import pl.karolbystrek.kairos.api.authentication.infrastructure.jwt.StaffPrincipalJwtAuthenticationConverter;
+import pl.karolbystrek.kairos.api.authentication.infrastructure.jwt.PanelPrincipalJwtAuthenticationConverter;
 import pl.karolbystrek.kairos.api.authentication.infrastructure.web.CookieBearerTokenResolver;
 import pl.karolbystrek.kairos.api.authentication.infrastructure.web.SecurityProblemDetailsHandler;
 import pl.karolbystrek.kairos.api.authentication.infrastructure.web.SpaCsrfTokenRequestHandler;
@@ -49,6 +50,8 @@ public class SecurityConfig {
         source.registerCorsConfiguration("/customer-notifications/**", customerConfiguration);
         source.registerCorsConfiguration("/auth/**", panelConfiguration);
         source.registerCorsConfiguration("/tenant-registrations/**", panelConfiguration);
+        source.registerCorsConfiguration("/tenant-registration-invitations/**", panelConfiguration);
+        source.registerCorsConfiguration("/tenant-registration-invitation-previews/**", panelConfiguration);
         source.registerCorsConfiguration("/locations/**", panelConfiguration);
         source.registerCorsConfiguration("/accounts/**", panelConfiguration);
         source.registerCorsConfiguration("/account-invitations/**", panelConfiguration);
@@ -95,12 +98,13 @@ public class SecurityConfig {
     }
 
     @Bean
+    @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
     SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             CsrfTokenRepository csrfTokenRepository,
             SpaCsrfTokenRequestHandler csrfTokenRequestHandler,
             CookieBearerTokenResolver bearerTokenResolver,
-            StaffPrincipalJwtAuthenticationConverter jwtAuthenticationConverter,
+            PanelPrincipalJwtAuthenticationConverter jwtAuthenticationConverter,
             SecurityProblemDetailsHandler problemDetailsHandler
     ) {
         return http
@@ -138,6 +142,7 @@ public class SecurityConfig {
                                 "/auth/v1/login",
                                 "/auth/v1/refresh",
                                 "/tenant-registrations/v1",
+                                "/tenant-registration-invitation-previews/v1",
                                 "/account-invitation-previews/v1",
                                 "/account-invitation-redemptions/v1"
                         ).permitAll()
@@ -146,7 +151,25 @@ public class SecurityConfig {
                                 "/customer-notifications/v1/subscription-replacement",
                                 "/customer-notifications/v1/enrollments"
                         ).permitAll()
-                        .anyRequest().authenticated())
+                        .requestMatchers(
+                                "/auth/v1/logout",
+                                "/auth/v1/logout-all",
+                                "/auth/v1/me"
+                        ).authenticated()
+                        .requestMatchers("/tenant-registration-invitations/v1/**")
+                                .hasRole("PLATFORM_OPERATOR")
+                        .requestMatchers(
+                                "/locations/v1/**",
+                                "/accounts/v1/**",
+                                "/account-invitations/v1/**",
+                                "/orders/v1/**",
+                                "/external-integrations/v1/**",
+                                "/api-keys/v1/**",
+                                "/api-key-versions/v1/**",
+                                "/webhook-subscriptions/v1/**",
+                                "/webhook-signing-secrets/v1/**"
+                        ).hasRole("TENANT_ACCOUNT")
+                        .anyRequest().denyAll())
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint(problemDetailsHandler)
                         .accessDeniedHandler(problemDetailsHandler))

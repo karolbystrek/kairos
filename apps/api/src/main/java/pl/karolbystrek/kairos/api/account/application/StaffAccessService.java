@@ -7,6 +7,7 @@ import pl.karolbystrek.kairos.api.account.application.exception.StaffAccessDenie
 import pl.karolbystrek.kairos.api.account.application.model.StaffAccessContext;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
 import pl.karolbystrek.kairos.api.account.domain.AccountStatus;
+import pl.karolbystrek.kairos.api.account.domain.AccountKind;
 import pl.karolbystrek.kairos.api.account.domain.TenantRole;
 import pl.karolbystrek.kairos.api.account.application.port.StaffLocationDirectory;
 import pl.karolbystrek.kairos.api.account.infrastructure.persistence.AccountRepository;
@@ -41,7 +42,8 @@ public class StaffAccessService {
             ? accountRepository.findForUpdateById(principal.accountId())
             : accountRepository.findById(principal.accountId()))
             .orElseThrow(() -> new StaffAccessDeniedException("The staff account is not eligible"));
-        if (account.getStatus() != AccountStatus.ENABLED
+        if (account.getKind() != AccountKind.TENANT_ACCOUNT
+            || account.getStatus() != AccountStatus.ENABLED
             || !account.getTenantId().equals(principal.tenantId())
             || account.getTenantRole() != principal.tenantRole()) {
             throw new StaffAccessDeniedException("The staff account is not eligible");

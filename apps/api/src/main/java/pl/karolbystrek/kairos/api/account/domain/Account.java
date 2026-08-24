@@ -23,7 +23,11 @@ public class Account {
     @Id
     private UUID id;
 
-    @Column(name = "tenant_id", nullable = false)
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 32)
+    private AccountKind kind;
+
+    @Column(name = "tenant_id")
     private UUID tenantId;
 
     @Column(nullable = false, unique = true, length = 120)
@@ -36,7 +40,7 @@ public class Account {
     private String passwordHash;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "tenant_role", nullable = false, length = 32)
+    @Column(name = "tenant_role", length = 32)
     private TenantRole tenantRole;
 
     @Enumerated(EnumType.STRING)
@@ -86,6 +90,24 @@ public class Account {
         );
     }
 
+    public static Account provisionPlatformOperator(
+        @NonNull String username,
+        @NonNull String email,
+        @NonNull String passwordHash,
+        @NonNull Instant now
+    ) {
+        var account = new Account();
+        account.id = UUID.randomUUID();
+        account.kind = AccountKind.PLATFORM_OPERATOR;
+        account.username = username;
+        account.email = email;
+        account.passwordHash = passwordHash;
+        account.status = AccountStatus.ENABLED;
+        account.createdAt = now;
+        account.updatedAt = now;
+        return account;
+    }
+
     private static Account provision(
         UUID tenantId,
         String username,
@@ -96,6 +118,7 @@ public class Account {
     ) {
         var account = new Account();
         account.id = UUID.randomUUID();
+        account.kind = AccountKind.TENANT_ACCOUNT;
         account.tenantId = tenantId;
         account.username = username;
         account.email = email;
@@ -118,6 +141,9 @@ public class Account {
     }
 
     public void archive(@NonNull Instant now) {
+        if (kind == AccountKind.PLATFORM_OPERATOR) {
+            throw new IllegalStateException("Platform Operator accounts cannot be archived");
+        }
         if (isArchived()) {
             return;
         }

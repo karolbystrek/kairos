@@ -24,6 +24,10 @@ class CookieBearerTokenResolverTests {
                 "/account-invitation-redemptions/v1",
                 accessCookie
         ))).isEqualTo("access-token");
+        assertThat(resolver.resolve(request(
+                "/tenant-registrations/v1",
+                accessCookie
+        ))).isEqualTo("access-token");
         assertThat(resolver.resolve(request("/auth/v1/csrf", accessCookie))).isNull();
         assertThat(resolver.resolve(request("/auth/v1/login", accessCookie))).isNull();
         assertThat(resolver.resolve(request("/auth/v1/refresh", accessCookie))).isNull();

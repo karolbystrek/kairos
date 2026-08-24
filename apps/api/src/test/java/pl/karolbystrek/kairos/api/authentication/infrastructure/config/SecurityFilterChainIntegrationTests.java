@@ -165,6 +165,16 @@ class SecurityFilterChainIntegrationTests extends RedisListenerIsolatedIntegrati
                 "/account-invitation-redemptions/v1",
                 "POST"
         );
+        assertCorsAllowed(
+                "http://localhost:3001",
+                "/tenant-registration-invitation-previews/v1",
+                "POST"
+        );
+        assertCorsAllowed(
+                "http://localhost:3001",
+                "/tenant-registration-invitations/v1",
+                "GET"
+        );
         assertCorsAllowed("http://localhost:3000", "/auth/v1/csrf", "GET");
         assertCorsAllowed("http://localhost:3001", "/auth/v1/csrf", "GET");
 
@@ -172,6 +182,11 @@ class SecurityFilterChainIntegrationTests extends RedisListenerIsolatedIntegrati
         assertCorsRejected(
                 "http://localhost:3000",
                 "/account-invitation-previews/v1",
+                "POST"
+        );
+        assertCorsRejected(
+                "http://localhost:3000",
+                "/tenant-registration-invitation-previews/v1",
                 "POST"
         );
         assertCorsRejected("http://localhost:3001", "/tracked-orders/v1/reference", "GET");

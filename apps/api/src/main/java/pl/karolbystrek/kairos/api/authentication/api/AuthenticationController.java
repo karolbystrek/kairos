@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
-import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
+import pl.karolbystrek.kairos.api.account.application.model.PanelPrincipal;
 import pl.karolbystrek.kairos.api.authentication.api.model.CsrfTokenResponse;
 import pl.karolbystrek.kairos.api.authentication.api.model.CurrentAccountResponse;
 import pl.karolbystrek.kairos.api.authentication.api.model.LoginRequest;
@@ -74,7 +74,7 @@ class AuthenticationController {
     @PostMapping("/logout")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     void logout(
-        @AuthenticationPrincipal StaffPrincipal principal,
+        @AuthenticationPrincipal PanelPrincipal principal,
         HttpServletRequest request,
         HttpServletResponse response
     ) {
@@ -86,7 +86,7 @@ class AuthenticationController {
     @PostMapping("/logout-all")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     void logoutAll(
-        @AuthenticationPrincipal StaffPrincipal principal,
+        @AuthenticationPrincipal PanelPrincipal principal,
         HttpServletRequest request,
         HttpServletResponse response
     ) {
@@ -96,7 +96,7 @@ class AuthenticationController {
     }
 
     @GetMapping("/me")
-    CurrentAccountResponse me(@AuthenticationPrincipal StaffPrincipal principal) {
+    CurrentAccountResponse me(@AuthenticationPrincipal PanelPrincipal principal) {
         var account = currentAccountService.get(principal);
         return CurrentAccountResponse.from(account);
     }

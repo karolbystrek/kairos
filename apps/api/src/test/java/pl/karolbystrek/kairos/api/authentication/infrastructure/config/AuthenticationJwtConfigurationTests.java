@@ -10,9 +10,11 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
+import pl.karolbystrek.kairos.api.account.application.model.PlatformOperatorPrincipal;
+import pl.karolbystrek.kairos.api.account.domain.AccountKind;
 import pl.karolbystrek.kairos.api.account.domain.TenantRole;
 import pl.karolbystrek.kairos.api.authentication.infrastructure.jwt.AccessTokenIssuer;
-import pl.karolbystrek.kairos.api.authentication.infrastructure.jwt.StaffPrincipalJwtAuthenticationConverter;
+import pl.karolbystrek.kairos.api.authentication.infrastructure.jwt.PanelPrincipalJwtAuthenticationConverter;
 
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
@@ -30,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class AuthenticationJwtConfigurationTests {
 
     private static final Instant NOW = Instant.now().truncatedTo(ChronoUnit.SECONDS);
+    private static final String ACCOUNT_KIND_CLAIM = "account_kind";
     private static final String TENANT_ID_CLAIM = "tenant_id";
     private static final String TENANT_ROLE_CLAIM = "tenant_role";
 
@@ -62,7 +65,7 @@ class AuthenticationJwtConfigurationTests {
 
         var issued = issuer.issue(expected);
         var jwt = decoder.decode(issued.value());
-        var authentication = new StaffPrincipalJwtAuthenticationConverter().convert(jwt);
+        var authentication = new PanelPrincipalJwtAuthenticationConverter().convert(jwt);
 
         assertThat(issued.issuedAt()).isEqualTo(NOW);
         assertThat(issued.expiresAt()).isEqualTo(NOW.plus(Duration.ofMinutes(5)));
@@ -70,7 +73,49 @@ class AuthenticationJwtConfigurationTests {
         assertThat(jwt.getAudience()).containsExactly("kairos-panel");
         assertThat(jwt.getId()).isNotBlank();
         assertThat(authentication.getPrincipal()).isEqualTo(expected);
-        assertThat(authentication.getAuthorities()).extracting("authority").containsExactly("ROLE_ADMIN");
+        assertThat(jwt.getClaimAsString(ACCOUNT_KIND_CLAIM)).isEqualTo("TENANT_ACCOUNT");
+        assertThat(authentication.getAuthorities()).extracting("authority")
+                .containsExactlyInAnyOrder("ROLE_TENANT_ACCOUNT", "ROLE_ADMIN");
+    }
+
+    @Test
+    void issuesAndConvertsAPlatformOperatorAccessTokenWithoutTenantClaims() {
+        var expected = new PlatformOperatorPrincipal(UUID.randomUUID());
+        var issuer = new AccessTokenIssuer(
+                encoder,
+                properties,
+                Clock.fixed(NOW, ZoneOffset.UTC)
+        );
+
+        var jwt = decoder.decode(issuer.issue(expected).value());
+        var authentication = new PanelPrincipalJwtAuthenticationConverter().convert(jwt);
+
+        assertThat(jwt.getClaimAsString(ACCOUNT_KIND_CLAIM)).isEqualTo("PLATFORM_OPERATOR");
+        assertThat(jwt.hasClaim(TENANT_ID_CLAIM)).isFalse();
+        assertThat(jwt.hasClaim(TENANT_ROLE_CLAIM)).isFalse();
+        assertThat(authentication.getPrincipal()).isEqualTo(expected);
+        assertThat(authentication.getAuthorities()).extracting("authority")
+                .containsExactly("ROLE_PLATFORM_OPERATOR");
+    }
+
+    @Test
+    void rejectsContradictoryPlatformOperatorClaims() {
+        var claims = JwtClaimsSet.builder()
+                .issuer("https://api.localhost")
+                .audience(List.of("kairos-panel"))
+                .subject(UUID.randomUUID().toString())
+                .issuedAt(Instant.now())
+                .expiresAt(Instant.now().plusSeconds(60))
+                .claim(ACCOUNT_KIND_CLAIM, AccountKind.PLATFORM_OPERATOR.name())
+                .claim(TENANT_ID_CLAIM, UUID.randomUUID().toString())
+                .build();
+        var jwt = decoder.decode(encoder.encode(JwtEncoderParameters.from(
+                JwsHeader.with(SignatureAlgorithm.RS256).type("JWT").build(),
+                claims
+        )).getTokenValue());
+
+        assertThatThrownBy(() -> new PanelPrincipalJwtAuthenticationConverter().convert(jwt))
+                .hasMessageContaining("invalid principal claims");
     }
 
     @Test
@@ -98,6 +143,7 @@ class AuthenticationJwtConfigurationTests {
                 .subject(UUID.randomUUID().toString())
                 .issuedAt(expiredAt.minusSeconds(60))
                 .expiresAt(expiredAt)
+                .claim(ACCOUNT_KIND_CLAIM, AccountKind.TENANT_ACCOUNT.name())
                 .claim(TENANT_ID_CLAIM, UUID.randomUUID().toString())
                 .claim(TENANT_ROLE_CLAIM, TenantRole.ADMIN.name())
                 .build();
@@ -122,6 +168,7 @@ class AuthenticationJwtConfigurationTests {
                 .subject(UUID.randomUUID().toString())
                 .issuedAt(Instant.now())
                 .expiresAt(Instant.now().plusSeconds(60))
+                .claim(ACCOUNT_KIND_CLAIM, AccountKind.TENANT_ACCOUNT.name())
                 .claim(TENANT_ID_CLAIM, UUID.randomUUID().toString())
                 .claim(TENANT_ROLE_CLAIM, TenantRole.ADMIN.name())
                 .build();
@@ -162,6 +209,7 @@ class AuthenticationJwtConfigurationTests {
                 .subject(UUID.randomUUID().toString())
                 .issuedAt(Instant.now())
                 .expiresAt(Instant.now().plusSeconds(60))
+                .claim(ACCOUNT_KIND_CLAIM, AccountKind.TENANT_ACCOUNT.name())
                 .claim(TENANT_ID_CLAIM, UUID.randomUUID().toString())
                 .claim(TENANT_ROLE_CLAIM, TenantRole.MEMBER.name())
                 .build();

@@ -10,10 +10,10 @@ export function PanelCard({
   title,
   trailing,
 }: {
-  accessibilityLabel: string;
+  accessibilityLabel?: string;
   isSelected?: boolean;
   metadata?: ReactNode;
-  onPress: () => void;
+  onPress?: () => void;
   title: string;
   trailing?: ReactNode;
 }) {
@@ -22,16 +22,20 @@ export function PanelCard({
       className="panel-card relative px-3 py-2"
       data-selected={isSelected || undefined}
     >
-      <Button
-        aria-current={isSelected ? "true" : undefined}
-        aria-label={accessibilityLabel}
-        className="absolute inset-0 z-0 bg-transparent outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset"
-        variant="tertiary"
-        onPress={onPress}
+      {onPress && accessibilityLabel && (
+        <Button
+          aria-current={isSelected ? "true" : undefined}
+          aria-label={accessibilityLabel}
+          className="absolute inset-0 z-0 bg-transparent outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset"
+          variant="tertiary"
+          onPress={onPress}
+        >
+          <span className="sr-only">{accessibilityLabel}</span>
+        </Button>
+      )}
+      <div
+        className={`panel-card-content relative z-10 ${onPress ? "pointer-events-none" : ""}`}
       >
-        <span className="sr-only">{accessibilityLabel}</span>
-      </Button>
-      <div className="panel-card-content pointer-events-none relative z-10">
         <div className="min-w-0 flex-1">
           <p className="break-words text-lg font-semibold tracking-[-0.025em]">
             {title}

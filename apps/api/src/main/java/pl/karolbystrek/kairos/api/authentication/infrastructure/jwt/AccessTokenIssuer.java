@@ -7,6 +7,7 @@ import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.stereotype.Component;
+import pl.karolbystrek.kairos.api.account.application.model.PanelPrincipal;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
 import pl.karolbystrek.kairos.api.authentication.infrastructure.config.AuthenticationProperties;
 
@@ -23,7 +24,7 @@ public class AccessTokenIssuer {
     private final AuthenticationProperties properties;
     private final Clock clock;
 
-    public IssuedAccessToken issue(StaffPrincipal principal) {
+    public IssuedAccessToken issue(PanelPrincipal principal) {
         var issuedAt = clock.instant();
         var expiresAt = issuedAt.plus(properties.jwt().accessLifetime());
         var claims = JwtClaimsSet.builder()
@@ -33,13 +34,15 @@ public class AccessTokenIssuer {
             .issuedAt(issuedAt)
             .expiresAt(expiresAt)
             .id(UUID.randomUUID().toString())
-            .claim(JwtClaimNames.TENANT_ID, principal.tenantId().toString())
-            .claim(JwtClaimNames.TENANT_ROLE, principal.tenantRole().name())
-            .build();
+            .claim(JwtClaimNames.ACCOUNT_KIND, principal.kind().name());
+        if (principal instanceof StaffPrincipal staffPrincipal) {
+            claims.claim(JwtClaimNames.TENANT_ID, staffPrincipal.tenantId().toString())
+                .claim(JwtClaimNames.TENANT_ROLE, staffPrincipal.tenantRole().name());
+        }
         var header = JwsHeader.with(SignatureAlgorithm.RS256)
             .type("JWT")
             .build();
-        var value = jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
+        var value = jwtEncoder.encode(JwtEncoderParameters.from(header, claims.build())).getTokenValue();
         return new IssuedAccessToken(value, issuedAt, expiresAt);
     }
 

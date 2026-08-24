@@ -9,6 +9,9 @@ export const staffAccountsKey = (accountId: string) =>
 export const staffInvitationsKey = (accountId: string) =>
   [staffCachePrefix, accountId, "account-invitations"] as const;
 
+export const staffTenantRegistrationInvitationsKey = (accountId: string) =>
+  [staffCachePrefix, accountId, "tenant-registration-invitations"] as const;
+
 export const staffIntegrationsKey = (accountId: string) =>
   [staffCachePrefix, accountId, "external-integrations"] as const;
 

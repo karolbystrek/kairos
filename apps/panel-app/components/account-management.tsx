@@ -1,7 +1,7 @@
 "use client";
 
 import type { FormEvent } from "react";
-import type { CurrentAccount } from "@/src/api/authentication";
+import type { TenantAccount } from "@/src/api/authentication";
 
 import {
   Alert,
@@ -148,7 +148,7 @@ function formatDateTime(value: string): string {
   }).format(new Date(value));
 }
 
-export function AccountManagement({ account }: { account: CurrentAccount }) {
+export function AccountManagement({ account }: { account: TenantAccount }) {
   const isAdministrator = account.tenantRole === "ADMIN";
   const [selectedAccountId, setSelectedAccountId] = useState<string>();
   const [accountToDisable, setAccountToDisable] = useState<ManagedAccount>();

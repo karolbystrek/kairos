@@ -1,19 +1,19 @@
 package pl.karolbystrek.kairos.api.account.application.model;
 
 import lombok.NonNull;
+import pl.karolbystrek.kairos.api.account.domain.AccountKind;
 import pl.karolbystrek.kairos.api.account.domain.TenantRole;
 
-import java.security.Principal;
 import java.util.UUID;
 
 public record StaffPrincipal(
     @NonNull UUID accountId,
     @NonNull UUID tenantId,
     @NonNull TenantRole tenantRole
-) implements Principal {
+) implements PanelPrincipal {
 
     @Override
-    public String getName() {
-        return accountId.toString();
+    public AccountKind kind() {
+        return AccountKind.TENANT_ACCOUNT;
     }
 }

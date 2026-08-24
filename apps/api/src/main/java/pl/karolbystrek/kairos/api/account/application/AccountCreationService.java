@@ -14,6 +14,7 @@ import pl.karolbystrek.kairos.api.account.infrastructure.persistence.AccountRepo
 import java.time.Clock;
 import java.util.Locale;
 import java.util.UUID;
+import java.nio.charset.StandardCharsets;
 
 @Service
 @RequiredArgsConstructor
@@ -53,6 +54,49 @@ public class AccountCreationService {
             password,
             false
         );
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Account createPlatformOperator(
+        String username,
+        String email,
+        String password
+    ) {
+        var normalizedUsername = username == null
+            ? ""
+            : username.strip().toLowerCase(Locale.ROOT);
+        if (normalizedUsername.isEmpty() || normalizedUsername.length() > 120) {
+            throw new InvalidAccountRequestException("A valid username is required");
+        }
+        if (email == null || email.isBlank()) {
+            throw new InvalidAccountRequestException("Email is required");
+        }
+        var normalizedEmail = email.strip().toLowerCase(Locale.ROOT);
+        if (normalizedEmail.length() > 254 || !normalizedEmail.contains("@")) {
+            throw new InvalidAccountRequestException("A valid email is required");
+        }
+        if (password == null
+            || password.length() < 12
+            || password.getBytes(StandardCharsets.UTF_8).length > 72) {
+            throw new InvalidAccountRequestException("A valid password is required");
+        }
+        requireAvailableIdentifiers(normalizedUsername, normalizedEmail);
+
+        var account = Account.provisionPlatformOperator(
+            normalizedUsername,
+            normalizedEmail,
+            passwordEncoder.encode(password),
+            clock.instant()
+        );
+        try {
+            return accountRepository.saveAndFlush(account);
+        }
+        catch (DataIntegrityViolationException exception) {
+            throw new AccountConflictException(
+                "An account with the supplied identity already exists",
+                exception
+            );
+        }
     }
 
     private Account create(

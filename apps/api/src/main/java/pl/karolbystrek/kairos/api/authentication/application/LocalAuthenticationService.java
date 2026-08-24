@@ -5,7 +5,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import pl.karolbystrek.kairos.api.account.application.exception.StaffAccessDeniedException;
-import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
 import pl.karolbystrek.kairos.api.account.infrastructure.persistence.AccountRepository;
 import pl.karolbystrek.kairos.api.authentication.application.exception.InvalidLoginException;
 import pl.karolbystrek.kairos.api.authentication.application.model.IssuedSession;
@@ -24,6 +23,7 @@ public class LocalAuthenticationService {
     private final AccountRepository accountRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationSessionService sessionService;
+    private final PanelAccessService panelAccessService;
     private final PasswordVerificationFallback passwordVerificationFallback;
 
     public IssuedSession authenticate(String username, String password) {
@@ -43,11 +43,7 @@ public class LocalAuthenticationService {
             throw new InvalidLoginException();
         }
 
-        var principal = new StaffPrincipal(
-            account.getId(),
-            account.getTenantId(),
-            account.getTenantRole()
-        );
+        var principal = panelAccessService.principalFor(account);
         try {
             var session = sessionService.start(principal);
             log.info("Authenticated local account {}", account.getId());

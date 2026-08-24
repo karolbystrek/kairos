@@ -5,9 +5,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
-import pl.karolbystrek.kairos.api.account.application.StaffAccessService;
 import pl.karolbystrek.kairos.api.account.application.exception.StaffAccessDeniedException;
-import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
+import pl.karolbystrek.kairos.api.account.application.model.PanelPrincipal;
 import pl.karolbystrek.kairos.api.account.application.port.AccountSessionRevoker;
 import pl.karolbystrek.kairos.api.account.infrastructure.persistence.AccountRepository;
 import pl.karolbystrek.kairos.api.authentication.application.exception.InvalidRefreshCredentialException;
@@ -21,8 +20,8 @@ import pl.karolbystrek.kairos.api.authentication.infrastructure.persistence.Refr
 
 import java.time.Clock;
 import java.time.Instant;
-import java.util.UUID;
 import java.util.Collection;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -32,14 +31,14 @@ public class AuthenticationSessionService implements AccountSessionRevoker {
     private final AccountRepository accountRepository;
     private final RefreshSessionRepository sessionRepository;
     private final RefreshCredentialService credentialService;
-    private final StaffAccessService staffAccessService;
+    private final PanelAccessService panelAccessService;
     private final AccessTokenIssuer accessTokenIssuer;
     private final AuthenticationProperties properties;
     private final Clock clock;
 
     @Transactional
-    public IssuedSession start(StaffPrincipal authenticatedAccount) {
-        staffAccessService.resolveForUpdate(authenticatedAccount);
+    public IssuedSession start(PanelPrincipal authenticatedAccount) {
+        panelAccessService.requireEligibleForUpdate(authenticatedAccount);
         var now = clock.instant();
         var credential = credentialService.generate();
         var session = RefreshSession.start(
@@ -87,13 +86,9 @@ public class AuthenticationSessionService implements AccountSessionRevoker {
             throw new InvalidRefreshCredentialException();
         }
 
-        var principal = new StaffPrincipal(
-            account.getId(),
-            account.getTenantId(),
-            account.getTenantRole()
-        );
+        var principal = panelAccessService.principalFor(account);
         try {
-            staffAccessService.resolveForUpdate(principal);
+            panelAccessService.requireEligibleForUpdate(principal);
         }
         catch (StaffAccessDeniedException exception) {
             sessionRepository.revokeAllForAccount(account.getId(), now);
@@ -109,7 +104,7 @@ public class AuthenticationSessionService implements AccountSessionRevoker {
     }
 
     @Transactional
-    public void logout(StaffPrincipal principal, String presentedCredential) {
+    public void logout(PanelPrincipal principal, String presentedCredential) {
         if (principal == null || !StringUtils.hasText(presentedCredential)) {
             return;
         }
@@ -137,7 +132,7 @@ public class AuthenticationSessionService implements AccountSessionRevoker {
     }
 
     @Transactional
-    public void logoutAll(StaffPrincipal principal) {
+    public void logoutAll(PanelPrincipal principal) {
         if (principal == null || accountRepository.findForUpdateById(principal.accountId()).isEmpty()) {
             return;
         }
@@ -161,7 +156,7 @@ public class AuthenticationSessionService implements AccountSessionRevoker {
     }
 
     private IssuedSession grant(
-        StaffPrincipal principal,
+        PanelPrincipal principal,
         String refreshCredential,
         RefreshSession session,
         Instant now

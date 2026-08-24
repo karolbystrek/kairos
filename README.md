@@ -43,6 +43,19 @@ The applications are available at:
 * Staff panel: https://panel.kairos.localhost
 * API: https://api.kairos.localhost
 
+Provision and manage Platform Operator Accounts through the protected
+interactive command while the Compose stack is running:
+
+```bash
+./operator-account provision
+./operator-account disable
+./operator-account enable
+```
+
+The command runs inside the API container so it uses the active deployment
+configuration. Provisioning reads and confirms the password from the terminal;
+it never accepts a password through arguments or environment variables.
+
 ## Repository checks
 
 Run the checks from the repository root:

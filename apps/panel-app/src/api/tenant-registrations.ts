@@ -6,9 +6,11 @@ import {
   usernameInputSchema,
 } from "./account-input";
 import { request } from "./api-fetch";
+import { currentAccountSchema, type CurrentAccount } from "./authentication";
 
 const tenantRegistrationInputSchema = z
   .object({
+    token: z.string().min(1, "Invitation token is required"),
     username: usernameInputSchema,
     email: requiredEmailInputSchema,
     password: passwordInputSchema,
@@ -21,37 +23,52 @@ const tenantRegistrationInputSchema = z
       path: ["passwordConfirmation"],
     },
   )
-  .transform(({ username, email, password }) => ({
-    administrator: {
-      username,
-      email,
-      password,
-    },
+  .transform(({ token, username, email, password, passwordConfirmation }) => ({
+    token,
+    username,
+    email,
+    password,
+    passwordConfirmation,
   }));
 
-const tenantRegistrationSchema = z.object({
-  tenantId: z.uuid(),
-  administratorAccountId: z.uuid(),
-  username: z.string(),
+const tenantRegistrationInvitationPreviewSchema = z.object({
+  expiresAt: z.iso.datetime({ offset: true }),
 });
 
 export type TenantRegistrationInput = z.input<
   typeof tenantRegistrationInputSchema
 >;
-export type TenantRegistration = z.infer<typeof tenantRegistrationSchema>;
+export type TenantRegistrationInvitationPreview = z.infer<
+  typeof tenantRegistrationInvitationPreviewSchema
+>;
 
 export function registerTenant(
   registration: TenantRegistrationInput,
-): Promise<TenantRegistration> {
+): Promise<CurrentAccount> {
   const input = tenantRegistrationInputSchema.parse(registration);
 
   return request(
     "/api/tenant-registrations/v1",
-    tenantRegistrationSchema,
+    currentAccountSchema,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
+    },
+    { retryUnauthorized: false },
+  );
+}
+
+export function previewTenantRegistrationInvitation(
+  token: string,
+): Promise<TenantRegistrationInvitationPreview> {
+  return request(
+    "/api/tenant-registration-invitation-previews/v1",
+    tenantRegistrationInvitationPreviewSchema,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
     },
     { retryUnauthorized: false },
   );

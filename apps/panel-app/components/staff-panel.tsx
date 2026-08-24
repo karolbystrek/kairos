@@ -1,7 +1,6 @@
 "use client";
 
 import type { FormEvent } from "react";
-import type { TenantRegistration } from "@/src/api/tenant-registrations";
 
 import {
   Alert,
@@ -16,7 +15,6 @@ import {
 } from "@heroui/react";
 import {
   ArrowRight as ArrowRightIcon,
-  ChevronLeft as BackIcon,
   ClipboardList as OrdersIcon,
   LogOut as SignOutIcon,
   MapPin as LocationsIcon,
@@ -35,7 +33,7 @@ import { BrandWordmark } from "@/components/brand-wordmark";
 import { IntegrationManagement } from "@/components/integration-management";
 import { LocationManagement } from "@/components/location-management";
 import { PanelAppearanceMenu } from "@/components/panel-appearance-menu";
-import { TenantRegistrationForm } from "@/components/tenant-registration-form";
+import { TenantInvitationManagement } from "@/components/tenant-invitation-management";
 import { subscribeToAuthenticationRequired } from "@/src/api/auth-coordination";
 import { ApiError } from "@/src/api/api-fetch";
 import {
@@ -124,23 +122,17 @@ function getLoginErrorMessage(error: unknown): string {
 }
 
 function LoginForm({
-  confirmation,
   error,
-  initialUsername,
   isPending,
-  onDismissConfirmation,
   onDismissError,
   onSubmit,
 }: {
-  confirmation?: string;
   error?: Error;
-  initialUsername?: string;
   isPending: boolean;
-  onDismissConfirmation: () => void;
   onDismissError: () => void;
   onSubmit: (credentials: LoginCredentials) => Promise<void>;
 }) {
-  const [username, setUsername] = useState(initialUsername ?? "");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -153,15 +145,6 @@ function LoginForm({
 
   return (
     <div className="flex flex-col gap-5">
-      {confirmation && (
-        <DismissibleNotice
-          description={confirmation}
-          status="success"
-          title="Tenant registered"
-          onDismiss={onDismissConfirmation}
-        />
-      )}
-
       {error && (
         <DismissibleNotice
           description={getLoginErrorMessage(error)}
@@ -223,18 +206,6 @@ function SignedOutPanel({
   onDismissLoginError: () => void;
   onSignIn: (credentials: LoginCredentials) => Promise<void>;
 }) {
-  const [selectedView, setSelectedView] = useState<"login" | "register">(
-    "login",
-  );
-  const [registration, setRegistration] = useState<TenantRegistration>();
-  const [showRegistrationNotice, setShowRegistrationNotice] = useState(false);
-
-  function registered(result: TenantRegistration) {
-    setRegistration(result);
-    setShowRegistrationNotice(true);
-    setSelectedView("login");
-  }
-
   return (
     <div className="flex min-h-[calc(100vh-5rem)] items-center justify-center py-8">
       <div className="w-full max-w-md">
@@ -243,56 +214,17 @@ function SignedOutPanel({
         </div>
 
         <div>
-          {selectedView === "login" ? (
-            <>
-              <div className="mb-6">
-                <h1 className="text-2xl font-semibold tracking-tight">
-                  Welcome back
-                </h1>
-              </div>
-              <LoginForm
-                key={registration?.username ?? "login"}
-                confirmation={
-                  registration && showRegistrationNotice
-                    ? "Sign in with the administrator account below."
-                    : undefined
-                }
-                error={loginError}
-                initialUsername={registration?.username}
-                isPending={isLoggingIn}
-                onDismissConfirmation={() => setShowRegistrationNotice(false)}
-                onDismissError={onDismissLoginError}
-                onSubmit={onSignIn}
-              />
-              <div className="mt-7 border-t border-separator pt-5 text-center">
-                <Button
-                  variant="tertiary"
-                  onPress={() => setSelectedView("register")}
-                >
-                  Set up a new restaurant
-                  <ArrowRightIcon size={18} />
-                </Button>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="mb-5 flex items-center gap-3">
-                <Button
-                  isIconOnly
-                  aria-label="Back to sign in"
-                  size="lg"
-                  variant="tertiary"
-                  onPress={() => setSelectedView("login")}
-                >
-                  <BackIcon size={20} />
-                </Button>
-                <h1 className="text-2xl font-semibold tracking-tight">
-                  Create your account
-                </h1>
-              </div>
-              <TenantRegistrationForm onRegistered={registered} />
-            </>
-          )}
+          <div className="mb-6">
+            <h1 className="text-2xl font-semibold tracking-tight">
+              Welcome back
+            </h1>
+          </div>
+          <LoginForm
+            error={loginError}
+            isPending={isLoggingIn}
+            onDismissError={onDismissLoginError}
+            onSubmit={onSignIn}
+          />
         </div>
       </div>
     </div>
@@ -455,7 +387,15 @@ export function StaffPanel() {
         </Alert>
       )}
 
-      {canManageAccounts || canManageLocations || canManageIntegrations ? (
+      {account.kind === "PLATFORM_OPERATOR" ? (
+        <>
+          <div className="flex justify-end">{utilities}</div>
+          <TenantInvitationManagement
+            key={account.accountId}
+            accountId={account.accountId}
+          />
+        </>
+      ) : canManageAccounts || canManageLocations || canManageIntegrations ? (
         <Tabs
           selectedKey={selectedWorkspace}
           onSelectionChange={(key) => setSelectedWorkspace(String(key))}
@@ -580,7 +520,13 @@ export function StaffPanel() {
                 <AlertDialog.Heading>Sign out?</AlertDialog.Heading>
               </AlertDialog.Header>
               <AlertDialog.Body className="flex flex-col gap-4">
-                <p>You will need to sign in again to manage orders.</p>
+                <p>
+                  You will need to sign in again to manage{" "}
+                  {account.kind === "PLATFORM_OPERATOR"
+                    ? "tenant invitations"
+                    : "orders"}
+                  .
+                </p>
                 {logoutError && (
                   <Alert status="danger">
                     <Alert.Indicator />
