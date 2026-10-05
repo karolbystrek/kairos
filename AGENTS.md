@@ -103,8 +103,6 @@ Use Conventional Commits for every commit.
   contract decisions in `docs/REQUIREMENTS.md`.
 - Keep `AGENTS.md` limited to durable repository-wide technology, boundaries,
   conventions, and workflows.
-- Keep `README.md`, `AGENTS.md`, `docs/PROBLEM_DESCRIPTION.md`, and
-  `docs/REQUIREMENTS.md` as the repository's only Markdown documentation files.
 - Update documentation and implementation together when either changes the
   other.
 
@@ -135,6 +133,23 @@ Use Conventional Commits for every commit.
 - If a changed Flyway migration conflicts with a persistent database checksum,
   report it and ask before resetting data.
 - Report checks as passed, failed, blocked, or not run.
+
+## Agent skills
+
+### Issue tracker
+
+Track progress in GitHub Issues for `karolbystrek/kairos`, using `gh`.
+See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Use the five default triage labels.
+See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Use `docs/REQUIREMENTS.md` as the canonical domain and decision source.
+See `docs/agents/domain.md`.
 
 ## Local Setup
 
