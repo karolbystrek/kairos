@@ -6,21 +6,17 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
-import org.springframework.security.config.ObjectPostProcessor;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
-import org.springframework.security.web.csrf.CsrfFilter;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.security.web.authentication.session.NullAuthenticatedSessionStrategy;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import pl.karolbystrek.kairos.api.authentication.infrastructure.jwt.PanelPrincipalJwtAuthenticationConverter;
-import pl.karolbystrek.kairos.api.authentication.infrastructure.web.CookieBearerTokenResolver;
 import pl.karolbystrek.kairos.api.authentication.infrastructure.web.SecurityProblemDetailsHandler;
 import pl.karolbystrek.kairos.api.authentication.infrastructure.web.SpaCsrfTokenRequestHandler;
 
@@ -50,8 +46,6 @@ public class SecurityConfig {
         source.registerCorsConfiguration("/customer-notifications/**", customerConfiguration);
         source.registerCorsConfiguration("/auth/**", panelConfiguration);
         source.registerCorsConfiguration("/tenant-registrations/**", panelConfiguration);
-        source.registerCorsConfiguration("/tenant-registration-invitations/**", panelConfiguration);
-        source.registerCorsConfiguration("/tenant-registration-invitation-previews/**", panelConfiguration);
         source.registerCorsConfiguration("/locations/**", panelConfiguration);
         source.registerCorsConfiguration("/accounts/**", panelConfiguration);
         source.registerCorsConfiguration("/account-invitations/**", panelConfiguration);
@@ -103,8 +97,10 @@ public class SecurityConfig {
             HttpSecurity http,
             CsrfTokenRepository csrfTokenRepository,
             SpaCsrfTokenRequestHandler csrfTokenRequestHandler,
-            CookieBearerTokenResolver bearerTokenResolver,
-            PanelPrincipalJwtAuthenticationConverter jwtAuthenticationConverter,
+            pl.karolbystrek.kairos.api.authentication.infrastructure.zitadel.ZitadelClient provider,
+            pl.karolbystrek.kairos.api.account.infrastructure.persistence.AccountRepository accounts,
+            pl.karolbystrek.kairos.api.account.application.StaffAccessService access,
+            org.springframework.session.web.http.HttpSessionIdResolver cookies,
             SecurityProblemDetailsHandler problemDetailsHandler
     ) {
         return http
@@ -112,19 +108,12 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(csrfTokenRepository)
                         .csrfTokenRequestHandler(csrfTokenRequestHandler)
-                        // Bearer authentication runs on every access-cookie request; it must not rotate CSRF state.
-                        .sessionAuthenticationStrategy(new NullAuthenticatedSessionStrategy())
-                        .withObjectPostProcessor(new ObjectPostProcessor<CsrfFilter>() {
-                            @Override
-                            public <O extends CsrfFilter> O postProcess(O filter) {
-                                // Resource Server assumes header bearer tokens are not CSRF-prone. Kairos uses a cookie.
-                                // Restore protection for every unsafe method after all configurers have run.
-                                filter.setRequireCsrfProtectionMatcher(CsrfFilter.DEFAULT_CSRF_MATCHER);
-                                return filter;
-                            }
-                        }))
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .securityContext(context -> context.requireExplicitSave(true))
+                        .sessionAuthenticationStrategy(new NullAuthenticatedSessionStrategy()))
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.NEVER)
+                    .sessionAuthenticationStrategy(new NullAuthenticatedSessionStrategy()))
+                .securityContext(context -> context.securityContextRepository(new org.springframework.security.web.context.NullSecurityContextRepository()))
+                .addFilterBefore(new pl.karolbystrek.kairos.api.authentication.infrastructure.web.StaffSessionFilter(
+                    provider, accounts, access, cookies, problemDetailsHandler), org.springframework.security.web.authentication.AnonymousAuthenticationFilter.class)
                 .requestCache(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
@@ -140,9 +129,8 @@ public class SecurityConfig {
                         ).permitAll()
                         .requestMatchers(HttpMethod.POST,
                                 "/auth/v1/login",
-                                "/auth/v1/refresh",
+                                "/auth/v1/logout",
                                 "/tenant-registrations/v1",
-                                "/tenant-registration-invitation-previews/v1",
                                 "/account-invitation-previews/v1",
                                 "/account-invitation-redemptions/v1"
                         ).permitAll()
@@ -154,10 +142,9 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/auth/v1/logout",
                                 "/auth/v1/logout-all",
-                                "/auth/v1/me"
+                                "/auth/v1/me",
+                                "/auth/v1/password"
                         ).authenticated()
-                        .requestMatchers("/tenant-registration-invitations/v1/**")
-                                .hasRole("PLATFORM_OPERATOR")
                         .requestMatchers(
                                 "/locations/v1/**",
                                 "/accounts/v1/**",
@@ -173,11 +160,6 @@ public class SecurityConfig {
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint(problemDetailsHandler)
                         .accessDeniedHandler(problemDetailsHandler))
-                .oauth2ResourceServer(resourceServer -> resourceServer
-                        .bearerTokenResolver(bearerTokenResolver)
-                        .authenticationEntryPoint(problemDetailsHandler)
-                        .accessDeniedHandler(problemDetailsHandler)
-                        .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter)))
                 .build();
     }
 }

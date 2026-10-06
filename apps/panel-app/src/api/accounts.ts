@@ -8,7 +8,6 @@ const managedAccountSchema = z.object({
   id: z.uuid(),
   tenantId: z.uuid(),
   locationId: z.uuid(),
-  username: z.string(),
   email: z.string(),
   role: assignmentRoleSchema,
   status: z.enum(["ENABLED", "DISABLED"]),

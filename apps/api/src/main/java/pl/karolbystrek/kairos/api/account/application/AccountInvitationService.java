@@ -79,7 +79,7 @@ public class AccountInvitationService {
             location.id()
         );
         return new CreatedAccountInvitation(
-            toView(invitation, location, issuer.getUsername()),
+            toView(invitation, location, issuer.getEmail()),
             token.value()
         );
     }
@@ -110,7 +110,7 @@ public class AccountInvitationService {
                     .orElseThrow(() -> new StaffAccessDeniedException(
                         "The invitation issuer is not available"
                     ));
-                return toView(invitation, location, issuer.getUsername());
+                return toView(invitation, location, issuer.getEmail());
             })
             .toList();
     }
@@ -187,18 +187,12 @@ public class AccountInvitationService {
 
     @Transactional
     public StaffPrincipal redeem(
-        PanelPrincipal signedInAccount,
-        String presentedToken,
-        String username,
+        String tokenHash,
         String email,
-        String password
+        String subject
     ) {
-        if (signedInAccount != null) {
-            throw new SignedInRedemptionException();
-        }
-
         var invitation = invitationRepository.findForUpdateByTokenHash(
-                tokenService.hash(presentedToken)
+                tokenHash
             )
             .orElseThrow(AccountInvitationNotFoundException::new);
         var now = clock.instant();
@@ -208,9 +202,8 @@ public class AccountInvitationService {
 
         var account = accountCreationService.createMember(
             invitation.getTenantId(),
-            username,
             email,
-            password
+            subject
         );
         var assignment = LocationAssignment.assign(
             account.getId(),
@@ -305,14 +298,14 @@ public class AccountInvitationService {
     private static AccountInvitationView toView(
         AccountInvitation invitation,
         StaffLocation location,
-        String issuedByUsername
+        String issuedByEmail
     ) {
         return new AccountInvitationView(
             invitation.getId(),
             invitation.getLocationId(),
             location.name(),
             invitation.getAssignmentRole(),
-            issuedByUsername,
+            issuedByEmail,
             invitation.getCreatedAt(),
             invitation.getExpiresAt()
         );

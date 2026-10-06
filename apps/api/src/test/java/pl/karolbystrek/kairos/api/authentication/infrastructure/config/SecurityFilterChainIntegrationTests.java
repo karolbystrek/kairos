@@ -73,7 +73,7 @@ class SecurityFilterChainIntegrationTests extends RedisListenerIsolatedIntegrati
                         .secure(true)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"username":"panel","password":"not-a-real-password"}
+                                {"email":"panel@example.com","password":"not-a-real-password"}
                                 """))
                 .andExpect(status().isForbidden())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
@@ -93,7 +93,7 @@ class SecurityFilterChainIntegrationTests extends RedisListenerIsolatedIntegrati
                         .header(CSRF_HEADER, "not-the-cookie-token")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"username":"panel","password":"not-a-real-password"}
+                                {"email":"panel@example.com","password":"not-a-real-password"}
                                 """))
                 .andExpect(status().isForbidden())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
@@ -114,7 +114,7 @@ class SecurityFilterChainIntegrationTests extends RedisListenerIsolatedIntegrati
                         .param("_csrf", xorEncode(csrf.getValue()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"username":"panel","password":"not-a-real-password"}
+                                {"email":"panel@example.com","password":"not-a-real-password"}
                                 """))
                 .andExpect(status().isForbidden())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
@@ -167,13 +167,13 @@ class SecurityFilterChainIntegrationTests extends RedisListenerIsolatedIntegrati
         );
         assertCorsAllowed(
                 "http://localhost:3001",
-                "/tenant-registration-invitation-previews/v1",
+                "/account-invitation-previews/v1",
                 "POST"
         );
         assertCorsAllowed(
                 "http://localhost:3001",
-                "/tenant-registration-invitations/v1",
-                "GET"
+                "/tenant-registrations/v1",
+                "POST"
         );
         assertCorsAllowed("http://localhost:3000", "/auth/v1/csrf", "GET");
         assertCorsAllowed("http://localhost:3001", "/auth/v1/csrf", "GET");
@@ -186,7 +186,7 @@ class SecurityFilterChainIntegrationTests extends RedisListenerIsolatedIntegrati
         );
         assertCorsRejected(
                 "http://localhost:3000",
-                "/tenant-registration-invitation-previews/v1",
+                "/account-invitation-previews/v1",
                 "POST"
         );
         assertCorsRejected("http://localhost:3001", "/tracked-orders/v1/reference", "GET");

@@ -81,6 +81,11 @@ public class SecurityProblemDetailsHandler implements AuthenticationEntryPoint, 
         );
     }
 
+    public void unavailable(HttpServletResponse response) throws IOException {
+        write(response, HttpStatus.SERVICE_UNAVAILABLE, URI.create("urn:kairos:problem:authentication-unavailable"),
+            "Authentication unavailable", "Authentication is temporarily unavailable. Try again.");
+    }
+
     private void write(
             HttpServletResponse response,
             HttpStatus status,

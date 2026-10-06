@@ -17,7 +17,6 @@ import pl.karolbystrek.kairos.api.account.domain.TenantRole;
 import pl.karolbystrek.kairos.api.account.domain.assignment.AssignmentRole;
 import pl.karolbystrek.kairos.api.account.domain.assignment.LocationAssignment;
 import pl.karolbystrek.kairos.api.account.domain.invitation.AccountInvitationRevocationReason;
-import pl.karolbystrek.kairos.api.account.infrastructure.persistence.AccountAuthenticatorRepository;
 import pl.karolbystrek.kairos.api.account.infrastructure.persistence.AccountRepository;
 import pl.karolbystrek.kairos.api.account.infrastructure.persistence.LocationAssignmentRepository;
 
@@ -36,7 +35,6 @@ public class AccountProvisioningService {
 
     private final AccountRepository accountRepository;
     private final LocationAssignmentRepository assignmentRepository;
-    private final AccountAuthenticatorRepository authenticatorRepository;
     private final StaffAccessService staffAccessService;
     private final AccountInvitationService invitationService;
     private final AccountSessionRevoker sessionRevoker;
@@ -70,7 +68,7 @@ public class AccountProvisioningService {
                 requireManagedAccount(accountsById.get(assignment.getAccountId()), access),
                 assignment
             ))
-            .sorted(Comparator.comparing(ManagedAccountView::username))
+            .sorted(Comparator.comparing(ManagedAccountView::email))
             .toList();
     }
 
@@ -132,7 +130,6 @@ public class AccountProvisioningService {
         }
 
         target.archive(clock.instant());
-        authenticatorRepository.deleteExternalIdentities(Set.of(accountId));
         sessionRevoker.revokeAll(accountId);
         invitationService.revokePendingByIssuer(
             accountId,
@@ -168,7 +165,6 @@ public class AccountProvisioningService {
             account.getId(),
             account.getTenantId(),
             assignment.getLocationId(),
-            account.getUsername(),
             account.getEmail(),
             assignment.getRole(),
             account.getStatus(),

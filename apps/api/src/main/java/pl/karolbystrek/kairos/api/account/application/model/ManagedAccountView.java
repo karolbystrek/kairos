@@ -10,7 +10,6 @@ public record ManagedAccountView(
     UUID id,
     UUID tenantId,
     UUID locationId,
-    String username,
     String email,
     AssignmentRole role,
     AccountStatus status,

@@ -14,7 +14,6 @@ import pl.karolbystrek.kairos.api.account.application.port.AccountSessionRevoker
 import pl.karolbystrek.kairos.api.account.domain.Account;
 import pl.karolbystrek.kairos.api.account.domain.invitation.AccountInvitationRevocationReason;
 import pl.karolbystrek.kairos.api.account.domain.assignment.LocationAssignment;
-import pl.karolbystrek.kairos.api.account.infrastructure.persistence.AccountAuthenticatorRepository;
 import pl.karolbystrek.kairos.api.account.infrastructure.persistence.AccountRepository;
 import pl.karolbystrek.kairos.api.account.infrastructure.persistence.LocationAssignmentRepository;
 import pl.karolbystrek.kairos.api.integration.infrastructure.persistence.ApiKeyRepository;
@@ -48,7 +47,6 @@ public class LocationService {
     private final TenantRepository tenantRepository;
     private final LocationAssignmentRepository assignmentRepository;
     private final AccountRepository accountRepository;
-    private final AccountAuthenticatorRepository authenticatorRepository;
     private final AccountInvitationService invitationService;
     private final AccountSessionRevoker sessionRevoker;
     private final CustomerOrderRepository orderRepository;
@@ -195,7 +193,6 @@ public class LocationService {
             .toList();
         var accountIds = accounts.stream().map(Account::getId).toList();
         accounts.forEach(account -> account.archive(now));
-        authenticatorRepository.deleteExternalIdentities(accountIds);
         sessionRevoker.revokeAll(accountIds);
         invitationService.revokePendingByLocation(
             location.getId(),

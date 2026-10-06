@@ -232,120 +232,25 @@ CREATE INDEX webhook_signing_secret_subscription_issued_idx
 
 CREATE TABLE accounts
 (
-    id            UUID PRIMARY KEY,
-    kind          VARCHAR(32)              NOT NULL DEFAULT 'TENANT_ACCOUNT',
-    tenant_id     UUID REFERENCES tenants (id),
-    username      VARCHAR(120)             NOT NULL UNIQUE,
-    email         VARCHAR(254) NOT NULL UNIQUE,
-    password_hash VARCHAR(255),
-    tenant_role   VARCHAR(32),
-    status        VARCHAR(32)              NOT NULL,
-    created_at    TIMESTAMP WITH TIME ZONE NOT NULL,
-    updated_at    TIMESTAMP WITH TIME ZONE NOT NULL,
-    archived_at   TIMESTAMP WITH TIME ZONE,
-    CONSTRAINT accounts_username_not_blank_check CHECK (TRIM(username) <> ''),
-    CONSTRAINT accounts_username_normalized_check CHECK (username = LOWER(TRIM(username))),
-    CONSTRAINT accounts_email_check CHECK (
-        TRIM(email) <> '' AND email = LOWER(TRIM(email))
-        ),
-    CONSTRAINT accounts_password_hash_not_blank_check CHECK (
-        password_hash IS NULL OR TRIM(password_hash) <> ''
-        ),
+    id UUID PRIMARY KEY,
+    tenant_id UUID NOT NULL REFERENCES tenants (id),
+    email VARCHAR(254) NOT NULL UNIQUE,
+    provider_subject VARCHAR(128) NOT NULL UNIQUE,
+    authentication_cutoff TIMESTAMP WITH TIME ZONE,
+    tenant_role VARCHAR(32) NOT NULL,
+    status VARCHAR(32) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    archived_at TIMESTAMP WITH TIME ZONE,
+    CONSTRAINT accounts_email_check CHECK (TRIM(email) <> '' AND email = LOWER(TRIM(email))),
     CONSTRAINT accounts_id_tenant_key UNIQUE (id, tenant_id),
-    CONSTRAINT accounts_id_kind_key UNIQUE (id, kind),
-    CONSTRAINT accounts_kind_check CHECK (kind IN ('TENANT_ACCOUNT', 'PLATFORM_OPERATOR')),
     CONSTRAINT accounts_tenant_role_check CHECK (tenant_role IN ('ADMIN', 'MEMBER')),
     CONSTRAINT accounts_status_check CHECK (status IN ('ENABLED', 'DISABLED', 'ARCHIVED')),
     CONSTRAINT accounts_archive_check CHECK (
-        (status = 'ARCHIVED' AND archived_at IS NOT NULL AND password_hash IS NULL)
-            OR (status <> 'ARCHIVED' AND archived_at IS NULL)
-        ),
-    CONSTRAINT accounts_kind_shape_check CHECK (
-        (kind = 'TENANT_ACCOUNT' AND tenant_id IS NOT NULL AND tenant_role IS NOT NULL)
-            OR (kind = 'PLATFORM_OPERATOR'
-                AND tenant_id IS NULL
-                AND tenant_role IS NULL
-                AND status IN ('ENABLED', 'DISABLED')
-                AND archived_at IS NULL)
-        ),
+        (status = 'ARCHIVED' AND archived_at IS NOT NULL) OR (status <> 'ARCHIVED' AND archived_at IS NULL)),
     CONSTRAINT accounts_updated_at_check CHECK (updated_at >= created_at)
 );
-
 CREATE INDEX accounts_tenant_id_idx ON accounts (tenant_id);
-
-CREATE TABLE tenant_registration_invitations
-(
-    id                    UUID PRIMARY KEY,
-    label                 VARCHAR(120)             NOT NULL,
-    issued_by_account_id  UUID                     NOT NULL,
-    issued_by_account_kind VARCHAR(32)              NOT NULL DEFAULT 'PLATFORM_OPERATOR',
-    token_hash            VARCHAR(64)              NOT NULL UNIQUE,
-    state                 VARCHAR(32)              NOT NULL,
-    revocation_reason     VARCHAR(32),
-    revoked_by_account_id UUID,
-    revoked_at            TIMESTAMP WITH TIME ZONE,
-    redeemed_tenant_id    UUID REFERENCES tenants (id),
-    redeemed_account_id   UUID,
-    redeemed_at           TIMESTAMP WITH TIME ZONE,
-    expires_at            TIMESTAMP WITH TIME ZONE NOT NULL,
-    created_at            TIMESTAMP WITH TIME ZONE NOT NULL,
-    updated_at            TIMESTAMP WITH TIME ZONE NOT NULL,
-    CONSTRAINT tenant_registration_invitations_issuer_kind_fk
-        FOREIGN KEY (issued_by_account_id, issued_by_account_kind)
-            REFERENCES accounts (id, kind),
-    CONSTRAINT tenant_registration_invitations_issuer_kind_check
-        CHECK (issued_by_account_kind = 'PLATFORM_OPERATOR'),
-    CONSTRAINT tenant_registration_invitations_revoker_fk
-        FOREIGN KEY (revoked_by_account_id)
-            REFERENCES accounts (id),
-    CONSTRAINT tenant_registration_invitations_redeemed_account_tenant_fk
-        FOREIGN KEY (redeemed_account_id, redeemed_tenant_id)
-            REFERENCES accounts (id, tenant_id),
-    CONSTRAINT tenant_registration_invitations_label_check CHECK (
-        TRIM(label) <> '' AND label = TRIM(label)
-        ),
-    CONSTRAINT tenant_registration_invitations_token_hash_check
-        CHECK (token_hash ~ '^[0-9a-f]{64}$'),
-    CONSTRAINT tenant_registration_invitations_state_check
-        CHECK (state IN ('PENDING', 'REDEEMED', 'REVOKED')),
-    CONSTRAINT tenant_registration_invitations_revocation_reason_check
-        CHECK (revocation_reason IS NULL OR revocation_reason IN (
-            'OPERATOR_REVOKED',
-            'ISSUER_DISABLED'
-            )),
-    CONSTRAINT tenant_registration_invitations_expiry_check
-        CHECK (expires_at = created_at + INTERVAL '7' DAY),
-    CONSTRAINT tenant_registration_invitations_updated_at_check
-        CHECK (updated_at >= created_at),
-    CONSTRAINT tenant_registration_invitations_lifecycle_check CHECK (
-        (state = 'PENDING'
-            AND revocation_reason IS NULL
-            AND revoked_by_account_id IS NULL
-            AND revoked_at IS NULL
-            AND redeemed_tenant_id IS NULL
-            AND redeemed_account_id IS NULL
-            AND redeemed_at IS NULL)
-        OR (state = 'REVOKED'
-            AND revocation_reason IS NOT NULL
-            AND revoked_at IS NOT NULL
-            AND redeemed_tenant_id IS NULL
-            AND redeemed_account_id IS NULL
-            AND redeemed_at IS NULL
-            AND (revocation_reason = 'ISSUER_DISABLED' OR revoked_by_account_id IS NOT NULL))
-        OR (state = 'REDEEMED'
-            AND revocation_reason IS NULL
-            AND revoked_by_account_id IS NULL
-            AND revoked_at IS NULL
-            AND redeemed_tenant_id IS NOT NULL
-            AND redeemed_account_id IS NOT NULL
-            AND redeemed_at IS NOT NULL)
-        )
-);
-
-CREATE INDEX tenant_registration_invitations_pending_idx
-    ON tenant_registration_invitations (state, expires_at, created_at DESC);
-CREATE INDEX tenant_registration_invitations_issuer_pending_idx
-    ON tenant_registration_invitations (issued_by_account_id, state, expires_at);
 
 CREATE TABLE account_invitations
 (
@@ -420,23 +325,6 @@ CREATE INDEX account_invitations_location_pending_idx
 CREATE INDEX account_invitations_issuer_pending_idx
     ON account_invitations (issued_by_account_id, state, expires_at);
 
-CREATE TABLE external_identities
-(
-    id         UUID PRIMARY KEY,
-    account_id UUID                     NOT NULL REFERENCES accounts (id),
-    provider   VARCHAR(120)             NOT NULL,
-    subject    VARCHAR(255)             NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    CONSTRAINT external_identities_provider_not_blank_check CHECK (TRIM(provider) <> ''),
-    CONSTRAINT external_identities_provider_normalized_check CHECK (provider = LOWER(TRIM(provider))),
-    CONSTRAINT external_identities_subject_not_blank_check CHECK (TRIM(subject) <> ''),
-    CONSTRAINT external_identities_provider_subject_key UNIQUE (provider, subject),
-    CONSTRAINT external_identities_account_provider_key UNIQUE (account_id, provider)
-);
-
-CREATE INDEX external_identities_account_id_idx ON external_identities (account_id);
-
 CREATE TABLE location_assignments
 (
     account_id  UUID                     NOT NULL,
@@ -459,26 +347,23 @@ CREATE TABLE location_assignments
 CREATE INDEX location_assignments_location_id_idx
     ON location_assignments (location_id, account_id);
 
-CREATE TABLE sessions
-(
-    id                 UUID PRIMARY KEY,
-    account_id         UUID                     NOT NULL REFERENCES accounts (id),
-    refresh_token_hash VARCHAR(255)             NOT NULL UNIQUE,
-    token_family_id    UUID                     NOT NULL,
-    created_at         TIMESTAMP WITH TIME ZONE NOT NULL,
-    expires_at         TIMESTAMP WITH TIME ZONE NOT NULL,
-    last_used_at       TIMESTAMP WITH TIME ZONE,
-    revoked_at         TIMESTAMP WITH TIME ZONE,
-    replaced_by_id     UUID REFERENCES sessions (id),
-    CONSTRAINT sessions_refresh_token_hash_not_blank_check CHECK (TRIM(refresh_token_hash) <> ''),
-    CONSTRAINT sessions_expiry_check CHECK (expires_at > created_at),
-    CONSTRAINT sessions_last_used_at_check CHECK (last_used_at IS NULL OR last_used_at >= created_at),
-    CONSTRAINT sessions_revoked_at_check CHECK (revoked_at IS NULL OR revoked_at >= created_at),
-    CONSTRAINT sessions_replacement_check CHECK (replaced_by_id IS NULL OR replaced_by_id <> id)
+CREATE TABLE SPRING_SESSION (
+    PRIMARY_ID CHAR(36) NOT NULL PRIMARY KEY,
+    SESSION_ID CHAR(36) NOT NULL UNIQUE,
+    CREATION_TIME BIGINT NOT NULL,
+    LAST_ACCESS_TIME BIGINT NOT NULL,
+    MAX_INACTIVE_INTERVAL INT NOT NULL,
+    EXPIRY_TIME BIGINT NOT NULL,
+    PRINCIPAL_NAME VARCHAR(100)
 );
-
-CREATE INDEX sessions_account_id_idx ON sessions (account_id);
-CREATE INDEX sessions_token_family_id_idx ON sessions (token_family_id);
+CREATE INDEX SPRING_SESSION_EXPIRY_IDX ON SPRING_SESSION (EXPIRY_TIME);
+CREATE INDEX SPRING_SESSION_PRINCIPAL_IDX ON SPRING_SESSION (PRINCIPAL_NAME);
+CREATE TABLE SPRING_SESSION_ATTRIBUTES (
+    SESSION_PRIMARY_ID CHAR(36) NOT NULL REFERENCES SPRING_SESSION (PRIMARY_ID) ON DELETE CASCADE,
+    ATTRIBUTE_NAME VARCHAR(200) NOT NULL,
+    ATTRIBUTE_BYTES BYTEA NOT NULL,
+    PRIMARY KEY (SESSION_PRIMARY_ID, ATTRIBUTE_NAME)
+);
 
 CREATE TABLE orders
 (

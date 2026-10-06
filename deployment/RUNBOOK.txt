@@ -31,12 +31,18 @@ PREPARE
    Set KAIROS_APPLICATION_SECRETS_DIRECTORY to that absolute directory. Compose
    mounts these files read-only at /run/secrets:
 
-   jwt-private.pem
-   jwt-public.pem
    webhook-encryption.bin
    vapid-private.pem
    vapid-public.pem
    push-subscription-encryption.bin
+   zitadel-masterkey
+
+   Configure a unique ZITADEL_DB_PASSWORD. Compose initializes a separate
+   ZITADEL database and provisions API service credentials automatically in
+   private volumes. Back up those volumes, both databases and zitadel-masterkey;
+   keep the master key stable while retaining provider data. Follow
+   docs/authentication-setup.md for credential rotation and provider acceptance.
+   No Google credentials or email provider are required.
 
    Keep the host directory, files, and .env owned by the deployment user. The
    generated .env has mode 0600.

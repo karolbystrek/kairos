@@ -1,187 +1,58 @@
 package pl.karolbystrek.kairos.api.authentication.application;
 
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.springframework.session.FindByIndexNameSessionRepository;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
-import pl.karolbystrek.kairos.api.account.application.exception.StaffAccessDeniedException;
 import pl.karolbystrek.kairos.api.account.application.model.PanelPrincipal;
 import pl.karolbystrek.kairos.api.account.application.port.AccountSessionRevoker;
 import pl.karolbystrek.kairos.api.account.infrastructure.persistence.AccountRepository;
-import pl.karolbystrek.kairos.api.authentication.application.exception.InvalidRefreshCredentialException;
-import pl.karolbystrek.kairos.api.authentication.application.exception.RefreshCredentialReuseException;
-import pl.karolbystrek.kairos.api.authentication.application.model.IssuedSession;
-import pl.karolbystrek.kairos.api.authentication.domain.RefreshSession;
-import pl.karolbystrek.kairos.api.authentication.infrastructure.config.AuthenticationProperties;
-import pl.karolbystrek.kairos.api.authentication.infrastructure.jwt.AccessTokenIssuer;
-import pl.karolbystrek.kairos.api.authentication.infrastructure.persistence.RefreshSessionRepository;
-import pl.karolbystrek.kairos.api.authentication.infrastructure.persistence.RefreshSessionRepository.RefreshSessionReference;
+import pl.karolbystrek.kairos.api.authentication.infrastructure.zitadel.ZitadelClient;
 
 import java.time.Clock;
-import java.time.Instant;
 import java.util.Collection;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class AuthenticationSessionService implements AccountSessionRevoker {
-
-    private final AccountRepository accountRepository;
-    private final RefreshSessionRepository sessionRepository;
-    private final RefreshCredentialService credentialService;
-    private final PanelAccessService panelAccessService;
-    private final AccessTokenIssuer accessTokenIssuer;
-    private final AuthenticationProperties properties;
+    public static final String IDENTITY = "kairos.identity";
+    public static final String SIGNED_IN_AT = "kairos.signedInAt";
+    private final JdbcTemplate database;
+    private final AccountRepository accounts;
+    private final ZitadelClient provider;
     private final Clock clock;
 
-    @Transactional
-    public IssuedSession start(PanelPrincipal authenticatedAccount) {
-        panelAccessService.requireEligibleForUpdate(authenticatedAccount);
-        var now = clock.instant();
-        var credential = credentialService.generate();
-        var session = RefreshSession.start(
-            authenticatedAccount.accountId(),
-            credential.hash(),
-            now,
-            now.plus(properties.refresh().absoluteLifetime())
-        );
-        sessionRepository.save(session);
-        log.info("Created refresh session {} for account {}", session.getId(), authenticatedAccount.accountId());
-        return grant(authenticatedAccount, credential.value(), session, now);
+    public void establish(HttpServletRequest request, PanelPrincipal principal, ZitadelClient.ProviderSession identity) {
+        var old = request.getSession(false);
+        if (old != null) old.invalidate();
+        var session = request.getSession(true);
+        session.setAttribute(IDENTITY, identity);
+        session.setAttribute(SIGNED_IN_AT, clock.instant());
+        session.setAttribute(FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME, principal.getName());
     }
 
-    @Transactional(noRollbackFor = InvalidRefreshCredentialException.class)
-    public IssuedSession rotate(String presentedCredential) {
-        if (!StringUtils.hasText(presentedCredential)) {
-            throw new InvalidRefreshCredentialException();
-        }
-
-        var credentialHash = credentialService.hash(presentedCredential);
-        var discovered = sessionRepository.findReferenceByRefreshTokenHash(credentialHash)
-            .orElseThrow(InvalidRefreshCredentialException::new);
-        var account = accountRepository.findForUpdateById(discovered.getAccountId())
-            .orElseThrow(InvalidRefreshCredentialException::new);
-
-        var familyRoot = sessionRepository.findForUpdateById(discovered.getTokenFamilyId())
-            .orElseThrow(InvalidRefreshCredentialException::new);
-        var current = sessionRepository.findForUpdateByRefreshTokenHash(credentialHash)
-            .orElseThrow(InvalidRefreshCredentialException::new);
-        if (!sameFamily(discovered, familyRoot, current)) {
-            throw new InvalidRefreshCredentialException();
-        }
-
-        var now = clock.instant();
-        if (current.wasConsumed()) {
-            sessionRepository.revokeFamily(current.getTokenFamilyId(), now);
-            log.warn("Detected refresh credential reuse for token family {}", current.getTokenFamilyId());
-            throw new RefreshCredentialReuseException();
-        }
-        if (current.getRevokedAt() != null) {
-            throw new InvalidRefreshCredentialException();
-        }
-        if (current.isUnavailableAt(now, properties.refresh().idleLifetime())) {
-            current.revoke(now);
-            throw new InvalidRefreshCredentialException();
-        }
-
-        var principal = panelAccessService.principalFor(account);
-        try {
-            panelAccessService.requireEligibleForUpdate(principal);
-        }
-        catch (StaffAccessDeniedException exception) {
-            sessionRepository.revokeAllForAccount(account.getId(), now);
-            throw new InvalidRefreshCredentialException();
-        }
-
-        var replacementCredential = credentialService.generate();
-        var replacement = current.replacement(replacementCredential.hash(), now);
-        sessionRepository.saveAndFlush(replacement);
-        current.consume(replacement.getId(), now);
-        log.info("Rotated refresh session {} to {}", current.getId(), replacement.getId());
-        return grant(principal, replacementCredential.value(), replacement, now);
-    }
-
-    @Transactional
-    public void logout(PanelPrincipal principal, String presentedCredential) {
-        if (principal == null || !StringUtils.hasText(presentedCredential)) {
-            return;
-        }
-
-        var credentialHash = credentialService.hash(presentedCredential);
-        var discovered = sessionRepository.findReferenceByRefreshTokenHash(credentialHash);
-        if (discovered.isEmpty() || !principal.accountId().equals(discovered.get().getAccountId())) {
-            return;
-        }
-        if (accountRepository.findForUpdateById(principal.accountId()).isEmpty()) {
-            return;
-        }
-        sessionRepository.findForUpdateById(discovered.get().getTokenFamilyId())
-            .orElseThrow(InvalidRefreshCredentialException::new);
-        var session = sessionRepository.findForUpdateByRefreshTokenHash(credentialHash)
-            .orElseThrow(InvalidRefreshCredentialException::new);
-        var now = clock.instant();
-        if (session.wasConsumed()) {
-            sessionRepository.revokeFamily(session.getTokenFamilyId(), now);
-        }
-        else {
-            session.revoke(now);
-        }
-        log.info("Revoked current refresh session for account {}", principal.accountId());
-    }
-
-    @Transactional
-    public void logoutAll(PanelPrincipal principal) {
-        if (principal == null || accountRepository.findForUpdateById(principal.accountId()).isEmpty()) {
-            return;
-        }
-        revokeAll(principal.accountId());
-        log.info("Revoked all refresh sessions for account {}", principal.accountId());
+    public void logout(HttpServletRequest request) {
+        var session = request.getSession(false);
+        if (session == null) return;
+        var identity = (ZitadelClient.ProviderSession) session.getAttribute(IDENTITY);
+        session.invalidate();
+        if (identity != null) provider.terminate(identity);
     }
 
     @Override
     @Transactional
     public void revokeAll(UUID accountId) {
-        sessionRepository.revokeAllForAccount(accountId, clock.instant());
+        accounts.findForUpdateById(accountId).ifPresent(account -> account.revokeAuthentication(clock.instant()));
+        // Bulk deletion shares the Account transaction; JDBC session attributes cascade.
+        database.update("DELETE FROM SPRING_SESSION WHERE PRINCIPAL_NAME = ?", accountId.toString());
     }
-
     @Override
     @Transactional
-    public void revokeAll(Collection<UUID> accountIds) {
-        if (accountIds == null || accountIds.isEmpty()) {
-            return;
-        }
-        sessionRepository.revokeAllForAccounts(accountIds, clock.instant());
-    }
+    public void revokeAll(Collection<UUID> ids) { ids.stream().sorted().forEach(this::revokeAll); }
 
-    private IssuedSession grant(
-        PanelPrincipal principal,
-        String refreshCredential,
-        RefreshSession session,
-        Instant now
-    ) {
-        var idleExpiresAt = now.plus(properties.refresh().idleLifetime());
-        var cookieExpiresAt = idleExpiresAt.isBefore(session.getExpiresAt())
-            ? idleExpiresAt
-            : session.getExpiresAt();
-        return new IssuedSession(
-            principal,
-            accessTokenIssuer.issue(principal),
-            refreshCredential,
-            cookieExpiresAt
-        );
-    }
-
-    private static boolean sameFamily(
-        RefreshSessionReference discovered,
-        RefreshSession familyRoot,
-        RefreshSession current
-    ) {
-        return discovered.getId().equals(current.getId())
-            && discovered.getAccountId().equals(current.getAccountId())
-            && discovered.getTokenFamilyId().equals(current.getTokenFamilyId())
-            && familyRoot.getId().equals(current.getTokenFamilyId())
-            && familyRoot.getAccountId().equals(current.getAccountId());
-    }
+    @Transactional
+    public void logoutAll(PanelPrincipal principal) { revokeAll(principal.accountId()); }
 }

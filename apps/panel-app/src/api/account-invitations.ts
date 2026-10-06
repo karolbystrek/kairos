@@ -1,20 +1,16 @@
 import { z } from "zod";
 
-import {
-  passwordInputSchema,
-  requiredEmailInputSchema,
-  usernameInputSchema,
-} from "./account-input";
+import { passwordInputSchema, requiredEmailInputSchema } from "./account-input";
 import { assignmentRoleSchema } from "./accounts";
 import { apiFetch, request } from "./api-fetch";
-import { currentAccountSchema } from "./authentication";
+import { authenticationResultSchema } from "./authentication";
 
 const invitationSchema = z.object({
   id: z.uuid(),
   locationId: z.uuid(),
   locationName: z.string(),
   role: assignmentRoleSchema,
-  issuedByUsername: z.string(),
+  issuedByEmail: z.string(),
   createdAt: z.iso.datetime({ offset: true }),
   expiresAt: z.iso.datetime({ offset: true }),
 });
@@ -38,9 +34,9 @@ const createInvitationInputSchema = z.object({
 
 const redemptionInputSchema = z.object({
   token: z.string().min(1),
-  username: usernameInputSchema,
   email: requiredEmailInputSchema,
   password: passwordInputSchema,
+  passwordConfirmation: z.string(),
 });
 
 export type AccountInvitation = z.infer<typeof invitationSchema>;
@@ -91,7 +87,7 @@ export function previewAccountInvitation(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token }),
     },
-    { retryUnauthorized: false },
+    { notifyUnauthorized: false },
   );
 }
 
@@ -102,12 +98,12 @@ export function redeemAccountInvitation(
 
   return request(
     "/api/account-invitation-redemptions/v1",
-    currentAccountSchema,
+    authenticationResultSchema,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
     },
-    { retryUnauthorized: false },
+    { notifyUnauthorized: false },
   );
 }

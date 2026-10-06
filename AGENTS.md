@@ -108,6 +108,12 @@ Use Conventional Commits for every commit.
 
 ## Agent Workflow
 
+- Until the user changes this policy, treat Kairos as a fresh, never-deployed
+  repository. Existing local accounts and data need no migration or backward
+  compatibility. Edit `V1__create_initial_schema.sql` directly when appropriate
+  rather than adding migrations solely to preserve development data. Do not
+  ask again whether existing accounts/data must be preserved. This policy does
+  not itself authorize stopping containers or resetting local data.
 - Before changing files, inspect `git status --short` and preserve unrelated
   worktree changes.
 - Do not inspect or exercise the running Compose stack unless runtime

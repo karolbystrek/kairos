@@ -14,7 +14,7 @@ import pl.karolbystrek.kairos.api.account.application.exception.InvalidAccountRe
 import pl.karolbystrek.kairos.api.account.application.exception.StaffAccessDeniedException;
 import pl.karolbystrek.kairos.api.account.application.exception.SignedInRedemptionException;
 
-@RestControllerAdvice(basePackageClasses = AccountController.class)
+@RestControllerAdvice(basePackageClasses = {AccountController.class, pl.karolbystrek.kairos.api.authentication.api.AuthenticationController.class})
 class AccountExceptionHandler {
 
     @ExceptionHandler(AccountNotFoundException.class)

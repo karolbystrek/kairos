@@ -1,75 +1,29 @@
 import { z } from "zod";
 
-import {
-  passwordInputSchema,
-  requiredEmailInputSchema,
-  usernameInputSchema,
-} from "./account-input";
+import { passwordInputSchema, requiredEmailInputSchema } from "./account-input";
 import { request } from "./api-fetch";
-import { currentAccountSchema, type CurrentAccount } from "./authentication";
-
-const tenantRegistrationInputSchema = z
+import { authenticationResultSchema } from "./authentication";
+export const registrationInputSchema = z
   .object({
-    token: z.string().min(1, "Invitation token is required"),
-    username: usernameInputSchema,
     email: requiredEmailInputSchema,
     password: passwordInputSchema,
     passwordConfirmation: z.string(),
+    token: z.string().optional(),
   })
   .refine(
     ({ password, passwordConfirmation }) => password === passwordConfirmation,
-    {
-      message: "Passwords must match",
-      path: ["passwordConfirmation"],
-    },
-  )
-  .transform(({ token, username, email, password, passwordConfirmation }) => ({
-    token,
-    username,
-    email,
-    password,
-    passwordConfirmation,
-  }));
-
-const tenantRegistrationInvitationPreviewSchema = z.object({
-  expiresAt: z.iso.datetime({ offset: true }),
-});
-
-export type TenantRegistrationInput = z.input<
-  typeof tenantRegistrationInputSchema
->;
-export type TenantRegistrationInvitationPreview = z.infer<
-  typeof tenantRegistrationInvitationPreviewSchema
->;
-
-export function registerTenant(
-  registration: TenantRegistrationInput,
-): Promise<CurrentAccount> {
-  const input = tenantRegistrationInputSchema.parse(registration);
-
+    { message: "Passwords must match", path: ["passwordConfirmation"] },
+  );
+export type TenantRegistrationInput = z.input<typeof registrationInputSchema>;
+export function registerTenant(registration: TenantRegistrationInput) {
   return request(
     "/api/tenant-registrations/v1",
-    currentAccountSchema,
+    authenticationResultSchema,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input),
+      body: JSON.stringify(registrationInputSchema.parse(registration)),
     },
-    { retryUnauthorized: false },
-  );
-}
-
-export function previewTenantRegistrationInvitation(
-  token: string,
-): Promise<TenantRegistrationInvitationPreview> {
-  return request(
-    "/api/tenant-registration-invitation-previews/v1",
-    tenantRegistrationInvitationPreviewSchema,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token }),
-    },
-    { retryUnauthorized: false },
+    { notifyUnauthorized: false },
   );
 }

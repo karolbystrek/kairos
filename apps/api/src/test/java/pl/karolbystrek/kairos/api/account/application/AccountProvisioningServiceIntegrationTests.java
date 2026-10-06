@@ -54,13 +54,13 @@ class AccountProvisioningServiceIntegrationTests extends RedisListenerIsolatedIn
         assertThat(provisioningService.listManageable(
             principal(administratorId, tenantId, TenantRole.ADMIN)
         ))
-            .extracting(account -> account.username())
-            .containsExactly("list.manager", "list.other", "list.own");
+            .extracting(account -> account.email())
+            .containsExactly("list.manager@example.com", "list.other@example.com", "list.own@example.com");
         assertThat(provisioningService.listManageable(
             principal(managerId, tenantId, TenantRole.MEMBER)
         ))
-            .extracting(account -> account.username())
-            .containsExactly("list.own");
+            .extracting(account -> account.email())
+            .containsExactly("list.own@example.com");
         assertThatThrownBy(() -> provisioningService.listManageable(
             principal(ownOperatorId, tenantId, TenantRole.MEMBER)
         )).isInstanceOf(StaffAccessDeniedException.class);
@@ -90,7 +90,7 @@ class AccountProvisioningServiceIntegrationTests extends RedisListenerIsolatedIn
         assertThat(accountRepository.findById(managerId).orElseThrow().getStatus())
             .isEqualTo(AccountStatus.DISABLED);
         assertThat(jdbcTemplate.queryForObject(
-            "SELECT revoked_at IS NOT NULL FROM sessions WHERE id = ?",
+            "SELECT authentication_cutoff IS NOT NULL FROM accounts WHERE id = ?",
             Boolean.class,
             sessionId
         )).isTrue();
@@ -149,18 +149,6 @@ class AccountProvisioningServiceIntegrationTests extends RedisListenerIsolatedIn
             AssignmentRole.OPERATOR
         );
         var sessionId = insertSession(managerId);
-        jdbcTemplate.update(
-            """
-                INSERT INTO external_identities (
-                    id, account_id, provider, subject, created_at, updated_at
-                ) VALUES (?, ?, 'example', ?, ?, ?)
-                """,
-            UUID.randomUUID(),
-            managerId,
-            "subject-" + managerId,
-            FIXTURE_TIME,
-            FIXTURE_TIME
-        );
         var administrator = principal(
             administratorId,
             tenantId,
@@ -171,22 +159,17 @@ class AccountProvisioningServiceIntegrationTests extends RedisListenerIsolatedIn
         provisioningService.delete(administrator, managerId);
 
         assertThat(jdbcTemplate.queryForMap(
-            "SELECT status, password_hash, archived_at FROM accounts WHERE id = ?",
+            "SELECT status, authentication_cutoff, archived_at FROM accounts WHERE id = ?",
             managerId
         )).containsEntry("status", "ARCHIVED")
-            .containsEntry("password_hash", null);
+            ;
         assertThat(jdbcTemplate.queryForObject(
             "SELECT archived_at IS NOT NULL FROM accounts WHERE id = ?",
             Boolean.class,
             managerId
         )).isTrue();
         assertThat(jdbcTemplate.queryForObject(
-            "SELECT COUNT(*) FROM external_identities WHERE account_id = ?",
-            Integer.class,
-            managerId
-        )).isZero();
-        assertThat(jdbcTemplate.queryForObject(
-            "SELECT revoked_at IS NOT NULL FROM sessions WHERE id = ?",
+            "SELECT authentication_cutoff IS NOT NULL FROM accounts WHERE id = ?",
             Boolean.class,
             sessionId
         )).isTrue();
@@ -230,23 +213,18 @@ class AccountProvisioningServiceIntegrationTests extends RedisListenerIsolatedIn
 
     private UUID insertAccount(
         UUID tenantId,
-        String username,
+        String emailPrefix,
         TenantRole tenantRole,
         AccountStatus status
     ) {
         var accountId = UUID.randomUUID();
         jdbcTemplate.update(
             """
-                INSERT INTO accounts (
-                    id, tenant_id, username, email, password_hash,
-                    tenant_role, status, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO accounts (id, provider_subject, tenant_id, email, tenant_role, status, created_at, updated_at) VALUES (?, CAST(RANDOM_UUID() AS VARCHAR), ?, ?, ?, ?, ?, ?)
                 """,
             accountId,
             tenantId,
-            username,
-            username + "@example.com",
-            "fixture-password-hash",
+            emailPrefix + "@example.com",
             tenantRole.name(),
             status.name(),
             FIXTURE_TIME,
@@ -277,22 +255,7 @@ class AccountProvisioningServiceIntegrationTests extends RedisListenerIsolatedIn
     }
 
     private UUID insertSession(UUID accountId) {
-        var sessionId = UUID.randomUUID();
-        jdbcTemplate.update(
-            """
-                INSERT INTO sessions (
-                    id, account_id, refresh_token_hash, token_family_id,
-                    created_at, expires_at, last_used_at, revoked_at, replaced_by_id
-                ) VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, NULL)
-                """,
-            sessionId,
-            accountId,
-            "fixture-hash-" + sessionId,
-            sessionId,
-            FIXTURE_TIME,
-            FIXTURE_TIME.plus(30, ChronoUnit.DAYS)
-        );
-        return sessionId;
+        return accountId;
     }
 
     private static StaffPrincipal principal(UUID accountId, UUID tenantId, TenantRole role) {

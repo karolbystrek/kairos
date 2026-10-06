@@ -62,6 +62,11 @@ class AccountInvitationApiIntegrationTests extends RedisListenerIsolatedIntegrat
 
     @BeforeEach
     void createAdministratorFixture() {
+        org.mockito.Mockito.when(identityProvider.createUser(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString()))
+            .thenAnswer(call -> call.getArgument(0));
+        org.mockito.Mockito.doAnswer(call -> new pl.karolbystrek.kairos.api.authentication.infrastructure.zitadel.ZitadelClient.ProviderSession(
+                UUID.randomUUID().toString(), call.getArgument(0)))
+            .when(identityProvider).signIn(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString());
         tenantId = UUID.randomUUID();
         locationId = UUID.randomUUID();
         var accountId = UUID.randomUUID();
@@ -78,16 +83,11 @@ class AccountInvitationApiIntegrationTests extends RedisListenerIsolatedIntegrat
         );
         jdbcTemplate.update(
             """
-                INSERT INTO accounts (
-                    id, tenant_id, username, email, password_hash,
-                    tenant_role, status, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, 'ADMIN', 'ENABLED', ?, ?)
+                INSERT INTO accounts (id, provider_subject, tenant_id, email, tenant_role, status, created_at, updated_at) VALUES (?, CAST(RANDOM_UUID() AS VARCHAR), ?, ?, 'ADMIN', 'ENABLED', ?, ?)
                 """,
             accountId,
             tenantId,
-            "invitation-admin-" + accountId,
             "invitation-admin-" + accountId + "@example.com",
-            "fixture-password-hash",
             now,
             now
         );
@@ -157,13 +157,13 @@ class AccountInvitationApiIntegrationTests extends RedisListenerIsolatedIntegrat
                 .content("""
                     {
                       "token":"%s",
-                      "username":"  Invited.Person  ",
                       "email":"INVITED.PERSON@EXAMPLE.COM",
-                      "password":"Secure-Password-12"
+                      "password":"Secure-Password-12",
+                      "passwordConfirmation":"Secure-Password-12"
                     }
                     """.formatted(token)), csrf))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.username").value("invited.person"))
+            .andExpect(jsonPath("$.email").value("invited.person@example.com"))
             .andExpect(jsonPath("$.tenantRole").value("MEMBER"))
             .andExpect(jsonPath("$.assignment.locationId").value(locationId.toString()))
             .andExpect(jsonPath("$.assignment.role").value("OPERATOR"))
@@ -172,8 +172,8 @@ class AccountInvitationApiIntegrationTests extends RedisListenerIsolatedIntegrat
         var accountId = UUID.fromString(objectMapper.readTree(
             redemption.getResponse().getContentAsByteArray()
         ).get("accountId").asText());
-        assertThat(redemption.getResponse().getCookie("__Host-access-token")).isNotNull();
-        assertThat(redemption.getResponse().getCookie("__Host-refresh-token")).isNotNull();
+        assertThat(redemption.getResponse().getCookie("__Host-session")).isNotNull();
+        assertThat(redemption.getResponse().getCookie("__Host-refresh-token")).isNull();
         assertThat(jdbcTemplate.queryForObject(
             "SELECT email FROM accounts WHERE id = ?",
             String.class,
@@ -274,7 +274,7 @@ class AccountInvitationApiIntegrationTests extends RedisListenerIsolatedIntegrat
                 .content(redemptionJson(
                     token,
                     "invitation-admin-" + administrator.accountId(),
-                    "different-" + administrator.accountId() + "@example.com"
+                    "invitation-admin-" + administrator.accountId() + "@example.com"
                 )), csrf))
             .andExpect(status().isConflict());
         assertThat(invitationState(invitationId)).isEqualTo("PENDING");
@@ -363,16 +363,11 @@ class AccountInvitationApiIntegrationTests extends RedisListenerIsolatedIntegrat
         var now = Instant.now();
         jdbcTemplate.update(
             """
-                INSERT INTO accounts (
-                    id, tenant_id, username, email, password_hash,
-                    tenant_role, status, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, 'MEMBER', 'ENABLED', ?, ?)
+                INSERT INTO accounts (id, provider_subject, tenant_id, email, tenant_role, status, created_at, updated_at) VALUES (?, CAST(RANDOM_UUID() AS VARCHAR), ?, ?, 'MEMBER', 'ENABLED', ?, ?)
                 """,
             accountId,
             tenantId,
-            "invitation-member-" + accountId,
             "invitation-member-" + accountId + "@example.com",
-            "fixture-password-hash",
             now,
             now
         );
@@ -392,15 +387,15 @@ class AccountInvitationApiIntegrationTests extends RedisListenerIsolatedIntegrat
         return new StaffPrincipal(accountId, tenantId, TenantRole.MEMBER);
     }
 
-    private static String redemptionJson(String token, String username, String email) {
+    private static String redemptionJson(String token, String ignored, String email) {
         return """
             {
               "token":"%s",
-              "username":"%s",
               "email":"%s",
-              "password":"Secure-Password-12"
+              "password":"Secure-Password-12",
+                      "passwordConfirmation":"Secure-Password-12"
             }
-            """.formatted(token, username, email);
+            """.formatted(token, email);
     }
 
     private String invitationState(UUID invitationId) {

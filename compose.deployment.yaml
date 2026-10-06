@@ -36,11 +36,46 @@ services:
     logging: *deployment-logging
     volumes:
       - type: bind
-        source: ${KAIROS_APPLICATION_SECRETS_DIRECTORY:?Set KAIROS_APPLICATION_SECRETS_DIRECTORY}
-        target: /run/secrets
+        source: ${KAIROS_APPLICATION_SECRETS_DIRECTORY:?Set KAIROS_APPLICATION_SECRETS_DIRECTORY}/webhook-encryption.bin
+        target: /run/secrets/webhook-encryption.bin
         read_only: true
         bind:
           create_host_path: false
+      - type: bind
+        source: ${KAIROS_APPLICATION_SECRETS_DIRECTORY:?Set KAIROS_APPLICATION_SECRETS_DIRECTORY}/vapid-private.pem
+        target: /run/secrets/vapid-private.pem
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${KAIROS_APPLICATION_SECRETS_DIRECTORY:?Set KAIROS_APPLICATION_SECRETS_DIRECTORY}/vapid-public.pem
+        target: /run/secrets/vapid-public.pem
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${KAIROS_APPLICATION_SECRETS_DIRECTORY:?Set KAIROS_APPLICATION_SECRETS_DIRECTORY}/push-subscription-encryption.bin
+        target: /run/secrets/push-subscription-encryption.bin
+        read_only: true
+        bind:
+          create_host_path: false
+
+  zitadel:
+    mem_limit: 1g
+    cpus: 1.00
+    logging: *deployment-logging
+    volumes:
+      - type: bind
+        source: ${KAIROS_APPLICATION_SECRETS_DIRECTORY:?Set KAIROS_APPLICATION_SECRETS_DIRECTORY}/zitadel-masterkey
+        target: /run/secrets/zitadel-masterkey
+        read_only: true
+        bind:
+          create_host_path: false
+
+  zitadel-bootstrap:
+    mem_limit: 128m
+    cpus: 0.25
+    logging: *deployment-logging
 
   postgres:
     mem_limit: 1g

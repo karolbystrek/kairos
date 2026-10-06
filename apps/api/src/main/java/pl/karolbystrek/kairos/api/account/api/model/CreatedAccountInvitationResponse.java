@@ -10,7 +10,7 @@ public record CreatedAccountInvitationResponse(
     UUID locationId,
     String locationName,
     pl.karolbystrek.kairos.api.account.domain.assignment.AssignmentRole role,
-    String issuedByUsername,
+    String issuedByEmail,
     Instant createdAt,
     Instant expiresAt,
     String invitationLink
@@ -28,7 +28,7 @@ public record CreatedAccountInvitationResponse(
             invitation.locationId(),
             invitation.locationName(),
             invitation.role(),
-            invitation.issuedByUsername(),
+            invitation.issuedByEmail(),
             invitation.createdAt(),
             invitation.expiresAt(),
             normalizedOrigin + "/account-registration#invitation=" + created.token()

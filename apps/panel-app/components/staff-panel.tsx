@@ -32,15 +32,15 @@ import { AccountManagement } from "@/components/account-management";
 import { BrandWordmark } from "@/components/brand-wordmark";
 import { IntegrationManagement } from "@/components/integration-management";
 import { LocationManagement } from "@/components/location-management";
+import { PasswordChangeDialog } from "@/components/password-change-dialog";
 import { PanelAppearanceMenu } from "@/components/panel-appearance-menu";
-import { TenantInvitationManagement } from "@/components/tenant-invitation-management";
-import { subscribeToAuthenticationRequired } from "@/src/api/auth-coordination";
+import { subscribeToAuthenticationRequired } from "@/src/api/auth-state";
 import { ApiError } from "@/src/api/api-fetch";
 import {
   getCurrentAccount,
   login as loginRequest,
   logout as logoutRequest,
-  type CurrentAccount,
+  type AuthenticationResult,
   type LoginCredentials,
 } from "@/src/api/authentication";
 import { isStaffCacheKey } from "@/src/api/cache-keys";
@@ -87,12 +87,15 @@ function DismissibleNotice({
 function loginMutation(
   _key: typeof currentAccountKey,
   { arg }: { arg: LoginCredentials },
-): Promise<CurrentAccount> {
+): Promise<AuthenticationResult> {
   return loginRequest(arg);
 }
 
-function logoutMutation(): Promise<boolean> {
-  return logoutRequest();
+function logoutMutation(
+  _key: typeof logoutKey,
+  { arg }: { arg: boolean },
+): Promise<boolean> {
+  return logoutRequest(arg);
 }
 
 function shouldRetryOnError(error: Error): boolean {
@@ -115,7 +118,7 @@ function getErrorMessage(error: unknown): string {
 
 function getLoginErrorMessage(error: unknown): string {
   if (error instanceof ApiError && error.status === 401) {
-    return "The username or password is incorrect.";
+    return "The email or password is incorrect.";
   }
 
   return getErrorMessage(error);
@@ -132,14 +135,14 @@ function LoginForm({
   onDismissError: () => void;
   onSubmit: (credentials: LoginCredentials) => Promise<void>;
 }) {
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (isPending) return;
 
-    await onSubmit({ username, password });
+    await onSubmit({ email, password });
     setPassword("");
   }
 
@@ -159,15 +162,16 @@ function LoginForm({
           fullWidth
           isRequired
           isDisabled={isPending}
-          maxLength={120}
-          name="username"
-          value={username}
-          onChange={setUsername}
+          maxLength={200}
+          name="email"
+          type="email"
+          value={email}
+          onChange={setEmail}
         >
-          <Label>Username</Label>
+          <Label>Email</Label>
           <Input
             autoCapitalize="none"
-            autoComplete="username"
+            autoComplete="email"
             spellCheck={false}
           />
         </TextField>
@@ -176,7 +180,7 @@ function LoginForm({
           fullWidth
           isRequired
           isDisabled={isPending}
-          maxLength={256}
+          maxLength={200}
           name="password"
           type="password"
           value={password}
@@ -191,6 +195,14 @@ function LoginForm({
           {!isPending && <ArrowRightIcon size={18} />}
         </Button>
       </form>
+      <Button
+        variant="secondary"
+        onPress={() => {
+          window.location.assign("/tenant-registration");
+        }}
+      >
+        Create account
+      </Button>
     </div>
   );
 }
@@ -280,13 +292,12 @@ export function StaffPanel() {
     const currentAccount = await triggerLogin(credentials);
 
     if (!currentAccount) return;
-
     await mutateCache(isStaffCacheKey, undefined, { revalidate: false });
     await mutateAccount(currentAccount, { revalidate: false });
   }
 
-  async function signOut() {
-    const didLogout = await triggerLogout();
+  async function signOut(everywhere = false) {
+    const didLogout = await triggerLogout(everywhere);
 
     if (!didLogout) return;
 
@@ -301,12 +312,14 @@ export function StaffPanel() {
 
   if (isUnauthorized || isSignedOut) {
     return (
-      <SignedOutPanel
-        isLoggingIn={isLoggingIn}
-        loginError={loginError}
-        onDismissLoginError={resetLogin}
-        onSignIn={signIn}
-      />
+      <>
+        <SignedOutPanel
+          isLoggingIn={isLoggingIn}
+          loginError={loginError}
+          onDismissLoginError={resetLogin}
+          onSignIn={signIn}
+        />
+      </>
     );
   }
 
@@ -350,6 +363,12 @@ export function StaffPanel() {
   );
   const utilities = (
     <div className="panel-workspace-utilities flex shrink-0 items-center gap-2">
+      <PasswordChangeDialog
+        onChanged={async () => {
+          await mutateAccount(undefined, { revalidate: false });
+          await mutateCache(isStaffCacheKey, undefined, { revalidate: false });
+        }}
+      />
       <PanelAppearanceMenu />
       <Tooltip delay={500}>
         <Tooltip.Trigger>
@@ -387,15 +406,7 @@ export function StaffPanel() {
         </Alert>
       )}
 
-      {account.kind === "PLATFORM_OPERATOR" ? (
-        <>
-          <div className="flex justify-end">{utilities}</div>
-          <TenantInvitationManagement
-            key={account.accountId}
-            accountId={account.accountId}
-          />
-        </>
-      ) : canManageAccounts || canManageLocations || canManageIntegrations ? (
+      {canManageAccounts || canManageLocations || canManageIntegrations ? (
         <Tabs
           selectedKey={selectedWorkspace}
           onSelectionChange={(key) => setSelectedWorkspace(String(key))}
@@ -520,13 +531,7 @@ export function StaffPanel() {
                 <AlertDialog.Heading>Sign out?</AlertDialog.Heading>
               </AlertDialog.Header>
               <AlertDialog.Body className="flex flex-col gap-4">
-                <p>
-                  You will need to sign in again to manage{" "}
-                  {account.kind === "PLATFORM_OPERATOR"
-                    ? "tenant invitations"
-                    : "orders"}
-                  .
-                </p>
+                <p>You will need to sign in again to manage orders.</p>
                 {logoutError && (
                   <Alert status="danger">
                     <Alert.Indicator />
@@ -540,6 +545,13 @@ export function StaffPanel() {
                 )}
               </AlertDialog.Body>
               <AlertDialog.Footer>
+                <Button
+                  isDisabled={isLoggingOut}
+                  variant="secondary"
+                  onPress={() => void signOut(true)}
+                >
+                  Sign out everywhere
+                </Button>
                 <Button
                   isDisabled={isLoggingOut}
                   slot="close"

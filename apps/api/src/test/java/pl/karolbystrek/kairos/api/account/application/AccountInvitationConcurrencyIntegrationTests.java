@@ -43,16 +43,11 @@ class AccountInvitationConcurrencyIntegrationTests extends RedisListenerIsolated
         );
         jdbcTemplate.update(
             """
-                INSERT INTO accounts (
-                    id, tenant_id, username, email, password_hash,
-                    tenant_role, status, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, 'ADMIN', 'ENABLED', ?, ?)
+                INSERT INTO accounts (id, provider_subject, tenant_id, email, tenant_role, status, created_at, updated_at) VALUES (?, CAST(RANDOM_UUID() AS VARCHAR), ?, ?, 'ADMIN', 'ENABLED', ?, ?)
                 """,
             administratorId,
             tenantId,
-            "concurrent-invitation-admin-" + administratorId,
             "concurrent-invitation-admin-" + administratorId + "@example.com",
-            "fixture-password-hash",
             now,
             now
         );
@@ -61,19 +56,19 @@ class AccountInvitationConcurrencyIntegrationTests extends RedisListenerIsolated
             locationId,
             AssignmentRole.OPERATOR
         );
-        var usernamePrefix = "concurrent-redeemer-" + UUID.randomUUID();
+        var emailPrefix = "concurrent-redeemer-" + UUID.randomUUID();
         var start = new CountDownLatch(1);
 
         try (var executor = Executors.newFixedThreadPool(2)) {
             var first = executor.submit(() -> redeemAfterStart(
                 start,
                 created.token(),
-                usernamePrefix + "-first"
+                emailPrefix + "-first"
             ));
             var second = executor.submit(() -> redeemAfterStart(
                 start,
                 created.token(),
-                usernamePrefix + "-second"
+                emailPrefix + "-second"
             ));
             start.countDown();
 
@@ -82,9 +77,9 @@ class AccountInvitationConcurrencyIntegrationTests extends RedisListenerIsolated
         }
 
         assertThat(jdbcTemplate.queryForObject(
-            "SELECT COUNT(*) FROM accounts WHERE username LIKE ?",
+            "SELECT COUNT(*) FROM accounts WHERE email LIKE ?",
             Integer.class,
-            usernamePrefix + "%"
+            emailPrefix + "%"
         )).isOne();
         assertThat(jdbcTemplate.queryForObject(
             "SELECT state FROM account_invitations WHERE id = ?",
@@ -93,16 +88,14 @@ class AccountInvitationConcurrencyIntegrationTests extends RedisListenerIsolated
         )).isEqualTo("REDEEMED");
     }
 
-    private boolean redeemAfterStart(CountDownLatch start, String token, String username)
-        throws InterruptedException {
+    private boolean redeemAfterStart(CountDownLatch start, String token, String emailPrefix)
+        throws Exception {
         start.await();
         try {
             invitationService.redeem(
-                null,
-                token,
-                username,
-                username + "@example.com",
-                "Secure-Password-12"
+                java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(token.getBytes(java.nio.charset.StandardCharsets.UTF_8))),
+                emailPrefix + "@example.com",
+                emailPrefix
             );
             return true;
         }

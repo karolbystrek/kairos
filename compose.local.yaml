@@ -41,8 +41,35 @@ services:
       target: runner
     volumes:
       - type: bind
-        source: ./secrets
-        target: /run/secrets
+        source: ./secrets/webhook-encryption.bin
+        target: /run/secrets/webhook-encryption.bin
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./secrets/vapid-private.pem
+        target: /run/secrets/vapid-private.pem
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./secrets/vapid-public.pem
+        target: /run/secrets/vapid-public.pem
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./secrets/push-subscription-encryption.bin
+        target: /run/secrets/push-subscription-encryption.bin
+        read_only: true
+        bind:
+          create_host_path: false
+
+  zitadel:
+    volumes:
+      - type: bind
+        source: ./secrets/zitadel-masterkey
+        target: /run/secrets/zitadel-masterkey
         read_only: true
         bind:
           create_host_path: false

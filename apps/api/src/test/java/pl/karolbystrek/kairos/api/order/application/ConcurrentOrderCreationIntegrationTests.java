@@ -38,7 +38,7 @@ class ConcurrentOrderCreationIntegrationTests extends RedisListenerIsolatedInteg
                     tenantId
             );
             jdbcTemplate.update(
-                    """
+            """
                     DELETE FROM order_history
                     WHERE order_id IN (
                         SELECT orders.id
@@ -146,16 +146,13 @@ class ConcurrentOrderCreationIntegrationTests extends RedisListenerIsolatedInteg
         var now = Instant.now();
         jdbcTemplate.update(
                 """
-                INSERT INTO accounts (
-                    id, tenant_id, username, email, tenant_role, status, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, 'ADMIN', 'ENABLED', ?, ?)
+                INSERT INTO accounts (id, provider_subject, tenant_id, email, tenant_role, status, created_at, updated_at) VALUES (?, CAST(RANDOM_UUID() AS VARCHAR), ?, ?, 'ADMIN', 'ENABLED', ?, ?)
                 """,
-                accountId,
-                tenantId,
-                "concurrent-admin-" + accountId,
-                "concurrent-admin-" + accountId + "@example.com",
-                now,
-                now
+            accountId,
+            tenantId,
+            "concurrent-admin-" + accountId + "@example.com",
+            now,
+            now
         );
         return new StaffPrincipal(accountId, tenantId, TenantRole.ADMIN);
     }

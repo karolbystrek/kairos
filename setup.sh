@@ -255,8 +255,7 @@ working_directory="$(mktemp -d "${secrets_parent}/.kairos-setup.XXXXXX")"
 chmod 0700 "${working_directory}"
 
 key_names="
-jwt-private.pem
-jwt-public.pem
+zitadel-masterkey
 webhook-encryption.bin
 vapid-private.pem
 vapid-public.pem
@@ -291,6 +290,8 @@ if [ -d "${secrets_directory}" ]; then
                 fail "The secrets entry is not a regular file: ${entry_name}"
             fi
             existing_key_count=$((existing_key_count + 1))
+        elif [ -f "${entry}" ] && [ ! -L "${entry}" ]; then
+            : # Externally managed files are preserved; setup does not own them.
         elif [ "${entry_name}" = tls ]; then
             if [ -L "${entry}" ] || [ ! -d "${entry}" ]; then
                 fail "The TLS secrets entry must be a regular directory."
@@ -332,35 +333,6 @@ validate_key_set() {
     mkdir -p "${validation_directory}"
 
     openssl pkey \
-        -in "${key_directory}/jwt-private.pem" \
-        -check \
-        -noout \
-        >/dev/null 2>&1 || return 1
-    openssl pkey \
-        -in "${key_directory}/jwt-private.pem" \
-        -pubout \
-        -out "${validation_directory}/jwt-derived.pem" \
-        >/dev/null 2>&1 || return 1
-    openssl pkey \
-        -pubin \
-        -in "${key_directory}/jwt-public.pem" \
-        -pubout \
-        -out "${validation_directory}/jwt-normalized.pem" \
-        >/dev/null 2>&1 || return 1
-    cmp -s \
-        "${validation_directory}/jwt-derived.pem" \
-        "${validation_directory}/jwt-normalized.pem" || return 1
-    openssl pkey \
-        -pubin \
-        -in "${key_directory}/jwt-public.pem" \
-        -text \
-        -noout \
-        > "${validation_directory}/jwt-details.txt" \
-        2>/dev/null || return 1
-    grep -Eq 'Public-Key: \(3072 bit\)' \
-        "${validation_directory}/jwt-details.txt" || return 1
-
-    openssl pkey \
         -in "${key_directory}/vapid-private.pem" \
         -check \
         -noout \
@@ -391,7 +363,8 @@ validate_key_set() {
 
     for encryption_key in \
         "${key_directory}/webhook-encryption.bin" \
-        "${key_directory}/push-subscription-encryption.bin"; do
+        "${key_directory}/push-subscription-encryption.bin" \
+        "${key_directory}/zitadel-masterkey"; do
         key_size="$(wc -c < "${encryption_key}" | tr -d ' ')" || return 1
         [ "${key_size}" -eq 32 ] || return 1
     done
@@ -422,7 +395,7 @@ validate_tls_pair() {
 }
 
 key_set_status=absent
-if [ "${existing_key_count}" -eq 6 ]; then
+if [ "${existing_key_count}" -eq 5 ]; then
     if validate_key_set "${secrets_directory}"; then
         key_set_status=valid
     else
@@ -445,7 +418,7 @@ case "${key_action}" in
                 final_key_action=reuse
                 ;;
             partial)
-                fail "Cannot keep a partial application key set (${existing_key_count} of 6 files)."
+                fail "Cannot keep a partial application key set (${existing_key_count} of 5 files)."
                 ;;
             invalid)
                 fail "Cannot keep the existing invalid application key set."
@@ -472,7 +445,7 @@ case "${key_action}" in
                 if [ "${non_interactive}" = true ]; then
                     fail "A partial application key set requires --replace-keys in non-interactive mode."
                 fi
-                prompt_yes_no "Replace the partial application key set (${existing_key_count} of 6 files)?" no
+                prompt_yes_no "Replace the partial application key set (${existing_key_count} of 5 files)?" no
                 [ "${prompt_result}" = yes ] || fail "Setup stopped without replacing the partial application key set."
                 final_key_action=generate
                 ;;
@@ -527,15 +500,11 @@ mkdir "${new_secrets_directory}"
 chmod 0700 "${new_secrets_directory}"
 
 if [ "${final_key_action}" = generate ]; then
-    openssl genpkey \
-        -quiet \
-        -algorithm RSA \
-        -pkeyopt rsa_keygen_bits:3072 \
-        -out "${new_secrets_directory}/jwt-private.pem"
-    openssl pkey \
-        -in "${new_secrets_directory}/jwt-private.pem" \
-        -pubout \
-        -out "${new_secrets_directory}/jwt-public.pem"
+    if [ -f "${secrets_directory}/zitadel-masterkey" ]; then
+        cp "${secrets_directory}/zitadel-masterkey" "${new_secrets_directory}/zitadel-masterkey"
+    else
+        openssl rand -hex 16 | tr -d '\n' > "${new_secrets_directory}/zitadel-masterkey"
+    fi
     openssl rand \
         -out "${new_secrets_directory}/webhook-encryption.bin" \
         32
@@ -560,6 +529,14 @@ fi
 
 for key_name in ${key_names}; do
     chmod 0400 "${new_secrets_directory}/${key_name}"
+done
+
+# Preserve externally managed regular files without provider-specific handling.
+for preserved_file in "${secrets_directory}"/* "${secrets_directory}"/.[!.]* "${secrets_directory}"/..?*; do
+    [ -f "${preserved_file}" ] && [ ! -L "${preserved_file}" ] || continue
+    preserved_name="$(basename -- "${preserved_file}")"
+    is_key_name "${preserved_name}" && continue
+    cp -p "${preserved_file}" "${new_secrets_directory}/${preserved_name}"
 done
 
 validate_key_set "${new_secrets_directory}" || fail "The prepared application key set failed validation."
@@ -638,5 +615,7 @@ case "${tls_action}:${existing_tls_status}" in
         echo "Skipped TLS certificate generation."
         ;;
 esac
+
+echo "ZITADEL initializes its database and API credentials on first Compose startup. Keep zitadel-masterkey stable while its database is retained."
 
 trap - EXIT HUP INT TERM

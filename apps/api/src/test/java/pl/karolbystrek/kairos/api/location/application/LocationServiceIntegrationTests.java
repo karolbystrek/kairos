@@ -93,7 +93,7 @@ class LocationServiceIntegrationTests extends RedisListenerIsolatedIntegrationTe
         assertThat(value("accounts", "status", manager.accountId())).isEqualTo("ENABLED");
         assertThat(value("account_invitations", "state", invitationId)).isEqualTo("PENDING");
         assertThat(jdbcTemplate.queryForObject(
-            "SELECT revoked_at IS NULL FROM sessions WHERE id = ?",
+            "SELECT authentication_cutoff IS NULL FROM accounts WHERE id = ?",
             Boolean.class,
             sessionId
         )).isTrue();
@@ -119,7 +119,7 @@ class LocationServiceIntegrationTests extends RedisListenerIsolatedIntegrationTe
         assertThat(value("accounts", "status", operator.accountId())).isEqualTo("DISABLED");
         assertThat(value("account_invitations", "state", invitationId)).isEqualTo("REVOKED");
         assertThat(jdbcTemplate.queryForObject(
-            "SELECT revoked_at IS NOT NULL FROM sessions WHERE id = ?",
+            "SELECT authentication_cutoff IS NOT NULL FROM accounts WHERE id = ?",
             Boolean.class,
             managerSession
         )).isTrue();
@@ -135,7 +135,7 @@ class LocationServiceIntegrationTests extends RedisListenerIsolatedIntegrationTe
         assertThat(value("accounts", "status", manager.accountId())).isEqualTo("ARCHIVED");
         assertThat(value("accounts", "status", operator.accountId())).isEqualTo("ARCHIVED");
         assertThat(jdbcTemplate.queryForObject(
-            "SELECT password_hash IS NULL FROM accounts WHERE id = ?",
+            "SELECT authentication_cutoff IS NOT NULL FROM accounts WHERE id = ?",
             Boolean.class,
             manager.accountId()
         )).isTrue();
@@ -181,16 +181,11 @@ class LocationServiceIntegrationTests extends RedisListenerIsolatedIntegrationTe
         var now = Instant.now();
         jdbcTemplate.update(
             """
-            INSERT INTO accounts (
-                id, tenant_id, username, email, password_hash,
-                tenant_role, status, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO accounts (id, provider_subject, tenant_id, email, tenant_role, status, created_at, updated_at) VALUES (?, CAST(RANDOM_UUID() AS VARCHAR), ?, ?, ?, ?, ?, ?)
             """,
             accountId,
             tenantId,
-            "location-test-" + accountId,
             "location-test-" + accountId + "@example.com",
-            "fixture-password-hash",
             tenantRole.name(),
             status.name(),
             now,
@@ -222,22 +217,7 @@ class LocationServiceIntegrationTests extends RedisListenerIsolatedIntegrationTe
     }
 
     private UUID insertSession(UUID accountId) {
-        var id = UUID.randomUUID();
-        var now = Instant.now();
-        jdbcTemplate.update(
-            """
-            INSERT INTO sessions (
-                id, account_id, refresh_token_hash, token_family_id, created_at, expires_at
-            ) VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            id,
-            accountId,
-            "hash-" + id,
-            id,
-            now,
-            now.plus(1, ChronoUnit.DAYS)
-        );
-        return id;
+        return accountId;
     }
 
     private UUID insertInvitation(UUID tenantId, UUID locationId, UUID issuerId) {

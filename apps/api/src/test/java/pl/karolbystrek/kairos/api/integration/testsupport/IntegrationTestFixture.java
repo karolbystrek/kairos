@@ -23,7 +23,7 @@ public final class IntegrationTestFixture {
         var now = Instant.parse("2026-07-26T10:00:00Z");
         jdbcTemplate.update("INSERT INTO tenants (id) VALUES (?)", tenantId);
         jdbcTemplate.update(
-                """
+            """
                 INSERT INTO locations (
                     id, tenant_id, name, normalized_name, live_normalized_name,
                     created_at, updated_at, last_enabled_at
@@ -72,17 +72,14 @@ public final class IntegrationTestFixture {
         var now = Instant.parse("2026-07-26T10:00:00Z");
         jdbcTemplate.update(
                 """
-                INSERT INTO accounts (
-                    id, tenant_id, username, email, tenant_role, status, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, 'ENABLED', ?, ?)
+                INSERT INTO accounts (id, provider_subject, tenant_id, email, tenant_role, status, created_at, updated_at) VALUES (?, CAST(RANDOM_UUID() AS VARCHAR), ?, ?, ?, 'ENABLED', ?, ?)
                 """,
-                accountId,
-                tenantId,
-                "integration-test-" + accountId,
-                "integration-test-" + accountId + "@example.com",
-                tenantRole.name(),
-                now,
-                now
+            accountId,
+            tenantId,
+            "integration-test-" + accountId + "@example.com",
+            tenantRole.name(),
+            now,
+            now
         );
         if (locationId != null) {
             jdbcTemplate.update(

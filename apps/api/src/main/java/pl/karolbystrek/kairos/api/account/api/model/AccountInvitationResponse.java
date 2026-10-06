@@ -11,7 +11,7 @@ public record AccountInvitationResponse(
     UUID locationId,
     String locationName,
     AssignmentRole role,
-    String issuedByUsername,
+    String issuedByEmail,
     Instant createdAt,
     Instant expiresAt
 ) {
@@ -21,7 +21,7 @@ public record AccountInvitationResponse(
             invitation.locationId(),
             invitation.locationName(),
             invitation.role(),
-            invitation.issuedByUsername(),
+            invitation.issuedByEmail(),
             invitation.createdAt(),
             invitation.expiresAt()
         );

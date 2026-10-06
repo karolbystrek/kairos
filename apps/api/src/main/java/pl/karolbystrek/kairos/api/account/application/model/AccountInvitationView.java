@@ -11,7 +11,7 @@ public record AccountInvitationView(
     @NonNull UUID locationId,
     @NonNull String locationName,
     @NonNull AssignmentRole role,
-    @NonNull String issuedByUsername,
+    @NonNull String issuedByEmail,
     @NonNull Instant createdAt,
     @NonNull Instant expiresAt
 ) {

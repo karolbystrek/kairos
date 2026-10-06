@@ -22,7 +22,7 @@ fi
 
 echo "Stopping Kairos and removing its containers and volumes..."
 if [ -f ".env" ] || [ -L ".env" ]; then
-    docker compose down -v --remove-orphans
+    docker compose --env-file .env.example --env-file .env down -v --remove-orphans
 else
     echo "No .env found; using .env.example for Docker Compose."
     docker compose --env-file .env.example down -v --remove-orphans
@@ -37,8 +37,7 @@ chmod 0600 ".env"
 echo "Copied .env.example to .env with mode 0600."
 
 rm -f \
-    "secrets/jwt-private.pem" \
-    "secrets/jwt-public.pem" \
+    "secrets/zitadel-masterkey" \
     "secrets/webhook-encryption.bin" \
     "secrets/vapid-private.pem" \
     "secrets/vapid-public.pem" \
@@ -48,4 +47,4 @@ rm -f \
 echo "Removed generated signing, encryption, and local TLS keys."
 
 echo
-echo "Reset complete. Run ./setup.sh to start Kairos."
+echo "Reset complete. Run ./setup.sh, then docker compose up --build to start Kairos."

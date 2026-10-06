@@ -4,6 +4,14 @@ import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 import org.springframework.test.context.bean.override.convention.TestBean;
 
 public abstract class RedisListenerIsolatedIntegrationTest {
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    protected pl.karolbystrek.kairos.api.authentication.infrastructure.zitadel.ZitadelClient identityProvider;
+
+    @org.junit.jupiter.api.BeforeEach
+    void rejectUnconfiguredProviderCalls() {
+        org.mockito.Mockito.when(identityProvider.signIn(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString()))
+            .thenThrow(new pl.karolbystrek.kairos.api.authentication.application.exception.InvalidLoginException());
+    }
 
     @TestBean(enforceOverride = true)
     private RedisMessageListenerContainer orderStatusRedisListenerContainer;

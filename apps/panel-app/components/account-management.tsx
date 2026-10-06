@@ -435,7 +435,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
             {accounts.map((managedAccount) => (
               <PanelCard
                 key={managedAccount.id}
-                accessibilityLabel={`View account ${managedAccount.username}`}
+                accessibilityLabel={`View account ${managedAccount.email}`}
                 isSelected={managedAccount.id === selectedAccount?.id}
                 metadata={
                   <span
@@ -450,7 +450,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
                       : "Disabled"}
                   </span>
                 }
-                title={managedAccount.username}
+                title={managedAccount.email}
                 trailing={<ArrowRightIcon size={17} />}
                 onPress={() => setSelectedAccountId(managedAccount.id)}
               />
@@ -461,14 +461,14 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
             <section className="min-w-0">
               <PanelDetailHeader
                 eyebrow="Account"
-                title={selectedAccount.username}
+                title={selectedAccount.email}
                 trailingActions={
                   <>
                     <Tooltip delay={500}>
                       <Tooltip.Trigger>
                         <Button
                           isIconOnly
-                          aria-label={`${selectedAccount.status === "ENABLED" ? "Disable" : "Enable"} account ${selectedAccount.username}`}
+                          aria-label={`${selectedAccount.status === "ENABLED" ? "Disable" : "Enable"} account ${selectedAccount.email}`}
                           className="shrink-0 rounded-md"
                           isPending={isChangingStatus}
                           variant={
@@ -501,7 +501,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
                       <Tooltip.Trigger>
                         <Button
                           isIconOnly
-                          aria-label={`Delete account ${selectedAccount.username}`}
+                          aria-label={`Delete account ${selectedAccount.email}`}
                           className="shrink-0 rounded-md"
                           variant="danger"
                           onPress={() => {
@@ -724,7 +724,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
                             </span>
                           </p>
                           <p className="mt-1 text-sm text-muted">
-                            Created by {invitation.issuedByUsername} on{" "}
+                            Created by {invitation.issuedByEmail} on{" "}
                             {formatDateTime(invitation.createdAt)}
                           </p>
                           <p className="mt-1 text-sm text-muted">
@@ -823,7 +823,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
               <AlertDialog.Header>
                 <AlertDialog.Icon status="warning" />
                 <AlertDialog.Heading>
-                  Disable {accountToDisable?.username}?
+                  Disable {accountToDisable?.email}?
                 </AlertDialog.Heading>
               </AlertDialog.Header>
               <AlertDialog.Body>
@@ -869,7 +869,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
               <AlertDialog.Header>
                 <AlertDialog.Icon status="danger" />
                 <AlertDialog.Heading>
-                  Delete {accountToDelete?.username}?
+                  Delete {accountToDelete?.email}?
                 </AlertDialog.Heading>
               </AlertDialog.Header>
               <AlertDialog.Body className="flex flex-col gap-4">
@@ -885,7 +885,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
                   value={deleteConfirmation}
                   onChange={setDeleteConfirmation}
                 >
-                  <Label>Type {accountToDelete?.username} to confirm</Label>
+                  <Label>Type {accountToDelete?.email} to confirm</Label>
                   <Input autoComplete="off" />
                 </TextField>
                 {deletionError && (
@@ -905,7 +905,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
                   Cancel
                 </Button>
                 <Button
-                  isDisabled={deleteConfirmation !== accountToDelete?.username}
+                  isDisabled={deleteConfirmation !== accountToDelete?.email}
                   isPending={isDeleting}
                   variant="danger"
                   onPress={() => void removeAccount()}

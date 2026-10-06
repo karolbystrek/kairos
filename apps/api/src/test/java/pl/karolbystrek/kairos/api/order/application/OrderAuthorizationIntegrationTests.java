@@ -141,13 +141,10 @@ class OrderAuthorizationIntegrationTests extends RedisListenerIsolatedIntegratio
         var now = Instant.now();
         jdbcTemplate.update(
             """
-            INSERT INTO accounts (
-                id, tenant_id, username, email, tenant_role, status, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO accounts (id, provider_subject, tenant_id, email, tenant_role, status, created_at, updated_at) VALUES (?, CAST(RANDOM_UUID() AS VARCHAR), ?, ?, ?, ?, ?, ?)
             """,
             accountId,
             accountTenantId,
-            "account-" + accountId,
             "account-" + accountId + "@example.com",
             tenantRole.name(),
             accountStatus,

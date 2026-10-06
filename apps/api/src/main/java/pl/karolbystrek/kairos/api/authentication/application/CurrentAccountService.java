@@ -6,9 +6,7 @@ import org.springframework.transaction.annotation.Transactional;
 import pl.karolbystrek.kairos.api.account.application.StaffAccessService;
 import pl.karolbystrek.kairos.api.account.application.exception.StaffAccessDeniedException;
 import pl.karolbystrek.kairos.api.account.application.model.PanelPrincipal;
-import pl.karolbystrek.kairos.api.account.application.model.PlatformOperatorPrincipal;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
-import pl.karolbystrek.kairos.api.account.domain.AccountKind;
 import pl.karolbystrek.kairos.api.account.domain.assignment.AssignmentRole;
 import pl.karolbystrek.kairos.api.account.infrastructure.persistence.AccountRepository;
 import pl.karolbystrek.kairos.api.authentication.application.model.CurrentAccountView;
@@ -27,9 +25,6 @@ public class CurrentAccountService {
 
     @Transactional(readOnly = true)
     public CurrentAccountView get(PanelPrincipal principal) {
-        if (principal instanceof PlatformOperatorPrincipal operatorPrincipal) {
-            return getOperator(operatorPrincipal);
-        }
         if (!(principal instanceof StaffPrincipal staffPrincipal)) {
             throw new StaffAccessDeniedException("The panel account is not eligible");
         }
@@ -68,10 +63,9 @@ public class CurrentAccountService {
             capabilities.add("INVITE_OPERATORS");
         }
 
-        return new CurrentAccountView.TenantAccountView(
+        return new CurrentAccountView(
             account.getId(),
-            account.getUsername(),
-            AccountKind.TENANT_ACCOUNT,
+            account.getEmail(),
             account.getTenantId(),
             account.getTenantRole(),
             assignment,
@@ -79,17 +73,4 @@ public class CurrentAccountService {
         );
     }
 
-    private CurrentAccountView getOperator(PlatformOperatorPrincipal principal) {
-        var account = accountRepository.findById(principal.accountId())
-            .orElseThrow(() -> new StaffAccessDeniedException("The panel account is not eligible"));
-        if (account.getKind() != AccountKind.PLATFORM_OPERATOR || !account.isEnabled()) {
-            throw new StaffAccessDeniedException("The panel account is not eligible");
-        }
-        return new CurrentAccountView.PlatformOperatorView(
-            account.getId(),
-            account.getUsername(),
-            AccountKind.PLATFORM_OPERATOR,
-            List.of("MANAGE_TENANT_REGISTRATION_INVITATIONS")
-        );
-    }
 }

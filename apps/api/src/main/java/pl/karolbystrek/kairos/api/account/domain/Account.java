@@ -23,21 +23,17 @@ public class Account {
     @Id
     private UUID id;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 32)
-    private AccountKind kind;
-
     @Column(name = "tenant_id")
     private UUID tenantId;
-
-    @Column(nullable = false, unique = true, length = 120)
-    private String username;
 
     @Column(nullable = false, unique = true, length = 254)
     private String email;
 
-    @Column(name = "password_hash", length = 255)
-    private String passwordHash;
+    @Column(name = "provider_subject", unique = true, length = 128)
+    private String providerSubject;
+
+    @Column(name = "authentication_cutoff")
+    private Instant authenticationCutoff;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "tenant_role", length = 32)
@@ -56,78 +52,29 @@ public class Account {
     @Column(name = "archived_at")
     private Instant archivedAt;
 
-    public static Account provisionMember(
-        @NonNull UUID tenantId,
-        @NonNull String username,
-        @NonNull String email,
-        @NonNull String passwordHash,
-        @NonNull Instant now
-    ) {
-        return provision(
-            tenantId,
-            username,
-            email,
-            passwordHash,
-            TenantRole.MEMBER,
-            now
-        );
+    public static Account provisionMember(UUID tenantId, String email, String providerSubject, Instant now) {
+        return provision(tenantId, email, providerSubject, TenantRole.MEMBER, now);
     }
 
-    public static Account provisionAdministrator(
-        @NonNull UUID tenantId,
-        @NonNull String username,
-        @NonNull String email,
-        @NonNull String passwordHash,
-        @NonNull Instant now
-    ) {
-        return provision(
-            tenantId,
-            username,
-            email,
-            passwordHash,
-            TenantRole.ADMIN,
-            now
-        );
+    public static Account provisionAdministrator(UUID tenantId, String email, String providerSubject, Instant now) {
+        return provision(tenantId, email, providerSubject, TenantRole.ADMIN, now);
     }
 
-    public static Account provisionPlatformOperator(
-        @NonNull String username,
-        @NonNull String email,
-        @NonNull String passwordHash,
-        @NonNull Instant now
-    ) {
+    private static Account provision(UUID tenantId, String email, String providerSubject, TenantRole role, Instant now) {
         var account = new Account();
         account.id = UUID.randomUUID();
-        account.kind = AccountKind.PLATFORM_OPERATOR;
-        account.username = username;
-        account.email = email;
-        account.passwordHash = passwordHash;
-        account.status = AccountStatus.ENABLED;
-        account.createdAt = now;
-        account.updatedAt = now;
-        return account;
-    }
-
-    private static Account provision(
-        UUID tenantId,
-        String username,
-        String email,
-        String passwordHash,
-        TenantRole tenantRole,
-        Instant now
-    ) {
-        var account = new Account();
-        account.id = UUID.randomUUID();
-        account.kind = AccountKind.TENANT_ACCOUNT;
         account.tenantId = tenantId;
-        account.username = username;
         account.email = email;
-        account.passwordHash = passwordHash;
-        account.tenantRole = tenantRole;
+        account.providerSubject = providerSubject;
+        account.tenantRole = role;
         account.status = AccountStatus.ENABLED;
         account.createdAt = now;
         account.updatedAt = now;
         return account;
+    }
+
+    public void revokeAuthentication(Instant now) {
+        authenticationCutoff = now;
     }
 
     public void enable(@NonNull Instant now) {
@@ -141,14 +88,10 @@ public class Account {
     }
 
     public void archive(@NonNull Instant now) {
-        if (kind == AccountKind.PLATFORM_OPERATOR) {
-            throw new IllegalStateException("Platform Operator accounts cannot be archived");
-        }
         if (isArchived()) {
             return;
         }
         status = AccountStatus.ARCHIVED;
-        passwordHash = null;
         archivedAt = now;
         updatedAt = now;
     }

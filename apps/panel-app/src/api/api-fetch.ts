@@ -1,9 +1,6 @@
 import { z } from "zod";
 
-import {
-  notifyAuthenticationRequired,
-  withAuthCookieLock,
-} from "./auth-coordination";
+import { notifyAuthenticationRequired } from "./auth-state";
 
 import { apiBaseUrl } from "@/src/config/public-environment";
 
@@ -25,7 +22,7 @@ const problemDetailsSchema = z.object({
 });
 
 type ApiFetchOptions = {
-  retryUnauthorized?: boolean;
+  notifyUnauthorized?: boolean;
 };
 
 type ProblemDetails = z.infer<typeof problemDetailsSchema>;
@@ -133,13 +130,7 @@ export function initializeCsrf(): Promise<string> {
   return csrfInitialization;
 }
 
-export async function refreshCsrf(): Promise<string> {
-  resetCsrf();
-
-  return initializeCsrf();
-}
-
-function resetCsrf(): void {
+export function resetCsrf(): void {
   csrfToken = undefined;
 }
 
@@ -181,55 +172,19 @@ async function sendWithCsrfRecovery(
   return send(url, init);
 }
 
-async function recoverSessionAndRetry(
-  url: string,
-  init: RequestInit | undefined,
-  isAuthCookieLockHeld: boolean,
-): Promise<Response> {
-  const recoverAndRetry = async () => {
-    const currentSession = await sendWithCsrfRecovery("/api/auth/v1/me");
-
-    if (!currentSession.ok && currentSession.status !== 401) {
-      throw await ApiError.fromResponse(currentSession);
-    }
-
-    if (currentSession.status === 401) {
-      const refresh = await sendWithCsrfRecovery("/api/auth/v1/refresh", {
-        method: "POST",
-      });
-
-      if (!refresh.ok) return refresh;
-    }
-
-    return sendWithCsrfRecovery(url, init);
-  };
-
-  if (isAuthCookieLockHeld) {
-    return recoverAndRetry();
-  }
-
-  return withAuthCookieLock(recoverAndRetry);
-}
-
 async function apiFetchInternal(
   url: string,
   init: RequestInit | undefined,
   options: ApiFetchOptions | undefined,
-  isAuthCookieLockHeld: boolean,
 ): Promise<Response> {
-  let response = await sendWithCsrfRecovery(url, init);
-
-  if (response.status === 401 && options?.retryUnauthorized !== false) {
-    response = await recoverSessionAndRetry(url, init, isAuthCookieLockHeld);
-  }
+  const response = await sendWithCsrfRecovery(url, init);
 
   if (!response.ok) {
     const error = await ApiError.fromResponse(response);
 
-    if (error.status === 401 && options?.retryUnauthorized !== false) {
+    if (error.status === 401 && options?.notifyUnauthorized !== false) {
       notifyAuthenticationRequired();
     }
-
     throw error;
   }
 
@@ -242,20 +197,7 @@ export async function apiFetch(
   options?: ApiFetchOptions,
 ): Promise<Response> {
   try {
-    return await apiFetchInternal(url, init, options, false);
-  } catch (error) {
-    logTechnicalError("Panel API request failed.", error);
-    throw error;
-  }
-}
-
-export async function apiFetchWhileAuthLocked(
-  url: string,
-  init?: RequestInit,
-  options?: ApiFetchOptions,
-): Promise<Response> {
-  try {
-    return await apiFetchInternal(url, init, options, true);
+    return await apiFetchInternal(url, init, options);
   } catch (error) {
     logTechnicalError("Panel API request failed.", error);
     throw error;
@@ -283,17 +225,6 @@ export async function request<T>(
   options?: ApiFetchOptions,
 ): Promise<T> {
   const response = await apiFetch(url, init, options);
-
-  return parseResponse(response, schema);
-}
-
-export async function requestWhileAuthLocked<T>(
-  url: string,
-  schema: z.ZodType<T>,
-  init?: RequestInit,
-  options?: ApiFetchOptions,
-): Promise<T> {
-  const response = await apiFetchWhileAuthLocked(url, init, options);
 
   return parseResponse(response, schema);
 }

@@ -1,4 +1,9 @@
 spring:
+  session:
+    timeout: 30d
+    jdbc:
+      initialize-schema: never
+      platform: postgresql
   application:
     name: api
   jpa:
@@ -39,17 +44,8 @@ kairos:
     panel: "${PANEL_APP_URL}"
     api: "${NEXT_PUBLIC_API_BASE_URL}"
   authentication:
-    jwt:
-      issuer: "${JWT_ISSUER:https://api.localhost}"
-      audience: kairos-panel
-      access-lifetime: 5m
-      public-key-location: "file:/run/secrets/jwt-public.pem"
-      private-key-location: "file:/run/secrets/jwt-private.pem"
-    refresh:
-      idle-lifetime: 7d
-      absolute-lifetime: 30d
-    password:
-      bcrypt-strength: 12
+    base-url: "${ZITADEL_API_URL:http://zitadel:8080}"
+    token-location: "${ZITADEL_TOKEN_LOCATION:file:/run/zitadel/kairos.pat}"
   webhooks:
     signing:
       encryption-key-location: "file:/run/secrets/webhook-encryption.bin"

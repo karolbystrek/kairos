@@ -6,98 +6,110 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
+import pl.karolbystrek.kairos.api.account.application.StaffAccessService;
 import pl.karolbystrek.kairos.api.account.application.model.PanelPrincipal;
-import pl.karolbystrek.kairos.api.authentication.api.model.CsrfTokenResponse;
-import pl.karolbystrek.kairos.api.authentication.api.model.CurrentAccountResponse;
-import pl.karolbystrek.kairos.api.authentication.api.model.LoginRequest;
-import pl.karolbystrek.kairos.api.authentication.application.AuthenticationSessionService;
-import pl.karolbystrek.kairos.api.authentication.application.CurrentAccountService;
-import pl.karolbystrek.kairos.api.authentication.application.LocalAuthenticationService;
-import pl.karolbystrek.kairos.api.authentication.application.exception.InvalidRefreshCredentialException;
-import pl.karolbystrek.kairos.api.authentication.infrastructure.web.AuthenticationCookieService;
+import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
+import pl.karolbystrek.kairos.api.account.infrastructure.persistence.AccountRepository;
+import pl.karolbystrek.kairos.api.authentication.api.model.*;
+import pl.karolbystrek.kairos.api.authentication.application.*;
+import pl.karolbystrek.kairos.api.authentication.application.exception.InvalidLoginException;
+import pl.karolbystrek.kairos.api.authentication.infrastructure.zitadel.ZitadelClient;
 import pl.karolbystrek.kairos.api.authentication.infrastructure.web.CsrfTokenService;
 
+import java.util.Locale;
+
 @RestController
-@RequestMapping("/auth/v1")
 @RequiredArgsConstructor
-class AuthenticationController {
+public class AuthenticationController {
+    private final ZitadelClient provider;
+    private final OnboardingService onboarding;
+    private final AuthenticationSessionService sessions;
+    private final CurrentAccountService current;
+    private final AccountRepository accounts;
+    private final StaffAccessService access;
+    private final CsrfTokenService csrf;
 
-    private final LocalAuthenticationService localAuthenticationService;
-    private final AuthenticationSessionService sessionService;
-    private final CurrentAccountService currentAccountService;
-    private final AuthenticationCookieService cookieService;
-    private final CsrfTokenService csrfTokenService;
+    @GetMapping("/auth/v1/csrf")
+    CsrfTokenResponse csrf(HttpServletRequest request) { return new CsrfTokenResponse(csrf.current(request).getToken()); }
 
-    @GetMapping("/csrf")
-    CsrfTokenResponse csrf(HttpServletRequest request) {
-        var csrfToken = csrfTokenService.current(request);
-        return new CsrfTokenResponse(csrfToken.getToken());
-    }
-
-    @PostMapping("/login")
-    CurrentAccountResponse login(
-        @Valid @RequestBody LoginRequest request,
-        HttpServletRequest servletRequest,
-        HttpServletResponse servletResponse
-    ) {
-        var session = localAuthenticationService.authenticate(
-            request.username(),
-            request.password()
-        );
-        var account = currentAccountService.get(session.principal());
-        var currentAccount = CurrentAccountResponse.from(account);
-        cookieService.write(servletResponse, session);
-        csrfTokenService.rotate(servletRequest, servletResponse);
-        return currentAccount;
-    }
-
-    @PostMapping("/refresh")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    void refresh(HttpServletRequest request, HttpServletResponse response) {
-        var refreshCredential = cookieService.readRefreshCredential(request);
+    @PostMapping("/auth/v1/login")
+    CurrentAccountResponse login(@Valid @RequestBody LoginRequest input, HttpServletRequest request, HttpServletResponse response) {
+        var identity = provider.signIn(normalize(input.email()), input.password());
         try {
-            var session = sessionService.rotate(refreshCredential);
-            cookieService.write(response, session);
-        }
-        catch (InvalidRefreshCredentialException exception) {
-            cookieService.clear(response);
+            var account = accounts.findByProviderSubject(identity.userId()).orElseThrow(InvalidLoginException::new);
+            var principal = new StaffPrincipal(account.getId(), account.getTenantId(), account.getTenantRole());
+            access.resolve(principal);
+            return finish(principal, identity, request, response);
+        } catch (RuntimeException exception) {
+            provider.terminate(identity);
             throw exception;
         }
     }
 
-    @PostMapping("/logout")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    void logout(
-        @AuthenticationPrincipal PanelPrincipal principal,
-        HttpServletRequest request,
-        HttpServletResponse response
-    ) {
-        sessionService.logout(principal, cookieService.readRefreshCredential(request));
-        cookieService.clear(response);
-        csrfTokenService.rotate(request, response);
+    @PostMapping("/tenant-registrations/v1")
+    CurrentAccountResponse registerTenant(@Valid @RequestBody RegistrationRequest input,
+            HttpServletRequest request, HttpServletResponse response) {
+        return register(input, false, request, response);
     }
 
-    @PostMapping("/logout-all")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    void logoutAll(
-        @AuthenticationPrincipal PanelPrincipal principal,
-        HttpServletRequest request,
-        HttpServletResponse response
-    ) {
-        sessionService.logoutAll(principal);
-        cookieService.clear(response);
-        csrfTokenService.rotate(request, response);
+    @PostMapping("/account-invitation-redemptions/v1")
+    CurrentAccountResponse redeemInvitation(@Valid @RequestBody RegistrationRequest input,
+            HttpServletRequest request, HttpServletResponse response) {
+        return register(input, true, request, response);
     }
 
-    @GetMapping("/me")
+    private CurrentAccountResponse register(RegistrationRequest input, boolean invited,
+            HttpServletRequest request, HttpServletResponse response) {
+        var existing = request.getSession(false);
+        if ((existing != null && existing.getAttribute(AuthenticationSessionService.IDENTITY) != null)
+            || (org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication() != null
+                && org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getPrincipal() instanceof PanelPrincipal))
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Sign out before registering");
+        if (invited && (input.token() == null || input.token().isBlank()))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invitation is required");
+        var registration = onboarding.register(normalize(input.email()), input.password(), invited ? input.token() : null);
+        return finish(registration.principal(), registration.session(), request, response);
+    }
+
+    private CurrentAccountResponse finish(StaffPrincipal principal, ZitadelClient.ProviderSession identity,
+            HttpServletRequest request, HttpServletResponse response) {
+        var result = CurrentAccountResponse.from(current.get(principal));
+        sessions.establish(request, principal, identity);
+        csrf.rotate(request, response);
+        return result;
+    }
+
+    @PostMapping("/auth/v1/logout")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void logout(HttpServletRequest request, HttpServletResponse response) {
+        sessions.logout(request);
+        csrf.rotate(request, response);
+    }
+
+    @PostMapping("/auth/v1/logout-all")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void logoutAll(@AuthenticationPrincipal PanelPrincipal principal, HttpServletRequest request, HttpServletResponse response) {
+        sessions.logoutAll(principal);
+        sessions.logout(request);
+        csrf.rotate(request, response);
+    }
+
+    @PostMapping("/auth/v1/password")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void changePassword(@AuthenticationPrincipal PanelPrincipal principal, @Valid @RequestBody ChangePasswordRequest input,
+            HttpServletRequest request, HttpServletResponse response) {
+        var account = accounts.findById(principal.accountId()).orElseThrow(InvalidLoginException::new);
+        provider.changePassword(account.getProviderSubject(), input.currentPassword(), input.password());
+        sessions.logoutAll(principal);
+        sessions.logout(request);
+        csrf.rotate(request, response);
+    }
+
+    @GetMapping("/auth/v1/me")
     CurrentAccountResponse me(@AuthenticationPrincipal PanelPrincipal principal) {
-        var account = currentAccountService.get(principal);
-        return CurrentAccountResponse.from(account);
+        return CurrentAccountResponse.from(current.get(principal));
     }
+    private static String normalize(String email) { return email.strip().toLowerCase(Locale.ROOT); }
 }

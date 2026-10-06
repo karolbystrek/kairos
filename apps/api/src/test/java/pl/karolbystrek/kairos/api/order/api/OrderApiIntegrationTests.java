@@ -75,17 +75,14 @@ class OrderApiIntegrationTests extends RedisListenerIsolatedIntegrationTest {
                 "test location"
         );
         jdbcTemplate.update(
-                """
-                INSERT INTO accounts (
-                    id, tenant_id, username, email, tenant_role, status, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, 'ADMIN', 'ENABLED', ?, ?)
+            """
+                INSERT INTO accounts (id, provider_subject, tenant_id, email, tenant_role, status, created_at, updated_at) VALUES (?, CAST(RANDOM_UUID() AS VARCHAR), ?, ?, 'ADMIN', 'ENABLED', ?, ?)
                 """,
-                accountId,
-                tenantId,
-                "order-api-admin-" + accountId,
-                "order-api-admin-" + accountId + "@example.com",
-                now,
-                now
+            accountId,
+            tenantId,
+            "order-api-admin-" + accountId + "@example.com",
+            now,
+            now
         );
     }
 
