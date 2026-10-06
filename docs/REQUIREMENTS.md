@@ -1127,6 +1127,46 @@ WebSocket independently rather than changing the SSE or Web Push contracts.
 
 ## 7. Routing and Deployment
 
+### Accepted public-deployment target (2026-10-06)
+
+The next deployment increment prepares public production on one x86-64 Linux VM
+running the complete Docker Compose stack. Cloudflare manages DNS and proxies
+three same-site customer, panel, and API hostnames to NGINX. Cloudflare Tunnel
+and private-staging Cloudflare Access are removed from the target topology.
+NGINX uses an externally mounted Cloudflare Origin CA certificate with Full
+(strict) edge-to-origin encryption; Cloudflare manages browser-facing TLS.
+Local development retains mkcert and the same shared gateway/application/data
+topology, security invariants, and request-throttling rules.
+
+Restrict hosted web ingress to Cloudflare proxy addresses, trust client-address
+headers only from those addresses, and keep application/data/management ports
+private. Cloudflare caching must bypass the API hostname and service-worker
+script. Public customer tracking and External Integration requests do not
+require Access authentication or interactive browser challenges.
+
+GitHub Actions owns tests, builds, publication of the complete image set,
+explicit manual production approval, deployment of those exact digests, and
+health verification. Serialize deployments and restrict them to main. Production
+credentials become available only after approval through a protected GitHub
+Environment. Frontend public URLs remain build-time values; release images use
+production URLs and local builds use local URLs. Secrets never enter images.
+
+Brief planned deployment and maintenance outages are accepted. Use forward-fix
+deployments rather than rollback automation or parallel application stacks.
+Scheduled, encrypted off-VM backups and tested restoration cover both databases,
+required roles, stable keys, and provider credentials. Additional pre-change
+backups are required for destructive migrations or risky data transformations,
+not ordinary releases. Public-launch preparation includes RLS, gateway
+throttling, live provider/device acceptance, patching/rotation, and monitoring.
+Replace the disposable private-staging runbook with a public-production runbook.
+
+The written design is
+[public deployment design](superpowers/specs/2026-10-06-public-deployment-design.md).
+Its implementation details and proposed operating defaults await written-design
+review. The following deployment descriptions record the existing implementation;
+their tunnel, private-staging, and manual-SSH release behavior is superseded by
+the accepted target above and remains to be changed in code.
+
 The independently deployable services share one production-like Docker Compose
 topology. NGINX is the only normal browser ingress; application and data
 services do not publish host ports.
