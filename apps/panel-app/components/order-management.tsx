@@ -607,7 +607,7 @@ export function OrderManagement({
                 <Modal.Heading>New order</Modal.Heading>
               </Modal.Header>
               <form onSubmit={createOrder}>
-                <Modal.Body className="flex flex-col gap-5">
+                <Modal.Body className="flex flex-col gap-4">
                   {createOrderError && (
                     <Alert status="danger">
                       <Alert.Indicator />

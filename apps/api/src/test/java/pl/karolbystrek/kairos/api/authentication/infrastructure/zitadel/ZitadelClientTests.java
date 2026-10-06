@@ -10,6 +10,7 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Clock;
+import pl.karolbystrek.kairos.api.authentication.application.exception.RegistrationValidationException;
 import java.time.Instant;
 import java.time.ZoneOffset;
 
@@ -89,6 +90,30 @@ class ZitadelClientTests {
             .andRespond(withSuccess("{\"id\":\"user\",\"emailCode\":\"discard-me\"}", MediaType.APPLICATION_JSON));
         assertThat(client.createUser("email@example.com", "password")).isEqualTo("user");
         server.verify();
+    }
+
+    @Test
+    void registrationTranslatesKnownProviderPasswordFailuresWithoutExposingProviderDetails() {
+        for (var failure : new String[][] {
+            { "DOMAIN-HuJf6", "Password is too short." },
+            { "DOMAIN-co3Xw", "Include a lowercase letter." },
+            { "DOMAIN-VoaRj", "Include an uppercase letter." },
+            { "DOMAIN-ZBv4H", "Include a number." },
+            { "DOMAIN-ZDLwA", "Include a symbol." }
+        }) {
+            server.reset();
+            server.expect(requestTo("http://zitadel:8080/management/v1/orgs/me"))
+                .andRespond(withSuccess("{\"org\":{\"id\":\"org\"}}", MediaType.APPLICATION_JSON));
+            server.expect(requestTo("http://zitadel:8080/v2/users/new"))
+                .andRespond(withStatus(HttpStatus.BAD_REQUEST).contentType(MediaType.APPLICATION_JSON)
+                    .body("{\"message\":\"private provider details (" + failure[0] + ")\"}"));
+            assertThatThrownBy(() -> client.createUser("email@example.com", "password"))
+                .isInstanceOfSatisfying(RegistrationValidationException.class, error -> {
+                    assertThat(error.getField()).isEqualTo("password");
+                    assertThat(error.getReason()).isEqualTo(failure[1]);
+                });
+            server.verify();
+        }
     }
 
     @Test

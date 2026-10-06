@@ -77,6 +77,8 @@
 
 	--content-customer: 40rem;
 	--focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent);
+	--popup-backdrop: color-mix(in srgb, var(--foreground) 20%, transparent);
+	--popup-backdrop-blur: 8px;
 	--shadow-floating: 0 18px 48px rgb(0 0 0 / 14%);
 	--interaction-duration: 150ms;
 	--interaction-easing: cubic-bezier(0.4, 0, 0.2, 1);
@@ -177,6 +179,22 @@ body {
 .section-rule {
 	border-color: var(--separator);
 	border-top-width: 1px;
+}
+
+/* Preserve title spacing when a form wraps the dialog body. */
+.modal__header + :is(.modal__body, form),
+.alert-dialog__header + :is(.alert-dialog__body, form),
+.drawer__header + :is(.drawer__body, form) {
+	margin-top: var(--space-4);
+}
+
+/* Shared backdrop treatment for every modal, confirmation, and drawer. */
+.modal__backdrop,
+.alert-dialog__backdrop,
+.drawer__backdrop {
+	background-color: var(--popup-backdrop);
+	-webkit-backdrop-filter: blur(var(--popup-backdrop-blur));
+	backdrop-filter: blur(var(--popup-backdrop-blur));
 }
 
 .floating-layer {

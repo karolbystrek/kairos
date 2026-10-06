@@ -33,11 +33,13 @@ function getErrorMessage(error: unknown): string {
 export function LocationCreationModal({
   accountId,
   isOpen,
+  isRequired = false,
   onCreated,
   onOpenChange,
 }: {
   accountId: string;
   isOpen: boolean;
+  isRequired?: boolean;
   onCreated: (location: Location) => void;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -47,7 +49,7 @@ export function LocationCreationModal({
   const [isCreating, setIsCreating] = useState(false);
 
   function changeOpen(open: boolean) {
-    if (isCreating) return;
+    if (isCreating || isRequired) return;
     onOpenChange(open);
     if (!open) {
       setName("");
@@ -87,12 +89,17 @@ export function LocationCreationModal({
 
   return (
     <Modal isOpen={isOpen} onOpenChange={changeOpen}>
-      <Modal.Backdrop>
+      <Modal.Backdrop
+        isDismissable={!isRequired}
+        isKeyboardDismissDisabled={isRequired}
+      >
         <Modal.Container placement="center" size="lg">
           <Modal.Dialog>
-            <Modal.CloseTrigger />
+            {!isRequired && <Modal.CloseTrigger />}
             <Modal.Header>
-              <Modal.Heading>New location</Modal.Heading>
+              <Modal.Heading>
+                {isRequired ? "Create your first location" : "New location"}
+              </Modal.Heading>
             </Modal.Header>
             <form onSubmit={submit}>
               <Modal.Body className="flex flex-col gap-4">
@@ -123,9 +130,11 @@ export function LocationCreationModal({
                 />
               </Modal.Body>
               <Modal.Footer>
-                <Button slot="close" variant="tertiary">
-                  Cancel
-                </Button>
+                {!isRequired && (
+                  <Button slot="close" variant="tertiary">
+                    Cancel
+                  </Button>
+                )}
                 <Button isPending={isCreating} type="submit">
                   <PlusIcon size={18} />
                   {isCreating ? "Creating…" : "Create"}

@@ -1,5 +1,23 @@
 server_tokens off;
 
+# Follow Docker service addresses when application containers are recreated.
+resolver 127.0.0.11 valid=5s ipv6=off;
+
+upstream kairos_customer {
+    zone kairos_customer 64k;
+    server customer-app:3000 resolve;
+}
+
+upstream kairos_panel {
+    zone kairos_panel 64k;
+    server panel-app:3000 resolve;
+}
+
+upstream kairos_api {
+    zone kairos_api 64k;
+    server api:8080 resolve;
+}
+
 client_max_body_size 1m;
 client_body_timeout 30s;
 client_header_timeout 15s;
@@ -71,7 +89,7 @@ server {
     }
 
     location / {
-        proxy_pass http://customer-app:3000;
+        proxy_pass http://kairos_customer;
     }
 }
 
@@ -90,7 +108,7 @@ server {
     }
 
     location / {
-        proxy_pass http://panel-app:3000;
+        proxy_pass http://kairos_panel;
     }
 }
 
@@ -109,7 +127,7 @@ server {
     }
 
     location ~ ^/api/tracked-orders/v1/[^/]+/events$ {
-        proxy_pass http://api:8080;
+        proxy_pass http://kairos_api;
         proxy_buffering off;
         proxy_cache off;
         proxy_read_timeout 31m;
@@ -117,7 +135,7 @@ server {
     }
 
     location /api/ {
-        proxy_pass http://api:8080;
+        proxy_pass http://kairos_api;
     }
 
     location / {

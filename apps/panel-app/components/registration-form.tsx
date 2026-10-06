@@ -1,15 +1,15 @@
 "use client";
 
 import { useSyncExternalStore, useState, type FormEvent } from "react";
-import { Alert, Button, ProgressBar } from "@heroui/react";
+import { Alert, Button, Link } from "@heroui/react";
 import useSWR from "swr";
 import { ZodError } from "zod";
 
-import { BrandWordmark } from "./brand-wordmark";
+import { AuthFormLayout } from "./auth-form-layout";
 
 import { FormTextField } from "@/components/form-controls";
 import {
-  administratorRegistrationInputSchema,
+  registrationInputSchema,
   registerTenant,
 } from "@/src/api/tenant-registrations";
 import {
@@ -33,8 +33,7 @@ export function RegistrationForm({ invited = false }: { invited?: boolean }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
-  const [step, setStep] = useState(1);
-  const [locationName, setLocationName] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
   const [terminalMessage, setTerminalMessage] = useState("");
@@ -76,34 +75,16 @@ export function RegistrationForm({ invited = false }: { invited?: boolean }) {
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (pending) return;
-    if (password !== confirmation) {
-      setMessage("Passwords must match.");
-
-      return;
-    }
     const input = { email, password, passwordConfirmation: confirmation };
 
-    if (!invited && step === 1) {
-      const validation = administratorRegistrationInputSchema.safeParse(input);
-
-      if (!validation.success) {
-        setMessage(
-          validation.error.issues[0]?.message ?? "Check the submitted values.",
-        );
-
-        return;
-      }
-      setMessage("");
-      setStep(2);
-
-      return;
-    }
+    setFieldErrors({});
     setPending(true);
     setMessage("");
     try {
+      registrationInputSchema.parse(input);
       invited
         ? await redeemAccountInvitation({ ...input, token: token ?? "" })
-        : await registerTenant({ ...input, locationName });
+        : await registerTenant(input);
 
       setPassword("");
       setConfirmation("");
@@ -119,26 +100,36 @@ export function RegistrationForm({ invited = false }: { invited?: boolean }) {
 
         return;
       }
-      setMessage(
-        error instanceof ZodError
-          ? (error.issues[0]?.message ?? "Check the submitted values.")
-          : error instanceof ApiError && error.status === 409
-            ? "An account or registration already exists. Sign in to continue."
-            : invited
-              ? "Registration could not be completed. Check the link and submitted values, then try again."
-              : "Registration could not be completed. Check your account details and location name, then try again.",
-      );
+      if (error instanceof ZodError) {
+        const errors: Record<string, string> = {};
+
+        for (const issue of error.issues) {
+          const field = String(issue.path[0]);
+
+          errors[field] ??= issue.message;
+        }
+        setFieldErrors(errors);
+      } else if (error instanceof ApiError && error.problem?.fieldErrors) {
+        setFieldErrors(error.problem.fieldErrors);
+      } else {
+        setMessage(
+          "Registration could not be completed. Try again when your connection is available.",
+        );
+      }
     } finally {
       setPending(false);
     }
   }
 
   return (
-    <div className="mx-auto flex max-w-md flex-col gap-6 py-12">
-      <BrandWordmark />
-      <h1 className="text-2xl font-semibold">
-        {invited ? "Join your team" : "Create account"}
-      </h1>
+    <AuthFormLayout
+      footer={
+        <>
+          Already have an account? <Link href="/">Sign in.</Link>
+        </>
+      }
+      title={invited ? "Join your team" : "Create account"}
+    >
       {invitation && (
         <p>
           {invitation.locationName} · {invitation.role.toLowerCase()}
@@ -173,86 +164,63 @@ export function RegistrationForm({ invited = false }: { invited?: boolean }) {
           </p>
         )}
       {!account && (
-        <form key={step} className="flex flex-col gap-4" onSubmit={submit}>
-          {!invited && (
-            <>
-              <ProgressBar
-                aria-label="Registration progress"
-                maxValue={2}
-                value={step}
-                valueLabel={`Step ${step} of 2`}
-              >
-                <ProgressBar.Output>Step {step} of 2</ProgressBar.Output>
-                <ProgressBar.Track>
-                  <ProgressBar.Fill />
-                </ProgressBar.Track>
-              </ProgressBar>
-              <h2 className="text-lg font-semibold">
-                {step === 1 ? "Admin account" : "Location"}
-              </h2>
-            </>
-          )}
-          {invited || step === 1 ? (
-            <>
-              <FormTextField
-                isRequired
-                inputProps={{
-                  autoCapitalize: "none",
-                  autoComplete: "email",
-                  autoFocus: true,
-                }}
-                label="Email"
-                maxLength={200}
-                type="email"
-                value={email}
-                onChange={setEmail}
-              />
-              <FormTextField
-                isRequired
-                inputProps={{ autoComplete: "new-password" }}
-                label="Password"
-                maxLength={200}
-                type="password"
-                value={password}
-                onChange={setPassword}
-              />
-              <p className="text-sm text-muted">
-                Use at least 12 characters. Up to 200 characters are supported.
-              </p>
-              <FormTextField
-                isRequired
-                inputProps={{ autoComplete: "new-password" }}
-                label="Confirm password"
-                maxLength={200}
-                type="password"
-                value={confirmation}
-                onChange={setConfirmation}
-              />
-            </>
-          ) : (
-            <>
-              <FormTextField
-                isRequired
-                inputProps={{ autoComplete: "organization", autoFocus: true }}
-                isDisabled={pending}
-                label="Location name"
-                maxLength={120}
-                value={locationName}
-                onChange={setLocationName}
-              />
-              <Button
-                isDisabled={pending}
-                type="button"
-                variant="tertiary"
-                onPress={() => {
-                  setStep(1);
-                  setMessage("");
-                }}
-              >
-                Back
-              </Button>
-            </>
-          )}
+        <form noValidate onSubmit={submit}>
+          <FormTextField
+            isRequired
+            errorMessage={fieldErrors.email}
+            inputProps={{
+              autoCapitalize: "none",
+              autoComplete: "email",
+              autoFocus: true,
+            }}
+            isDisabled={pending}
+            label="Email"
+            maxLength={200}
+            name="email"
+            type="email"
+            value={email}
+            onChange={(value) => {
+              setEmail(value);
+              setFieldErrors((current) => ({ ...current, email: "" }));
+            }}
+          />
+          <FormTextField
+            isRequired
+            errorMessage={fieldErrors.password}
+            inputProps={{ autoComplete: "new-password" }}
+            isDisabled={pending}
+            label="Password"
+            maxLength={200}
+            name="password"
+            type="password"
+            value={password}
+            onChange={(value) => {
+              setPassword(value);
+              setFieldErrors((current) => ({
+                ...current,
+                password: "",
+                passwordConfirmation: "",
+              }));
+            }}
+          />
+          <FormTextField
+            isRequired
+            errorMessage={fieldErrors.passwordConfirmation}
+            inputProps={{ autoComplete: "new-password" }}
+            isDisabled={pending}
+            label="Confirm password"
+            maxLength={200}
+            name="passwordConfirmation"
+            type="password"
+            value={confirmation}
+            onChange={(value) => {
+              setConfirmation(value);
+              setFieldErrors((current) => ({
+                ...current,
+                passwordConfirmation: "",
+              }));
+            }}
+          />
           <Button
             isDisabled={
               checkingAccount ||
@@ -266,19 +234,11 @@ export function RegistrationForm({ invited = false }: { invited?: boolean }) {
             isPending={pending}
             type="submit"
           >
-            {!invited && step === 1 ? "Next" : "Create account"}
+            Create account
           </Button>
         </form>
       )}
-      <Button
-        variant="tertiary"
-        onPress={() => {
-          window.location.assign("/");
-        }}
-      >
-        Sign in
-      </Button>
-    </div>
+    </AuthFormLayout>
   );
 }
 

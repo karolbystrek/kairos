@@ -78,6 +78,8 @@
 
 	--content-panel: 90rem;
 	--focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent);
+	--popup-backdrop: color-mix(in srgb, var(--foreground) 20%, transparent);
+	--popup-backdrop-blur: 8px;
 	--shadow-floating: 0 18px 48px rgb(0 0 0 / 14%);
 	--interaction-duration: 150ms;
 	--interaction-easing: cubic-bezier(0.4, 0, 0.2, 1);
@@ -165,6 +167,35 @@ body {
 	line-height: 1;
 }
 
+/* Auth pages do not reserve space for the signed-in bottom navigation. */
+.panel-page:has(.auth-form-layout) {
+	padding-block: 0;
+}
+
+.auth-form-layout {
+	display: flex;
+	min-height: 100dvh;
+	padding-block: var(--space-6);
+}
+
+/* Reserve space after the footer, keeping it next to each form's action. */
+.auth-form-content {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-6);
+	min-height: calc(4 * var(--control-regular) + 3 * var(--space-4) + var(--space-6) + 1lh);
+}
+
+.auth-form-layout form {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-4);
+}
+
+.auth-form-layout :is(.text-field, .button:not(.button--icon-only)) {
+	width: 100%;
+}
+
 .section-title {
 	font-size: var(--type-heading);
 	font-weight: 620;
@@ -179,6 +210,22 @@ body {
 .section-rule {
 	border-color: var(--separator);
 	border-top-width: 1px;
+}
+
+/* Preserve title spacing when a form wraps the dialog body. */
+.modal__header + :is(.modal__body, form),
+.alert-dialog__header + :is(.alert-dialog__body, form),
+.drawer__header + :is(.drawer__body, form) {
+	margin-top: var(--space-4);
+}
+
+/* Shared backdrop treatment for every modal, confirmation, and drawer. */
+.modal__backdrop,
+.alert-dialog__backdrop,
+.drawer__backdrop {
+	background-color: var(--popup-backdrop);
+	-webkit-backdrop-filter: blur(var(--popup-backdrop-blur));
+	backdrop-filter: blur(var(--popup-backdrop-blur));
 }
 
 .floating-layer {

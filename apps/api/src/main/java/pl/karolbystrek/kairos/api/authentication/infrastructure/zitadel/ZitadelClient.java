@@ -10,6 +10,7 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.server.ResponseStatusException;
 import pl.karolbystrek.kairos.api.authentication.application.exception.InvalidLoginException;
+import pl.karolbystrek.kairos.api.authentication.application.exception.RegistrationValidationException;
 import pl.karolbystrek.kairos.api.authentication.infrastructure.config.AuthenticationProperties;
 import tools.jackson.databind.JsonNode;
 
@@ -133,9 +134,23 @@ public class ZitadelClient {
                 throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Identity not found");
             if (exception.getStatusCode().value() == 409)
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "An account already exists");
-            if (exception.getStatusCode().value() == 400)
+            if (exception.getStatusCode().value() == 400) {
+                // Translate only known ZITADEL v4 policy codes; never expose its response body.
+                var messages = Map.of(
+                    "DOMAIN-HuJf6", "Password is too short.",
+                    "DOMAIN-co3Xw", "Include a lowercase letter.",
+                    "DOMAIN-VoaRj", "Include an uppercase letter.",
+                    "DOMAIN-ZBv4H", "Include a number.",
+                    "DOMAIN-ZDLwA", "Include a symbol."
+                );
+                for (var entry : messages.entrySet()) {
+                    if (exception.getResponseBodyAsString().contains("(" + entry.getKey() + ")")) {
+                        throw new RegistrationValidationException(HttpStatus.BAD_REQUEST, "password", entry.getValue());
+                    }
+                }
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Check the current password and password requirements");
+            }
             throw unavailable();
         } catch (RestClientException exception) { throw unavailable(); }
     }

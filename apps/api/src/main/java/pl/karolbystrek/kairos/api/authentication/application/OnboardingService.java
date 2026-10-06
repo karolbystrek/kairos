@@ -8,9 +8,9 @@ import org.springframework.web.server.ResponseStatusException;
 import pl.karolbystrek.kairos.api.account.application.AccountInvitationService;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
 import pl.karolbystrek.kairos.api.account.infrastructure.persistence.AccountRepository;
+import pl.karolbystrek.kairos.api.authentication.application.exception.RegistrationValidationException;
 import pl.karolbystrek.kairos.api.authentication.infrastructure.zitadel.ZitadelClient;
 import pl.karolbystrek.kairos.api.tenant.application.TenantRegistrationService;
-import pl.karolbystrek.kairos.api.location.domain.ManagedLocationName;
 
 @Service
 @RequiredArgsConstructor
@@ -23,25 +23,25 @@ public class OnboardingService {
     private final TenantRegistrationService tenants;
     private final ZitadelClient provider;
 
-    public Registration register(String email, String password, String invitation, String locationName) {
-        ManagedLocationName firstLocation = null;
-        if (invitation == null) {
-            try {
-                firstLocation = ManagedLocationName.from(locationName);
-            }
-            catch (IllegalArgumentException exception) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage());
-            }
-        }
+    public Registration register(String email, String password, String invitation) {
         if (accounts.existsByEmail(email))
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Account already exists; sign in instead");
+            throw new RegistrationValidationException(HttpStatus.CONFLICT, "email", "An account with this email already exists. Sign in instead.");
         if (invitation != null) invitations.preview(invitation);
-        var subject = provider.createUser(email, password);
+        String subject;
+        try {
+            subject = provider.createUser(email, password);
+        }
+        catch (ResponseStatusException exception) {
+            if (exception.getStatusCode().value() == 409) {
+                throw new RegistrationValidationException(HttpStatus.CONFLICT, "email", "An account with this email already exists. Sign in instead.");
+            }
+            throw exception;
+        }
         ZitadelClient.ProviderSession session = null;
         try {
             session = provider.signIn(email, password);
             if (!subject.equals(session.userId())) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
-            var principal = invitation == null ? tenants.register(email, subject, firstLocation)
+            var principal = invitation == null ? tenants.register(email, subject)
                 : invitations.redeem(tokens.hash(invitation), email, subject);
             return new Registration(principal, session);
         } catch (RuntimeException exception) {

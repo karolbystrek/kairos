@@ -2,22 +2,25 @@
 
 import type { ComponentProps, ReactNode } from "react";
 
-import { Input, Label, Select, TextField } from "@heroui/react";
+import { FieldError, Input, Label, Select, TextField } from "@heroui/react";
 
 export function FormTextField({
   label,
   placeholder = label,
   inputProps,
+  errorMessage,
   ...props
 }: Omit<ComponentProps<typeof TextField>, "children"> & {
+  errorMessage?: string;
   label: string;
   placeholder?: string;
   inputProps?: Omit<ComponentProps<typeof Input>, "placeholder">;
 }) {
   return (
-    <TextField {...props}>
+    <TextField {...props} isInvalid={Boolean(errorMessage) || props.isInvalid}>
       <Label className="sr-only">{label}</Label>
       <Input {...inputProps} placeholder={placeholder} />
+      {errorMessage && <FieldError>{errorMessage}</FieldError>}
     </TextField>
   );
 }

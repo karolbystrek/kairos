@@ -114,15 +114,14 @@ for (const operation of ["login", "logout", "changePassword"]) {
 }
 
 
-test("public registration rejects an absent or invalid first location before making a request", () => {
+test("public registration rejects a short password before making a request", () => {
   const api = client(() => { throw new Error("Invalid registration must not reach the network"); });
-  const account = { email: "admin@example.com", password: "password-12345", passwordConfirmation: "password-12345" };
-  for (const locationName of [undefined, "", "   ", "x".repeat(121)]) {
-    assert.throws(() => api.registration.registerTenant({ ...account, locationName }), /Name|required|characters/i);
-  }
+  assert.throws(() => api.registration.registerTenant({
+    email: "admin@example.com", password: "short", passwordConfirmation: "short",
+  }), /12 characters/i);
 });
 
-test("public registration submits the account and normalized first location together", async () => {
+test("public registration submits account details without a location", async () => {
   const result = {
     accountId: "12345678-1234-4234-8234-123456789abc", email: "admin@example.com",
     tenantId: "12345678-1234-4234-8234-123456789abd", tenantRole: "ADMIN",
@@ -137,10 +136,23 @@ test("public registration submits the account and normalized first location toge
   });
   assert.deepEqual(await api.registration.registerTenant({
     email: "  ADMIN@example.com  ", password: "password-12345",
-    passwordConfirmation: "password-12345", locationName: "  First location  ",
+    passwordConfirmation: "password-12345",
   }), result);
   assert.deepEqual(submissions, [{
     email: "admin@example.com", password: "password-12345",
-    passwordConfirmation: "password-12345", locationName: "First location",
+    passwordConfirmation: "password-12345",
   }]);
+});
+
+
+test("registration field errors survive the API error boundary", async () => {
+  const api = client(async (url) => url.endsWith("/csrf")
+    ? Response.json({ token: "csrf" })
+    : Response.json({ status: 400, fieldErrors: { password: "Use at least 12 characters." } }, { status: 400 }));
+  await assert.rejects(api.registration.registerTenant({
+    email: "admin@example.com", password: "password-12345", passwordConfirmation: "password-12345",
+  }), error => {
+    assert.deepEqual(error.problem.fieldErrors, { password: "Use at least 12 characters." });
+    return true;
+  });
 });

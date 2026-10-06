@@ -6,12 +6,12 @@ import {
   Alert,
   AlertDialog,
   Button,
+  Link,
   Spinner,
   Tabs,
   Tooltip,
 } from "@heroui/react";
 import {
-  ArrowRight as ArrowRightIcon,
   ClipboardList as OrdersIcon,
   LogOut as SignOutIcon,
   MapPin as LocationsIcon,
@@ -27,8 +27,9 @@ import { ZodError } from "zod";
 import { FormTextField } from "@/components/form-controls";
 import { OrderManagement } from "@/components/order-management";
 import { AccountManagement } from "@/components/account-management";
-import { BrandWordmark } from "@/components/brand-wordmark";
+import { AuthFormLayout } from "@/components/auth-form-layout";
 import { IntegrationManagement } from "@/components/integration-management";
+import { LocationCreationModal } from "@/components/location-creation-modal";
 import { LocationManagement } from "@/components/location-management";
 import { PasswordChangeDialog } from "@/components/password-change-dialog";
 import { PanelAppearanceMenu } from "@/components/panel-appearance-menu";
@@ -146,7 +147,7 @@ function LoginForm({
   }
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-6">
       {error && (
         <DismissibleNotice
           description={getLoginErrorMessage(error)}
@@ -156,9 +157,8 @@ function LoginForm({
         />
       )}
 
-      <form className="flex flex-col gap-4" onSubmit={submit}>
+      <form onSubmit={submit}>
         <FormTextField
-          fullWidth
           isRequired
           inputProps={{
             autoCapitalize: "none",
@@ -175,7 +175,6 @@ function LoginForm({
         />
 
         <FormTextField
-          fullWidth
           isRequired
           inputProps={{ autoComplete: "current-password" }}
           isDisabled={isPending}
@@ -187,19 +186,10 @@ function LoginForm({
           onChange={setPassword}
         />
 
-        <Button fullWidth isPending={isPending} type="submit">
+        <Button isPending={isPending} type="submit">
           {isPending ? "Signing in…" : "Sign in"}
-          {!isPending && <ArrowRightIcon size={18} />}
         </Button>
       </form>
-      <Button
-        variant="secondary"
-        onPress={() => {
-          window.location.assign("/tenant-registration");
-        }}
-      >
-        Create account
-      </Button>
     </div>
   );
 }
@@ -216,27 +206,21 @@ function SignedOutPanel({
   onSignIn: (credentials: LoginCredentials) => Promise<void>;
 }) {
   return (
-    <div className="flex min-h-[calc(100vh-5rem)] items-center justify-center py-8">
-      <div className="w-full max-w-md">
-        <div className="mb-8 text-center">
-          <BrandWordmark />
-        </div>
-
-        <div>
-          <div className="mb-6">
-            <h1 className="text-2xl font-semibold tracking-tight">
-              Welcome back
-            </h1>
-          </div>
-          <LoginForm
-            error={loginError}
-            isPending={isLoggingIn}
-            onDismissError={onDismissLoginError}
-            onSubmit={onSignIn}
-          />
-        </div>
-      </div>
-    </div>
+    <AuthFormLayout
+      footer={
+        <>
+          Don’t have an account? <Link href="/registration">Create one.</Link>
+        </>
+      }
+      title="Welcome back"
+    >
+      <LoginForm
+        error={loginError}
+        isPending={isLoggingIn}
+        onDismissError={onDismissLoginError}
+        onSubmit={onSignIn}
+      />
+    </AuthFormLayout>
   );
 }
 
@@ -257,7 +241,11 @@ export function StaffPanel() {
     shouldRetryOnError,
   });
 
-  const { data: locations } = useSWR(
+  const {
+    data: locations,
+    error: locationsError,
+    mutate: mutateLocations,
+  } = useSWR(
     account ? staffLocationsKey(account.accountId) : null,
     listLocations,
     { errorRetryCount: 3, shouldRetryOnError },
@@ -369,6 +357,18 @@ export function StaffPanel() {
   const canManageIntegrations = account.capabilities.includes(
     "MANAGE_EXTERNAL_INTEGRATIONS",
   );
+
+  if (canManageLocations && !locations) {
+    return locationsError ? (
+      <div className="flex flex-col gap-4 py-12">
+        <p role="alert">Your locations could not be loaded. Try again.</p>
+        <Button onPress={() => void mutateLocations()}>Retry</Button>
+      </div>
+    ) : (
+      <Spinner aria-label="Loading locations" />
+    );
+  }
+  const needsFirstLocation = canManageLocations && hasNoLocations;
   const utilities = (
     <div className="panel-workspace-utilities flex shrink-0 items-center gap-2">
       <PasswordChangeDialog
@@ -519,6 +519,20 @@ export function StaffPanel() {
             )}
           />
         </>
+      )}
+
+      {needsFirstLocation && (
+        <LocationCreationModal
+          key={account.accountId}
+          isOpen
+          isRequired
+          accountId={account.accountId}
+          onCreated={(location) => {
+            setRequestedOrderLocationId(location.id);
+            setSelectedWorkspace("orders");
+          }}
+          onOpenChange={() => {}}
+        />
       )}
 
       <AlertDialog

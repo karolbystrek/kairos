@@ -38,7 +38,7 @@ export default function RootLayout({
             enableSystem: true,
           }}
         >
-          <main className="mx-auto min-h-screen max-w-[var(--content-panel)] px-5 pb-24 pt-5 sm:px-7 sm:pb-10 sm:pt-6 lg:px-10">
+          <main className="panel-page mx-auto min-h-screen max-w-[var(--content-panel)] px-5 pb-24 pt-5 sm:px-7 sm:pb-10 sm:pt-6 lg:px-10">
             {children}
           </main>
         </Providers>

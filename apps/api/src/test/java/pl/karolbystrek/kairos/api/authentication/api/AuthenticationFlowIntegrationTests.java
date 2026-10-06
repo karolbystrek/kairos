@@ -33,7 +33,7 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
     @Autowired private AccountInvitationService invitations;
 
     @Test
-    void registrationImmediatelyCreatesTenantLocationAndDurableSecureSessionWithoutVerification() throws Exception {
+    void registrationCreatesTenantAndDurableSecureSessionBeforeFirstLocation() throws Exception {
         var email = email();
         configure(email);
         var result = mvc.perform(csrf(postApi("/tenant-registrations/v1").content(registration(email, null))))
@@ -47,10 +47,7 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
             SELECT name, normalized_name, status, time_zone FROM locations
             WHERE tenant_id = (SELECT tenant_id FROM accounts WHERE email = ?)
             """, email);
-        assertThat(locations).hasSize(1);
-        assertThat(locations.getFirst()).containsEntry("NAME", "First location")
-            .containsEntry("NORMALIZED_NAME", "first location")
-            .containsEntry("STATUS", "ENABLED").containsEntry("TIME_ZONE", "UTC");
+        assertThat(locations).isEmpty();
         var cookie = result.getResponse().getCookie("__Host-session");
         assertThat(cookie.getDomain()).isNull();
         assertThat(database.queryForObject("SELECT COUNT(*) FROM accounts WHERE email = ?", Integer.class, email)).isOne();
@@ -63,18 +60,59 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
     }
 
     @Test
-    void invalidFirstLocationIsRejectedBeforeProviderProvisioning() throws Exception {
-        for (var location : new String[] { "", "   ", "x".repeat(121) }) {
-            var email = email();
-            var payload = registration(email, null).replace("  First location  ", location);
-            mvc.perform(csrf(postApi("/tenant-registrations/v1").content(payload)))
-                .andExpect(status().isBadRequest());
-            assertThat(database.queryForObject("SELECT COUNT(*) FROM accounts WHERE email = ?", Integer.class, email)).isZero();
-        }
+    void invalidRegistrationReturnsFieldErrorsBeforeProviderProvisioning() throws Exception {
+        var email = email();
         mvc.perform(csrf(postApi("/tenant-registrations/v1")
-            .content(registration(email(), null).replace(",\"locationName\":\"  First location  \"", ""))))
-            .andExpect(status().isBadRequest());
+            .content(registration("invalid-email", null))))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.fieldErrors.email").isNotEmpty());
+        mvc.perform(csrf(postApi("/tenant-registrations/v1")
+            .content(registration(email, null).replace("password-12345", "short"))))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.fieldErrors.password").value("Use at least 12 characters."));
+        mvc.perform(csrf(postApi("/tenant-registrations/v1")
+            .content(registration(email, null).replace("passwordConfirmation\":\"password-12345", "passwordConfirmation\":\"different"))))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.fieldErrors.passwordConfirmation").value("Passwords must match."));
         verify(identityProvider, never()).createUser(anyString(), anyString());
+        assertThat(database.queryForObject("SELECT COUNT(*) FROM accounts WHERE email = ?", Integer.class, email)).isZero();
+    }
+
+    @Test
+    void existingEmailHasAnEmailFieldError() throws Exception {
+        var email = email();
+        register(email);
+        mvc.perform(csrf(postApi("/tenant-registrations/v1").content(registration(email, null))))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.fieldErrors.email").isNotEmpty());
+    }
+
+    @Test
+    void providerEmailConflictIsAttachedToEmailWithoutExposingProviderDetails() throws Exception {
+        var email = email();
+        when(identityProvider.createUser(eq(email), anyString()))
+            .thenThrow(new ResponseStatusException(HttpStatus.CONFLICT, "private provider details"));
+        mvc.perform(csrf(postApi("/tenant-registrations/v1").content(registration(email, null))))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.fieldErrors.email").isNotEmpty())
+            .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("private provider"))));
+    }
+
+    @Test
+    void incompleteOnboardingSurvivesSignInAndFirstLocationIsCreatedSeparately() throws Exception {
+        var email = email();
+        var session = register(email);
+        mvc.perform(getApi("/locations/v1").cookie(session))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(0));
+        mvc.perform(csrf(postApi("/auth/v1/logout").cookie(session))).andExpect(status().isNoContent());
+        session = login(email);
+        mvc.perform(getApi("/locations/v1").cookie(session))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(0));
+        mvc.perform(csrf(postApi("/locations/v1").cookie(session).content("{\"name\":\"  First location  \"}")))
+            .andExpect(status().isCreated()).andExpect(jsonPath("$.name").value("First location"))
+            .andExpect(jsonPath("$.status").value("ENABLED"));
+        mvc.perform(getApi("/locations/v1").cookie(session))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(1));
     }
 
     @Test
@@ -183,7 +221,7 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
     private static String email() { return UUID.randomUUID() + "@example.com"; }
     private static String registration(String email, String token) {
         return "{\"email\":\"" + email + "\",\"password\":\"password-12345\",\"passwordConfirmation\":\"password-12345\""
-            + (token == null ? ",\"locationName\":\"  First location  \"" : ",\"token\":\"" + token + "\"") + "}";
+            + (token == null ? "" : ",\"token\":\"" + token + "\"") + "}";
     }
     private static MockHttpServletRequestBuilder postApi(String path) {
         return post("/api" + path).contextPath("/api").secure(true).contentType(MediaType.APPLICATION_JSON);

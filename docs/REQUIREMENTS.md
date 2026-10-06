@@ -2,7 +2,7 @@
 
 ## 1. Purpose and Scope
 
-Kairos is a multi-tenant virtual pager system for restaurants. A tenant represents a customer organization, such as an independent restaurant or restaurant chain, and owns one or more non-archived physical locations. Public registration creates the first enabled location together with the tenant and administrator; the last non-archived location may be disabled but cannot be deleted. A customer scans a QR code assigned to an order and opens a lightweight web application that displays the current order state and receives real-time updates. Restaurant staff manage orders through a separate administrative panel. External systems, initially point-of-sale systems, can create and update orders through a versioned REST API and receive webhooks.
+Kairos is a multi-tenant virtual pager system for restaurants. A tenant represents a customer organization, such as an independent restaurant or restaurant chain, and owns physical locations. Public registration first creates the tenant and administrator; before entering the staff workspace, that administrator must create the first enabled location through mandatory onboarding. A tenant may temporarily have no location while onboarding is incomplete. Once created, its last non-archived location may be disabled but cannot be deleted. A customer scans a QR code assigned to an order and opens a lightweight web application that displays the current order state and receives real-time updates. Restaurant staff manage orders through a separate administrative panel. External systems, initially point-of-sale systems, can create and update orders through a versioned REST API and receive webhooks.
 
 Kairos replaces failure-prone physical restaurant pagers without requiring a
 customer to install a chain-specific native application for a short-lived
@@ -45,6 +45,25 @@ font. On the anonymous staff sign-in and onboarding surface, the wordmark is
 centered and visually dominant without a descriptor or explanatory sign-in
 sentence beneath it.
 
+Staff sign-in, public registration, and invitation registration use one shared
+form-page layout with the same responsive width, wordmark, heading, and field
+spacing. The layout centers its content vertically in the dynamic viewport using
+available space rather than a fixed top offset. It reserves a common form area
+based on the registration control heights and spacing tokens, so switching
+between sign-in and registration keeps the wordmark, heading, and first field
+stable. Short viewports allow the content to grow and scroll without clipping;
+anonymous pages do not reserve space for the signed-in bottom navigation. Primary submit buttons span the field width and use text without a
+trailing arrow. Account-navigation sentences beneath the forms are centered.
+The shared form-page layout owns form spacing, field and button widths, and
+footer presentation rather than repeating those rules in each page. Navigation
+sentences follow the form action with the same standard spacing; any reserved
+space for stable page alignment follows the footer instead of separating it
+from the button. This also
+covers invitation registration and signed-in registration recovery actions.
+Focused management dialogs retain their shared HeroUI body/footer anatomy with
+adjacent primary and secondary actions, using the same spacing and control-size
+tokens rather than the standalone authentication-page layout.
+
 The shared visual character is direct, neutral, and hospitality-oriented
 without restaurant-themed decoration. Light appearance uses a true white page,
 light-gray secondary regions, and one restrained light-blue selection/accent;
@@ -54,6 +73,15 @@ comes primarily from typography, alignment, spacing, and separators rather
 than visible containers. Routine content must not be wrapped in cards, bordered
 boxes, or decorative materials. Elevation is reserved for genuinely floating
 layers such as menus and modal sheets.
+Both frontends use one backdrop treatment for every modal, confirmation dialog,
+and drawer: a neutral tint at 20% opacity derived from the foreground color and
+an 8-pixel background blur. It follows Light and Dark appearance, keeps the
+underlying page visible, and avoids a solid black backdrop. Opacity applies to
+the backdrop color, never the dialog or its contents. The rule lives in each
+application's shared stylesheet rather than per-popup overrides. Modal,
+confirmation, and drawer headers have one 16-pixel gap before their content,
+whether the body follows directly or is wrapped in a form; shared stylesheet
+rules cover both structures so form submission wrappers cannot remove spacing.
 
 Both frontends use one CSS-defined foundation before component styling: a
 4-point spacing basis with 4, 8, 12, 16, 24, 32, and 48-pixel steps; 32-pixel
@@ -81,8 +109,10 @@ and modal backgrounds so their boundaries remain visible without focus.
 
 Visible labels remain for native date/time inputs, read-only values, and grouped
 choices that cannot communicate their purpose through a placeholder. Validation,
-password guidance, and consequential confirmation instructions remain available
-outside the field; placeholders do not replace essential instructions.
+field-specific password errors, and consequential confirmation instructions remain
+available outside the field; placeholders do not replace essential instructions.
+Registration omits persistent password-guidance copy and shows the corrective
+requirement beside Password only after validation rejects the submitted value.
 
 Both frontends provide Light, Dark, and System appearance preferences, with
 System as the default. Each browser stores its own preference; appearance is
@@ -335,8 +365,9 @@ claim existing clients; an update activates through the browser lifecycle.
 
 The staff panel must:
 
-* offer public email/password registration that creates a tenant, its first
-  administrator, and its first enabled location together, without email verification;
+* offer public email/password registration that creates a tenant and its first
+  administrator immediately, then requires first-location creation on the main
+  page before the administrator can use the workspace, without email verification;
 * require an authenticated internal account;
 * show only locations and orders accessible to the account;
 * allow tenant administrators to switch between locations or view an aggregate queue;
@@ -368,9 +399,13 @@ account.
 Orders, Locations, Accounts, and Integrations use one adaptive tab-style
 navigation system: a centered rounded segmented control on tablet and desktop and bottom
 navigation on narrow mobile layouts. Only authorized destinations are present.
-Accounts and Integrations are disabled when the tenant has no non-archived
-location; while location data is loading or unavailable, the panel does not infer
-that the tenant has none. A disabled location still counts as existing.
+An administrator with no non-archived location first sees the required
+first-location modal over the rendered workspace. The workspace remains visible
+through the shared blurred backdrop but cannot be interacted with while the
+required modal is open. The panel waits for
+account-scoped authoritative location data before showing either onboarding or
+the workspace; a failed initial request shows Retry and does not permit skipping
+onboarding. A disabled location still counts as existing.
 The shell and visual treatment do not vary by role. Appearance and Sign out
 remain direct trailing utilities on the same level rather than peer workspace
 destinations or commands nested in an account menu. Sign out requires an
@@ -614,23 +649,40 @@ is used. Kairos owns tenants, Accounts, memberships and authorization. All
 Accounts belong to one tenant. Username, local password hashes, Platform
 Operator, Tenant Registration Invitations, and verification staging are removed.
 
-Public registration collects two sections: **Step 1 of 2 — Admin account**
-(email, password, confirmation), followed by **Step 2 of 2 — Location** (name).
-A labelled progress bar starts at step 1, showing half of the two steps rather
-than zero progress. Next advances only after validating the account section;
-Back retains all entered values, including the location name. No provider identity,
-tenant, account, location, or browser session is created merely by advancing a
-step. Final submission validates both sections and immediately creates one
-tenant, its first administrator, and its first enabled location in one local
-transaction. Recoverable failures retain values for correction and retry.
-Managers/operators register through manually shared member
-invitations. Email verification and forgotten-password recovery are deferred;
-provider email remains truthfully unverified and registration sends no email.
-ZITADEL enforces password requirements. Initial provider policy is a minimum
-of 12 characters without mandatory character classes or scheduled password
-expiry; Kairos displays matching guidance, checks confirmation, and bounds input
-at the provider's 200-character limit for email/password without duplicating
-password policy.
+Public registration collects email, password, and confirmation in one focused
+account form. Submitting it immediately validates and provisions the identity,
+commits one tenant and administrator locally, establishes the browser session,
+and opens the main panel page. Registration does not collect or create a location.
+The registration form has no step counter, progress bar, Next/Back controls, or
+persistent password-requirement paragraph. Account fields retain submitted values
+on recoverable failure and show corrective errors beside the affected control.
+Public Sign in ends with **Don't have an account? Create one.**, with only
+**Create one.** linked to the public `/registration` page. Registration ends with **Already have an
+account? Sign in.**, with only **Sign in.** linked to the main sign-in page.
+
+On the main page, an administrator whose tenant has no non-archived location
+must create the first location in the existing focused location-creation modal.
+Its required mode has no Close or Cancel action and cannot be dismissed with
+Escape or an outside click. Only successful location creation completes the
+onboarding and opens Orders selected to the created location. Failed creation
+retains the modal and entered name. Completion is derived from the server's
+saved location collection, with no browser flag or additional persisted
+onboarding status. Reload, subsequent sign-in, and direct main-page navigation
+repeat the same check. This gate applies only to administrators; invited members
+already have a fixed location and do not create one. A disabled saved location
+counts as completed onboarding. Future email verification can precede the same
+gate; verification itself remains outside the current increment.
+
+Managers/operators register through manually shared member invitations. Email
+verification and forgotten-password recovery remain deferred; provider email
+remains truthfully unverified and registration sends no email. Initial provider
+policy is a minimum of 12 characters without mandatory character classes or
+scheduled password expiry. Registration validates that configured minimum,
+email syntax, confirmation, and the 200-character input bounds at submission
+in the panel and API. ZITADEL remains authoritative for provider password policy;
+known provider password-complexity failures are translated to safe Password
+field messages, and identity conflicts to Email field messages. Provider response
+bodies, internal identifiers, and submitted credentials never become UI errors.
 
 Spring Session JDBC stores browser sessions durably in PostgreSQL. A secure,
 HttpOnly, host-only `__Host-session` cookie with `Path=/` and `SameSite=Lax`
@@ -675,9 +727,10 @@ observe logout on their next protected request. Automated/background protected
 requests count as activity; tracking mouse/keyboard activity is not required.
 
 A **Location** is an enabled, disabled, or archived physical restaurant owned by
-one tenant. Every newly registered tenant has at least one non-archived location.
-A tenant may have no enabled locations after all its locations are disabled,
-but its last non-archived location cannot be deleted.
+one tenant. A newly registered tenant may have no location until its
+administrator completes mandatory first-location onboarding. After that, its
+last non-archived location cannot be deleted. A tenant may have no enabled
+locations after all its locations are disabled.
 Only a tenant administrator manages the location lifecycle. The editable
 location property in this increment is its
 display name; its IANA time zone remains fixed at `UTC`. Enabled and disabled
@@ -861,9 +914,9 @@ master key and private credential volumes need backups and restricted access.
 No SMTP provider is configured in this increment.
 
 Validate invitation/email availability before provider provisioning. Create and
-password-authenticate the provider identity, then commit the tenant/admin/first-location or
-invitation/member transaction locally. Validate the first location name before
-provider provisioning during public registration. Recheck invitation eligibility and consume
+password-authenticate the provider identity, then commit the tenant/admin or
+invitation/member transaction locally. First-location creation is a separate
+authenticated transaction after account registration. Recheck invitation eligibility and consume
 it atomically with the Account and assignment. On local failure, terminate the
 new provider session and attempt deletion of only the newly provisioned identity.
 No distributed transaction, queue or retry worker is introduced. A provider
@@ -1200,10 +1253,13 @@ tenant UUID, tenant role, optional location assignment, and capabilities. No
 username, Account-kind discriminator, password, or provider credential is
 returned. Login/public registration/invitation registration return `200` with
 the current Account and an HttpOnly session cookie. Registration accepts
-email/password/passwordConfirmation; public registration also requires
-`locationName`, while only member registration requires `token`. Public
-registration uses the same normalized name constraints as Location creation
-and starts the location enabled with its time zone fixed at `UTC`.
+email/password/passwordConfirmation; only member registration requires `token`.
+Public registration creates no location. Registration input failures use Problem
+Details with a `fieldErrors` object mapping `email`, `password`, or
+`passwordConfirmation` to safe corrective messages; identity conflicts return
+`409` with an Email field error. First-location onboarding uses the ordinary
+`POST /api/locations/v1` contract and its name validation, enabled initial state,
+and fixed `UTC` time zone.
 Anonymous login, local logout and both registration families remain CSRF
 protected. Current Account, password changes and global logout require eligible
 authentication. Successful password changes and logout return
@@ -1281,7 +1337,10 @@ build generates the Serwist service worker before the runtime image is
 assembled. The packaged Spring Boot API runs Flyway migrations and scheduled
 webhook and customer-push background jobs in the same application process.
 Applying source changes requires rebuilding and recreating the affected
-application container.
+application container. NGINX uses shared upstream zones with runtime resolution
+through Docker's embedded DNS and a five-second refresh interval for all three
+application services. It must follow container IP changes without restart, so
+recreating services cannot leave hostnames routed to a stale or reassigned IP.
 
 The customer Next.js application serves the generated service worker with a
 root scope, JavaScript content type, restrictive content-security policy, and
@@ -1384,17 +1443,21 @@ health succeeds, and verify the internal and external paths.
   durable/rolling sessions, provider outage/revocation, current local access,
   password change, local/global logout and cookie/CSRF behavior are covered by
   provider-isolated and HTTP contract tests. Live provider acceptance is separate.
-* Public registration shows one-based progress across account and location
-  steps, validates forward navigation, and retains values when moving back.
-  Final submission creates one tenant, administrator, enabled normalized first
-  location, and browser session; invalid location input provisions no provider
-  identity or local account. Member registration remains single-use and
-  rechecks current invitation eligibility.
+* Public registration rejects invalid email, a short password, and mismatched
+  confirmation with errors attached to the correct fields before provider
+  provisioning. Local/provider identity conflicts have an Email field error;
+  known provider password failures have a safe Password field error.
+* Successful public registration creates the tenant, administrator and browser
+  session without creating a location. The main panel requires first-location
+  creation, survives reload and later sign-in with onboarding incomplete,
+  prevents dismissal, retains failed input, and opens the new location's Orders
+  only after creation succeeds. A saved disabled location does not repeat onboarding.
+* Member registration remains single-use and rechecks current invitation eligibility.
 * Deleting the last non-archived location is rejected without archival cascades,
   including concurrent deletion attempts. Disabling the final location remains
   available under the ordinary active-order restriction. Accounts and Integrations
-  are disabled only when no location exists, and remain available when all are
-  disabled without the invitation warning container.
+  remain behind required onboarding until a location exists, and are available
+  when all locations are disabled without the invitation warning container.
 * Username, local password hashes, custom refresh sessions, Platform Operator,
   verification staging and Tenant Registration Invitations are absent from the
   initial schema and runtime. Existing local data needs no migration.
@@ -1609,9 +1672,9 @@ deployment. Direct member creation through `POST /api/accounts/v1` remains
 unavailable; managers/operators join only through fixed Account Invitations.
 
 The implemented administrative-lifecycle increment provides
-tenant-administrator Location management, includes first-location creation in
-the two-step tenant registration flow, protects the last non-archived location
-from deletion, retains the reusable zero-enabled-location creation flow in
+tenant-administrator Location management, validates and completes account
+registration before requiring first-location creation on the main page,
+protects the last non-archived location from deletion, retains the reusable zero-enabled-location creation flow in
 Orders, standardizes the managed-resource lifecycle vocabulary, adds Account
 archival through Delete, and applies the Location cascades and contracts
 specified above across the schema, API, panel, and automated verification.

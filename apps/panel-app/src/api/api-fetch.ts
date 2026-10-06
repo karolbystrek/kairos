@@ -19,6 +19,7 @@ const problemDetailsSchema = z.object({
   title: z.string().optional(),
   status: z.number().int().optional(),
   detail: z.string().optional(),
+  fieldErrors: z.record(z.string(), z.string()).optional(),
 });
 
 type ApiFetchOptions = {
