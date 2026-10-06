@@ -4,11 +4,9 @@ import type { PendingOneTimeSecret } from "./one-time-secret";
 
 import {
   Alert,
-  AlertDialog,
   Button,
   Input,
   Label,
-  Modal,
   Radio,
   RadioGroup,
   Spinner,
@@ -17,6 +15,7 @@ import {
 import { useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
 
+import { PanelPopup } from "@/components/panel-popup";
 import { FormTextField } from "@/components/form-controls";
 import {
   formatIntegrationDateTime,
@@ -408,7 +407,9 @@ export function ApiKeyManagement({
                     isDisabled={Boolean(apiKey.revokedAt)}
                     isPending={pendingAction === `revoke-${apiKey.id}`}
                     variant="danger"
-                    onPress={() => setApiKeyToRevoke(apiKey)}
+                    onPress={() => {
+                      if (!pendingAction) setApiKeyToRevoke(apiKey);
+                    }}
                   >
                     Revoke
                   </Button>
@@ -419,119 +420,108 @@ export function ApiKeyManagement({
         )}
       </section>
 
-      <AlertDialog
+      <PanelPopup
+        className="sm:max-w-[420px]"
         isOpen={Boolean(apiKeyToRevoke)}
+        role="alertdialog"
         onOpenChange={(open) => {
           if (!open) setApiKeyToRevoke(undefined);
         }}
       >
-        <AlertDialog.Backdrop>
-          <AlertDialog.Container>
-            <AlertDialog.Dialog className="sm:max-w-[420px]">
-              <AlertDialog.CloseTrigger />
-              <AlertDialog.Header>
-                <AlertDialog.Icon status="danger" />
-                <AlertDialog.Heading>
-                  Revoke {apiKeyToRevoke?.name}?
-                </AlertDialog.Heading>
-              </AlertDialog.Header>
-              <AlertDialog.Body>
-                Every secret version for this key will stop authenticating
-                immediately. This cannot be undone.
-              </AlertDialog.Body>
-              <AlertDialog.Footer>
-                <Button slot="close" variant="tertiary">
-                  Cancel
-                </Button>
-                <Button
-                  isPending={
-                    pendingAction === `revoke-${apiKeyToRevoke?.id ?? ""}`
-                  }
-                  variant="danger"
-                  onPress={() => {
-                    if (!apiKeyToRevoke) return;
+        <PanelPopup.Header>
+          <PanelPopup.Icon status="danger" />
+          <PanelPopup.Heading>
+            Revoke {apiKeyToRevoke?.name}?
+          </PanelPopup.Heading>
+        </PanelPopup.Header>
+        <PanelPopup.Body>
+          Every secret version for this key will stop authenticating
+          immediately. This cannot be undone.
+        </PanelPopup.Body>
+        <PanelPopup.Footer>
+          <Button slot="close" variant="tertiary">
+            Cancel
+          </Button>
+          <Button
+            isPending={pendingAction === `revoke-${apiKeyToRevoke?.id ?? ""}`}
+            variant="danger"
+            onPress={() => {
+              if (!apiKeyToRevoke) return;
 
-                    void revoke(apiKeyToRevoke).then((revoked) => {
-                      if (revoked) setApiKeyToRevoke(undefined);
-                    });
-                  }}
-                >
-                  Revoke
-                </Button>
-              </AlertDialog.Footer>
-            </AlertDialog.Dialog>
-          </AlertDialog.Container>
-        </AlertDialog.Backdrop>
-      </AlertDialog>
+              void revoke(apiKeyToRevoke).then((revoked) => {
+                if (revoked) setApiKeyToRevoke(undefined);
+              });
+            }}
+          >
+            Revoke
+          </Button>
+        </PanelPopup.Footer>
+      </PanelPopup>
 
-      <Modal
+      <PanelPopup
         isOpen={Boolean(selectedApiKey)}
+        size="md"
         onOpenChange={(open) => {
           if (!open) setSelectedApiKeyId(undefined);
         }}
       >
-        <Modal.Backdrop>
-          <Modal.Container placement="center" size="md">
-            <Modal.Dialog>
-              <Modal.CloseTrigger />
-              <Modal.Header>
-                <Modal.Heading>{selectedApiKey?.name} versions</Modal.Heading>
-              </Modal.Header>
-              <Modal.Body className="flex flex-col gap-4">
-                <p className="text-sm text-muted">
-                  After rotation, the previous secret remains valid until the
-                  time shown below.
-                </p>
-                {versionsError ? (
-                  <Alert status="danger">
-                    <Alert.Indicator />
-                    <Alert.Content>
-                      <Alert.Title>Versions unavailable</Alert.Title>
-                      <Alert.Description>
-                        {getIntegrationErrorMessage(versionsError)}
-                      </Alert.Description>
-                    </Alert.Content>
-                  </Alert>
-                ) : areVersionsLoading ? (
-                  <div className="flex min-h-32 items-center justify-center">
-                    <Spinner aria-label="Loading API Key versions" />
-                  </div>
-                ) : versions.length === 0 ? (
-                  <p className="text-muted">No versions found.</p>
-                ) : (
-                  <div className="border-t border-separator">
-                    {versions.map((version) => (
-                      <div
-                        key={version.id}
-                        className="flex flex-wrap items-center justify-between gap-3 border-b border-separator py-3"
-                      >
-                        <p className="text-sm text-muted">
-                          Issued {formatIntegrationDateTime(version.issuedAt)}
-                        </p>
-                        <span
-                          className={
-                            version.retiredAt
-                              ? "text-sm secondary-text"
-                              : "text-sm font-medium text-accent"
-                          }
-                        >
-                          {version.retiredAt
-                            ? "Retired"
-                            : version.validUntil
-                              ? `Valid until ${formatIntegrationDateTime(
-                                  version.validUntil,
-                                )}`
-                              : "Current"}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </Modal.Body>
-            </Modal.Dialog>
-          </Modal.Container>
-        </Modal.Backdrop>
-      </Modal>
+        <PanelPopup.Header>
+          <PanelPopup.Heading>
+            {selectedApiKey?.name} versions
+          </PanelPopup.Heading>
+        </PanelPopup.Header>
+        <PanelPopup.Body className="flex flex-col gap-4">
+          <p className="text-sm text-muted">
+            After rotation, the previous secret remains valid until the time
+            shown below.
+          </p>
+          {versionsError ? (
+            <Alert status="danger">
+              <Alert.Indicator />
+              <Alert.Content>
+                <Alert.Title>Versions unavailable</Alert.Title>
+                <Alert.Description>
+                  {getIntegrationErrorMessage(versionsError)}
+                </Alert.Description>
+              </Alert.Content>
+            </Alert>
+          ) : areVersionsLoading ? (
+            <div className="flex min-h-32 items-center justify-center">
+              <Spinner aria-label="Loading API Key versions" />
+            </div>
+          ) : versions.length === 0 ? (
+            <p className="text-muted">No versions found.</p>
+          ) : (
+            <div className="border-t border-separator">
+              {versions.map((version) => (
+                <div
+                  key={version.id}
+                  className="flex flex-wrap items-center justify-between gap-3 border-b border-separator py-3"
+                >
+                  <p className="text-sm text-muted">
+                    Issued {formatIntegrationDateTime(version.issuedAt)}
+                  </p>
+                  <span
+                    className={
+                      version.retiredAt
+                        ? "text-sm secondary-text"
+                        : "text-sm font-medium text-accent"
+                    }
+                  >
+                    {version.retiredAt
+                      ? "Retired"
+                      : version.validUntil
+                        ? `Valid until ${formatIntegrationDateTime(
+                            version.validUntil,
+                          )}`
+                        : "Current"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </PanelPopup.Body>
+      </PanelPopup>
     </div>
   );
 }

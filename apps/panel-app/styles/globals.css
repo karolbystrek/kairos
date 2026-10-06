@@ -219,6 +219,15 @@ body {
 	margin-top: var(--space-4);
 }
 
+/* Keep long popup headings clear of the shared top-right Close control. */
+.panel-popup:has(> .modal__close-trigger) > .modal__header {
+	padding-inline-end: var(--space-12);
+}
+
+.panel-popup > .modal__header:has(> .modal__heading.text-center) {
+	padding-inline-start: var(--space-12);
+}
+
 /* Shared backdrop treatment for every modal, confirmation, and drawer. */
 .modal__backdrop,
 .alert-dialog__backdrop,
@@ -226,6 +235,32 @@ body {
 	background-color: var(--popup-backdrop);
 	-webkit-backdrop-filter: blur(var(--popup-backdrop-blur));
 	backdrop-filter: blur(var(--popup-backdrop-blur));
+}
+
+@keyframes popup-backdrop-in {
+	from {
+		background-color: transparent;
+		-webkit-backdrop-filter: blur(0);
+		backdrop-filter: blur(0);
+	}
+}
+
+@keyframes popup-backdrop-out {
+	to {
+		background-color: transparent;
+		-webkit-backdrop-filter: blur(0);
+		backdrop-filter: blur(0);
+	}
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	:is(.modal__backdrop, .alert-dialog__backdrop, .drawer__backdrop)[data-entering="true"] {
+		animation: popup-backdrop-in 150ms ease-out both;
+	}
+
+	:is(.modal__backdrop, .alert-dialog__backdrop, .drawer__backdrop)[data-exiting="true"] {
+		animation: popup-backdrop-out 100ms ease-out both;
+	}
 }
 
 .floating-layer {

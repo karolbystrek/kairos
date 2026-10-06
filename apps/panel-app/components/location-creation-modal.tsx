@@ -2,12 +2,13 @@
 
 import type { FormEvent } from "react";
 
-import { Alert, Button, Modal } from "@heroui/react";
+import { Alert, Button } from "@heroui/react";
 import { Plus as PlusIcon } from "lucide-react";
 import { useState } from "react";
 import { useSWRConfig } from "swr";
 import { ZodError } from "zod";
 
+import { PanelPopup } from "@/components/panel-popup";
 import { FormTextField } from "@/components/form-controls";
 import { ApiError } from "@/src/api/api-fetch";
 import { staffLocationsKey } from "@/src/api/cache-keys";
@@ -49,7 +50,6 @@ export function LocationCreationModal({
   const [isCreating, setIsCreating] = useState(false);
 
   function changeOpen(open: boolean) {
-    if (isCreating || isRequired) return;
     onOpenChange(open);
     if (!open) {
       setName("");
@@ -88,62 +88,55 @@ export function LocationCreationModal({
   }
 
   return (
-    <Modal isOpen={isOpen} onOpenChange={changeOpen}>
-      <Modal.Backdrop
-        isDismissable={!isRequired}
-        isKeyboardDismissDisabled={isRequired}
-      >
-        <Modal.Container placement="center" size="lg">
-          <Modal.Dialog>
-            {!isRequired && <Modal.CloseTrigger />}
-            <Modal.Header>
-              <Modal.Heading>
-                {isRequired ? "Create your first location" : "New location"}
-              </Modal.Heading>
-            </Modal.Header>
-            <form onSubmit={submit}>
-              <Modal.Body className="flex flex-col gap-4">
-                {error !== undefined && (
-                  <Alert status="danger">
-                    <Alert.Indicator />
-                    <Alert.Content>
-                      <Alert.Title>Location could not be created</Alert.Title>
-                      <Alert.Description>
-                        {getErrorMessage(error)}
-                      </Alert.Description>
-                    </Alert.Content>
-                  </Alert>
-                )}
-                <FormTextField
-                  fullWidth
-                  isRequired
-                  inputProps={{ autoComplete: "organization" }}
-                  isDisabled={isCreating}
-                  label="Location name"
-                  maxLength={120}
-                  name="location-name"
-                  value={name}
-                  onChange={(value) => {
-                    setName(value);
-                    setError(undefined);
-                  }}
-                />
-              </Modal.Body>
-              <Modal.Footer>
-                {!isRequired && (
-                  <Button slot="close" variant="tertiary">
-                    Cancel
-                  </Button>
-                )}
-                <Button isPending={isCreating} type="submit">
-                  <PlusIcon size={18} />
-                  {isCreating ? "Creating…" : "Create"}
-                </Button>
-              </Modal.Footer>
-            </form>
-          </Modal.Dialog>
-        </Modal.Container>
-      </Modal.Backdrop>
-    </Modal>
+    <PanelPopup
+      isOpen={isOpen}
+      isRequired={isRequired}
+      size="lg"
+      onOpenChange={changeOpen}
+    >
+      <PanelPopup.Header>
+        <PanelPopup.Heading>
+          {isRequired ? "Create your first location" : "New location"}
+        </PanelPopup.Heading>
+      </PanelPopup.Header>
+      <form onSubmit={submit}>
+        <PanelPopup.Body className="flex flex-col gap-4">
+          {error !== undefined && (
+            <Alert status="danger">
+              <Alert.Indicator />
+              <Alert.Content>
+                <Alert.Title>Location could not be created</Alert.Title>
+                <Alert.Description>{getErrorMessage(error)}</Alert.Description>
+              </Alert.Content>
+            </Alert>
+          )}
+          <FormTextField
+            fullWidth
+            isRequired
+            inputProps={{ autoComplete: "organization" }}
+            isDisabled={isCreating}
+            label="Location name"
+            maxLength={120}
+            name="location-name"
+            value={name}
+            onChange={(value) => {
+              setName(value);
+              setError(undefined);
+            }}
+          />
+        </PanelPopup.Body>
+        <PanelPopup.Footer>
+          {!isRequired && (
+            <Button slot="close" variant="tertiary">
+              Cancel
+            </Button>
+          )}
+          <Button isPending={isCreating} type="submit">
+            <PlusIcon size={18} />
+            {isCreating ? "Creating…" : "Create"}
+          </Button>
+        </PanelPopup.Footer>
+      </form>
+    </PanelPopup>
   );
 }

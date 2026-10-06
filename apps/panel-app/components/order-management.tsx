@@ -1,14 +1,6 @@
 import type { FormEvent } from "react";
 
-import {
-  Alert,
-  AlertDialog,
-  Button,
-  ListBox,
-  Modal,
-  Spinner,
-  Tooltip,
-} from "@heroui/react";
+import { Alert, Button, ListBox, Spinner, Tooltip } from "@heroui/react";
 import {
   ArrowRight as ArrowRightIcon,
   Clock3 as ClockIcon,
@@ -21,6 +13,7 @@ import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 import useSWRMutation from "swr/mutation";
 
+import { PanelPopup } from "@/components/panel-popup";
 import { FormSelect, FormTextField } from "@/components/form-controls";
 import { PanelCard } from "@/components/panel-card";
 import { LocationCreationModal } from "@/components/location-creation-modal";
@@ -136,12 +129,14 @@ function useMinuteClock() {
 }
 
 function LocationSelect({
+  isDisabled = false,
   label,
   locations,
   onChange,
   selectedId,
   showAll,
 }: {
+  isDisabled?: boolean;
   label: string;
   locations: Location[];
   onChange: (locationId?: string) => void;
@@ -155,6 +150,7 @@ function LocationSelect({
   return (
     <FormSelect
       className="w-full sm:max-w-xs"
+      isDisabled={isDisabled}
       label={label}
       selectedKey={selectedId ?? "all"}
       onSelectionChange={(key) =>
@@ -403,6 +399,11 @@ export function OrderManagement({
     locationsError ?? ordersError ?? createOrderError ?? updateOrderError;
 
   function openCreate() {
+    if (isCreatingOrder) {
+      setIsCreateOpen(true);
+
+      return;
+    }
     resetCreateOrder();
     setCreateLocationId(locationId ?? enabledLocations[0]?.id);
     setIsCreateOpen(true);
@@ -448,6 +449,8 @@ export function OrderManagement({
     order: StaffOrder,
     status: OrderStatus,
   ): Promise<boolean> {
+    if (isUpdatingOrder) return false;
+
     resetUpdateOrder();
     const updated = await triggerUpdateOrder({ orderId: order.id, status });
 
@@ -472,6 +475,7 @@ export function OrderManagement({
   }
 
   function selectLocation(nextLocationId?: string) {
+    if (isCreatingOrder || isUpdatingOrder) return;
     setSelectedLocationId(nextLocationId);
     onRequestedLocationApplied?.();
     resetCreateOrder();
@@ -532,6 +536,7 @@ export function OrderManagement({
           {canViewTenantOrders && (
             <LocationSelect
               showAll
+              isDisabled={isCreatingOrder || isUpdatingOrder}
               label="Queue location"
               locations={enabledLocations}
               selectedId={locationId}
@@ -579,6 +584,7 @@ export function OrderManagement({
                             order={order}
                             showLocation={locationId === undefined}
                             onCancel={(selectedOrder) => {
+                              if (isUpdatingOrder) return;
                               resetUpdateOrder();
                               setCancelOrder(selectedOrder);
                             }}
@@ -598,68 +604,65 @@ export function OrderManagement({
         </>
       )}
 
-      <Modal isOpen={isCreateOpen} onOpenChange={setIsCreateOpen}>
-        <Modal.Backdrop>
-          <Modal.Container placement="center" size="lg">
-            <Modal.Dialog>
-              <Modal.CloseTrigger />
-              <Modal.Header>
-                <Modal.Heading>New order</Modal.Heading>
-              </Modal.Header>
-              <form onSubmit={createOrder}>
-                <Modal.Body className="flex flex-col gap-4">
-                  {createOrderError && (
-                    <Alert status="danger">
-                      <Alert.Indicator />
-                      <Alert.Content>
-                        <Alert.Title>Order could not be created</Alert.Title>
-                        <Alert.Description>
-                          {getErrorMessage(createOrderError)}
-                        </Alert.Description>
-                      </Alert.Content>
-                    </Alert>
-                  )}
-                  {canViewTenantOrders && (
-                    <LocationSelect
-                      label="Location"
-                      locations={enabledLocations}
-                      selectedId={createLocationId}
-                      showAll={false}
-                      onChange={setCreateLocationId}
-                    />
-                  )}
-                  <FormTextField
-                    fullWidth
-                    isDisabled={isCreatingOrder}
-                    isInvalid={Boolean(customLabelError)}
-                    label="Order label (optional)"
-                    maxLength={32}
-                    name="custom-order-label"
-                    placeholder="Order label (automatic if empty)"
-                    value={customLabel}
-                    onChange={(value) => {
-                      setCustomLabel(value);
-                      setCustomLabelError(undefined);
-                    }}
-                  />
-                  {customLabelError && (
-                    <p className="text-sm text-danger">{customLabelError}</p>
-                  )}
-                </Modal.Body>
-                <Modal.Footer>
-                  <Button slot="close" variant="tertiary">
-                    Cancel
-                  </Button>
-                  <Button isPending={isCreatingOrder} type="submit">
-                    <PlusIcon size={18} />
-                    {isCreatingOrder ? "Creating…" : "Create"}
-                  </Button>
-                </Modal.Footer>
-              </form>
-            </Modal.Dialog>
-          </Modal.Container>
-        </Modal.Backdrop>
-      </Modal>
+      <PanelPopup
+        isOpen={isCreateOpen}
+        size="lg"
+        onOpenChange={setIsCreateOpen}
+      >
+        <PanelPopup.Header>
+          <PanelPopup.Heading>New order</PanelPopup.Heading>
+        </PanelPopup.Header>
+        <form onSubmit={createOrder}>
+          <PanelPopup.Body className="flex flex-col gap-4">
+            {createOrderError && (
+              <Alert status="danger">
+                <Alert.Indicator />
+                <Alert.Content>
+                  <Alert.Title>Order could not be created</Alert.Title>
+                  <Alert.Description>
+                    {getErrorMessage(createOrderError)}
+                  </Alert.Description>
+                </Alert.Content>
+              </Alert>
+            )}
+            {canViewTenantOrders && (
+              <LocationSelect
+                label="Location"
+                locations={enabledLocations}
+                selectedId={createLocationId}
+                showAll={false}
+                onChange={setCreateLocationId}
+              />
+            )}
+            <FormTextField
+              fullWidth
+              isDisabled={isCreatingOrder}
+              isInvalid={Boolean(customLabelError)}
+              label="Order label (optional)"
+              maxLength={32}
+              name="custom-order-label"
+              placeholder="Order label (automatic if empty)"
+              value={customLabel}
+              onChange={(value) => {
+                setCustomLabel(value);
+                setCustomLabelError(undefined);
+              }}
+            />
+            {customLabelError && (
+              <p className="text-sm text-danger">{customLabelError}</p>
+            )}
+          </PanelPopup.Body>
+          <PanelPopup.Footer>
+            <Button slot="close" variant="tertiary">
+              Cancel
+            </Button>
+            <Button isPending={isCreatingOrder} type="submit">
+              <PlusIcon size={18} />
+              {isCreatingOrder ? "Creating…" : "Create"}
+            </Button>
+          </PanelPopup.Footer>
+        </form>
+      </PanelPopup>
 
       {canManageLocations && (
         <LocationCreationModal
@@ -673,87 +676,72 @@ export function OrderManagement({
         />
       )}
 
-      <Modal
+      <PanelPopup
         isOpen={Boolean(qrOrder)}
+        size="lg"
         onOpenChange={(open) => {
           if (!open) setQrOrder(undefined);
         }}
       >
-        <Modal.Backdrop>
-          <Modal.Container placement="center" size="lg">
-            <Modal.Dialog>
-              <Modal.CloseTrigger />
-              <Modal.Header className="justify-center px-16 pb-2">
-                <Modal.Heading className="text-center text-lg font-medium tracking-normal secondary-text">
-                  {qrOrder?.label}
-                </Modal.Heading>
-              </Modal.Header>
-              <Modal.Body className="flex items-center justify-center px-6 pb-8 pt-2 sm:px-10">
-                {qrOrder && (
-                  <OrderQrCode accountId={accountId} order={qrOrder} />
-                )}
-              </Modal.Body>
-            </Modal.Dialog>
-          </Modal.Container>
-        </Modal.Backdrop>
-      </Modal>
+        <PanelPopup.Header className="justify-center px-16 pb-2">
+          <PanelPopup.Heading className="text-center text-lg font-medium tracking-normal secondary-text">
+            {qrOrder?.label}
+          </PanelPopup.Heading>
+        </PanelPopup.Header>
+        <PanelPopup.Body className="flex items-center justify-center px-6 pb-8 pt-2 sm:px-10">
+          {qrOrder && <OrderQrCode accountId={accountId} order={qrOrder} />}
+        </PanelPopup.Body>
+      </PanelPopup>
 
-      <AlertDialog
+      <PanelPopup
+        className="sm:max-w-[420px]"
         isOpen={Boolean(cancelOrder)}
+        role="alertdialog"
         onOpenChange={(open) => {
           if (!open) setCancelOrder(undefined);
         }}
       >
-        <AlertDialog.Backdrop>
-          <AlertDialog.Container>
-            <AlertDialog.Dialog className="sm:max-w-[420px]">
-              <AlertDialog.CloseTrigger />
-              <AlertDialog.Header>
-                <AlertDialog.Icon status="danger" />
-                <AlertDialog.Heading>
-                  Cancel order {cancelOrder?.label}?
-                </AlertDialog.Heading>
-              </AlertDialog.Header>
-              <AlertDialog.Body>
-                <p>
-                  The customer will see that this order was canceled. This
-                  cannot be undone.
-                </p>
-                {updateOrderError && (
-                  <Alert className="mt-4" status="danger">
-                    <Alert.Indicator />
-                    <Alert.Content>
-                      <Alert.Title>Order could not be canceled</Alert.Title>
-                      <Alert.Description>
-                        {getErrorMessage(updateOrderError)}
-                      </Alert.Description>
-                    </Alert.Content>
-                  </Alert>
-                )}
-              </AlertDialog.Body>
-              <AlertDialog.Footer>
-                <Button slot="close" variant="tertiary">
-                  Keep order
-                </Button>
-                <Button
-                  isPending={isUpdatingOrder}
-                  variant="danger"
-                  onPress={() => {
-                    if (!cancelOrder) return;
-                    void updateStatus(cancelOrder, "CANCELED").then(
-                      (didUpdate) => {
-                        if (didUpdate) setCancelOrder(undefined);
-                      },
-                    );
-                  }}
-                >
-                  Cancel order
-                </Button>
-              </AlertDialog.Footer>
-            </AlertDialog.Dialog>
-          </AlertDialog.Container>
-        </AlertDialog.Backdrop>
-      </AlertDialog>
+        <PanelPopup.Header>
+          <PanelPopup.Icon status="danger" />
+          <PanelPopup.Heading>
+            Cancel order {cancelOrder?.label}?
+          </PanelPopup.Heading>
+        </PanelPopup.Header>
+        <PanelPopup.Body>
+          <p>
+            The customer will see that this order was canceled. This cannot be
+            undone.
+          </p>
+          {updateOrderError && (
+            <Alert className="mt-4" status="danger">
+              <Alert.Indicator />
+              <Alert.Content>
+                <Alert.Title>Order could not be canceled</Alert.Title>
+                <Alert.Description>
+                  {getErrorMessage(updateOrderError)}
+                </Alert.Description>
+              </Alert.Content>
+            </Alert>
+          )}
+        </PanelPopup.Body>
+        <PanelPopup.Footer>
+          <Button slot="close" variant="tertiary">
+            Keep order
+          </Button>
+          <Button
+            isPending={isUpdatingOrder}
+            variant="danger"
+            onPress={() => {
+              if (!cancelOrder) return;
+              void updateStatus(cancelOrder, "CANCELED").then((didUpdate) => {
+                if (didUpdate) setCancelOrder(undefined);
+              });
+            }}
+          >
+            Cancel order
+          </Button>
+        </PanelPopup.Footer>
+      </PanelPopup>
     </div>
   );
 }

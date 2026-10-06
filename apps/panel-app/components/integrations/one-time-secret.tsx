@@ -49,8 +49,8 @@ export function OneTimeSecret({
         <Alert.Content>
           <Alert.Title>Copy this secret now</Alert.Title>
           <Alert.Description>
-            Kairos will not show it again. This view stays locked until you
-            confirm that you saved it.
+            Kairos will not show it again after confirmation. Save it before
+            confirming.
           </Alert.Description>
         </Alert.Content>
       </Alert>

@@ -4,8 +4,8 @@ import type { FormEvent } from "react";
 
 import {
   Alert,
-  AlertDialog,
   Button,
+  Dropdown,
   Link,
   Spinner,
   Tabs,
@@ -13,7 +13,7 @@ import {
 } from "@heroui/react";
 import {
   ClipboardList as OrdersIcon,
-  LogOut as SignOutIcon,
+  UserRound as AccountIcon,
   MapPin as LocationsIcon,
   Users as TeamIcon,
   Workflow as IntegrationIcon,
@@ -24,6 +24,7 @@ import useSWR, { useSWRConfig } from "swr";
 import useSWRMutation from "swr/mutation";
 import { ZodError } from "zod";
 
+import { PanelPopup } from "@/components/panel-popup";
 import { FormTextField } from "@/components/form-controls";
 import { OrderManagement } from "@/components/order-management";
 import { AccountManagement } from "@/components/account-management";
@@ -229,8 +230,10 @@ export function StaffPanel() {
   const [selectedWorkspace, setSelectedWorkspace] = useState("orders");
   const [requestedOrderLocationId, setRequestedOrderLocationId] =
     useState<string>();
-  const [isSignOutConfirmationOpen, setIsSignOutConfirmationOpen] =
-    useState(false);
+  const [signOutScope, setSignOutScope] = useState<
+    "device" | "everywhere" | null
+  >(null);
+  const [isPasswordChangeOpen, setIsPasswordChangeOpen] = useState(false);
   const {
     data: account,
     error: accountError,
@@ -277,6 +280,8 @@ export function StaffPanel() {
   useEffect(
     () =>
       subscribeToAuthenticationRequired(() => {
+        setIsPasswordChangeOpen(false);
+        setSignOutScope(null);
         void mutateCache(isStaffCacheKey, undefined, { revalidate: false });
         void mutateAccount(undefined, { revalidate: false });
       }),
@@ -293,11 +298,13 @@ export function StaffPanel() {
   }
 
   async function signOut(everywhere = false) {
+    if (isLoggingOut) return;
+
     const didLogout = await triggerLogout(everywhere);
 
     if (!didLogout) return;
 
-    setIsSignOutConfirmationOpen(false);
+    setSignOutScope(null);
     await mutateAccount(undefined, { revalidate: false });
     await mutateCache(isStaffCacheKey, undefined, { revalidate: false });
   }
@@ -371,32 +378,38 @@ export function StaffPanel() {
   const needsFirstLocation = canManageLocations && hasNoLocations;
   const utilities = (
     <div className="panel-workspace-utilities flex shrink-0 items-center gap-2">
-      <PasswordChangeDialog
-        onChanged={async () => {
-          await mutateAccount(undefined, { revalidate: false });
-          await mutateCache(isStaffCacheKey, undefined, { revalidate: false });
-        }}
-      />
       <PanelAppearanceMenu />
-      <Tooltip delay={500}>
-        <Tooltip.Trigger>
-          <Button
-            isIconOnly
-            aria-label={isLoggingOut ? "Signing out" : "Sign out"}
-            className="rounded-md"
-            isPending={isLoggingOut}
-            size="lg"
-            variant="tertiary"
-            onPress={() => {
-              resetLogout();
-              setIsSignOutConfirmationOpen(true);
+      <Dropdown>
+        <Tooltip delay={500}>
+          <Tooltip.Trigger>
+            <Dropdown.Trigger
+              aria-label="Account"
+              className="icon-menu-trigger icon-menu-trigger--touch"
+              isDisabled={isLoggingOut}
+            >
+              <AccountIcon aria-hidden="true" size={20} />
+            </Dropdown.Trigger>
+          </Tooltip.Trigger>
+          <Tooltip.Content>Account</Tooltip.Content>
+        </Tooltip>
+        <Dropdown.Popover placement="bottom end">
+          <Dropdown.Menu
+            aria-label="Account actions"
+            onAction={(key) => {
+              if (key === "password") {
+                setIsPasswordChangeOpen(true);
+              } else {
+                resetLogout();
+                setSignOutScope(key === "everywhere" ? "everywhere" : "device");
+              }
             }}
           >
-            <SignOutIcon size={20} />
-          </Button>
-        </Tooltip.Trigger>
-        <Tooltip.Content>Sign out</Tooltip.Content>
-      </Tooltip>
+            <Dropdown.Item id="password">Change password</Dropdown.Item>
+            <Dropdown.Item id="device">Sign out</Dropdown.Item>
+            <Dropdown.Item id="everywhere">Sign out everywhere</Dropdown.Item>
+          </Dropdown.Menu>
+        </Dropdown.Popover>
+      </Dropdown>
     </div>
   );
 
@@ -535,64 +548,65 @@ export function StaffPanel() {
         />
       )}
 
-      <AlertDialog
-        isOpen={isSignOutConfirmationOpen}
-        onOpenChange={(open) => {
-          if (isLoggingOut) return;
+      <PasswordChangeDialog
+        isOpen={isPasswordChangeOpen}
+        onChanged={async () => {
+          await mutateAccount(undefined, { revalidate: false });
+          await mutateCache(isStaffCacheKey, undefined, { revalidate: false });
+        }}
+        onOpenChange={setIsPasswordChangeOpen}
+      />
 
-          setIsSignOutConfirmationOpen(open);
-          if (!open) resetLogout();
+      <PanelPopup
+        className="sm:max-w-[420px]"
+        isOpen={signOutScope !== null}
+        role="alertdialog"
+        onOpenChange={(open) => {
+          if (!open) {
+            setSignOutScope(null);
+            if (!isLoggingOut) resetLogout();
+          }
         }}
       >
-        <AlertDialog.Backdrop>
-          <AlertDialog.Container>
-            <AlertDialog.Dialog className="sm:max-w-[420px]">
-              <AlertDialog.CloseTrigger />
-              <AlertDialog.Header>
-                <AlertDialog.Icon status="warning" />
-                <AlertDialog.Heading>Sign out?</AlertDialog.Heading>
-              </AlertDialog.Header>
-              <AlertDialog.Body className="flex flex-col gap-4">
-                <p>You will need to sign in again to manage orders.</p>
-                {logoutError && (
-                  <Alert status="danger">
-                    <Alert.Indicator />
-                    <Alert.Content>
-                      <Alert.Title>Sign-out failed</Alert.Title>
-                      <Alert.Description>
-                        {getErrorMessage(logoutError)}
-                      </Alert.Description>
-                    </Alert.Content>
-                  </Alert>
-                )}
-              </AlertDialog.Body>
-              <AlertDialog.Footer>
-                <Button
-                  isDisabled={isLoggingOut}
-                  variant="secondary"
-                  onPress={() => void signOut(true)}
-                >
-                  Sign out everywhere
-                </Button>
-                <Button
-                  isDisabled={isLoggingOut}
-                  slot="close"
-                  variant="tertiary"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  isPending={isLoggingOut}
-                  variant="danger"
-                  onPress={() => void signOut()}
-                >
-                  Sign out
-                </Button>
-              </AlertDialog.Footer>
-            </AlertDialog.Dialog>
-          </AlertDialog.Container>
-        </AlertDialog.Backdrop>
-      </AlertDialog>
+        <PanelPopup.Header>
+          <PanelPopup.Icon status="warning" />
+          <PanelPopup.Heading>
+            {signOutScope === "everywhere"
+              ? "Sign out everywhere?"
+              : "Sign out?"}
+          </PanelPopup.Heading>
+        </PanelPopup.Header>
+        <PanelPopup.Body className="flex flex-col gap-4">
+          <p>
+            {signOutScope === "everywhere"
+              ? "You will be signed out on all devices, including this one."
+              : "You will be signed out on this device and need to sign in again to manage orders."}
+          </p>
+          {logoutError && (
+            <Alert status="danger">
+              <Alert.Indicator />
+              <Alert.Content>
+                <Alert.Title>Sign-out failed</Alert.Title>
+                <Alert.Description>
+                  {getErrorMessage(logoutError)}
+                </Alert.Description>
+              </Alert.Content>
+            </Alert>
+          )}
+        </PanelPopup.Body>
+        <PanelPopup.Footer>
+          <Button slot="close" variant="tertiary">
+            Cancel
+          </Button>
+          <Button
+            isPending={isLoggingOut}
+            variant="danger"
+            onPress={() => void signOut(signOutScope === "everywhere")}
+          >
+            {signOutScope === "everywhere" ? "Sign out everywhere" : "Sign out"}
+          </Button>
+        </PanelPopup.Footer>
+      </PanelPopup>
     </div>
   );
 }

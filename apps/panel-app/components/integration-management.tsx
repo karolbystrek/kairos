@@ -3,15 +3,7 @@ import type { Location } from "@/src/api/locations";
 import type { ExternalIntegration } from "@/src/api/integrations";
 import type { PendingOneTimeSecret } from "./integrations/one-time-secret";
 
-import {
-  Alert,
-  AlertDialog,
-  Button,
-  Modal,
-  Spinner,
-  Tabs,
-  Tooltip,
-} from "@heroui/react";
+import { Alert, Button, Spinner, Tabs, Tooltip } from "@heroui/react";
 import {
   ArrowRight as ArrowRightIcon,
   Ban as DisableIcon,
@@ -24,6 +16,7 @@ import {
 import { useState } from "react";
 import useSWR from "swr";
 
+import { PanelPopup } from "@/components/panel-popup";
 import { FormTextField } from "@/components/form-controls";
 import { ApiKeyManagement } from "@/components/integrations/api-key-management";
 import {
@@ -235,6 +228,7 @@ function IntegrationDetails({
                     integration.status === "ENABLED" ? "danger" : "secondary"
                   }
                   onPress={() => {
+                    if (pendingAction) return;
                     if (integration.status === "ENABLED") {
                       setConfirmation("disable");
                     } else {
@@ -261,7 +255,10 @@ function IntegrationDetails({
                   className="rounded-md"
                   isPending={pendingAction === "delete"}
                   variant="danger"
-                  onPress={() => setConfirmation("delete")}
+                  onPress={() => {
+                    if (pendingAction) return;
+                    setConfirmation("delete");
+                  }}
                 >
                   <TrashIcon size={20} />
                 </Button>
@@ -303,101 +300,87 @@ function IntegrationDetails({
         </Tabs.Panel>
       </Tabs>
 
-      <AlertDialog
+      <PanelPopup
+        className="sm:max-w-[420px]"
         isOpen={confirmation === "disable"}
+        role="alertdialog"
         onOpenChange={(open) => {
           if (!open) closeConfirmation();
         }}
       >
-        <AlertDialog.Backdrop>
-          <AlertDialog.Container>
-            <AlertDialog.Dialog className="sm:max-w-[420px]">
-              <AlertDialog.CloseTrigger />
-              <AlertDialog.Header>
-                <AlertDialog.Icon status="warning" />
-                <AlertDialog.Heading>
-                  Disable {integration.name}?
-                </AlertDialog.Heading>
-              </AlertDialog.Header>
-              <AlertDialog.Body>
-                Its API Keys will stop authenticating and future webhook fan-out
-                will pause until the integration is enabled again.
-              </AlertDialog.Body>
-              <AlertDialog.Footer>
-                <Button slot="close" variant="tertiary">
-                  Cancel
-                </Button>
-                <Button
-                  isPending={pendingAction === "status"}
-                  variant="danger"
-                  onPress={() => {
-                    void changeStatus().then((changed) => {
-                      if (changed) closeConfirmation();
-                    });
-                  }}
-                >
-                  Disable
-                </Button>
-              </AlertDialog.Footer>
-            </AlertDialog.Dialog>
-          </AlertDialog.Container>
-        </AlertDialog.Backdrop>
-      </AlertDialog>
+        <PanelPopup.Header>
+          <PanelPopup.Icon status="warning" />
+          <PanelPopup.Heading>Disable {integration.name}?</PanelPopup.Heading>
+        </PanelPopup.Header>
+        <PanelPopup.Body>
+          Its API Keys will stop authenticating and future webhook fan-out will
+          pause until the integration is enabled again.
+        </PanelPopup.Body>
+        <PanelPopup.Footer>
+          <Button slot="close" variant="tertiary">
+            Cancel
+          </Button>
+          <Button
+            isPending={pendingAction === "status"}
+            variant="danger"
+            onPress={() => {
+              void changeStatus().then((changed) => {
+                if (changed) closeConfirmation();
+              });
+            }}
+          >
+            Disable
+          </Button>
+        </PanelPopup.Footer>
+      </PanelPopup>
 
-      <AlertDialog
+      <PanelPopup
+        className="sm:max-w-[460px]"
         isOpen={confirmation === "delete"}
+        role="alertdialog"
         onOpenChange={(open) => {
           if (!open) closeConfirmation();
         }}
       >
-        <AlertDialog.Backdrop>
-          <AlertDialog.Container>
-            <AlertDialog.Dialog className="sm:max-w-[460px]">
-              <AlertDialog.CloseTrigger />
-              <AlertDialog.Header>
-                <AlertDialog.Icon status="danger" />
-                <AlertDialog.Heading>
-                  Delete {integration.name}?
-                </AlertDialog.Heading>
-              </AlertDialog.Header>
-              <AlertDialog.Body className="flex flex-col gap-4">
-                <p>
-                  This permanently removes the integration from this workspace
-                  and immediately blocks its API Keys and future webhook
-                  fan-out. Type its exact name to confirm.
-                </p>
-                <FormTextField
-                  fullWidth
-                  isRequired
-                  inputProps={{ autoComplete: "off" }}
-                  isDisabled={pendingAction === "delete"}
-                  label={`Type ${integration.name} to confirm`}
-                  name="delete-integration-confirmation"
-                  value={deleteConfirmation}
-                  onChange={setDeleteConfirmation}
-                />
-              </AlertDialog.Body>
-              <AlertDialog.Footer>
-                <Button slot="close" variant="tertiary">
-                  Cancel
-                </Button>
-                <Button
-                  isDisabled={deleteConfirmation !== integration.name}
-                  isPending={pendingAction === "delete"}
-                  variant="danger"
-                  onPress={() => {
-                    void remove().then((removed) => {
-                      if (removed) closeConfirmation();
-                    });
-                  }}
-                >
-                  Delete
-                </Button>
-              </AlertDialog.Footer>
-            </AlertDialog.Dialog>
-          </AlertDialog.Container>
-        </AlertDialog.Backdrop>
-      </AlertDialog>
+        <PanelPopup.Header>
+          <PanelPopup.Icon status="danger" />
+          <PanelPopup.Heading>Delete {integration.name}?</PanelPopup.Heading>
+        </PanelPopup.Header>
+        <PanelPopup.Body className="flex flex-col gap-4">
+          <p>
+            This permanently removes the integration from this workspace and
+            immediately blocks its API Keys and future webhook fan-out. Type its
+            exact name to confirm.
+          </p>
+          <FormTextField
+            fullWidth
+            isRequired
+            inputProps={{ autoComplete: "off" }}
+            isDisabled={pendingAction === "delete"}
+            label={`Type ${integration.name} to confirm`}
+            name="delete-integration-confirmation"
+            value={deleteConfirmation}
+            onChange={setDeleteConfirmation}
+          />
+        </PanelPopup.Body>
+        <PanelPopup.Footer>
+          <Button slot="close" variant="tertiary">
+            Cancel
+          </Button>
+          <Button
+            isDisabled={deleteConfirmation !== integration.name}
+            isPending={pendingAction === "delete"}
+            variant="danger"
+            onPress={() => {
+              void remove().then((removed) => {
+                if (removed) closeConfirmation();
+              });
+            }}
+          >
+            Delete
+          </Button>
+        </PanelPopup.Footer>
+      </PanelPopup>
     </div>
   );
 }
@@ -595,54 +578,49 @@ export function IntegrationManagement({ accountId }: { accountId: string }) {
         </div>
       )}
 
-      <Modal isOpen={isCreateOpen} onOpenChange={setIsCreateOpen}>
-        <Modal.Backdrop>
-          <Modal.Container placement="center" size="sm">
-            <Modal.Dialog>
-              <Modal.CloseTrigger />
-              <Modal.Header>
-                <Modal.Heading>New integration</Modal.Heading>
-              </Modal.Header>
-              <form onSubmit={create}>
-                <Modal.Body className="flex flex-col gap-4">
-                  {Boolean(createError) && (
-                    <Alert status="danger">
-                      <Alert.Indicator />
-                      <Alert.Content>
-                        <Alert.Title>
-                          Integration could not be created
-                        </Alert.Title>
-                        <Alert.Description>
-                          {getIntegrationErrorMessage(createError)}
-                        </Alert.Description>
-                      </Alert.Content>
-                    </Alert>
-                  )}
-                  <FormTextField
-                    fullWidth
-                    isRequired
-                    isDisabled={isCreating}
-                    label="Integration name"
-                    maxLength={64}
-                    name="new-integration-name"
-                    value={name}
-                    onChange={setName}
-                  />
-                </Modal.Body>
-                <Modal.Footer>
-                  <Button slot="close" variant="tertiary">
-                    Cancel
-                  </Button>
-                  <Button isPending={isCreating} type="submit">
-                    <PlusIcon size={18} />
-                    {isCreating ? "Creating…" : "Create"}
-                  </Button>
-                </Modal.Footer>
-              </form>
-            </Modal.Dialog>
-          </Modal.Container>
-        </Modal.Backdrop>
-      </Modal>
+      <PanelPopup
+        isOpen={isCreateOpen}
+        size="sm"
+        onOpenChange={setIsCreateOpen}
+      >
+        <PanelPopup.Header>
+          <PanelPopup.Heading>New integration</PanelPopup.Heading>
+        </PanelPopup.Header>
+        <form onSubmit={create}>
+          <PanelPopup.Body className="flex flex-col gap-4">
+            {Boolean(createError) && (
+              <Alert status="danger">
+                <Alert.Indicator />
+                <Alert.Content>
+                  <Alert.Title>Integration could not be created</Alert.Title>
+                  <Alert.Description>
+                    {getIntegrationErrorMessage(createError)}
+                  </Alert.Description>
+                </Alert.Content>
+              </Alert>
+            )}
+            <FormTextField
+              fullWidth
+              isRequired
+              isDisabled={isCreating}
+              label="Integration name"
+              maxLength={64}
+              name="new-integration-name"
+              value={name}
+              onChange={setName}
+            />
+          </PanelPopup.Body>
+          <PanelPopup.Footer>
+            <Button slot="close" variant="tertiary">
+              Cancel
+            </Button>
+            <Button isPending={isCreating} type="submit">
+              <PlusIcon size={18} />
+              {isCreating ? "Creating…" : "Create"}
+            </Button>
+          </PanelPopup.Footer>
+        </form>
+      </PanelPopup>
     </div>
   );
 }

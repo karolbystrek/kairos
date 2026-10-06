@@ -2,7 +2,7 @@
 
 import type { FormEvent } from "react";
 
-import { Alert, AlertDialog, Button, Spinner, Tooltip } from "@heroui/react";
+import { Alert, Button, Spinner, Tooltip } from "@heroui/react";
 import {
   ArrowRight as ArrowRightIcon,
   Ban as DisableIcon,
@@ -16,6 +16,7 @@ import { useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
 import { ZodError } from "zod";
 
+import { PanelPopup } from "@/components/panel-popup";
 import { FormTextField } from "@/components/form-controls";
 import { LocationCreationModal } from "@/components/location-creation-modal";
 import { PanelCard } from "@/components/panel-card";
@@ -174,6 +175,7 @@ export function LocationManagement({
   }
 
   function openConfirmation(next: Confirmation) {
+    if (pendingAction) return;
     setActionError(undefined);
     setDeleteConfirmation("");
     setConfirmation(next);
@@ -419,122 +421,109 @@ export function LocationManagement({
         onOpenChange={setIsCreateOpen}
       />
 
-      <AlertDialog
+      <PanelPopup
+        className="sm:max-w-[480px]"
         isOpen={Boolean(confirmation)}
+        role="alertdialog"
         onOpenChange={(open) => {
-          if (!open && !pendingAction) {
+          if (!open) {
             setConfirmation(undefined);
             setActionError(undefined);
             setDeleteConfirmation("");
           }
         }}
       >
-        <AlertDialog.Backdrop>
-          <AlertDialog.Container>
-            <AlertDialog.Dialog className="sm:max-w-[480px]">
-              <AlertDialog.CloseTrigger />
-              <AlertDialog.Header>
-                <AlertDialog.Icon
-                  status={
-                    confirmation?.kind === "enable" ? "warning" : "danger"
-                  }
-                />
-                <AlertDialog.Heading>{confirmationTitle}</AlertDialog.Heading>
-              </AlertDialog.Header>
-              <AlertDialog.Body className="flex flex-col gap-4">
-                {confirmation?.kind === "disable" && (
-                  <p>
-                    Assigned accounts will be disabled and signed out. Pending
-                    invitations for this location will be revoked.
-                  </p>
-                )}
-                {confirmation?.kind === "enable" && (
-                  <p>
-                    Every assigned non-archived account will be enabled, even if
-                    it was disabled independently.
-                  </p>
-                )}
-                {confirmation?.kind === "delete" && (
-                  <>
-                    <p>
-                      The location and its assigned accounts will disappear from
-                      ordinary management and cannot be restored. Historical
-                      orders remain readable. Type its exact name to confirm.
-                    </p>
-                    <FormTextField
-                      fullWidth
-                      isRequired
-                      inputProps={{ autoComplete: "off" }}
-                      isDisabled={Boolean(pendingAction)}
-                      label={`Type ${confirmation.location.name} to confirm`}
-                      name="delete-location-confirmation"
-                      value={deleteConfirmation}
-                      onChange={setDeleteConfirmation}
-                    />
-                  </>
-                )}
-                {actionError !== undefined && (
-                  <Alert status="danger">
-                    <Alert.Indicator />
-                    <Alert.Content>
-                      <Alert.Title>
-                        {hasActiveOrdersConflict
-                          ? "Active orders must be resolved"
-                          : "Location action failed"}
-                      </Alert.Title>
-                      <Alert.Description>
-                        {hasActiveOrdersConflict
-                          ? "Complete or cancel every active order before disabling this location."
-                          : getErrorMessage(actionError)}
-                      </Alert.Description>
-                    </Alert.Content>
-                  </Alert>
-                )}
-              </AlertDialog.Body>
-              <AlertDialog.Footer>
-                <Button
-                  isDisabled={Boolean(pendingAction)}
-                  slot="close"
-                  variant="tertiary"
-                >
-                  Cancel
-                </Button>
-                {hasActiveOrdersConflict && confirmation && (
-                  <Button
-                    variant="secondary"
-                    onPress={() => {
-                      const locationId = confirmation.location.id;
+        <PanelPopup.Header>
+          <PanelPopup.Icon
+            status={confirmation?.kind === "enable" ? "warning" : "danger"}
+          />
+          <PanelPopup.Heading>{confirmationTitle}</PanelPopup.Heading>
+        </PanelPopup.Header>
+        <PanelPopup.Body className="flex flex-col gap-4">
+          {confirmation?.kind === "disable" && (
+            <p>
+              Assigned accounts will be disabled and signed out. Pending
+              invitations for this location will be revoked.
+            </p>
+          )}
+          {confirmation?.kind === "enable" && (
+            <p>
+              Every assigned non-archived account will be enabled, even if it
+              was disabled independently.
+            </p>
+          )}
+          {confirmation?.kind === "delete" && (
+            <>
+              <p>
+                The location and its assigned accounts will disappear from
+                ordinary management and cannot be restored. Historical orders
+                remain readable. Type its exact name to confirm.
+              </p>
+              <FormTextField
+                fullWidth
+                isRequired
+                inputProps={{ autoComplete: "off" }}
+                isDisabled={Boolean(pendingAction)}
+                label={`Type ${confirmation.location.name} to confirm`}
+                name="delete-location-confirmation"
+                value={deleteConfirmation}
+                onChange={setDeleteConfirmation}
+              />
+            </>
+          )}
+          {actionError !== undefined && (
+            <Alert status="danger">
+              <Alert.Indicator />
+              <Alert.Content>
+                <Alert.Title>
+                  {hasActiveOrdersConflict
+                    ? "Active orders must be resolved"
+                    : "Location action failed"}
+                </Alert.Title>
+                <Alert.Description>
+                  {hasActiveOrdersConflict
+                    ? "Complete or cancel every active order before disabling this location."
+                    : getErrorMessage(actionError)}
+                </Alert.Description>
+              </Alert.Content>
+            </Alert>
+          )}
+        </PanelPopup.Body>
+        <PanelPopup.Footer>
+          <Button slot="close" variant="tertiary">
+            Cancel
+          </Button>
+          {hasActiveOrdersConflict && confirmation && (
+            <Button
+              variant="secondary"
+              onPress={() => {
+                const locationId = confirmation.location.id;
 
-                      setConfirmation(undefined);
-                      setActionError(undefined);
-                      onViewOrders(locationId);
-                    }}
-                  >
-                    View orders
-                  </Button>
-                )}
-                <Button
-                  isDisabled={
-                    confirmation?.kind === "delete" &&
-                    deleteConfirmation !== confirmation.location.name
-                  }
-                  isPending={Boolean(pendingAction)}
-                  variant={
-                    confirmation?.kind === "enable" ? "primary" : "danger"
-                  }
-                  onPress={() => void confirmAction()}
-                >
-                  {confirmation?.kind === "disable"
-                    ? "Disable"
-                    : confirmation?.kind === "enable"
-                      ? "Enable"
-                      : "Delete"}
-                </Button>
-              </AlertDialog.Footer>
-            </AlertDialog.Dialog>
-          </AlertDialog.Container>
-        </AlertDialog.Backdrop>
-      </AlertDialog>
+                setConfirmation(undefined);
+                setActionError(undefined);
+                onViewOrders(locationId);
+              }}
+            >
+              View orders
+            </Button>
+          )}
+          <Button
+            isDisabled={
+              confirmation?.kind === "delete" &&
+              deleteConfirmation !== confirmation.location.name
+            }
+            isPending={Boolean(pendingAction)}
+            variant={confirmation?.kind === "enable" ? "primary" : "danger"}
+            onPress={() => void confirmAction()}
+          >
+            {confirmation?.kind === "disable"
+              ? "Disable"
+              : confirmation?.kind === "enable"
+                ? "Enable"
+                : "Delete"}
+          </Button>
+        </PanelPopup.Footer>
+      </PanelPopup>
     </div>
   );
 }

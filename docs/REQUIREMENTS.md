@@ -82,6 +82,23 @@ application's shared stylesheet rather than per-popup overrides. Modal,
 confirmation, and drawer headers have one 16-pixel gap before their content,
 whether the body follows directly or is wrapped in a form; shared stylesheet
 rules cover both structures so form submission wrappers cannot remove spacing.
+Every staff modal and confirmation uses one shared HeroUI popup shell that owns
+its backdrop, centered placement, top-right Close control, dismissal policy, and
+header clearance. Staff popup backdrops animate their tint and blur over 150 ms
+on entry and 100 ms on exit using ease-out timing, without applying backdrop opacity to the popup
+contents. Reduced-motion preferences disable this backdrop animation.
+Optional popups close through Close, an outside click, or
+Escape, including while a request is pending; closing does not cancel an
+already submitted operation or permit duplicate submission. Queue location
+selection is temporarily unavailable while an order mutation is pending, so
+completion stays associated with the submitted queue. Required steps such
+as first-location onboarding explicitly use non-dismissible required mode,
+which hides Close and rejects outside-click, Escape, and close-slot dismissal.
+Dropdowns and selectors retain their native menu behavior rather than using the
+popup shell. HeroUI retains focus management and focus restoration.
+Dismissing invitation creation while its request is pending does not discard
+its once-revealed result: success presents the link, and closing and reopening
+New account retains it until the user explicitly confirms saving it.
 
 Both frontends use one CSS-defined foundation before component styling: a
 4-point spacing basis with 4, 8, 12, 16, 24, 32, and 48-pixel steps; 32-pixel
@@ -131,8 +148,8 @@ Neither frontend uses a persistent global top bar. Customer pages
 place only the utilities relevant to that page in a quiet trailing control
 group; the tracking view aligns Home, Notifications, and Appearance on one
 level. On tablet and desktop, staff workspace navigation is a flat, rounded
-segmented control centered independently of the trailing Appearance and Sign
-out utilities on the same level. It uses only a solid secondary background and
+segmented control centered independently of the trailing Appearance and Account
+utilities on the same level. It uses only a solid secondary background and
 selected segment, without glass effects, decorative borders, or shadows.
 
 Interactive staff cards across Orders, Locations, Accounts, and Integrations
@@ -406,10 +423,16 @@ required modal is open. The panel waits for
 account-scoped authoritative location data before showing either onboarding or
 the workspace; a failed initial request shows Retry and does not permit skipping
 onboarding. A disabled location still counts as existing.
-The shell and visual treatment do not vary by role. Appearance and Sign out
-remain direct trailing utilities on the same level rather than peer workspace
-destinations or commands nested in an account menu. Sign out requires an
-explicit confirmation before the browser session is ended.
+The shell and visual treatment do not vary by role. Appearance and Account
+remain trailing icon-only utilities on the same level rather than peer workspace
+destinations. Account opens a menu containing Change password, Sign out, and
+Sign out everywhere. Ordinary Sign out requires a focused confirmation for the
+current device. Sign out everywhere requires its own destructive confirmation
+explaining that every device, including the current one, will be signed out;
+Cancel sends no request. Failed logout retains the confirmation for retry, and
+pending logout prevents repeat submissions without preventing popup dismissal. Change password uses
+the existing focused form, omits persistent password-length guidance, and retains
+validation errors and the explanation that success signs out every device.
 
 Locations appears between Orders and Accounts for a tenant administrator and
 is absent for managers and operators. The Locations collection includes enabled

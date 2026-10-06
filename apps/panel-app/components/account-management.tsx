@@ -5,11 +5,9 @@ import type { TenantAccount } from "@/src/api/authentication";
 
 import {
   Alert,
-  AlertDialog,
   Badge,
   Button,
   ListBox,
-  Modal,
   Radio,
   RadioGroup,
   Spinner,
@@ -28,6 +26,7 @@ import { useEffect, useState } from "react";
 import useSWR from "swr";
 import useSWRMutation from "swr/mutation";
 
+import { PanelPopup } from "@/components/panel-popup";
 import { FormSelect, FormTextField } from "@/components/form-controls";
 import { OneTimeSecret } from "@/components/integrations/one-time-secret";
 import { PanelCard } from "@/components/panel-card";
@@ -256,6 +255,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
 
     if (!created) return;
     setCreatedInvitation(created);
+    setIsCreateOpen(true);
     await mutateInvitations((current) => [created, ...(current ?? [])], {
       revalidate: false,
     });
@@ -263,7 +263,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
   }
 
   async function revokeInvitation(): Promise<void> {
-    if (!invitationToRevoke) return;
+    if (!invitationToRevoke || isRevoking) return;
     resetRevocation();
     const revoked = await triggerRevocation(invitationToRevoke.id);
 
@@ -282,6 +282,8 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
   async function changeStatus(
     managedAccount: ManagedAccount,
   ): Promise<boolean> {
+    if (isChangingStatus) return false;
+
     resetStatus();
     const updated = await triggerStatus({
       accountId: managedAccount.id,
@@ -304,7 +306,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
   }
 
   async function removeAccount(): Promise<boolean> {
-    if (!accountToDelete) return false;
+    if (!accountToDelete || isDeleting) return false;
 
     resetDeletion();
     const deleted = await triggerDeletion(accountToDelete.id);
@@ -327,8 +329,12 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
   }
 
   function openCreate() {
+    if (isCreating || createdInvitation) {
+      setIsCreateOpen(true);
+
+      return;
+    }
     resetCreation();
-    setCreatedInvitation(undefined);
     setSelectedLocationId(locationId ?? enabledLocations[0]?.id);
     setRole("OPERATOR");
     setIsCreateOpen(true);
@@ -466,6 +472,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
                               : "secondary"
                           }
                           onPress={() => {
+                            if (isChangingStatus) return;
                             if (selectedAccount.status === "ENABLED") {
                               setAccountToDisable(selectedAccount);
                             } else {
@@ -494,6 +501,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
                           className="shrink-0 rounded-md"
                           variant="danger"
                           onPress={() => {
+                            if (isDeleting) return;
                             resetDeletion();
                             setDeleteConfirmation("");
                             setAccountToDelete(selectedAccount);
@@ -550,362 +558,331 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
         </div>
       )}
 
-      <Modal
+      <PanelPopup
+        className="min-w-0"
         isOpen={isCreateOpen}
-        onOpenChange={(open) => {
-          setIsCreateOpen(open);
-          if (!open) setCreatedInvitation(undefined);
-        }}
+        size="lg"
+        onOpenChange={setIsCreateOpen}
       >
-        <Modal.Backdrop>
-          <Modal.Container placement="center" size="lg">
-            <Modal.Dialog className="min-w-0">
-              <Modal.CloseTrigger />
-              <Modal.Header>
-                <Modal.Heading>
-                  {createdInvitation ? "Invitation link" : "New account"}
-                </Modal.Heading>
-              </Modal.Header>
-              {createdInvitation ? (
-                <Modal.Body className="min-w-0 max-w-full pb-6">
-                  <OneTimeSecret
-                    secret={{
-                      title: "Share this invitation",
-                      description: `${createdInvitation.role === "MANAGER" ? "Manager" : "Operator"} · ${createdInvitation.locationName}`,
-                      value: createdInvitation.invitationLink,
-                    }}
-                    onConfirmed={() => setIsCreateOpen(false)}
-                  />
-                </Modal.Body>
-              ) : (
-                <form
-                  className="min-w-0 max-w-full"
-                  onSubmit={submitInvitation}
-                >
-                  <Modal.Body className="flex min-w-0 max-w-full flex-col gap-4">
-                    {creationError && (
-                      <Alert status="danger">
-                        <Alert.Indicator />
-                        <Alert.Content>
-                          <Alert.Title>
-                            Invitation could not be created
-                          </Alert.Title>
-                          <Alert.Description>
-                            {getErrorMessage(creationError)}
-                          </Alert.Description>
-                        </Alert.Content>
-                      </Alert>
-                    )}
-                    {isAdministrator ? (
-                      <LocationSelect
-                        locations={enabledLocations}
-                        selectedId={locationId}
-                        onChange={setSelectedLocationId}
-                      />
-                    ) : (
-                      <div className="min-w-0 max-w-full">
-                        <p className="text-sm font-medium">Location</p>
-                        <p className="mt-1 break-words text-sm text-muted">
-                          {
-                            locations.find(
-                              (location) => location.id === locationId,
-                            )?.name
-                          }
-                        </p>
-                      </div>
-                    )}
-                    {isAdministrator && (
-                      <RadioGroup
-                        className="min-w-0 max-w-full"
-                        name="account-role"
-                        orientation="horizontal"
-                        value={role}
-                        onChange={(value) =>
-                          setRole(value === "MANAGER" ? "MANAGER" : "OPERATOR")
-                        }
-                      >
-                        <Label>Role</Label>
-                        <Radio value="OPERATOR">
-                          <Radio.Content>
-                            <Radio.Control>
-                              <Radio.Indicator />
-                            </Radio.Control>
-                            Operator
-                          </Radio.Content>
-                        </Radio>
-                        <Radio value="MANAGER">
-                          <Radio.Content>
-                            <Radio.Control>
-                              <Radio.Indicator />
-                            </Radio.Control>
-                            Manager
-                          </Radio.Content>
-                        </Radio>
-                      </RadioGroup>
-                    )}
-                  </Modal.Body>
-                  <Modal.Footer className="max-w-full flex-wrap">
-                    <Button slot="close" variant="tertiary">
-                      Cancel
-                    </Button>
-                    <Button isPending={isCreating} type="submit">
-                      <PlusIcon size={18} />
-                      {isCreating ? "Creating…" : "Create invitation"}
-                    </Button>
-                  </Modal.Footer>
-                </form>
+        <PanelPopup.Header>
+          <PanelPopup.Heading>
+            {createdInvitation ? "Invitation link" : "New account"}
+          </PanelPopup.Heading>
+        </PanelPopup.Header>
+        {createdInvitation ? (
+          <PanelPopup.Body className="min-w-0 max-w-full pb-6">
+            <OneTimeSecret
+              secret={{
+                title: "Share this invitation",
+                description: `${createdInvitation.role === "MANAGER" ? "Manager" : "Operator"} · ${createdInvitation.locationName}`,
+                value: createdInvitation.invitationLink,
+              }}
+              onConfirmed={() => {
+                setCreatedInvitation(undefined);
+                setIsCreateOpen(false);
+              }}
+            />
+          </PanelPopup.Body>
+        ) : (
+          <form className="min-w-0 max-w-full" onSubmit={submitInvitation}>
+            <PanelPopup.Body className="flex min-w-0 max-w-full flex-col gap-4">
+              {creationError && (
+                <Alert status="danger">
+                  <Alert.Indicator />
+                  <Alert.Content>
+                    <Alert.Title>Invitation could not be created</Alert.Title>
+                    <Alert.Description>
+                      {getErrorMessage(creationError)}
+                    </Alert.Description>
+                  </Alert.Content>
+                </Alert>
               )}
-            </Modal.Dialog>
-          </Modal.Container>
-        </Modal.Backdrop>
-      </Modal>
-
-      <Modal isOpen={isInvitationsOpen} onOpenChange={setIsInvitationsOpen}>
-        <Modal.Backdrop>
-          <Modal.Container placement="center" size="lg">
-            <Modal.Dialog className="max-h-[min(90vh,760px)] sm:max-w-3xl">
-              <Modal.CloseTrigger />
-              <Modal.Header>
-                <Modal.Heading>Pending invitations</Modal.Heading>
-              </Modal.Header>
-              <Modal.Body className="pb-6">
-                {areInvitationsLoading ? (
-                  <div className="flex min-h-48 items-center justify-center">
-                    <Spinner aria-label="Loading invitations" />
-                  </div>
-                ) : invitationsError ? (
-                  <Alert status="danger">
-                    <Alert.Indicator />
-                    <Alert.Content>
-                      <Alert.Title>Invitations could not load</Alert.Title>
-                      <Alert.Description>
-                        {getErrorMessage(invitationsError)}
-                      </Alert.Description>
-                      <Button
-                        className="mt-3"
-                        size="sm"
-                        variant="danger"
-                        onPress={() => void mutateInvitations()}
-                      >
-                        Retry
-                      </Button>
-                    </Alert.Content>
-                  </Alert>
-                ) : pendingInvitations.length === 0 ? (
-                  <p className="py-12 text-center secondary-text">
-                    No pending invitations
+              {isAdministrator ? (
+                <LocationSelect
+                  locations={enabledLocations}
+                  selectedId={locationId}
+                  onChange={setSelectedLocationId}
+                />
+              ) : (
+                <div className="min-w-0 max-w-full">
+                  <p className="text-sm font-medium">Location</p>
+                  <p className="mt-1 break-words text-sm text-muted">
+                    {
+                      locations.find((location) => location.id === locationId)
+                        ?.name
+                    }
                   </p>
-                ) : (
-                  <ul className="divide-y divide-separator">
-                    {pendingInvitations.map((invitation) => (
-                      <li
-                        key={invitation.id}
-                        className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between"
-                      >
-                        <div className="min-w-0">
-                          <p className="font-semibold">
-                            {invitation.role === "MANAGER"
-                              ? "Manager"
-                              : "Operator"}
-                            <span className="font-normal text-muted">
-                              {" "}
-                              · {invitation.locationName}
-                            </span>
-                          </p>
-                          <p className="mt-1 text-sm text-muted">
-                            Created by {invitation.issuedByEmail} on{" "}
-                            {formatDateTime(invitation.createdAt)}
-                          </p>
-                          <p className="mt-1 text-sm text-muted">
-                            Expires {formatDateTime(invitation.expiresAt)}
-                          </p>
-                        </div>
-                        <Tooltip delay={500}>
-                          <Tooltip.Trigger>
-                            <Button
-                              isIconOnly
-                              aria-label={`Revoke ${invitation.role === "MANAGER" ? "manager" : "operator"} invitation for ${invitation.locationName}`}
-                              className="shrink-0 self-end rounded-md sm:self-auto"
-                              variant="danger"
-                              onPress={() => {
-                                resetRevocation();
-                                setInvitationToRevoke(invitation);
-                              }}
-                            >
-                              <DisableIcon size={20} />
-                            </Button>
-                          </Tooltip.Trigger>
-                          <Tooltip.Content>Revoke</Tooltip.Content>
-                        </Tooltip>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </Modal.Body>
-            </Modal.Dialog>
-          </Modal.Container>
-        </Modal.Backdrop>
-      </Modal>
+                </div>
+              )}
+              {isAdministrator && (
+                <RadioGroup
+                  className="min-w-0 max-w-full"
+                  name="account-role"
+                  orientation="horizontal"
+                  value={role}
+                  onChange={(value) =>
+                    setRole(value === "MANAGER" ? "MANAGER" : "OPERATOR")
+                  }
+                >
+                  <Label>Role</Label>
+                  <Radio value="OPERATOR">
+                    <Radio.Content>
+                      <Radio.Control>
+                        <Radio.Indicator />
+                      </Radio.Control>
+                      Operator
+                    </Radio.Content>
+                  </Radio>
+                  <Radio value="MANAGER">
+                    <Radio.Content>
+                      <Radio.Control>
+                        <Radio.Indicator />
+                      </Radio.Control>
+                      Manager
+                    </Radio.Content>
+                  </Radio>
+                </RadioGroup>
+              )}
+            </PanelPopup.Body>
+            <PanelPopup.Footer className="max-w-full flex-wrap">
+              <Button slot="close" variant="tertiary">
+                Cancel
+              </Button>
+              <Button isPending={isCreating} type="submit">
+                <PlusIcon size={18} />
+                {isCreating ? "Creating…" : "Create invitation"}
+              </Button>
+            </PanelPopup.Footer>
+          </form>
+        )}
+      </PanelPopup>
 
-      <AlertDialog
+      <PanelPopup
+        className="max-h-[min(90vh,760px)] sm:max-w-3xl"
+        isOpen={isInvitationsOpen}
+        size="lg"
+        onOpenChange={setIsInvitationsOpen}
+      >
+        <PanelPopup.Header>
+          <PanelPopup.Heading>Pending invitations</PanelPopup.Heading>
+        </PanelPopup.Header>
+        <PanelPopup.Body className="pb-6">
+          {areInvitationsLoading ? (
+            <div className="flex min-h-48 items-center justify-center">
+              <Spinner aria-label="Loading invitations" />
+            </div>
+          ) : invitationsError ? (
+            <Alert status="danger">
+              <Alert.Indicator />
+              <Alert.Content>
+                <Alert.Title>Invitations could not load</Alert.Title>
+                <Alert.Description>
+                  {getErrorMessage(invitationsError)}
+                </Alert.Description>
+                <Button
+                  className="mt-3"
+                  size="sm"
+                  variant="danger"
+                  onPress={() => void mutateInvitations()}
+                >
+                  Retry
+                </Button>
+              </Alert.Content>
+            </Alert>
+          ) : pendingInvitations.length === 0 ? (
+            <p className="py-12 text-center secondary-text">
+              No pending invitations
+            </p>
+          ) : (
+            <ul className="divide-y divide-separator">
+              {pendingInvitations.map((invitation) => (
+                <li
+                  key={invitation.id}
+                  className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="min-w-0">
+                    <p className="font-semibold">
+                      {invitation.role === "MANAGER" ? "Manager" : "Operator"}
+                      <span className="font-normal text-muted">
+                        {" "}
+                        · {invitation.locationName}
+                      </span>
+                    </p>
+                    <p className="mt-1 text-sm text-muted">
+                      Created by {invitation.issuedByEmail} on{" "}
+                      {formatDateTime(invitation.createdAt)}
+                    </p>
+                    <p className="mt-1 text-sm text-muted">
+                      Expires {formatDateTime(invitation.expiresAt)}
+                    </p>
+                  </div>
+                  <Tooltip delay={500}>
+                    <Tooltip.Trigger>
+                      <Button
+                        isIconOnly
+                        aria-label={`Revoke ${invitation.role === "MANAGER" ? "manager" : "operator"} invitation for ${invitation.locationName}`}
+                        className="shrink-0 self-end rounded-md sm:self-auto"
+                        variant="danger"
+                        onPress={() => {
+                          if (isRevoking) return;
+                          resetRevocation();
+                          setInvitationToRevoke(invitation);
+                        }}
+                      >
+                        <DisableIcon size={20} />
+                      </Button>
+                    </Tooltip.Trigger>
+                    <Tooltip.Content>Revoke</Tooltip.Content>
+                  </Tooltip>
+                </li>
+              ))}
+            </ul>
+          )}
+        </PanelPopup.Body>
+      </PanelPopup>
+
+      <PanelPopup
+        className="sm:max-w-[440px]"
         isOpen={Boolean(invitationToRevoke)}
+        role="alertdialog"
         onOpenChange={(open) => {
-          if (!open && !isRevoking) setInvitationToRevoke(undefined);
+          if (!open) setInvitationToRevoke(undefined);
         }}
       >
-        <AlertDialog.Backdrop>
-          <AlertDialog.Container>
-            <AlertDialog.Dialog className="sm:max-w-[440px]">
-              <AlertDialog.CloseTrigger />
-              <AlertDialog.Header>
-                <AlertDialog.Icon status="danger" />
-                <AlertDialog.Heading>Revoke invitation?</AlertDialog.Heading>
-              </AlertDialog.Header>
-              <AlertDialog.Body className="flex flex-col gap-4">
-                <p>
-                  The{" "}
-                  {invitationToRevoke?.role === "MANAGER"
-                    ? "manager"
-                    : "operator"}{" "}
-                  invitation for {invitationToRevoke?.locationName} will stop
-                  working immediately.
-                </p>
-                {revocationError && (
-                  <Alert status="danger">
-                    <Alert.Indicator />
-                    <Alert.Content>
-                      <Alert.Title>Invitation could not be revoked</Alert.Title>
-                      <Alert.Description>
-                        {getErrorMessage(revocationError)}
-                      </Alert.Description>
-                    </Alert.Content>
-                  </Alert>
-                )}
-              </AlertDialog.Body>
-              <AlertDialog.Footer>
-                <Button isDisabled={isRevoking} slot="close" variant="tertiary">
-                  Cancel
-                </Button>
-                <Button
-                  isPending={isRevoking}
-                  variant="danger"
-                  onPress={() => void revokeInvitation()}
-                >
-                  Revoke
-                </Button>
-              </AlertDialog.Footer>
-            </AlertDialog.Dialog>
-          </AlertDialog.Container>
-        </AlertDialog.Backdrop>
-      </AlertDialog>
+        <PanelPopup.Header>
+          <PanelPopup.Icon status="danger" />
+          <PanelPopup.Heading>Revoke invitation?</PanelPopup.Heading>
+        </PanelPopup.Header>
+        <PanelPopup.Body className="flex flex-col gap-4">
+          <p>
+            The{" "}
+            {invitationToRevoke?.role === "MANAGER" ? "manager" : "operator"}{" "}
+            invitation for {invitationToRevoke?.locationName} will stop working
+            immediately.
+          </p>
+          {revocationError && (
+            <Alert status="danger">
+              <Alert.Indicator />
+              <Alert.Content>
+                <Alert.Title>Invitation could not be revoked</Alert.Title>
+                <Alert.Description>
+                  {getErrorMessage(revocationError)}
+                </Alert.Description>
+              </Alert.Content>
+            </Alert>
+          )}
+        </PanelPopup.Body>
+        <PanelPopup.Footer>
+          <Button slot="close" variant="tertiary">
+            Cancel
+          </Button>
+          <Button
+            isPending={isRevoking}
+            variant="danger"
+            onPress={() => void revokeInvitation()}
+          >
+            Revoke
+          </Button>
+        </PanelPopup.Footer>
+      </PanelPopup>
 
-      <AlertDialog
+      <PanelPopup
+        className="sm:max-w-[420px]"
         isOpen={Boolean(accountToDisable)}
+        role="alertdialog"
         onOpenChange={(open) => {
           if (!open) setAccountToDisable(undefined);
         }}
       >
-        <AlertDialog.Backdrop>
-          <AlertDialog.Container>
-            <AlertDialog.Dialog className="sm:max-w-[420px]">
-              <AlertDialog.CloseTrigger />
-              <AlertDialog.Header>
-                <AlertDialog.Icon status="warning" />
-                <AlertDialog.Heading>
-                  Disable {accountToDisable?.email}?
-                </AlertDialog.Heading>
-              </AlertDialog.Header>
-              <AlertDialog.Body>
-                This account will be signed out, its pending invitations will be
-                revoked, and it cannot access the panel until enabled again.
-              </AlertDialog.Body>
-              <AlertDialog.Footer>
-                <Button slot="close" variant="tertiary">
-                  Cancel
-                </Button>
-                <Button
-                  isPending={isChangingStatus}
-                  variant="danger"
-                  onPress={() => {
-                    if (!accountToDisable) return;
-                    void changeStatus(accountToDisable).then((changed) => {
-                      if (changed) setAccountToDisable(undefined);
-                    });
-                  }}
-                >
-                  Disable
-                </Button>
-              </AlertDialog.Footer>
-            </AlertDialog.Dialog>
-          </AlertDialog.Container>
-        </AlertDialog.Backdrop>
-      </AlertDialog>
+        <PanelPopup.Header>
+          <PanelPopup.Icon status="warning" />
+          <PanelPopup.Heading>
+            Disable {accountToDisable?.email}?
+          </PanelPopup.Heading>
+        </PanelPopup.Header>
+        <PanelPopup.Body>
+          This account will be signed out, its pending invitations will be
+          revoked, and it cannot access the panel until enabled again.
+        </PanelPopup.Body>
+        <PanelPopup.Footer>
+          <Button slot="close" variant="tertiary">
+            Cancel
+          </Button>
+          <Button
+            isPending={isChangingStatus}
+            variant="danger"
+            onPress={() => {
+              if (!accountToDisable) return;
+              void changeStatus(accountToDisable).then((changed) => {
+                if (changed) setAccountToDisable(undefined);
+              });
+            }}
+          >
+            Disable
+          </Button>
+        </PanelPopup.Footer>
+      </PanelPopup>
 
-      <AlertDialog
+      <PanelPopup
+        className="sm:max-w-[460px]"
         isOpen={Boolean(accountToDelete)}
+        role="alertdialog"
         onOpenChange={(open) => {
-          if (!open && !isDeleting) {
+          if (!open) {
             setAccountToDelete(undefined);
             setDeleteConfirmation("");
-            resetDeletion();
+            if (!isDeleting) resetDeletion();
           }
         }}
       >
-        <AlertDialog.Backdrop>
-          <AlertDialog.Container>
-            <AlertDialog.Dialog className="sm:max-w-[460px]">
-              <AlertDialog.CloseTrigger />
-              <AlertDialog.Header>
-                <AlertDialog.Icon status="danger" />
-                <AlertDialog.Heading>
-                  Delete {accountToDelete?.email}?
-                </AlertDialog.Heading>
-              </AlertDialog.Header>
-              <AlertDialog.Body className="flex flex-col gap-4">
-                <p>
-                  This account will be signed out, disappear from Accounts, lose
-                  its pending invitations, and never regain access. Type its
-                  exact email to confirm.
-                </p>
-                <FormTextField
-                  fullWidth
-                  isRequired
-                  inputProps={{ autoComplete: "off" }}
-                  isDisabled={isDeleting}
-                  label={`Type ${accountToDelete?.email} to confirm`}
-                  name="delete-account-confirmation"
-                  value={deleteConfirmation}
-                  onChange={setDeleteConfirmation}
-                />
-                {deletionError && (
-                  <Alert status="danger">
-                    <Alert.Indicator />
-                    <Alert.Content>
-                      <Alert.Title>Account could not be deleted</Alert.Title>
-                      <Alert.Description>
-                        {getErrorMessage(deletionError)}
-                      </Alert.Description>
-                    </Alert.Content>
-                  </Alert>
-                )}
-              </AlertDialog.Body>
-              <AlertDialog.Footer>
-                <Button isDisabled={isDeleting} slot="close" variant="tertiary">
-                  Cancel
-                </Button>
-                <Button
-                  isDisabled={deleteConfirmation !== accountToDelete?.email}
-                  isPending={isDeleting}
-                  variant="danger"
-                  onPress={() => void removeAccount()}
-                >
-                  Delete
-                </Button>
-              </AlertDialog.Footer>
-            </AlertDialog.Dialog>
-          </AlertDialog.Container>
-        </AlertDialog.Backdrop>
-      </AlertDialog>
+        <PanelPopup.Header>
+          <PanelPopup.Icon status="danger" />
+          <PanelPopup.Heading>
+            Delete {accountToDelete?.email}?
+          </PanelPopup.Heading>
+        </PanelPopup.Header>
+        <PanelPopup.Body className="flex flex-col gap-4">
+          <p>
+            This account will be signed out, disappear from Accounts, lose its
+            pending invitations, and never regain access. Type its exact email
+            to confirm.
+          </p>
+          <FormTextField
+            fullWidth
+            isRequired
+            inputProps={{ autoComplete: "off" }}
+            isDisabled={isDeleting}
+            label={`Type ${accountToDelete?.email} to confirm`}
+            name="delete-account-confirmation"
+            value={deleteConfirmation}
+            onChange={setDeleteConfirmation}
+          />
+          {deletionError && (
+            <Alert status="danger">
+              <Alert.Indicator />
+              <Alert.Content>
+                <Alert.Title>Account could not be deleted</Alert.Title>
+                <Alert.Description>
+                  {getErrorMessage(deletionError)}
+                </Alert.Description>
+              </Alert.Content>
+            </Alert>
+          )}
+        </PanelPopup.Body>
+        <PanelPopup.Footer>
+          <Button slot="close" variant="tertiary">
+            Cancel
+          </Button>
+          <Button
+            isDisabled={deleteConfirmation !== accountToDelete?.email}
+            isPending={isDeleting}
+            variant="danger"
+            onPress={() => void removeAccount()}
+          >
+            Delete
+          </Button>
+        </PanelPopup.Footer>
+      </PanelPopup>
     </div>
   );
 }

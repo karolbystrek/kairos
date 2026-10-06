@@ -7,7 +7,7 @@ import type {
   WebhookSubscriptionInput,
 } from "@/src/api/webhook-subscriptions";
 
-import { Alert, AlertDialog, Button, Spinner, Tooltip } from "@heroui/react";
+import { Alert, Button, Spinner, Tooltip } from "@heroui/react";
 import {
   Ban as DisableIcon,
   Check as CheckIcon,
@@ -17,6 +17,7 @@ import {
 import { useState } from "react";
 import useSWR from "swr";
 
+import { PanelPopup } from "@/components/panel-popup";
 import { FormTextField } from "@/components/form-controls";
 import {
   formatIntegrationDateTime,
@@ -645,6 +646,7 @@ export function WebhookSubscriptionManagement({
                             : "secondary"
                         }
                         onPress={() => {
+                          if (pendingAction) return;
                           if (subscription.status === "ENABLED") {
                             setConfirmation({ kind: "disable", subscription });
                           } else {
@@ -680,9 +682,10 @@ export function WebhookSubscriptionManagement({
                           pendingAction === `archive-${subscription.id}`
                         }
                         variant="danger"
-                        onPress={() =>
-                          setConfirmation({ kind: "delete", subscription })
-                        }
+                        onPress={() => {
+                          if (pendingAction) return;
+                          setConfirmation({ kind: "delete", subscription });
+                        }}
                       >
                         <TrashIcon size={20} />
                       </Button>
@@ -721,13 +724,14 @@ export function WebhookSubscriptionManagement({
                           <Button
                             isPending={pendingAction === `retire-${version.id}`}
                             variant="danger"
-                            onPress={() =>
+                            onPress={() => {
+                              if (pendingAction) return;
                               setConfirmation({
                                 kind: "retire",
                                 subscription,
                                 versionId: version.id,
-                              })
-                            }
+                              });
+                            }}
                           >
                             Retire
                           </Button>
@@ -753,41 +757,34 @@ export function WebhookSubscriptionManagement({
         />
       )}
 
-      <AlertDialog
+      <PanelPopup
+        className="sm:max-w-[440px]"
         isOpen={Boolean(confirmation)}
+        role="alertdialog"
         onOpenChange={(open) => {
           if (!open) setConfirmation(undefined);
         }}
       >
-        <AlertDialog.Backdrop>
-          <AlertDialog.Container>
-            <AlertDialog.Dialog className="sm:max-w-[440px]">
-              <AlertDialog.CloseTrigger />
-              <AlertDialog.Header>
-                <AlertDialog.Icon
-                  status={
-                    confirmation?.kind === "disable" ? "warning" : "danger"
-                  }
-                />
-                <AlertDialog.Heading>{confirmationTitle}</AlertDialog.Heading>
-              </AlertDialog.Header>
-              <AlertDialog.Body>{confirmationDescription}</AlertDialog.Body>
-              <AlertDialog.Footer>
-                <Button slot="close" variant="tertiary">
-                  Cancel
-                </Button>
-                <Button
-                  isPending={isConfirmationPending}
-                  variant="danger"
-                  onPress={() => void confirmDestructiveAction()}
-                >
-                  {confirmationLabel}
-                </Button>
-              </AlertDialog.Footer>
-            </AlertDialog.Dialog>
-          </AlertDialog.Container>
-        </AlertDialog.Backdrop>
-      </AlertDialog>
+        <PanelPopup.Header>
+          <PanelPopup.Icon
+            status={confirmation?.kind === "disable" ? "warning" : "danger"}
+          />
+          <PanelPopup.Heading>{confirmationTitle}</PanelPopup.Heading>
+        </PanelPopup.Header>
+        <PanelPopup.Body>{confirmationDescription}</PanelPopup.Body>
+        <PanelPopup.Footer>
+          <Button slot="close" variant="tertiary">
+            Cancel
+          </Button>
+          <Button
+            isPending={isConfirmationPending}
+            variant="danger"
+            onPress={() => void confirmDestructiveAction()}
+          >
+            {confirmationLabel}
+          </Button>
+        </PanelPopup.Footer>
+      </PanelPopup>
     </div>
   );
 }
