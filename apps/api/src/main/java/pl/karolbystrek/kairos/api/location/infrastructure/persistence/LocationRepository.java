@@ -13,6 +13,8 @@ import java.util.UUID;
 
 public interface LocationRepository extends JpaRepository<Location, UUID> {
 
+    long countByTenantIdAndStatusNot(UUID tenantId, LocationStatus status);
+
     List<Location> findAllByTenantIdAndStatusNot(UUID tenantId, LocationStatus status);
 
     List<Location> findAllByIdInAndStatus(Collection<UUID> ids, LocationStatus status);

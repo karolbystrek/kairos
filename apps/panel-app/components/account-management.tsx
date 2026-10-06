@@ -352,7 +352,11 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
                 <PlusIcon size={20} />
               </Button>
             </Tooltip.Trigger>
-            <Tooltip.Content>New account</Tooltip.Content>
+            <Tooltip.Content>
+              {enabledLocations.length === 0
+                ? "Enable a location before inviting an account"
+                : "New account"}
+            </Tooltip.Content>
           </Tooltip>
         </div>
         <Tooltip delay={500}>
@@ -396,15 +400,9 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
       )}
 
       {!areLocationsLoading && enabledLocations.length === 0 && (
-        <Alert status="warning">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Title>Account invitations unavailable</Alert.Title>
-            <Alert.Description>
-              Create a location before inviting an account.
-            </Alert.Description>
-          </Alert.Content>
-        </Alert>
+        <p className="text-sm text-muted">
+          Enable a location in Locations before inviting an account.
+        </p>
       )}
 
       {areLocationsLoading || areAccountsLoading ? (

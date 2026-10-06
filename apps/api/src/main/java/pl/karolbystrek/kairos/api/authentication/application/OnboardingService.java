@@ -10,6 +10,7 @@ import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
 import pl.karolbystrek.kairos.api.account.infrastructure.persistence.AccountRepository;
 import pl.karolbystrek.kairos.api.authentication.infrastructure.zitadel.ZitadelClient;
 import pl.karolbystrek.kairos.api.tenant.application.TenantRegistrationService;
+import pl.karolbystrek.kairos.api.location.domain.ManagedLocationName;
 
 @Service
 @RequiredArgsConstructor
@@ -22,7 +23,16 @@ public class OnboardingService {
     private final TenantRegistrationService tenants;
     private final ZitadelClient provider;
 
-    public Registration register(String email, String password, String invitation) {
+    public Registration register(String email, String password, String invitation, String locationName) {
+        ManagedLocationName firstLocation = null;
+        if (invitation == null) {
+            try {
+                firstLocation = ManagedLocationName.from(locationName);
+            }
+            catch (IllegalArgumentException exception) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage());
+            }
+        }
         if (accounts.existsByEmail(email))
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Account already exists; sign in instead");
         if (invitation != null) invitations.preview(invitation);
@@ -31,7 +41,7 @@ public class OnboardingService {
         try {
             session = provider.signIn(email, password);
             if (!subject.equals(session.userId())) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
-            var principal = invitation == null ? tenants.register(email, subject)
+            var principal = invitation == null ? tenants.register(email, subject, firstLocation)
                 : invitations.redeem(tokens.hash(invitation), email, subject);
             return new Registration(principal, session);
         } catch (RuntimeException exception) {

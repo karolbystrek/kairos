@@ -2,7 +2,7 @@
 
 ## 1. Purpose and Scope
 
-Kairos is a multi-tenant virtual pager system for restaurants. A tenant represents a customer organization, such as an independent restaurant or restaurant chain, and owns zero or more physical locations. A newly registered tenant has no location until its tenant administrator creates one. A customer scans a QR code assigned to an order and opens a lightweight web application that displays the current order state and receives real-time updates. Restaurant staff manage orders through a separate administrative panel. External systems, initially point-of-sale systems, can create and update orders through a versioned REST API and receive webhooks.
+Kairos is a multi-tenant virtual pager system for restaurants. A tenant represents a customer organization, such as an independent restaurant or restaurant chain, and owns one or more non-archived physical locations. Public registration creates the first enabled location together with the tenant and administrator; the last non-archived location may be disabled but cannot be deleted. A customer scans a QR code assigned to an order and opens a lightweight web application that displays the current order state and receives real-time updates. Restaurant staff manage orders through a separate administrative panel. External systems, initially point-of-sale systems, can create and update orders through a versioned REST API and receive webhooks.
 
 Kairos replaces failure-prone physical restaurant pagers without requiring a
 customer to install a chain-specific native application for a short-lived
@@ -335,8 +335,8 @@ claim existing clients; an update activates through the browser lifecycle.
 
 The staff panel must:
 
-* offer public email/password registration that creates a tenant and its first
-  administrator immediately, without email verification;
+* offer public email/password registration that creates a tenant, its first
+  administrator, and its first enabled location together, without email verification;
 * require an authenticated internal account;
 * show only locations and orders accessible to the account;
 * allow tenant administrators to switch between locations or view an aggregate queue;
@@ -367,8 +367,11 @@ account.
 
 Orders, Locations, Accounts, and Integrations use one adaptive tab-style
 navigation system: a centered rounded segmented control on tablet and desktop and bottom
-navigation on narrow mobile layouts. Only authorized destinations are present,
-but the shell and visual treatment do not vary by role. Appearance and Sign out
+navigation on narrow mobile layouts. Only authorized destinations are present.
+Accounts and Integrations are disabled when the tenant has no non-archived
+location; while location data is loading or unavailable, the panel does not infer
+that the tenant has none. A disabled location still counts as existing.
+The shell and visual treatment do not vary by role. Appearance and Sign out
 remain direct trailing utilities on the same level rather than peer workspace
 destinations or commands nested in an account menu. Sign out requires an
 explicit confirmation before the browser session is ended.
@@ -461,7 +464,9 @@ first in display-name order, followed by disabled cards in display-name order,
 with stable identity as the deterministic tie-breaker. Each card shows the
 location status beneath its name. Selecting one opens a detail surface whose
 stable action rail contains Edit, Disable or Enable, and Delete. Delete remains
-visible but unavailable until the location is disabled. The detail uses no
+visible but unavailable until the location is disabled and at least one other
+non-archived location exists. The detail explains that the last location can be
+disabled but cannot be deleted. The detail uses no
 time-zone editor or unrelated operational fields.
 
 If confirmed location disablement is rejected because the location still has
@@ -469,11 +474,12 @@ active orders, the location remains enabled and the panel explains that those
 orders must be completed or canceled first. A direct **View orders** action
 opens Orders filtered to that location.
 
-Accounts and Integrations remain available when the tenant has no enabled
-location. Account Invitation creation is unavailable with guidance to create
-or enable a location. External Integrations may still be created, while API Key
-and webhook-subscription creation remains unavailable until an enabled location
-exists.
+Accounts and Integrations remain available when all existing locations are
+disabled. Account Invitation creation is unavailable with quiet inline guidance
+to enable a location and an explanatory creation-control tooltip, without an
+"Account invitations unavailable" warning container. External Integrations may
+still be created, while API Key and webhook-subscription creation remains
+unavailable with inline guidance until an enabled location exists.
 
 Integration credential and webhook forms use neutral, task-specific
 placeholders rather than suggesting a restaurant, point-of-sale product, or
@@ -608,8 +614,16 @@ is used. Kairos owns tenants, Accounts, memberships and authorization. All
 Accounts belong to one tenant. Username, local password hashes, Platform
 Operator, Tenant Registration Invitations, and verification staging are removed.
 
-Public registration immediately creates one tenant and its first administrator,
-without a location. Managers/operators register through manually shared member
+Public registration collects two sections: **Step 1 of 2 — Admin account**
+(email, password, confirmation), followed by **Step 2 of 2 — Location** (name).
+A labelled progress bar starts at step 1, showing half of the two steps rather
+than zero progress. Next advances only after validating the account section;
+Back retains all entered values, including the location name. No provider identity,
+tenant, account, location, or browser session is created merely by advancing a
+step. Final submission validates both sections and immediately creates one
+tenant, its first administrator, and its first enabled location in one local
+transaction. Recoverable failures retain values for correction and retry.
+Managers/operators register through manually shared member
 invitations. Email verification and forgotten-password recovery are deferred;
 provider email remains truthfully unverified and registration sends no email.
 ZITADEL enforces password requirements. Initial provider policy is a minimum
@@ -661,8 +675,9 @@ observe logout on their next protected request. Automated/background protected
 requests count as activity; tracking mouse/keyboard activity is not required.
 
 A **Location** is an enabled, disabled, or archived physical restaurant owned by
-one tenant. A tenant may remain without any enabled locations, including before
-its first location is created or after its last one is disabled or archived.
+one tenant. Every newly registered tenant has at least one non-archived location.
+A tenant may have no enabled locations after all its locations are disabled,
+but its last non-archived location cannot be deleted.
 Only a tenant administrator manages the location lifecycle. The editable
 location property in this increment is its
 display name; its IANA time zone remains fixed at `UTC`. Enabled and disabled
@@ -698,9 +713,14 @@ the ordinary Accounts collection. Completed and canceled orders retain their
 location association and remain anonymously readable through their existing
 customer tracking references after location disablement or archival.
 
-Only a disabled location can be deleted. Deletion is an irreversible archival
-transition and an archived location cannot be restored. Archived member
-accounts retain and reserve their normalized email addresses and provider subjects for
+Only a disabled location can be deleted, and at least one other non-archived
+location must remain in the same tenant. Archived locations and other tenants'
+locations do not count. Location creation and deletion serialize on the tenant
+row before deletion locks the target and checks the remaining count, so concurrent
+deletions cannot remove the final location. Rejected deletion applies no cascade.
+Repeating Delete for an already archived location remains idempotent.
+Deletion is an irreversible archival transition and an archived location cannot
+be restored. Archived member accounts retain and reserve their normalized email addresses and provider subjects for
 unambiguous historical attribution. They cannot authenticate or be restored.
 
 Archiving a location permanently removes it from API Key location grants and
@@ -841,8 +861,9 @@ master key and private credential volumes need backups and restricted access.
 No SMTP provider is configured in this increment.
 
 Validate invitation/email availability before provider provisioning. Create and
-password-authenticate the provider identity, then commit the tenant/admin or
-invitation/member transaction locally. Recheck invitation eligibility and consume
+password-authenticate the provider identity, then commit the tenant/admin/first-location or
+invitation/member transaction locally. Validate the first location name before
+provider provisioning during public registration. Recheck invitation eligibility and consume
 it atomically with the Account and assignment. On local failure, terminate the
 new provider session and attempt deletion of only the newly provisioned identity.
 No distributed transaction, queue or retry worker is introduced. A provider
@@ -1179,7 +1200,10 @@ tenant UUID, tenant role, optional location assignment, and capabilities. No
 username, Account-kind discriminator, password, or provider credential is
 returned. Login/public registration/invitation registration return `200` with
 the current Account and an HttpOnly session cookie. Registration accepts
-email/password/passwordConfirmation; only member registration requires token.
+email/password/passwordConfirmation; public registration also requires
+`locationName`, while only member registration requires `token`. Public
+registration uses the same normalized name constraints as Location creation
+and starts the location enabled with its time zone fixed at `UTC`.
 Anonymous login, local logout and both registration families remain CSRF
 protected. Current Account, password changes and global logout require eligible
 authentication. Successful password changes and logout return
@@ -1200,7 +1224,9 @@ indistinguishable from an unknown target. Rename and status operations also
 treat an archived target as unknown, while repeating Delete for an archived
 location in the caller's tenant remains idempotently successful. Name
 conflicts, attempting to delete an enabled location, and attempting to disable
-a location with an active order produce safe `409` responses. The active-order
+a location with an active order produce safe `409` responses. Attempting to
+delete the last non-archived location also returns `409`, with stable problem
+type `urn:kairos:problem:location-last-location`. The active-order
 conflict has a stable problem type so the panel can offer its direct **View
 orders** recovery. Each successful disable, enable, or Delete transition and
 all of its account, authentication-cutoff, invitation, credential-grant, and subscription
@@ -1358,8 +1384,17 @@ health succeeds, and verify the internal and external paths.
   durable/rolling sessions, provider outage/revocation, current local access,
   password change, local/global logout and cookie/CSRF behavior are covered by
   provider-isolated and HTTP contract tests. Live provider acceptance is separate.
-* Public registration creates one tenant/administrator and no location. Member
-  registration remains single-use and rechecks current invitation eligibility.
+* Public registration shows one-based progress across account and location
+  steps, validates forward navigation, and retains values when moving back.
+  Final submission creates one tenant, administrator, enabled normalized first
+  location, and browser session; invalid location input provisions no provider
+  identity or local account. Member registration remains single-use and
+  rechecks current invitation eligibility.
+* Deleting the last non-archived location is rejected without archival cascades,
+  including concurrent deletion attempts. Disabling the final location remains
+  available under the ordinary active-order restriction. Accounts and Integrations
+  are disabled only when no location exists, and remain available when all are
+  disabled without the invitation warning container.
 * Username, local password hashes, custom refresh sessions, Platform Operator,
   verification staging and Tenant Registration Invitations are absent from the
   initial schema and runtime. Existing local data needs no migration.
@@ -1574,8 +1609,9 @@ deployment. Direct member creation through `POST /api/accounts/v1` remains
 unavailable; managers/operators join only through fixed Account Invitations.
 
 The implemented administrative-lifecycle increment provides
-tenant-administrator Location management, removes first-location creation from
-tenant registration, adds the reusable zero-enabled-location creation flow in
+tenant-administrator Location management, includes first-location creation in
+the two-step tenant registration flow, protects the last non-archived location
+from deletion, retains the reusable zero-enabled-location creation flow in
 Orders, standardizes the managed-resource lifecycle vocabulary, adds Account
 archival through Delete, and applies the Location cascades and contracts
 specified above across the schema, API, panel, and automated verification.

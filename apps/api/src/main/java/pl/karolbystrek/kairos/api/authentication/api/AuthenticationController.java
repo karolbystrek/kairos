@@ -69,7 +69,8 @@ public class AuthenticationController {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Sign out before registering");
         if (invited && (input.token() == null || input.token().isBlank()))
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invitation is required");
-        var registration = onboarding.register(normalize(input.email()), input.password(), invited ? input.token() : null);
+        var registration = onboarding.register(normalize(input.email()), input.password(), invited ? input.token() : null,
+            invited ? null : input.locationName());
         return finish(registration.principal(), registration.session(), request, response);
     }
 

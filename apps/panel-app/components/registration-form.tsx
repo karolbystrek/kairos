@@ -1,14 +1,17 @@
 "use client";
 
 import { useSyncExternalStore, useState, type FormEvent } from "react";
-import { Alert, Button } from "@heroui/react";
+import { Alert, Button, ProgressBar } from "@heroui/react";
 import useSWR from "swr";
 import { ZodError } from "zod";
 
 import { BrandWordmark } from "./brand-wordmark";
 
 import { FormTextField } from "@/components/form-controls";
-import { registerTenant } from "@/src/api/tenant-registrations";
+import {
+  administratorRegistrationInputSchema,
+  registerTenant,
+} from "@/src/api/tenant-registrations";
 import {
   previewAccountInvitation,
   redeemAccountInvitation,
@@ -30,6 +33,8 @@ export function RegistrationForm({ invited = false }: { invited?: boolean }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
+  const [step, setStep] = useState(1);
+  const [locationName, setLocationName] = useState("");
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
   const [terminalMessage, setTerminalMessage] = useState("");
@@ -76,14 +81,29 @@ export function RegistrationForm({ invited = false }: { invited?: boolean }) {
 
       return;
     }
+    const input = { email, password, passwordConfirmation: confirmation };
+
+    if (!invited && step === 1) {
+      const validation = administratorRegistrationInputSchema.safeParse(input);
+
+      if (!validation.success) {
+        setMessage(
+          validation.error.issues[0]?.message ?? "Check the submitted values.",
+        );
+
+        return;
+      }
+      setMessage("");
+      setStep(2);
+
+      return;
+    }
     setPending(true);
     setMessage("");
     try {
-      const input = { email, password, passwordConfirmation: confirmation };
-
       invited
         ? await redeemAccountInvitation({ ...input, token: token ?? "" })
-        : await registerTenant(input);
+        : await registerTenant({ ...input, locationName });
 
       setPassword("");
       setConfirmation("");
@@ -104,7 +124,9 @@ export function RegistrationForm({ invited = false }: { invited?: boolean }) {
           ? (error.issues[0]?.message ?? "Check the submitted values.")
           : error instanceof ApiError && error.status === 409
             ? "An account or registration already exists. Sign in to continue."
-            : "Registration could not be completed. Check the link and submitted values, then try again.",
+            : invited
+              ? "Registration could not be completed. Check the link and submitted values, then try again."
+              : "Registration could not be completed. Check your account details and location name, then try again.",
       );
     } finally {
       setPending(false);
@@ -151,37 +173,86 @@ export function RegistrationForm({ invited = false }: { invited?: boolean }) {
           </p>
         )}
       {!account && (
-        <form className="flex flex-col gap-4" onSubmit={submit}>
-          <FormTextField
-            isRequired
-            inputProps={{ autoCapitalize: "none", autoComplete: "email" }}
-            label="Email"
-            maxLength={200}
-            type="email"
-            value={email}
-            onChange={setEmail}
-          />
-          <FormTextField
-            isRequired
-            inputProps={{ autoComplete: "new-password" }}
-            label="Password"
-            maxLength={200}
-            type="password"
-            value={password}
-            onChange={setPassword}
-          />
-          <p className="text-sm text-muted">
-            Use at least 12 characters. Up to 200 characters are supported.
-          </p>
-          <FormTextField
-            isRequired
-            inputProps={{ autoComplete: "new-password" }}
-            label="Confirm password"
-            maxLength={200}
-            type="password"
-            value={confirmation}
-            onChange={setConfirmation}
-          />
+        <form key={step} className="flex flex-col gap-4" onSubmit={submit}>
+          {!invited && (
+            <>
+              <ProgressBar
+                aria-label="Registration progress"
+                maxValue={2}
+                value={step}
+                valueLabel={`Step ${step} of 2`}
+              >
+                <ProgressBar.Output>Step {step} of 2</ProgressBar.Output>
+                <ProgressBar.Track>
+                  <ProgressBar.Fill />
+                </ProgressBar.Track>
+              </ProgressBar>
+              <h2 className="text-lg font-semibold">
+                {step === 1 ? "Admin account" : "Location"}
+              </h2>
+            </>
+          )}
+          {invited || step === 1 ? (
+            <>
+              <FormTextField
+                isRequired
+                inputProps={{
+                  autoCapitalize: "none",
+                  autoComplete: "email",
+                  autoFocus: true,
+                }}
+                label="Email"
+                maxLength={200}
+                type="email"
+                value={email}
+                onChange={setEmail}
+              />
+              <FormTextField
+                isRequired
+                inputProps={{ autoComplete: "new-password" }}
+                label="Password"
+                maxLength={200}
+                type="password"
+                value={password}
+                onChange={setPassword}
+              />
+              <p className="text-sm text-muted">
+                Use at least 12 characters. Up to 200 characters are supported.
+              </p>
+              <FormTextField
+                isRequired
+                inputProps={{ autoComplete: "new-password" }}
+                label="Confirm password"
+                maxLength={200}
+                type="password"
+                value={confirmation}
+                onChange={setConfirmation}
+              />
+            </>
+          ) : (
+            <>
+              <FormTextField
+                isRequired
+                inputProps={{ autoComplete: "organization", autoFocus: true }}
+                isDisabled={pending}
+                label="Location name"
+                maxLength={120}
+                value={locationName}
+                onChange={setLocationName}
+              />
+              <Button
+                isDisabled={pending}
+                type="button"
+                variant="tertiary"
+                onPress={() => {
+                  setStep(1);
+                  setMessage("");
+                }}
+              >
+                Back
+              </Button>
+            </>
+          )}
           <Button
             isDisabled={
               checkingAccount ||
@@ -195,7 +266,7 @@ export function RegistrationForm({ invited = false }: { invited?: boolean }) {
             isPending={pending}
             type="submit"
           >
-            Create account
+            {!invited && step === 1 ? "Next" : "Create account"}
           </Button>
         </form>
       )}

@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
 import pl.karolbystrek.kairos.api.account.domain.AccountStatus;
 import pl.karolbystrek.kairos.api.account.domain.TenantRole;
@@ -16,6 +17,9 @@ import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTe
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -171,6 +175,69 @@ class LocationServiceIntegrationTests extends RedisListenerIsolatedIntegrationTe
             .isEqualTo("ARCHIVED");
         assertThat(value("webhook_subscriptions", "status", integration.multiLocationSubscriptionId()))
             .isEqualTo("ENABLED");
+    }
+
+    @Test
+    void lastDisabledLocationCannotBeDeletedEvenWithArchivedOrOtherTenantLocations() {
+        var tenantId = insertTenant();
+        var administrator = insertAccount(tenantId, TenantRole.ADMIN, AccountStatus.ENABLED);
+        var archived = locationService.create(administrator, "Archived");
+        var last = locationService.create(administrator, "Last");
+        var otherAdministrator = insertAccount(insertTenant(), TenantRole.ADMIN, AccountStatus.ENABLED);
+        locationService.create(otherAdministrator, "Other tenant");
+        locationService.updateStatus(administrator, archived.id(), LocationStatus.DISABLED);
+        locationService.delete(administrator, archived.id());
+        locationService.delete(administrator, archived.id());
+        var operator = insertAccount(tenantId, TenantRole.MEMBER, AccountStatus.ENABLED);
+        insertAssignment(operator.accountId(), tenantId, last.id(), AssignmentRole.OPERATOR);
+        locationService.updateStatus(administrator, last.id(), LocationStatus.DISABLED);
+
+        assertThatThrownBy(() -> locationService.delete(administrator, last.id()))
+            .isInstanceOf(LocationConflictException.class)
+            .extracting(exception -> ((LocationConflictException) exception).getReason().name())
+            .isEqualTo("LAST_LOCATION");
+        assertThat(value("locations", "status", last.id())).isEqualTo("DISABLED");
+        assertThat(value("accounts", "status", operator.accountId())).isEqualTo("DISABLED");
+        assertThat(locationService.listAccessible(administrator)).extracting(location -> location.id())
+            .containsExactly(last.id());
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void concurrentDeletesByDifferentAdministratorsRetainOneLocation() throws Exception {
+        var tenantId = insertTenant();
+        var firstAdmin = insertAccount(tenantId, TenantRole.ADMIN, AccountStatus.ENABLED);
+        var secondAdmin = insertAccount(tenantId, TenantRole.ADMIN, AccountStatus.ENABLED);
+        var first = locationService.create(firstAdmin, "First");
+        var second = locationService.create(firstAdmin, "Second");
+        locationService.updateStatus(firstAdmin, first.id(), LocationStatus.DISABLED);
+        locationService.updateStatus(firstAdmin, second.id(), LocationStatus.DISABLED);
+        var start = new CountDownLatch(1);
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            var firstResult = executor.submit(() -> deleteAfterStart(start, firstAdmin, first.id()));
+            var secondResult = executor.submit(() -> deleteAfterStart(start, secondAdmin, second.id()));
+            start.countDown();
+            assertThat(new boolean[] {
+                firstResult.get(10, TimeUnit.SECONDS), secondResult.get(10, TimeUnit.SECONDS)
+            }).containsExactlyInAnyOrder(true, false);
+        }
+        assertThat(jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM locations WHERE tenant_id = ? AND status <> 'ARCHIVED'",
+            Integer.class, tenantId
+        )).isOne();
+    }
+
+    private boolean deleteAfterStart(CountDownLatch start, StaffPrincipal admin, UUID locationId)
+            throws InterruptedException {
+        start.await();
+        try {
+            locationService.delete(admin, locationId);
+            return true;
+        }
+        catch (LocationConflictException conflict) {
+            assertThat(conflict.getReason().name()).isEqualTo("LAST_LOCATION");
+            return false;
+        }
     }
 
     private UUID insertTenant() {

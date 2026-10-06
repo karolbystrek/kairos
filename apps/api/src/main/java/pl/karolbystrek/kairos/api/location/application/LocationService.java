@@ -174,6 +174,8 @@ public class LocationService {
     @Transactional
     public void delete(StaffPrincipal principal, UUID locationId) {
         var access = requireAdministrator(principal, true);
+        tenantRepository.findForUpdateById(access.tenantId())
+            .orElseThrow(LocationNotFoundException::new);
         var location = locationRepository.findForUpdateById(locationId)
             .filter(candidate -> candidate.getTenantId().equals(access.tenantId()))
             .orElseThrow(LocationNotFoundException::new);
@@ -184,6 +186,13 @@ public class LocationService {
             throw new LocationConflictException(
                 LocationConflictException.Reason.ENABLED_DELETE,
                 "Disable the location before deleting it"
+            );
+        }
+
+        if (locationRepository.countByTenantIdAndStatusNot(access.tenantId(), LocationStatus.ARCHIVED) <= 1) {
+            throw new LocationConflictException(
+                LocationConflictException.Reason.LAST_LOCATION,
+                "The last location cannot be deleted; you can disable it instead"
             );
         }
 

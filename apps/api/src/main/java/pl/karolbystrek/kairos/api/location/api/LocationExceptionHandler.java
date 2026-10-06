@@ -28,9 +28,11 @@ class LocationExceptionHandler {
     ProblemDetail handleConflict(LocationConflictException exception) {
         var problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
         problem.setType(URI.create(
-            exception.getReason() == LocationConflictException.Reason.ACTIVE_ORDERS
-                ? "urn:kairos:problem:location-active-orders"
-                : "urn:kairos:problem:location-conflict"
+            switch (exception.getReason()) {
+                case ACTIVE_ORDERS -> "urn:kairos:problem:location-active-orders";
+                case LAST_LOCATION -> "urn:kairos:problem:location-last-location";
+                default -> "urn:kairos:problem:location-conflict";
+            }
         ));
         return problem;
     }

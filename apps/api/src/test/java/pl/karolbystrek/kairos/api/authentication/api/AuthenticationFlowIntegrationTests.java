@@ -33,7 +33,7 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
     @Autowired private AccountInvitationService invitations;
 
     @Test
-    void registrationImmediatelyCreatesTenantAndDurableSecureSessionWithoutVerification() throws Exception {
+    void registrationImmediatelyCreatesTenantLocationAndDurableSecureSessionWithoutVerification() throws Exception {
         var email = email();
         configure(email);
         var result = mvc.perform(csrf(postApi("/tenant-registrations/v1").content(registration(email, null))))
@@ -43,6 +43,14 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
             .andExpect(cookie().httpOnly("__Host-session", true)).andExpect(cookie().secure("__Host-session", true))
             .andExpect(cookie().sameSite("__Host-session", "Lax")).andExpect(cookie().path("__Host-session", "/"))
             .andExpect(cookie().maxAge("__Host-session", 30 * 86400)).andReturn();
+        var locations = database.queryForList("""
+            SELECT name, normalized_name, status, time_zone FROM locations
+            WHERE tenant_id = (SELECT tenant_id FROM accounts WHERE email = ?)
+            """, email);
+        assertThat(locations).hasSize(1);
+        assertThat(locations.getFirst()).containsEntry("NAME", "First location")
+            .containsEntry("NORMALIZED_NAME", "first location")
+            .containsEntry("STATUS", "ENABLED").containsEntry("TIME_ZONE", "UTC");
         var cookie = result.getResponse().getCookie("__Host-session");
         assertThat(cookie.getDomain()).isNull();
         assertThat(database.queryForObject("SELECT COUNT(*) FROM accounts WHERE email = ?", Integer.class, email)).isOne();
@@ -52,6 +60,21 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
             .andExpect(cookie().value("__Host-session", cookie.getValue()))
             .andExpect(cookie().maxAge("__Host-session", 30 * 86400));
         verify(identityProvider).isValid(any());
+    }
+
+    @Test
+    void invalidFirstLocationIsRejectedBeforeProviderProvisioning() throws Exception {
+        for (var location : new String[] { "", "   ", "x".repeat(121) }) {
+            var email = email();
+            var payload = registration(email, null).replace("  First location  ", location);
+            mvc.perform(csrf(postApi("/tenant-registrations/v1").content(payload)))
+                .andExpect(status().isBadRequest());
+            assertThat(database.queryForObject("SELECT COUNT(*) FROM accounts WHERE email = ?", Integer.class, email)).isZero();
+        }
+        mvc.perform(csrf(postApi("/tenant-registrations/v1")
+            .content(registration(email(), null).replace(",\"locationName\":\"  First location  \"", ""))))
+            .andExpect(status().isBadRequest());
+        verify(identityProvider, never()).createUser(anyString(), anyString());
     }
 
     @Test
@@ -160,7 +183,7 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
     private static String email() { return UUID.randomUUID() + "@example.com"; }
     private static String registration(String email, String token) {
         return "{\"email\":\"" + email + "\",\"password\":\"password-12345\",\"passwordConfirmation\":\"password-12345\""
-            + (token == null ? "" : ",\"token\":\"" + token + "\"") + "}";
+            + (token == null ? ",\"locationName\":\"  First location  \"" : ",\"token\":\"" + token + "\"") + "}";
     }
     private static MockHttpServletRequestBuilder postApi(String path) {
         return post("/api" + path).contextPath("/api").secure(true).contentType(MediaType.APPLICATION_JSON);

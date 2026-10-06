@@ -25,6 +25,7 @@ public class LocationConflictException extends RuntimeException {
     public enum Reason {
         NAME_CONFLICT,
         ACTIVE_ORDERS,
-        ENABLED_DELETE
+        ENABLED_DELETE,
+        LAST_LOCATION
     }
 }

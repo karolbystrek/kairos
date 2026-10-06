@@ -43,6 +43,12 @@ function getErrorMessage(error: unknown): string {
   if (error instanceof ZodError) {
     return error.issues[0]?.message ?? "Enter a valid location name.";
   }
+  if (
+    error instanceof ApiError &&
+    error.problem?.type === "urn:kairos:problem:location-last-location"
+  ) {
+    return "Your last location cannot be deleted. Disable it instead.";
+  }
   if (error instanceof ApiError && error.status === 409) {
     return "This action conflicts with the current location state.";
   }
@@ -369,7 +375,10 @@ export function LocationManagement({
                             isIconOnly
                             aria-label="Delete location"
                             className="rounded-md"
-                            isDisabled={selectedLocation.status !== "DISABLED"}
+                            isDisabled={
+                              locations.length <= 1 ||
+                              selectedLocation.status !== "DISABLED"
+                            }
                             variant="danger"
                             onPress={() =>
                               openConfirmation({
@@ -382,15 +391,22 @@ export function LocationManagement({
                           </Button>
                         </Tooltip.Trigger>
                         <Tooltip.Content>
-                          {selectedLocation.status === "DISABLED"
-                            ? "Delete"
-                            : "Disable before deleting"}
+                          {locations.length <= 1
+                            ? "Your last location cannot be deleted"
+                            : selectedLocation.status === "DISABLED"
+                              ? "Delete"
+                              : "Disable before deleting"}
                         </Tooltip.Content>
                       </Tooltip>
                     </>
                   ) : null
                 }
               />
+              {locations.length <= 1 && (
+                <p className="mt-4 text-sm text-muted">
+                  Your last location can be disabled, but cannot be deleted.
+                </p>
+              )}
             </section>
           )}
         </div>

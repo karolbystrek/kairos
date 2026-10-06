@@ -575,15 +575,10 @@ export function IntegrationManagement({ accountId }: { accountId: string }) {
 
           <div className="min-w-0">
             {enabledLocations.length === 0 && (
-              <Alert className="mb-5" status="warning">
-                <Alert.Indicator />
-                <Alert.Content>
-                  <Alert.Title>No location</Alert.Title>
-                  <Alert.Description>
-                    Create a location before adding API Keys or webhooks.
-                  </Alert.Description>
-                </Alert.Content>
-              </Alert>
+              <p className="mb-5 text-sm text-muted">
+                Enable a location in Locations before adding API Keys or
+                webhooks.
+              </p>
             )}
             {selectedIntegration && (
               <IntegrationDetails

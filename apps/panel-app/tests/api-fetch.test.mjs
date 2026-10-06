@@ -31,6 +31,7 @@ function client(fetch) {
   const exports = load("./api-fetch");
   exports.authentication = load("./authentication");
   exports.authState = load("./auth-state");
+  exports.registration = load("./tenant-registrations");
 
   return exports;
 }
@@ -111,3 +112,35 @@ for (const operation of ["login", "logout", "changePassword"]) {
     assert.equal(mutations, 2);
   });
 }
+
+
+test("public registration rejects an absent or invalid first location before making a request", () => {
+  const api = client(() => { throw new Error("Invalid registration must not reach the network"); });
+  const account = { email: "admin@example.com", password: "password-12345", passwordConfirmation: "password-12345" };
+  for (const locationName of [undefined, "", "   ", "x".repeat(121)]) {
+    assert.throws(() => api.registration.registerTenant({ ...account, locationName }), /Name|required|characters/i);
+  }
+});
+
+test("public registration submits the account and normalized first location together", async () => {
+  const result = {
+    accountId: "12345678-1234-4234-8234-123456789abc", email: "admin@example.com",
+    tenantId: "12345678-1234-4234-8234-123456789abd", tenantRole: "ADMIN",
+    assignment: null, capabilities: ["MANAGE_LOCATIONS"],
+  };
+  const submissions = [];
+  const api = client(async (url, init) => {
+    if (url.endsWith("/csrf")) return Response.json({ token: "csrf" });
+    assert.ok(url.endsWith("/tenant-registrations/v1"));
+    submissions.push(JSON.parse(init.body));
+    return Response.json(result);
+  });
+  assert.deepEqual(await api.registration.registerTenant({
+    email: "  ADMIN@example.com  ", password: "password-12345",
+    passwordConfirmation: "password-12345", locationName: "  First location  ",
+  }), result);
+  assert.deepEqual(submissions, [{
+    email: "admin@example.com", password: "password-12345",
+    passwordConfirmation: "password-12345", locationName: "First location",
+  }]);
+});

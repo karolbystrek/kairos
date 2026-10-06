@@ -41,7 +41,8 @@ import {
   type AuthenticationResult,
   type LoginCredentials,
 } from "@/src/api/authentication";
-import { isStaffCacheKey } from "@/src/api/cache-keys";
+import { listLocations } from "@/src/api/locations";
+import { isStaffCacheKey, staffLocationsKey } from "@/src/api/cache-keys";
 
 const currentAccountKey = ["authentication", "current-account"] as const;
 const logoutKey = ["authentication", "logout"] as const;
@@ -256,6 +257,17 @@ export function StaffPanel() {
     shouldRetryOnError,
   });
 
+  const { data: locations } = useSWR(
+    account ? staffLocationsKey(account.accountId) : null,
+    listLocations,
+    { errorRetryCount: 3, shouldRetryOnError },
+  );
+  const hasNoLocations = locations?.length === 0;
+  const workspace =
+    hasNoLocations && ["accounts", "integrations"].includes(selectedWorkspace)
+      ? "orders"
+      : selectedWorkspace;
+
   const {
     error: loginError,
     isMutating: isLoggingIn,
@@ -404,7 +416,7 @@ export function StaffPanel() {
 
       {canManageAccounts || canManageLocations || canManageIntegrations ? (
         <Tabs
-          selectedKey={selectedWorkspace}
+          selectedKey={workspace}
           onSelectionChange={(key) => setSelectedWorkspace(String(key))}
         >
           <div className="panel-workspace-controls">
@@ -431,7 +443,7 @@ export function StaffPanel() {
                   </Tabs.Tab>
                 )}
                 {canManageAccounts && (
-                  <Tabs.Tab id="accounts">
+                  <Tabs.Tab id="accounts" isDisabled={hasNoLocations}>
                     <span className="tab-motion-content">
                       <TeamIcon size={18} />
                       <span>Accounts</span>
@@ -440,7 +452,7 @@ export function StaffPanel() {
                   </Tabs.Tab>
                 )}
                 {canManageIntegrations && (
-                  <Tabs.Tab id="integrations">
+                  <Tabs.Tab id="integrations" isDisabled={hasNoLocations}>
                     <span className="tab-motion-content">
                       <IntegrationIcon size={18} />
                       <span>Integrations</span>
