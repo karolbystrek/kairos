@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { AlertDialog, Button, Input, Label, TextField } from "@heroui/react";
+import { AlertDialog, Button } from "@heroui/react";
 
+import { FormTextField } from "@/components/form-controls";
 import { changePassword } from "@/src/api/authentication";
 import { ApiError } from "@/src/api/api-fetch";
 
@@ -73,42 +74,39 @@ export function PasswordChangeDialog({
                     password.
                   </p>
                   {error && <p role="alert">{error}</p>}
-                  <TextField
+                  <FormTextField
                     isRequired
+                    inputProps={{ autoComplete: "current-password" }}
                     isDisabled={pending}
+                    label="Current password"
                     maxLength={200}
                     type="password"
                     value={current}
                     onChange={setCurrent}
-                  >
-                    <Label>Current password</Label>
-                    <Input autoComplete="current-password" />
-                  </TextField>
-                  <TextField
+                  />
+                  <FormTextField
                     isRequired
+                    inputProps={{ autoComplete: "new-password" }}
                     isDisabled={pending}
+                    label="New password"
                     maxLength={200}
                     type="password"
                     value={password}
                     onChange={setPassword}
-                  >
-                    <Label>New password</Label>
-                    <Input autoComplete="new-password" />
-                  </TextField>
+                  />
                   <p className="text-sm text-muted">
                     Use at least 12 characters.
                   </p>
-                  <TextField
+                  <FormTextField
                     isRequired
+                    inputProps={{ autoComplete: "new-password" }}
                     isDisabled={pending}
+                    label="Confirm password"
                     maxLength={200}
                     type="password"
                     value={confirmation}
                     onChange={setConfirmation}
-                  >
-                    <Label>Confirm password</Label>
-                    <Input autoComplete="new-password" />
-                  </TextField>
+                  />
                 </AlertDialog.Body>
                 <AlertDialog.Footer>
                   <Button

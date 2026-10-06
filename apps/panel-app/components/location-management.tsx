@@ -2,16 +2,7 @@
 
 import type { FormEvent } from "react";
 
-import {
-  Alert,
-  AlertDialog,
-  Button,
-  Input,
-  Label,
-  Spinner,
-  TextField,
-  Tooltip,
-} from "@heroui/react";
+import { Alert, AlertDialog, Button, Spinner, Tooltip } from "@heroui/react";
 import {
   ArrowRight as ArrowRightIcon,
   Ban as DisableIcon,
@@ -25,6 +16,7 @@ import { useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
 import { ZodError } from "zod";
 
+import { FormTextField } from "@/components/form-controls";
 import { LocationCreationModal } from "@/components/location-creation-modal";
 import { PanelCard } from "@/components/panel-card";
 import { PanelDetailHeader } from "@/components/panel-detail-header";
@@ -273,10 +265,11 @@ export function LocationManagement({
                       className="flex min-w-0 items-end gap-2"
                       onSubmit={submitRename}
                     >
-                      <TextField
+                      <FormTextField
                         fullWidth
                         isRequired
                         isDisabled={pendingAction === "rename"}
+                        label="Location name"
                         maxLength={120}
                         name="location-name"
                         value={editName}
@@ -284,10 +277,7 @@ export function LocationManagement({
                           setEditName(value);
                           setError(undefined);
                         }}
-                      >
-                        <Label className="sr-only">Location name</Label>
-                        <Input />
-                      </TextField>
+                      />
                       <Tooltip delay={500}>
                         <Tooltip.Trigger>
                           <Button
@@ -453,21 +443,18 @@ export function LocationManagement({
                     <p>
                       The location and its assigned accounts will disappear from
                       ordinary management and cannot be restored. Historical
-                      orders remain readable.
+                      orders remain readable. Type its exact name to confirm.
                     </p>
-                    <TextField
+                    <FormTextField
                       fullWidth
                       isRequired
+                      inputProps={{ autoComplete: "off" }}
                       isDisabled={Boolean(pendingAction)}
+                      label={`Type ${confirmation.location.name} to confirm`}
                       name="delete-location-confirmation"
                       value={deleteConfirmation}
                       onChange={setDeleteConfirmation}
-                    >
-                      <Label>
-                        Type {confirmation.location.name} to confirm
-                      </Label>
-                      <Input autoComplete="off" />
-                    </TextField>
+                    />
                   </>
                 )}
                 {actionError !== undefined && (

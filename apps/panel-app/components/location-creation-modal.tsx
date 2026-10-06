@@ -2,12 +2,13 @@
 
 import type { FormEvent } from "react";
 
-import { Alert, Button, Input, Label, Modal, TextField } from "@heroui/react";
+import { Alert, Button, Modal } from "@heroui/react";
 import { Plus as PlusIcon } from "lucide-react";
 import { useState } from "react";
 import { useSWRConfig } from "swr";
 import { ZodError } from "zod";
 
+import { FormTextField } from "@/components/form-controls";
 import { ApiError } from "@/src/api/api-fetch";
 import { staffLocationsKey } from "@/src/api/cache-keys";
 import {
@@ -106,10 +107,12 @@ export function LocationCreationModal({
                     </Alert.Content>
                   </Alert>
                 )}
-                <TextField
+                <FormTextField
                   fullWidth
                   isRequired
+                  inputProps={{ autoComplete: "organization" }}
                   isDisabled={isCreating}
+                  label="Location name"
                   maxLength={120}
                   name="location-name"
                   value={name}
@@ -117,10 +120,7 @@ export function LocationCreationModal({
                     setName(value);
                     setError(undefined);
                   }}
-                >
-                  <Label>Location name</Label>
-                  <Input autoComplete="organization" />
-                </TextField>
+                />
               </Modal.Body>
               <Modal.Footer>
                 <Button slot="close" variant="tertiary">

@@ -17,6 +17,7 @@ import {
 import { useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
 
+import { FormTextField } from "@/components/form-controls";
 import {
   formatIntegrationDateTime,
   getIntegrationErrorMessage,
@@ -244,18 +245,16 @@ export function ApiKeyManagement({
         </div>
 
         <form className="flex max-w-3xl flex-col gap-4" onSubmit={issue}>
-          <TextField
+          <FormTextField
             fullWidth
             isRequired
             isDisabled={Boolean(pendingAction)}
+            label="API key name"
             maxLength={64}
             name="api-key-name"
             value={name}
             onChange={setName}
-          >
-            <Label>Name</Label>
-            <Input placeholder="API key name" />
-          </TextField>
+          />
 
           <RadioGroup
             isDisabled={Boolean(pendingAction)}

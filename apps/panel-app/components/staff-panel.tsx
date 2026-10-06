@@ -6,11 +6,8 @@ import {
   Alert,
   AlertDialog,
   Button,
-  Input,
-  Label,
   Spinner,
   Tabs,
-  TextField,
   Tooltip,
 } from "@heroui/react";
 import {
@@ -27,6 +24,7 @@ import useSWR, { useSWRConfig } from "swr";
 import useSWRMutation from "swr/mutation";
 import { ZodError } from "zod";
 
+import { FormTextField } from "@/components/form-controls";
 import { OrderManagement } from "@/components/order-management";
 import { AccountManagement } from "@/components/account-management";
 import { BrandWordmark } from "@/components/brand-wordmark";
@@ -158,37 +156,35 @@ function LoginForm({
       )}
 
       <form className="flex flex-col gap-4" onSubmit={submit}>
-        <TextField
+        <FormTextField
           fullWidth
           isRequired
+          inputProps={{
+            autoCapitalize: "none",
+            autoComplete: "email",
+            spellCheck: false,
+          }}
           isDisabled={isPending}
+          label="Email"
           maxLength={200}
           name="email"
           type="email"
           value={email}
           onChange={setEmail}
-        >
-          <Label>Email</Label>
-          <Input
-            autoCapitalize="none"
-            autoComplete="email"
-            spellCheck={false}
-          />
-        </TextField>
+        />
 
-        <TextField
+        <FormTextField
           fullWidth
           isRequired
+          inputProps={{ autoComplete: "current-password" }}
           isDisabled={isPending}
+          label="Password"
           maxLength={200}
           name="password"
           type="password"
           value={password}
           onChange={setPassword}
-        >
-          <Label>Password</Label>
-          <Input autoComplete="current-password" />
-        </TextField>
+        />
 
         <Button fullWidth isPending={isPending} type="submit">
           {isPending ? "Signing in…" : "Sign in"}

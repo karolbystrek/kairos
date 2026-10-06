@@ -4,13 +4,9 @@ import {
   Alert,
   AlertDialog,
   Button,
-  Input,
-  Label,
   ListBox,
   Modal,
-  Select,
   Spinner,
-  TextField,
   Tooltip,
 } from "@heroui/react";
 import {
@@ -25,6 +21,7 @@ import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 import useSWRMutation from "swr/mutation";
 
+import { FormSelect, FormTextField } from "@/components/form-controls";
 import { PanelCard } from "@/components/panel-card";
 import { LocationCreationModal } from "@/components/location-creation-modal";
 import { ApiError } from "@/src/api/api-fetch";
@@ -156,29 +153,22 @@ function LocationSelect({
     : locations;
 
   return (
-    <Select
-      aria-label={label}
+    <FormSelect
       className="w-full sm:max-w-xs"
+      label={label}
       selectedKey={selectedId ?? "all"}
       onSelectionChange={(key) =>
         onChange(key === "all" || key === null ? undefined : String(key))
       }
     >
-      <Label>{label}</Label>
-      <Select.Trigger>
-        <Select.Value />
-        <Select.Indicator />
-      </Select.Trigger>
-      <Select.Popover>
-        <ListBox items={items}>
-          {(item) => (
-            <ListBox.Item id={item.id} textValue={item.name}>
-              {item.name}
-            </ListBox.Item>
-          )}
-        </ListBox>
-      </Select.Popover>
-    </Select>
+      <ListBox items={items}>
+        {(item) => (
+          <ListBox.Item id={item.id} textValue={item.name}>
+            {item.name}
+          </ListBox.Item>
+        )}
+      </ListBox>
+    </FormSelect>
   );
 }
 
@@ -638,21 +628,20 @@ export function OrderManagement({
                       onChange={setCreateLocationId}
                     />
                   )}
-                  <TextField
+                  <FormTextField
                     fullWidth
                     isDisabled={isCreatingOrder}
                     isInvalid={Boolean(customLabelError)}
+                    label="Order label (optional)"
                     maxLength={32}
                     name="custom-order-label"
+                    placeholder="Order label (automatic if empty)"
                     value={customLabel}
                     onChange={(value) => {
                       setCustomLabel(value);
                       setCustomLabelError(undefined);
                     }}
-                  >
-                    <Label>Order label (optional)</Label>
-                    <Input placeholder="Default: automatic" />
-                  </TextField>
+                  />
                   {customLabelError && (
                     <p className="text-sm text-danger">{customLabelError}</p>
                   )}

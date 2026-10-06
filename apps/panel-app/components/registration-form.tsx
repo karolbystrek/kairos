@@ -1,11 +1,13 @@
 "use client";
+
 import { useSyncExternalStore, useState, type FormEvent } from "react";
-import { Alert, Button, Input, Label, TextField } from "@heroui/react";
+import { Alert, Button } from "@heroui/react";
 import useSWR from "swr";
 import { ZodError } from "zod";
 
 import { BrandWordmark } from "./brand-wordmark";
 
+import { FormTextField } from "@/components/form-controls";
 import { registerTenant } from "@/src/api/tenant-registrations";
 import {
   previewAccountInvitation,
@@ -150,39 +152,36 @@ export function RegistrationForm({ invited = false }: { invited?: boolean }) {
         )}
       {!account && (
         <form className="flex flex-col gap-4" onSubmit={submit}>
-          <TextField
+          <FormTextField
             isRequired
+            inputProps={{ autoCapitalize: "none", autoComplete: "email" }}
+            label="Email"
             maxLength={200}
             type="email"
             value={email}
             onChange={setEmail}
-          >
-            <Label>Email</Label>
-            <Input autoCapitalize="none" autoComplete="email" />
-          </TextField>
-          <TextField
+          />
+          <FormTextField
             isRequired
+            inputProps={{ autoComplete: "new-password" }}
+            label="Password"
             maxLength={200}
             type="password"
             value={password}
             onChange={setPassword}
-          >
-            <Label>Password</Label>
-            <Input autoComplete="new-password" />
-          </TextField>
+          />
           <p className="text-sm text-muted">
             Use at least 12 characters. Up to 200 characters are supported.
           </p>
-          <TextField
+          <FormTextField
             isRequired
+            inputProps={{ autoComplete: "new-password" }}
+            label="Confirm password"
             maxLength={200}
             type="password"
             value={confirmation}
             onChange={setConfirmation}
-          >
-            <Label>Confirm password</Label>
-            <Input autoComplete="new-password" />
-          </TextField>
+          />
           <Button
             isDisabled={
               checkingAccount ||

@@ -67,6 +67,23 @@ input and actions share an inline control row, that row owns one semantic height
 for every peer so their alignment can be changed centrally without per-control
 overrides.
 
+Routine editable text fields and single-choice selectors use compact,
+placeholder-led presentation instead of visible labels beside or above the
+control. Reusable HeroUI form controls retain associated visually hidden labels
+so each field has a stable accessible name after a value is entered. Placeholder
+copy is concise, sentence case, and task-specific: text fields name the expected
+value (for example, **Email** or **Location name**) and empty selectors use
+**Select location**. Optional fields identify their default when needed, such as
+**Order label (automatic if empty)**. Placeholder typography and color come
+from shared semantic styles rather than per-page overrides.
+In dark appearance, form fields use a lighter dark-gray surface than the page
+and modal backgrounds so their boundaries remain visible without focus.
+
+Visible labels remain for native date/time inputs, read-only values, and grouped
+choices that cannot communicate their purpose through a placeholder. Validation,
+password guidance, and consequential confirmation instructions remain available
+outside the field; placeholders do not replace essential instructions.
+
 Both frontends provide Light, Dark, and System appearance preferences, with
 System as the default. Each browser stores its own preference; appearance is
 not account data and does not synchronize between devices. The appearance
@@ -425,8 +442,8 @@ through the Edit control in that rail; edit mode exposes direct confirm and
 cancel controls in place of the title.
 Contextual action labels omit a repeated entity name when the selected detail
 already makes the target unambiguous. The new-integration sheet keeps its
-single name field visually unlabeled and uses the direct **Enter integration
-name** placeholder while retaining an assistive-technology label.
+single name field visually unlabeled and uses the direct **Integration name**
+placeholder while retaining an assistive-technology label.
 
 Account and integration collection cards use the shared Panel Card directly,
 including its comfortable padding, minimum touch size, rounded geometry,

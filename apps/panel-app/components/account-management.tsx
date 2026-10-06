@@ -8,15 +8,12 @@ import {
   AlertDialog,
   Badge,
   Button,
-  Input,
   ListBox,
   Modal,
   Radio,
   RadioGroup,
-  Select,
   Spinner,
   Label,
-  TextField,
   Tooltip,
 } from "@heroui/react";
 import {
@@ -31,6 +28,7 @@ import { useEffect, useState } from "react";
 import useSWR from "swr";
 import useSWRMutation from "swr/mutation";
 
+import { FormSelect, FormTextField } from "@/components/form-controls";
 import { OneTimeSecret } from "@/components/integrations/one-time-secret";
 import { PanelCard } from "@/components/panel-card";
 import { PanelDetailHeader } from "@/components/panel-detail-header";
@@ -114,30 +112,23 @@ function LocationSelect({
   selectedId?: string;
 }) {
   return (
-    <Select
+    <FormSelect
       fullWidth
-      aria-label="Location"
       className="min-w-0 max-w-full"
+      label="Location"
       selectedKey={selectedId}
       onSelectionChange={(key) => {
         if (key !== null) onChange(String(key));
       }}
     >
-      <Label>Location</Label>
-      <Select.Trigger className="min-w-0 max-w-full">
-        <Select.Value className="min-w-0" />
-        <Select.Indicator />
-      </Select.Trigger>
-      <Select.Popover>
-        <ListBox items={locations}>
-          {(location) => (
-            <ListBox.Item id={location.id} textValue={location.name}>
-              {location.name}
-            </ListBox.Item>
-          )}
-        </ListBox>
-      </Select.Popover>
-    </Select>
+      <ListBox items={locations}>
+        {(location) => (
+          <ListBox.Item id={location.id} textValue={location.name}>
+            {location.name}
+          </ListBox.Item>
+        )}
+      </ListBox>
+    </FormSelect>
   );
 }
 
@@ -875,19 +866,19 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
               <AlertDialog.Body className="flex flex-col gap-4">
                 <p>
                   This account will be signed out, disappear from Accounts, lose
-                  its pending invitations, and never regain access.
+                  its pending invitations, and never regain access. Type its
+                  exact email to confirm.
                 </p>
-                <TextField
+                <FormTextField
                   fullWidth
                   isRequired
+                  inputProps={{ autoComplete: "off" }}
                   isDisabled={isDeleting}
+                  label={`Type ${accountToDelete?.email} to confirm`}
                   name="delete-account-confirmation"
                   value={deleteConfirmation}
                   onChange={setDeleteConfirmation}
-                >
-                  <Label>Type {accountToDelete?.email} to confirm</Label>
-                  <Input autoComplete="off" />
-                </TextField>
+                />
                 {deletionError && (
                   <Alert status="danger">
                     <Alert.Indicator />

@@ -7,12 +7,9 @@ import {
   Alert,
   AlertDialog,
   Button,
-  Input,
-  Label,
   Modal,
   Spinner,
   Tabs,
-  TextField,
   Tooltip,
 } from "@heroui/react";
 import {
@@ -27,6 +24,7 @@ import {
 import { useState } from "react";
 import useSWR from "swr";
 
+import { FormTextField } from "@/components/form-controls";
 import { ApiKeyManagement } from "@/components/integrations/api-key-management";
 import {
   getIntegrationErrorMessage,
@@ -164,18 +162,16 @@ function IntegrationDetails({
               className="control-row control-row--touch min-w-0 w-full sm:max-w-xl"
               onSubmit={rename}
             >
-              <TextField
+              <FormTextField
                 fullWidth
                 isRequired
                 isDisabled={pendingAction === "rename"}
+                label="Integration name"
                 maxLength={64}
                 name="integration-name"
                 value={name}
                 onChange={setName}
-              >
-                <Label className="sr-only">Name</Label>
-                <Input />
-              </TextField>
+              />
               <Tooltip delay={500}>
                 <Tooltip.Trigger>
                   <Button
@@ -368,19 +364,18 @@ function IntegrationDetails({
                 <p>
                   This permanently removes the integration from this workspace
                   and immediately blocks its API Keys and future webhook
-                  fan-out.
+                  fan-out. Type its exact name to confirm.
                 </p>
-                <TextField
+                <FormTextField
                   fullWidth
                   isRequired
+                  inputProps={{ autoComplete: "off" }}
                   isDisabled={pendingAction === "delete"}
+                  label={`Type ${integration.name} to confirm`}
                   name="delete-integration-confirmation"
                   value={deleteConfirmation}
                   onChange={setDeleteConfirmation}
-                >
-                  <Label>Type {integration.name} to confirm</Label>
-                  <Input autoComplete="off" />
-                </TextField>
+                />
               </AlertDialog.Body>
               <AlertDialog.Footer>
                 <Button slot="close" variant="tertiary">
@@ -628,18 +623,16 @@ export function IntegrationManagement({ accountId }: { accountId: string }) {
                       </Alert.Content>
                     </Alert>
                   )}
-                  <TextField
+                  <FormTextField
                     fullWidth
                     isRequired
                     isDisabled={isCreating}
+                    label="Integration name"
                     maxLength={64}
                     name="new-integration-name"
                     value={name}
                     onChange={setName}
-                  >
-                    <Label className="sr-only">Integration name</Label>
-                    <Input placeholder="Enter integration name" />
-                  </TextField>
+                  />
                 </Modal.Body>
                 <Modal.Footer>
                   <Button slot="close" variant="tertiary">

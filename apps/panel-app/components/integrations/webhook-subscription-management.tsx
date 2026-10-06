@@ -7,16 +7,7 @@ import type {
   WebhookSubscriptionInput,
 } from "@/src/api/webhook-subscriptions";
 
-import {
-  Alert,
-  AlertDialog,
-  Button,
-  Input,
-  Label,
-  Spinner,
-  TextField,
-  Tooltip,
-} from "@heroui/react";
+import { Alert, AlertDialog, Button, Spinner, Tooltip } from "@heroui/react";
 import {
   Ban as DisableIcon,
   Check as CheckIcon,
@@ -26,6 +17,7 @@ import {
 import { useState } from "react";
 import useSWR from "swr";
 
+import { FormTextField } from "@/components/form-controls";
 import {
   formatIntegrationDateTime,
   getIntegrationErrorMessage,
@@ -106,37 +98,34 @@ function SubscriptionFields({
 }) {
   return (
     <>
-      <TextField
+      <FormTextField
         fullWidth
         isRequired
         isDisabled={isDisabled}
+        label="Webhook name"
         maxLength={64}
         name="webhook-name"
         value={draft.name}
         onChange={(name) => onChange({ ...draft, name })}
-      >
-        <Label>Name</Label>
-        <Input placeholder="Webhook name" />
-      </TextField>
+      />
 
-      <TextField
+      <FormTextField
         fullWidth
         isRequired
+        inputProps={{
+          autoCapitalize: "none",
+          autoComplete: "off",
+          spellCheck: false,
+        }}
         isDisabled={isDisabled}
+        label="Destination URL"
         maxLength={2048}
         name="webhook-destination"
+        placeholder="Destination URL (https://…)"
         type="url"
         value={draft.destinationUrl}
         onChange={(destinationUrl) => onChange({ ...draft, destinationUrl })}
-      >
-        <Label>Destination URL</Label>
-        <Input
-          autoCapitalize="none"
-          autoComplete="off"
-          placeholder="https://example.com/webhooks"
-          spellCheck={false}
-        />
-      </TextField>
+      />
 
       <div className="flex flex-col gap-3">
         <p className="text-sm font-medium">Locations</p>
