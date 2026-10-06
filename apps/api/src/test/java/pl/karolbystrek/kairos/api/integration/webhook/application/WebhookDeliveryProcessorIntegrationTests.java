@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.test.context.transaction.TestTransaction;
 import pl.karolbystrek.kairos.api.integration.application.ExternalIntegrationManagementService;
 import pl.karolbystrek.kairos.api.integration.testsupport.IntegrationTestFixture;
 import pl.karolbystrek.kairos.api.integration.webhook.domain.WebhookDeliveryStatus;
@@ -64,8 +65,9 @@ class WebhookDeliveryProcessorIntegrationTests
             }
         });
         server.start();
+        var tenant = new IntegrationTestFixture(jdbcTemplate).createTenant();
+        var committed = false;
         try {
-            var tenant = new IntegrationTestFixture(jdbcTemplate).createTenant();
             var integration = integrationService.create(
                     tenant.administrator(),
                     "Processor integration"
@@ -91,7 +93,14 @@ class WebhookDeliveryProcessorIntegrationTests
             assertThat(fanoutService.fanOutAvailable()).isEqualTo(1);
             var claimed = claimService.claimAvailable().getFirst();
 
+            TestTransaction.flagForCommit();
+            TestTransaction.end();
+            committed = true;
+
             deliveryProcessor.process(claimed);
+
+            // Read through a fresh transaction so the result must be durable.
+            TestTransaction.start();
 
             var delivery = deliveryRepository.findById(claimed.id()).orElseThrow();
             assertThat(delivery.getStatus())
@@ -107,6 +116,29 @@ class WebhookDeliveryProcessorIntegrationTests
             )).isEqualTo("IN_PREPARATION");
         } finally {
             server.stop(0);
+            if (committed) {
+                if (!TestTransaction.isActive()) TestTransaction.start();
+                removeCommittedFixture(tenant.tenantId());
+                TestTransaction.flagForCommit();
+                TestTransaction.end();
+            }
         }
+    }
+
+    private void removeCommittedFixture(java.util.UUID tenantId) {
+        jdbcTemplate.update("DELETE FROM webhook_delivery_signing_versions WHERE delivery_id IN (SELECT id FROM webhook_deliveries WHERE outbox_event_id IN (SELECT id FROM order_outbox_events WHERE tenant_id = ?))", tenantId);
+        jdbcTemplate.update("DELETE FROM webhook_deliveries WHERE outbox_event_id IN (SELECT id FROM order_outbox_events WHERE tenant_id = ?)", tenantId);
+        jdbcTemplate.update("DELETE FROM order_outbox_events WHERE tenant_id = ?", tenantId);
+        jdbcTemplate.update("DELETE FROM order_history WHERE order_id IN (SELECT id FROM orders WHERE location_id IN (SELECT id FROM locations WHERE tenant_id = ?))", tenantId);
+        jdbcTemplate.update("DELETE FROM orders WHERE location_id IN (SELECT id FROM locations WHERE tenant_id = ?)", tenantId);
+        jdbcTemplate.update("DELETE FROM webhook_signing_secret_versions WHERE subscription_id IN (SELECT id FROM webhook_subscriptions WHERE tenant_id = ?)", tenantId);
+        jdbcTemplate.update("DELETE FROM webhook_subscription_event_types WHERE subscription_id IN (SELECT id FROM webhook_subscriptions WHERE tenant_id = ?)", tenantId);
+        jdbcTemplate.update("DELETE FROM webhook_subscription_location_access WHERE tenant_id = ?", tenantId);
+        jdbcTemplate.update("DELETE FROM webhook_subscriptions WHERE tenant_id = ?", tenantId);
+        jdbcTemplate.update("DELETE FROM external_integrations WHERE tenant_id = ?", tenantId);
+        jdbcTemplate.update("DELETE FROM location_assignments WHERE tenant_id = ?", tenantId);
+        jdbcTemplate.update("DELETE FROM accounts WHERE tenant_id = ?", tenantId);
+        jdbcTemplate.update("DELETE FROM locations WHERE tenant_id = ?", tenantId);
+        jdbcTemplate.update("DELETE FROM tenants WHERE id = ?", tenantId);
     }
 }

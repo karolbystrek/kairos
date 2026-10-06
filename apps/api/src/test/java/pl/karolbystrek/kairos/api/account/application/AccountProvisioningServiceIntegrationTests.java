@@ -79,6 +79,7 @@ class AccountProvisioningServiceIntegrationTests extends RedisListenerIsolatedIn
             AssignmentRole.OPERATOR
         );
         var sessionId = insertSession(managerId);
+        var administratorSession = insertSession(administratorId);
 
         var disabled = provisioningService.updateStatus(
             principal(administratorId, tenantId, TenantRole.ADMIN),
@@ -92,8 +93,10 @@ class AccountProvisioningServiceIntegrationTests extends RedisListenerIsolatedIn
         assertThat(jdbcTemplate.queryForObject(
             "SELECT authentication_cutoff IS NOT NULL FROM accounts WHERE id = ?",
             Boolean.class,
-            sessionId
+            managerId
         )).isTrue();
+        assertThat(sessionExists(sessionId)).isFalse();
+        assertThat(sessionExists(administratorSession)).isTrue();
         assertThat(jdbcTemplate.queryForMap(
             "SELECT state, revocation_reason FROM account_invitations WHERE id = ?",
             invitation.invitation().id()
@@ -127,7 +130,7 @@ class AccountProvisioningServiceIntegrationTests extends RedisListenerIsolatedIn
     }
 
     @Test
-    void deletingManagedAccountArchivesItAndRemovesEveryAuthenticator() {
+    void deletingManagedAccountArchivesItAndRevokesItsSessionsAndInvitations() {
         var tenantId = insertTenant();
         var locationId = insertLocation(tenantId);
         var administratorId = insertAccount(
@@ -149,6 +152,7 @@ class AccountProvisioningServiceIntegrationTests extends RedisListenerIsolatedIn
             AssignmentRole.OPERATOR
         );
         var sessionId = insertSession(managerId);
+        var administratorSession = insertSession(administratorId);
         var administrator = principal(
             administratorId,
             tenantId,
@@ -161,8 +165,7 @@ class AccountProvisioningServiceIntegrationTests extends RedisListenerIsolatedIn
         assertThat(jdbcTemplate.queryForMap(
             "SELECT status, authentication_cutoff, archived_at FROM accounts WHERE id = ?",
             managerId
-        )).containsEntry("status", "ARCHIVED")
-            ;
+        )).containsEntry("status", "ARCHIVED");
         assertThat(jdbcTemplate.queryForObject(
             "SELECT archived_at IS NOT NULL FROM accounts WHERE id = ?",
             Boolean.class,
@@ -171,8 +174,10 @@ class AccountProvisioningServiceIntegrationTests extends RedisListenerIsolatedIn
         assertThat(jdbcTemplate.queryForObject(
             "SELECT authentication_cutoff IS NOT NULL FROM accounts WHERE id = ?",
             Boolean.class,
-            sessionId
+            managerId
         )).isTrue();
+        assertThat(sessionExists(sessionId)).isFalse();
+        assertThat(sessionExists(administratorSession)).isTrue();
         assertThat(jdbcTemplate.queryForMap(
             "SELECT state, revocation_reason FROM account_invitations WHERE id = ?",
             invitation.invitation().id()
@@ -254,8 +259,27 @@ class AccountProvisioningServiceIntegrationTests extends RedisListenerIsolatedIn
         );
     }
 
-    private UUID insertSession(UUID accountId) {
-        return accountId;
+    private String insertSession(UUID accountId) {
+        var sessionId = UUID.randomUUID().toString();
+        var now = Instant.now().toEpochMilli();
+        jdbcTemplate.update(
+            """
+            INSERT INTO spring_session (primary_id, session_id, creation_time, last_access_time,
+                                        max_inactive_interval, expiry_time, principal_name)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            UUID.randomUUID().toString(), sessionId, now, now, 30 * 86400,
+            now + 30L * 86400 * 1000, accountId.toString()
+        );
+        return sessionId;
+    }
+
+    private boolean sessionExists(String sessionId) {
+        return jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) > 0 FROM spring_session WHERE session_id = ?",
+            Boolean.class,
+            sessionId
+        );
     }
 
     private static StaffPrincipal principal(UUID accountId, UUID tenantId, TenantRole role) {

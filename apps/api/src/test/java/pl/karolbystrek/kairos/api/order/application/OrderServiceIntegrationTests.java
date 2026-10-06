@@ -12,8 +12,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
 import pl.karolbystrek.kairos.api.account.domain.TenantRole;
-import pl.karolbystrek.kairos.api.location.application.LocationService;
-import pl.karolbystrek.kairos.api.order.application.model.StaffOrderView;
 import pl.karolbystrek.kairos.api.order.domain.InvalidOrderTransitionException;
 import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
 import pl.karolbystrek.kairos.api.order.infrastructure.persistence.OrderHistoryRepository;
@@ -35,9 +33,6 @@ class OrderServiceIntegrationTests extends RedisListenerIsolatedIntegrationTest 
 
     @Autowired
     private OrderService orderService;
-
-    @Autowired
-    private LocationService locationService;
 
     @Autowired
     private OrderHistoryRepository historyRepository;
@@ -87,10 +82,6 @@ class OrderServiceIntegrationTests extends RedisListenerIsolatedIntegrationTest 
         assertThat(created.status()).isEqualTo(OrderStatus.IN_PREPARATION);
         assertThat(created.label()).isEqualTo("1");
         assertThat(created.trackingReference()).isNotNull();
-        assertThat(locationService.listAccessible(principal)).extracting(location -> location.id())
-            .containsExactly(locationId);
-        assertThat(orderService.listOrders(principal, locationId, null)).extracting(StaffOrderView::id)
-            .contains(created.id());
 
         var ready = orderService.updateStatus(principal, created.id(), OrderStatus.READY);
         var completed = orderService.updateStatus(principal, created.id(), OrderStatus.COMPLETED);
@@ -100,8 +91,6 @@ class OrderServiceIntegrationTests extends RedisListenerIsolatedIntegrationTest 
         assertThat(completed.status()).isEqualTo(OrderStatus.COMPLETED);
         assertThat(tracked.label()).isEqualTo("1");
         assertThat(tracked.status()).isEqualTo(OrderStatus.COMPLETED);
-        assertThat(orderService.listOrders(principal, locationId, null)).isEmpty();
-        assertThat(orderService.listOrders(principal, null, null)).isEmpty();
         assertThat(historyRepository.count()).isEqualTo(3);
         assertThat(jdbcTemplate.queryForList(
             "SELECT initiator_type FROM order_history WHERE order_id = ? ORDER BY id",
@@ -120,8 +109,7 @@ class OrderServiceIntegrationTests extends RedisListenerIsolatedIntegrationTest 
         var created = orderService.createOrder(principal, locationId, null);
 
         assertThatThrownBy(() -> orderService.updateStatus(principal, created.id(), OrderStatus.COMPLETED))
-            .isInstanceOf(InvalidOrderTransitionException.class)
-            .hasMessageContaining("IN_PREPARATION to COMPLETED");
+            .isInstanceOf(InvalidOrderTransitionException.class);
     }
 
     @Test

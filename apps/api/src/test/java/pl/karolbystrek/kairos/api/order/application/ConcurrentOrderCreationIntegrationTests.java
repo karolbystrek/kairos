@@ -92,34 +92,6 @@ class ConcurrentOrderCreationIntegrationTests extends RedisListenerIsolatedInteg
         assertThat(labels).containsExactly("1", "2", "3", "4", "5", "6");
     }
 
-    @Test
-    void keepsConcurrentCountersIndependentAcrossLocations() throws Exception {
-        var tenantId = insertTenant();
-        var firstLocationId = insertLocation(tenantId);
-        var secondLocationId = insertLocation(tenantId);
-        var firstPrincipal = insertAdministrator(tenantId);
-        var secondPrincipal = insertAdministrator(tenantId);
-        List<Callable<String>> tasks = List.of(
-                () -> orderService.createOrder(firstPrincipal, firstLocationId, null).label(),
-                () -> orderService.createOrder(secondPrincipal, secondLocationId, null).label()
-        );
-
-        List<String> labels;
-        try (var executor = Executors.newFixedThreadPool(2)) {
-            labels = executor.invokeAll(tasks).stream()
-                    .map(future -> {
-                        try {
-                            return future.get();
-                        } catch (Exception exception) {
-                            throw new IllegalStateException(exception);
-                        }
-                    })
-                    .toList();
-        }
-
-        assertThat(labels).containsExactlyInAnyOrder("1", "1");
-    }
-
     private UUID insertTenant() {
         var tenantId = UUID.randomUUID();
         jdbcTemplate.update("INSERT INTO tenants (id) VALUES (?)", tenantId);

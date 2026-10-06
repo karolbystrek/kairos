@@ -63,7 +63,7 @@ test("retryable registration failures preserve the invitation", () => {
   }
 });
 
-test("successful registration removes the invitation before navigating away", () => {
+test("clearing the invitation preserves unrelated URL state", () => {
   const view = registrationPage();
   view.page.clearInvitationFragment();
   assert.equal(view.url.href, "https://panel.example.com/account-registration?source=team#keep=yes");

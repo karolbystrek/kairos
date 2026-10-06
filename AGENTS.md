@@ -140,6 +140,26 @@ Use Conventional Commits for every commit.
   report it and ask before resetting data.
 - Report checks as passed, failed, blocked, or not run.
 
+### Test scope
+
+- Add or change tests only to protect an accepted product behavior, security
+  boundary, data-integrity invariant, external contract, or concrete regression.
+  State the failure the test would catch.
+- Prefer the smallest behavioral test at the owning boundary. Extend existing
+  coverage before adding a suite; do not repeat the same scenario across layers
+  unless each layer verifies a distinct contract.
+- Do not test trivial getters, pass-through wrappers, framework/library behavior,
+  file existence, implementation structure, CSS classes, icon selection, or exact
+  non-contract copy. Keep accessibility assertions about observable semantics
+  and interaction.
+- Assert outcomes independently of the implementation. Mock external boundaries,
+  not the behavior being verified; call counts matter only when repetition itself
+  violates the contract.
+- No coverage-percentage targets or default test-per-function requirement.
+  Presentation-only changes normally need lint/type-checking, not new tests.
+- Keep focused coverage for authorization, tenant isolation, validation,
+  consequential state transitions, atomicity, idempotency, and relevant races.
+
 ## Agent skills
 
 ### Issue tracker

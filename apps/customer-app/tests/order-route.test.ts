@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  getTrackedOrderHref,
-  parseScannedOrderUrl,
-} from "@/src/orders/order-route";
+import { parseScannedOrderUrl } from "@/src/orders/order-route";
 
 const CUSTOMER_URL = "https://customer.kairos.test";
 const TRACKING_REFERENCE = "930fccf0-c771-4c46-b4fd-ee59ce6e11cc";
@@ -16,9 +13,6 @@ describe("scanned order routes", () => {
         CUSTOMER_URL,
       ),
     ).toBe(TRACKING_REFERENCE);
-    expect(getTrackedOrderHref(TRACKING_REFERENCE)).toBe(
-      `/orders/${TRACKING_REFERENCE}`,
-    );
   });
 
   it.each([

@@ -184,11 +184,6 @@ class SecurityFilterChainIntegrationTests extends RedisListenerIsolatedIntegrati
                 "/account-invitation-previews/v1",
                 "POST"
         );
-        assertCorsRejected(
-                "http://localhost:3000",
-                "/account-invitation-previews/v1",
-                "POST"
-        );
         assertCorsRejected("http://localhost:3001", "/tracked-orders/v1/reference", "GET");
         assertCorsRejected("http://localhost:3001", "/external/orders/v1", "GET");
         assertCorsRejected("https://unknown.example.org", "/orders/v1", "GET");

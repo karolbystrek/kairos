@@ -33,8 +33,14 @@ class OrderStatusRedisAdapterTests {
 
         assertThat(redisTemplate.channel)
                 .isEqualTo(OrderEventRedisConfiguration.ORDER_STATUS_CHANNEL);
-        assertThat(redisTemplate.payload)
-                .isEqualTo(objectMapper.writeValueAsString(OrderStatusRedisMessage.from(event)));
+        var payload = objectMapper.readTree(redisTemplate.payload);
+        assertThat(payload.get("version").asInt()).isEqualTo(2);
+        assertThat(payload.get("eventId").asText())
+                .isEqualTo("00000000-0000-0000-0000-000000000002");
+        assertThat(payload.get("trackingReference").asText())
+                .isEqualTo("00000000-0000-0000-0000-000000000001");
+        assertThat(payload.get("status").asText()).isEqualTo("READY");
+        assertThat(payload.get("updatedAt").asText()).isEqualTo("2026-07-24T12:00:00Z");
 
         redisTemplate.fail = true;
         assertThatCode(() -> publisher.publish(event)).doesNotThrowAnyException();
@@ -49,6 +55,7 @@ class OrderStatusRedisAdapterTests {
         subscriber.onMessage(message("""
                 {
                   "version": 999,
+                  "eventId": "00000000-0000-0000-0000-000000000002",
                   "trackingReference": "00000000-0000-0000-0000-000000000001",
                   "status": "READY",
                   "updatedAt": "2026-07-24T12:00:00Z"
@@ -63,7 +70,15 @@ class OrderStatusRedisAdapterTests {
         var registry = new CapturingEmitterRegistry();
         var subscriber = new OrderStatusRedisSubscriber(objectMapper, registry);
         var event = event(OrderStatus.COMPLETED);
-        var payload = objectMapper.writeValueAsString(OrderStatusRedisMessage.from(event));
+        var payload = """
+                {
+                  "version": 2,
+                  "eventId": "00000000-0000-0000-0000-000000000002",
+                  "trackingReference": "00000000-0000-0000-0000-000000000001",
+                  "status": "COMPLETED",
+                  "updatedAt": "2026-07-24T12:00:00Z"
+                }
+                """;
 
         subscriber.onMessage(message(payload), null);
 

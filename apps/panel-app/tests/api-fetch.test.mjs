@@ -6,7 +6,6 @@ import ts from "typescript";
 
 const require = createRequire(import.meta.url);
 
-
 function client(fetch) {
   const modules = new Map();
   function load(name) {
@@ -14,7 +13,6 @@ function client(fetch) {
     const exports = {};
     modules.set(name, exports);
     const dependencies = (dependency) => {
-      if (dependency === "./auth-state") return { notifyAuthenticationRequired() {} };
       if (dependency.includes("public-environment"))
         return { apiBaseUrl: "https://api.example.com" };
       if (dependency.startsWith("./")) return load(dependency);
@@ -32,34 +30,50 @@ function client(fetch) {
   }
   const exports = load("./api-fetch");
   exports.authentication = load("./authentication");
+  exports.authState = load("./auth-state");
 
   return exports;
 }
 
-test("expired sessions report unauthorized without refresh or request replay", async () => {
+test("expired sessions notify authentication listeners without request replay", async () => {
   const calls = [];
   const api = client(async (url) => {
     calls.push(url);
     return new Response(null, { status: 401 });
   });
-  await assert.rejects(api.apiFetch("/api/orders/v1"), (error) => error.status === 401);
+  let authenticationRequired = false;
+  const unsubscribe = api.authState.subscribeToAuthenticationRequired(() => {
+    authenticationRequired = true;
+  });
+  try {
+    await assert.rejects(api.apiFetch("/api/orders/v1"), (error) => error.status === 401);
+    assert.equal(authenticationRequired, true);
+  } finally {
+    unsubscribe();
+  }
   assert.equal(calls.length, 1);
   assert.ok(calls[0].endsWith("/api/orders/v1"));
 });
 
 test("CSRF rejection retries once after retrieving a fresh token", async () => {
-  let tokens = 0;
-  let writes = 0;
-  const api = client(async (url, init) => {
-    if (url.endsWith("/csrf")) return Response.json({ token: `csrf-${++tokens}` });
-    assert.equal(init.credentials, "include");
-    if (++writes === 1) return Response.json({ type: "urn:kairos:problem:csrf-token-invalid" }, { status: 403 });
-    assert.equal(init.headers.get("X-XSRF-TOKEN"), "csrf-2");
-    return new Response(null, { status: 204 });
-  });
-  await api.apiFetch("/api/orders/v1", { method: "POST" });
-  assert.equal(writes, 2);
-  assert.equal(tokens, 2);
+  for (const recovered of [true, false]) {
+    let tokens = 0;
+    let writes = 0;
+    const api = client(async (url, init) => {
+      if (url.endsWith("/csrf")) return Response.json({ token: `csrf-${++tokens}` });
+      assert.equal(init.credentials, "include");
+      writes++;
+      assert.equal(init.headers.get("X-XSRF-TOKEN"), `csrf-${writes}`);
+      if (writes === 1 || !recovered)
+        return Response.json({ type: "urn:kairos:problem:csrf-token-invalid" }, { status: 403 });
+      return new Response(null, { status: 204 });
+    });
+    if (recovered) await api.apiFetch("/api/orders/v1", { method: "POST" });
+    else await assert.rejects(api.apiFetch("/api/orders/v1", { method: "POST" }),
+      (error) => error.status === 403);
+    assert.equal(writes, 2);
+    assert.equal(tokens, 2);
+  }
 });
 
 for (const operation of ["login", "logout", "changePassword"]) {

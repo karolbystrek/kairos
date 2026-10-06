@@ -95,8 +95,9 @@ class LocationServiceIntegrationTests extends RedisListenerIsolatedIntegrationTe
         assertThat(jdbcTemplate.queryForObject(
             "SELECT authentication_cutoff IS NULL FROM accounts WHERE id = ?",
             Boolean.class,
-            sessionId
+            manager.accountId()
         )).isTrue();
+        assertThat(sessionExists(sessionId)).isTrue();
     }
 
     @Test
@@ -110,6 +111,7 @@ class LocationServiceIntegrationTests extends RedisListenerIsolatedIntegrationTe
         insertAssignment(manager.accountId(), tenantId, target.id(), AssignmentRole.MANAGER);
         insertAssignment(operator.accountId(), tenantId, target.id(), AssignmentRole.OPERATOR);
         var managerSession = insertSession(manager.accountId());
+        var administratorSession = insertSession(administrator.accountId());
         var invitationId = insertInvitation(tenantId, target.id(), manager.accountId());
         var terminalOrderId = insertOrder(target.id(), "COMPLETED");
         var integration = insertIntegrationResources(tenantId, target.id(), retained.id());
@@ -121,17 +123,22 @@ class LocationServiceIntegrationTests extends RedisListenerIsolatedIntegrationTe
         assertThat(jdbcTemplate.queryForObject(
             "SELECT authentication_cutoff IS NOT NULL FROM accounts WHERE id = ?",
             Boolean.class,
-            managerSession
+            manager.accountId()
         )).isTrue();
+        assertThat(sessionExists(managerSession)).isFalse();
+        assertThat(sessionExists(administratorSession)).isTrue();
 
         locationService.updateStatus(administrator, target.id(), LocationStatus.ENABLED);
         assertThat(value("accounts", "status", manager.accountId())).isEqualTo("ENABLED");
         assertThat(value("accounts", "status", operator.accountId())).isEqualTo("ENABLED");
 
         locationService.updateStatus(administrator, target.id(), LocationStatus.DISABLED);
+        var staleSession = insertSession(manager.accountId());
         locationService.delete(administrator, target.id());
 
         assertThat(value("locations", "status", target.id())).isEqualTo("ARCHIVED");
+        assertThat(sessionExists(staleSession)).isFalse();
+        assertThat(sessionExists(administratorSession)).isTrue();
         assertThat(value("accounts", "status", manager.accountId())).isEqualTo("ARCHIVED");
         assertThat(value("accounts", "status", operator.accountId())).isEqualTo("ARCHIVED");
         assertThat(jdbcTemplate.queryForObject(
@@ -216,8 +223,27 @@ class LocationServiceIntegrationTests extends RedisListenerIsolatedIntegrationTe
         );
     }
 
-    private UUID insertSession(UUID accountId) {
-        return accountId;
+    private String insertSession(UUID accountId) {
+        var sessionId = UUID.randomUUID().toString();
+        var now = Instant.now().toEpochMilli();
+        jdbcTemplate.update(
+            """
+            INSERT INTO spring_session (primary_id, session_id, creation_time, last_access_time,
+                                        max_inactive_interval, expiry_time, principal_name)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            UUID.randomUUID().toString(), sessionId, now, now, 30 * 86400,
+            now + 30L * 86400 * 1000, accountId.toString()
+        );
+        return sessionId;
+    }
+
+    private boolean sessionExists(String sessionId) {
+        return jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) > 0 FROM spring_session WHERE session_id = ?",
+            Boolean.class,
+            sessionId
+        );
     }
 
     private UUID insertInvitation(UUID tenantId, UUID locationId, UUID issuerId) {

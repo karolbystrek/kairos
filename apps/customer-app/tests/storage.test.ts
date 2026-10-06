@@ -13,6 +13,7 @@ import {
 } from "@/src/pwa/storage";
 
 const TRACKING_REFERENCE = "930fccf0-c771-4c46-b4fd-ee59ce6e11cc";
+const OTHER_REFERENCE = "060f9c9d-1762-4fd2-a5a8-c11ddc00ff21";
 
 function deleteCustomerDatabase(): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -31,8 +32,14 @@ beforeEach(async () => {
 describe("single-order tracking storage", () => {
   it("removes just one order and permits explicit retracking", async () => {
     await updateNotificationMetadata({
-      enrolledTrackingReferences: [TRACKING_REFERENCE],
+      enrolledTrackingReferences: [TRACKING_REFERENCE, OTHER_REFERENCE],
       notificationsEnabled: true,
+    });
+    await rememberTrackedOrder({
+      label: "B12",
+      status: "READY",
+      trackingReference: OTHER_REFERENCE,
+      updatedAt: "2026-08-05T10:00:00Z",
     });
     await rememberTrackedOrder({
       label: "A12",
@@ -46,9 +53,11 @@ describe("single-order tracking storage", () => {
     ).toBe(true);
 
     expect(await readTrackedOrder(TRACKING_REFERENCE)).toBeNull();
+    expect((await readTrackedOrder(OTHER_REFERENCE))?.label).toBe("B12");
     expect(
       (await readNotificationMetadata()).enrolledTrackingReferences,
-    ).toEqual([]);
+    ).toEqual([OTHER_REFERENCE]);
+    expect((await readNotificationMetadata()).notificationsEnabled).toBe(true);
 
     await rememberTrackedOrder({
       label: "A12",

@@ -7,6 +7,8 @@ import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import java.util.function.Consumer;
 
@@ -14,23 +16,30 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class OrderSseEmitterRegistryTests {
 
-    private final OrderSseEmitterRegistry registry = new OrderSseEmitterRegistry(SseEmitter::new);
+    private final OrderSseEmitterRegistry registry = new OrderSseEmitterRegistry(ignored -> new RecordingEmitter());
 
     @Test
     void forwardsOnlyToTheMatchingReferenceAndRetainsConnectionsForActiveEvents() {
         var matchingReference = UUID.randomUUID();
         var otherReference = UUID.randomUUID();
-        registry.register(matchingReference);
-        registry.register(matchingReference);
-        registry.register(otherReference);
+        var first = (RecordingEmitter) registry.register(matchingReference);
+        var second = (RecordingEmitter) registry.register(matchingReference);
+        var other = (RecordingEmitter) registry.register(otherReference);
 
-        registry.forward(new OrderStatusChangedEvent(
+        var event = new OrderStatusChangedEvent(
                 UUID.randomUUID(),
                 matchingReference,
                 OrderStatus.READY,
                 Instant.parse("2026-07-24T12:00:00Z")
-        ));
+        );
+        registry.forward(event);
 
+        assertThat(first.events).containsExactly(event);
+        assertThat(second.events).containsExactly(event);
+        assertThat(other.events).isEmpty();
+        assertThat(first.completed).isFalse();
+        assertThat(second.completed).isFalse();
+        assertThat(other.completed).isFalse();
         assertThat(registry.connectionCount(matchingReference)).isEqualTo(2);
         assertThat(registry.connectionCount(otherReference)).isEqualTo(1);
     }
@@ -39,17 +48,24 @@ class OrderSseEmitterRegistryTests {
     void completesAndRemovesEveryMatchingConnectionForATerminalEvent() {
         var matchingReference = UUID.randomUUID();
         var otherReference = UUID.randomUUID();
-        registry.register(matchingReference);
-        registry.register(matchingReference);
-        registry.register(otherReference);
+        var first = (RecordingEmitter) registry.register(matchingReference);
+        var second = (RecordingEmitter) registry.register(matchingReference);
+        var other = (RecordingEmitter) registry.register(otherReference);
 
-        registry.forward(new OrderStatusChangedEvent(
+        var event = new OrderStatusChangedEvent(
                 UUID.randomUUID(),
                 matchingReference,
                 OrderStatus.CANCELED,
                 Instant.parse("2026-07-24T12:00:00Z")
-        ));
+        );
+        registry.forward(event);
 
+        assertThat(first.events).containsExactly(event);
+        assertThat(second.events).containsExactly(event);
+        assertThat(other.events).isEmpty();
+        assertThat(first.completed).isTrue();
+        assertThat(second.completed).isTrue();
+        assertThat(other.completed).isFalse();
         assertThat(registry.connectionCount(matchingReference)).isZero();
         assertThat(registry.connectionCount(otherReference)).isEqualTo(1);
     }
@@ -119,6 +135,26 @@ class OrderSseEmitterRegistryTests {
         emitter.timeoutRequest();
 
         assertThat(callbackRegistry.connectionCount(trackingReference)).isZero();
+    }
+
+    private static final class RecordingEmitter extends SseEmitter {
+
+        private final List<OrderStatusChangedEvent> events = new ArrayList<>();
+        private boolean completed;
+
+        @Override
+        public void send(SseEventBuilder builder) {
+            for (var part : builder.build()) {
+                if (part.getData() instanceof OrderStatusChangedEvent event) {
+                    events.add(event);
+                }
+            }
+        }
+
+        @Override
+        public void complete() {
+            completed = true;
+        }
     }
 
     private static final class FailingEmitter extends SseEmitter {

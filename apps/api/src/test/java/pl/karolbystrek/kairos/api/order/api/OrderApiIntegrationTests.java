@@ -131,8 +131,8 @@ class OrderApiIntegrationTests extends RedisListenerIsolatedIntegrationTest {
                         .content(requestBody)))
                 .andExpect(status().isBadRequest())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
-                .andExpect(jsonPath("$.detail")
-                        .value("Custom label must be single-line text without control characters"));
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.detail").isNotEmpty());
     }
 
     @Test

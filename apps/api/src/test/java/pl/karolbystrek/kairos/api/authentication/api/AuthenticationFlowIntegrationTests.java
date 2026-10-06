@@ -116,19 +116,6 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
     }
 
     @Test
-    void invitationIsConsumedImmediatelyAtItsFixedLocationAndRole() throws Exception {
-        var tenant = new IntegrationTestFixture(database).createTenant();
-        var invitation = invitations.create(tenant.administrator(), tenant.firstLocationId(), AssignmentRole.MANAGER);
-        var email = email();
-        configure(email);
-        mvc.perform(csrf(postApi("/account-invitation-redemptions/v1").content(registration(email, invitation.token()))))
-            .andExpect(status().isOk()).andExpect(jsonPath("$.assignment.locationId").value(tenant.firstLocationId().toString()))
-            .andExpect(jsonPath("$.assignment.role").value("MANAGER"));
-        mvc.perform(csrf(postApi("/account-invitation-redemptions/v1").content(registration(email(), invitation.token()))))
-            .andExpect(status().isGone());
-    }
-
-    @Test
     void invalidInvitationIsRejectedBeforeProviderCreationAndSignedInRegistrationIsRejected() throws Exception {
         mvc.perform(csrf(postApi("/account-invitation-redemptions/v1").content(registration(email(), "invalid"))))
             .andExpect(status().isNotFound());

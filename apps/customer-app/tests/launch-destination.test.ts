@@ -45,15 +45,21 @@ describe("installed launch restoration", () => {
         orders: [ACTIVE_ORDER],
       }),
     ).toBe("/");
-    expect(
-      resolveInstalledLaunchHref({
-        installationTrackingReference: null,
-        lastDestination: {
-          kind: "order",
-          trackingReference: TRACKING_REFERENCE,
-        },
-        orders: [],
-      }),
-    ).toBe("/");
+    for (const orders of [
+      [],
+      [{ ...ACTIVE_ORDER, status: "COMPLETED" as const }],
+      [{ ...ACTIVE_ORDER, status: "CANCELED" as const }],
+    ]) {
+      expect(
+        resolveInstalledLaunchHref({
+          installationTrackingReference: null,
+          lastDestination: {
+            kind: "order",
+            trackingReference: TRACKING_REFERENCE,
+          },
+          orders,
+        }),
+      ).toBe("/");
+    }
   });
 });
