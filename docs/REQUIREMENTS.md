@@ -932,8 +932,10 @@ Start with one instance and accept planned maintenance outages; HA is deferred.
 `setup.sh` prepares the five application secrets including a stable 32-character
 ZITADEL master key, preserving that key when replacing webhook/push material.
 The provider needs the same master key for as long as its database is retained.
-API PATs expire after one year and require operational rotation. Provider data,
-master key and private credential volumes need backups and restricted access.
+New API PATs use ZITADEL's no-expiry sentinel `9999-12-31T23:59:59Z`; the pinned
+v4.19.4 v2 API requires an explicit expiration timestamp. Operators can revoke
+or rotate them through provider administration. Bootstrap preserves existing PATs and does not change their
+expiration. Provider data, master key and private credential volumes need backups and restricted access.
 No SMTP provider is configured in this increment.
 
 Validate invitation/email availability before provider provisioning. Create and
@@ -1222,9 +1224,10 @@ at most five attempts
 per endpoint with 5-second connect and 15-second request limits. Only after every
 check passes does the command atomically replace `/srv/kairos/deployed-release.json`
 with the successful revision/digests. Failed stages retain the previous success
-record and report bounded service/state/health diagnostics without raw logs,
-environment values or resolved configuration. A failed update can leave a partially
-updated stack; recovery uses a forward fix, with no automated rollback or reset.
+record and report the failed stage with a safe validation reason, command exit
+status/timeout, or final probe HTTP status. Raw command arguments/output, response
+bodies, environment values and resolved configuration are not printed. A failed
+update can leave a partially updated stack; recovery uses a forward fix, with no automated rollback or reset.
 Command tests use fake Docker/curl and temporary state. First install, reboot
 recovery and real Cloudflare-path acceptance on the selected VM remain launch
 work requiring explicit runtime authorization.

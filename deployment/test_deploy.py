@@ -124,6 +124,13 @@ sys.path.insert(0, str(Path(sys.argv.pop(1)).parent))
 import deploy
 deploy.STATE_DIRECTORY = Path(os.environ['STATE_FIXTURE'])
 deploy.time.sleep = lambda _: None
+if os.environ.get('FAIL_STAGE') == 'timeout':
+    real_run = deploy.subprocess.run
+    def run(args, **kwargs):
+        if args[0] == 'docker' and 'up' in args and args[-1] == 'api':
+            raise deploy.subprocess.TimeoutExpired(args, kwargs['timeout'], output='do-not-print-this-secret')
+        return real_run(args, **kwargs)
+    deploy.subprocess.run = run
 sys.exit(deploy.main(sys.argv[1:]))
 """
         interpreter = self.bin / "python3"
@@ -227,6 +234,24 @@ sys.exit(deploy.main(sys.argv[1:]))
                 self.log.unlink(missing_ok=True)
                 self.assert_failed_safely(self.run_deploy(**extra))
                 self.assertLessEqual(sum(call[0] == "curl" for call in self.commands()), 15)
+
+    def test_safe_failure_details_explain_validation_commands_and_probes(self):
+        invalid = {**self.manifest, "revision": "invalid"}
+        result = self.run_deploy(invalid)
+        self.assert_failed_safely(result)
+        self.assertIn("invalid release revision", result.stderr)
+        for extra, expected in (
+            ({"FAIL_STAGE": "api"}, "exit status 1"),
+            ({"FAIL_STAGE": "timeout"}, "timed out after 360 seconds"),
+            ({"PROBE_STATUS": "503"}, "HTTP 503"),
+            ({"FAIL_STAGE": "external"}, "exit status 7"),
+            ({"PROBE_BODY": "do-not-print-this-secret"}, "invalid JSON"),
+        ):
+            with self.subTest(extra=extra):
+                self.log.unlink(missing_ok=True)
+                result = self.run_deploy(**extra)
+                self.assert_failed_safely(result)
+                self.assertIn(expected, result.stderr)
 
     def test_host_lock_rejects_concurrent_deployment_before_docker(self):
         with (self.state / "deploy.lock").open("a") as lock:

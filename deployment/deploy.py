@@ -18,28 +18,46 @@ RUNTIME_FILES = (
 )
 
 
+class ValidationError(ValueError):
+    """An explanation written by this command, never external output."""
+
+
+def failure_reason(error):
+    if isinstance(error, ValidationError):
+        return str(error)
+    if isinstance(error, subprocess.CalledProcessError):
+        return f"command failed with exit status {error.returncode}"
+    if isinstance(error, subprocess.TimeoutExpired):
+        return f"command timed out after {error.timeout} seconds"
+    if isinstance(error, json.JSONDecodeError):
+        return "invalid JSON"
+    if isinstance(error, OSError) and error.errno is not None:
+        return f"OS error {error.errno}: {os.strerror(error.errno)}"
+    return "invalid or incomplete configuration"
+
+
 def inputs(arguments):
     if len(arguments) != 2 or any(not Path(arg).is_absolute() for arg in arguments):
-        raise ValueError("two absolute paths are required")
+        raise ValidationError("two absolute paths are required")
     release, env_file = (Path(arg).resolve(strict=True) for arg in arguments)
     if not release.is_dir() or not env_file.is_file() or env_file.is_relative_to(release):
-        raise ValueError("environment file must be external to the release directory")
+        raise ValidationError("environment file must be external to the release directory")
     for name in ("release.json", *RUNTIME_FILES):
         path = release / name
         if not path.is_file() or path.is_symlink() or not path.resolve().is_relative_to(release):
-            raise ValueError("release runtime files must be present and regular")
+            raise ValidationError("release runtime files must be present and regular")
     manifest = json.loads((release / "release.json").read_text())
     if not isinstance(manifest, dict) or set(manifest) != {"revision", "images"}:
-        raise ValueError("invalid release manifest")
+        raise ValidationError("invalid release manifest")
     revision, images = manifest["revision"], manifest["images"]
     if not isinstance(revision, str) or not re.fullmatch(r"[0-9a-f]{40}", revision):
-        raise ValueError("invalid release revision")
+        raise ValidationError("invalid release revision")
     if not isinstance(images, dict) or set(images) != set(SERVICES):
-        raise ValueError("release requires exactly three application images")
+        raise ValidationError("release requires exactly three application images")
     for service, image in images.items():
         pattern = rf"ghcr\.io/karolbystrek/kairos/{service}@sha256:[0-9a-f]{{64}}"
         if not isinstance(image, str) or not re.fullmatch(pattern, image):
-            raise ValueError("invalid repository-owned image digest")
+            raise ValidationError("invalid repository-owned image digest")
     return release, env_file, manifest
 
 
@@ -59,8 +77,7 @@ def atomic_json(path, value):
 
 
 def command(args, env, *, capture=False, timeout=900):
-    # Docker errors/configuration may contain passwords. Only sanitized stage
-    # names and the deliberately restricted status diagnostic reach the terminal.
+    # Arguments and raw output can contain secrets; report error metadata only.
     return subprocess.run(args, env=env, check=True, timeout=timeout,
                           stdout=subprocess.PIPE if capture else subprocess.DEVNULL,
                           stderr=subprocess.DEVNULL, text=True).stdout
@@ -69,13 +86,13 @@ def command(args, env, *, capture=False, timeout=900):
 def configuration(config, release, images):
     services = config["services"]
     if any(value is None for service in services.values() for value in service.get("environment", {}).values()):
-        raise ValueError("Compose environment values must be supplied")
+        raise ValidationError("Compose environment values must be supplied")
     for name, image in images.items():
         if services[name]["image"] != image:
-            raise ValueError("Compose did not resolve the pinned application image")
+            raise ValidationError("Compose did not resolve the pinned application image")
     api = services["api"]["environment"]
     if any(api.get(name) != "PUBLIC_HTTPS" for name in ("WEBHOOK_DESTINATION_POLICY", "PUSH_DESTINATION_POLICY")):
-        raise ValueError("hosted delivery policies must require public HTTPS")
+        raise ValidationError("hosted delivery policies must require public HTTPS")
     gateway = services["nginx"]["environment"]
     origins = []
     for origin_key, host_key in (
@@ -87,10 +104,10 @@ def configuration(config, release, images):
         url = urlsplit(origin)
         if (url.scheme != "https" or not url.hostname or url.netloc != gateway[host_key]
                 or url.path not in ("", "/") or url.query or url.fragment or url.username):
-            raise ValueError("public HTTPS origins must match exact gateway hostnames")
+            raise ValidationError("public HTTPS origins must match exact gateway hostnames")
         origins.append(origin.rstrip("/"))
     if len(set(origins)) != 3:
-        raise ValueError("three distinct public origins are required")
+        raise ValidationError("three distinct public origins are required")
     # Bind mounts fail safely: no missing path may become an empty directory,
     # and persistent key/certificate material must live outside the checkout.
     for name in ("api", "zitadel", "nginx"):
@@ -101,15 +118,15 @@ def configuration(config, release, images):
                 continue
             source = Path(volume["source"])
             if not source.is_absolute() or not source.exists():
-                raise ValueError("bind mount source must exist at an absolute path")
+                raise ValidationError("bind mount source must exist at an absolute path")
             if source.resolve().is_relative_to(release) or not volume.get("read_only"):
-                raise ValueError("persistent secrets must be external and read-only")
+                raise ValidationError("persistent secrets must be external and read-only")
             if name == "nginx":
                 if not all((source / file).is_file() and not (source / file).resolve().is_relative_to(release)
                            for file in ("tls.crt", "tls.key")):
-                    raise ValueError("external TLS certificate and key are required")
+                    raise ValidationError("external TLS certificate and key are required")
             elif not source.is_file():
-                raise ValueError("application key bind mounts must be regular files")
+                raise ValidationError("application key bind mounts must be regular files")
     return origins
 
 
@@ -123,21 +140,23 @@ def probe(url, env, csrf=False):
                     "--connect-timeout", "5", "--max-time", "15", "--max-filesize", "1048576",
                     "--output", str(body), "--write-out", "%{http_code}", url,
                 ], env, capture=True, timeout=20)
+                reason = f"HTTP {status}" if re.fullmatch(r"[0-9]{3}", status) else "invalid HTTP status"
                 if status == "200":
                     if not csrf:
                         return
                     data = json.loads(body.read_text())
                     if isinstance(data, dict) and isinstance(data.get("token"), str) and data["token"].strip():
                         return
-            except (subprocess.SubprocessError, OSError, ValueError):
-                pass
+                    reason = "missing or invalid CSRF token"
+            except (subprocess.SubprocessError, OSError, ValueError) as error:
+                reason = failure_reason(error)
             if attempt < 4:
                 time.sleep(2)
-    raise ValueError("public probe did not return the expected application response")
+    raise ValidationError(f"public probe failed after 5 attempts: {reason}")
 
 
 def main(arguments=None):
-    stage, compose, env, mutated = "inputs", None, None, False
+    stage = "inputs"
     try:
         release, env_file, manifest = inputs(sys.argv[1:] if arguments is None else arguments)
         env = {**os.environ, "COMPOSE_PROJECT_NAME": "kairos",
@@ -159,7 +178,7 @@ def main(arguments=None):
             stage = "Compose validation"
             resolved = json.loads(command([*compose, "config", "--format", "json", "--no-path-resolution"], env, capture=True, timeout=60))
             origins = configuration(resolved, release, manifest["images"])
-            stage, mutated = "pull", True
+            stage = "pull"
             command([*compose, "pull", "--policy", "always"], env)
             up = [*compose, "up", "--no-deps", "--no-build", "--pull", "never"]
             healthy = [*up, "--wait", "--wait-timeout", "300"]
@@ -173,23 +192,18 @@ def main(arguments=None):
             ):
                 print(f"Deployment stage: {stage}", flush=True)
                 command(args, env, timeout=360)
-            stage = "external probes"
+            stage = "customer HTTPS probe"
             probe(origins[0] + "/", env)
+            stage = "panel HTTPS probe"
             probe(origins[1] + "/", env)
+            stage = "API CSRF HTTPS probe"
             probe(origins[2] + "/api/auth/v1/csrf", env, csrf=True)
             stage = "success record"
             atomic_json(STATE_DIRECTORY / "deployed-release.json", manifest)
             print(f"Deployment verified: {manifest['revision']}")
         return 0
-    except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
-        print(f"Deployment failed at {stage}.", file=sys.stderr)
-        if mutated:
-            try:
-                status = command([*compose, "ps", "--all", "--format", "{{.Service}}\t{{.State}}\t{{.Health}}"],
-                                 env, capture=True, timeout=15)
-                print(status[:4096], file=sys.stderr)
-            except (OSError, subprocess.SubprocessError):
-                pass
+    except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as error:
+        print(f"Deployment failed at {stage}: {failure_reason(error)}.", file=sys.stderr)
         return 1
 
 

@@ -20,7 +20,7 @@ keys. Never discard that key while retaining the provider database.
    A supplied provider Login UI is not needed for Kairos's custom login flow.
 3. A one-shot Python bootstrap creates the service account `kairos-api`, grants
    standard `IAM_LOGIN_CLIENT` and organization `ORG_USER_MANAGER` roles, and
-   writes a one-year PAT into the private `zitadel-api-credentials` volume.
+   writes a non-expiring PAT into the private `zitadel-api-credentials` volume.
    The API mounts this volume read-only and starts after bootstrap completes.
    The administrator PAT lives in a different private bootstrap volume and is
    never mounted into the API. No bootstrap credentials are printed.
@@ -64,9 +64,13 @@ Back up both databases, the master key and the private provider credential
 volumes. Changing database passwords in `.env` alone does not rotate existing
 PostgreSQL roles. The bootstrap PAT is an operator credential and needs restricted
 storage; the API PAT has only the standard roles required by this integration.
-Rotate the API PAT before its one-year expiry: provision a replacement through
-trusted provider administration, atomically replace `kairos.pat` in its credential
-volume, restart the API, then revoke the old PAT. Keep this operational process
+New API PATs use ZITADEL's no-expiry value `9999-12-31T23:59:59Z`; the pinned
+v4.19.4 v2 API requires the expiration field. Existing tokens retain their configured expiration;
+bootstrap never replaces an existing token. To rotate a token, provision a
+replacement with the provider's no-expiry value through trusted provider
+administration, atomically
+replace `kairos.pat` in its credential volume, restart the API, then revoke the old
+PAT. Keep this operational process
 separate from application account/session expiry.
 
 No existing account/password migration is needed: V1 is the initial development

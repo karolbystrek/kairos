@@ -31,6 +31,8 @@ class BootstrapTest(unittest.TestCase):
 
             with patch('pathlib.Path', side_effect=resolve), patch('urllib.request.urlopen', side_effect=respond), contextlib.redirect_stdout(io.StringIO()):
                 runpy.run_path(str(SCRIPT))
+            pat_request = next(call for call in calls if call.full_url.endswith('/pats'))
+            self.assertEqual(json.loads(pat_request.data), {'expirationDate': '9999-12-31T23:59:59Z'})
             self.assertEqual(api.read_text(), 'test-api')
             self.assertEqual(api.stat().st_mode & 0o777, 0o600)
             payloads = [json.loads(call.data) for call in calls if call.data]
