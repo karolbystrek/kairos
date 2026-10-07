@@ -1161,9 +1161,33 @@ requests go directly to the dedicated API origin through the gateway.
   local TLS material. Secret directories use `0700` and application key files `0400`.
 
 GitHub Actions validates pull requests and `main` with frontend lint, type checks,
-configured tests and builds, and the complete Maven `verify` lifecycle. Frontend
+configured tests and production Docker builds, and the complete Maven `verify`
+lifecycle followed by the API Docker build. Frontend
 validation requires the non-secret `NEXT_PUBLIC_API_BASE_URL` and
 `NEXT_PUBLIC_CUSTOMER_APP_URL` inputs.
+
+Main pushes and manual dispatches on `main` publish all three application images
+only after those checks pass; pull requests never publish. Existing full-revision
+tags remain unchanged. Every published or reused image is pulled for
+`linux/amd64` and inspected for the matching source-revision label and a
+repository-owned GHCR registry digest. Validation jobs export OCI image archives
+with provenance and upload them with their build digests on main release runs.
+One `Publish release` job copies those exact artifacts to GHCR using Skopeo with
+all manifests and digest preservation, checks published digests against build
+outputs, captures inspections locally, and verifies all three before uploading
+the `release-manifest` artifact. Publication never rebuilds the images and is
+serialized for the same revision. Previously published immutable tags remain
+unchanged and are inspected before reuse. PRs build images without publishing.
+Failed or incomplete publication cannot produce an eligible release.
+
+That artifact contains `release.json` with a full 40-character lowercase Git
+`revision` and `images` entries for `customer-app`, `panel-app`, and `api`, each
+using `ghcr.io/karolbystrek/kairos/<service>@sha256:<64 lowercase hex>`.
+`release.tar.gz` contains the same manifest plus the exact checkout's shared and
+hosted Compose files, both NGINX configuration files, and the ZITADEL bootstrap
+script. An explicit file allowlist excludes environment files, certificates and
+private keys. First-install deployment and protected production approval remain
+separate implementation steps; publication does not deploy the release.
 
 ### 7.1 Current HTTP resource families
 
