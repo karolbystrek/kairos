@@ -24,9 +24,9 @@ keys. Never discard that key while retaining the provider database.
    The API mounts this volume read-only and starts after bootstrap completes.
    The administrator PAT lives in a different private bootstrap volume and is
    never mounted into the API. No bootstrap credentials are printed.
-4. The API loads `ZITADEL_TOKEN_LOCATION` and calls `ZITADEL_API_URL`. Deployment
-   outside Compose must supply a service credential with the same permissions
-   and connect over a trusted private network or HTTPS.
+4. The API loads `ZITADEL_TOKEN_LOCATION` and calls `ZITADEL_API_URL`.
+   Service credentials remain private and connections use the trusted private
+   network or HTTPS.
 
 The shared provider organization holds identities only; restaurant permissions
 remain in Kairos. Initial password policy requires 12 characters, without forced
@@ -69,8 +69,8 @@ trusted provider administration, atomically replace `kairos.pat` in its credenti
 volume, restart the API, then revoke the old PAT. Keep this operational process
 separate from application account/session expiry.
 
-No existing account/password migration is needed: this repository has never been
-deployed and V1 is the initial schema. An existing development database may have
+No existing account/password migration is needed: V1 is the initial development
+schema. An existing development database may have
 a V1 checksum mismatch; reset it yourself when desired. Implementation never
 resets user-owned containers or volumes automatically.
 
@@ -82,16 +82,14 @@ background repair queue is introduced. Expired/local-only-revoked provider
 sessions may remain in ZITADEL, but cannot authorize Kairos without a valid local
 session; provider housekeeping can be added if retained session volume warrants it.
 
-## Verification before public deployment
+## Provider verification
 
 Automated tests isolate the provider and verify REST payloads, factor validation,
 JDBC expiry/revocation, cookies, CSRF and failure behavior. Separately verify the
 pinned provider's unverified-email login, disabling/deleting a user, password
-changes, explicit session termination and outages. Configure rate limiting,
-backups, credential rotation and monitoring before public deployment. No running
-Compose stack was used by the source/test checks.
+changes, explicit session termination and outages. Source/test checks do not
+exercise the running Compose stack.
 
 References: [Session API](https://zitadel.com/docs/guides/integrate/login-ui/username-password),
 [session validation](https://zitadel.com/docs/guides/integrate/login-ui/session-validation),
-[Compose deployment](https://zitadel.com/docs/self-hosting/deploy/compose),
 and [Spring Session JDBC](https://docs.spring.io/spring-session/reference/configuration/jdbc.html).

@@ -10,7 +10,7 @@ transaction. It remains independently usable by restaurant staff while
 offering an optional, language-agnostic integration boundary for point-of-sale
 systems.
 
-The core system consists of three independently deployable applications:
+The core system consists of three applications:
 
 * **Customer application:** anonymous, mobile-first Next.js PWA for order tracking.
 * **Staff panel:** authenticated Next.js application for queue management and QR-code generation.
@@ -606,7 +606,7 @@ stable, named API Key has immutable scopes, access to one or more current tenant
 locations, and an optional immutable expiration. `orders:write` includes
 `orders:read`. Keys can be revoked immediately and irreversibly. Rotation
 creates a new secret version while the immediately preceding version remains
-valid for a deployment-configured 24-hour grace period. The full high-entropy
+valid for a configured 24-hour grace period. The full high-entropy
 secret is revealed once and only a non-reversible hash is stored. One-time
 secret presentation keeps the copy control beside the secret, temporarily
 replaces it with a completion mark after copying, and uses a right-aligned
@@ -912,12 +912,12 @@ Web Lock. Different Accounts require separate profiles, private contexts, or
 devices. The primary workspace supports administrator location switching and
 aggregate views without depending on tabs.
 
-Before public deployment, a non-bypassable gateway must rate-limit login,
+A non-bypassable gateway must rate-limit login,
 registration, invitation redemption, authenticated password changes, and future
 password recovery. Future email verification will not substitute for throttling.
 Social login, MFA, and additional administrator invitations remain deferred.
 
-### 4.1.1 Provider deployment and registration consistency
+### 4.1.1 Provider setup and registration consistency
 
 Compose pins ZITADEL v4.19.4, uses its own database/user on the existing
 PostgreSQL server, and keeps the provider on the private data network without a
@@ -946,7 +946,7 @@ No distributed transaction, queue or retry worker is introduced. A provider
 outage during cleanup can leave an orphan identity requiring operator cleanup;
 never attach an existing identity solely because its email matches.
 
-Treat Kairos as a fresh, never-deployed repository until the user changes that
+Treat Kairos as a fresh development repository until the user changes that
 policy: no existing-account/password migration or backward compatibility.
 V1 contains the accepted initial schema, including standard Spring Session JDBC
 tables. Do not introduce transitional migrations solely for development data.
@@ -972,8 +972,7 @@ sequenceDiagram
 ```
 
 Validate unverified-email password login and provider disable/delete/password-
-change/session-termination semantics against the pinned provider release before
-public deployment. HTTP contract and provider-isolated tests do not replace this
+change/session-termination semantics against the pinned provider release. HTTP contract and provider-isolated tests do not replace this
 live acceptance. Primary contracts: [Session API](https://zitadel.com/docs/guides/integrate/login-ui/username-password),
 [session validation](https://zitadel.com/docs/guides/integrate/login-ui/session-validation),
 and [Spring Session JDBC](https://docs.spring.io/spring-session/reference/configuration/jdbc.html).
@@ -1053,9 +1052,9 @@ The database schema must include tables covering the following concepts. Names a
   persisted as a fourth lifecycle state. An invitation contains no account
   recipient email or password and is not itself an account. Multiple pending
   invitations may share a target location and role. Terminal metadata is
-  retained indefinitely in the current pre-deployment scope without a
+  retained indefinitely in the current development scope without a
   recoverable bearer secret; a deliberate security-event retention policy
-  replaces that default before public deployment.
+  must replace that default.
 * **Location assignments:** relationship between a non-admin tenant Account and its
   accessible location, including a manager or operator role. The assignment has
   no independent lifecycle status; effective access requires both its Account
@@ -1090,10 +1089,10 @@ The database schema must include tables covering the following concepts. Names a
 
 Tenant ownership may be direct or derived through an unambiguous relationship such as order to location to tenant. Tables must carry enough association for RLS enforcement and efficient access checks without duplicating ownership data by default. Passwords and External Integration bearer secrets must never be stored in plaintext. Standard Spring Session JDBC stores opaque session IDs and identity references; protect the database and backups as authentication-bearing data. Provider session bearer tokens are discarded, and provider service credentials remain in private mounted files.
 
-The pre-deployment account model does not grandfather accounts without email.
+The current account model does not grandfather accounts without email.
 The consolidated initial migration requires a normalized email for every
 account; local development data is recreated manually when applying that
-pre-deployment schema change.
+initial schema change.
 
 Order labels are trimmed, single-line text with a maximum of 32 characters. Automatic labeling is requested by omitting the custom label and uses the order's one-based creation ordinal among all orders at its location during the current UTC date. A provided blank label is invalid. Labels preserve casing, may contain ordinary Unicode text, and are not unique; staff remain responsible for avoiding ambiguous duplicates. Labels cannot be edited after order creation.
 
@@ -1125,139 +1124,37 @@ against current PostgreSQL order state. Authenticated staff queue streaming
 remains deferred. Future genuinely bidirectional features may introduce
 WebSocket independently rather than changing the SSE or Web Push contracts.
 
-## 7. Routing and Deployment
+## 7. Local Routing
 
-### Accepted public-deployment target (2026-10-06)
+The local Docker Compose stack uses NGINX HTTPS ingress with mkcert certificates.
+Application and data services do not publish host ports. Browser REST and SSE
+requests go directly to the dedicated API origin through the gateway.
 
-The next deployment increment prepares public production on one x86-64 Linux VM
-running the complete Docker Compose stack. Cloudflare manages DNS and proxies
-three same-site customer, panel, and API hostnames to NGINX. Cloudflare Tunnel
-and private-staging Cloudflare Access are removed from the target topology.
-NGINX uses an externally mounted Cloudflare Origin CA certificate with Full
-(strict) edge-to-origin encryption; Cloudflare manages browser-facing TLS.
-Local development retains mkcert and the same shared gateway/application/data
-topology, security invariants, and request-throttling rules.
+* The root environment file configures the customer, panel, and API origins and
+  exact gateway hostnames; `.env.example` records the configuration surface.
+* Spring scopes credentialed CORS by frontend origin and browser resource family.
+  External Integration APIs and internal management endpoints have no browser
+  CORS policy. Next.js services render frontend concerns only.
+* NGINX rejects unknown hosts, keeps frontend and API path spaces separate, and
+  exposes Actuator only to container-internal health checks. The API hostname
+  forwards `/api/`; frontend hostnames reject that namespace.
+* NGINX and applications share the gateway network. Only the API also joins the
+  internal data network containing PostgreSQL and Redis.
+* Local traffic does not trust supplied forwarding headers. NGINX replaces them
+  with a canonical client address, host, HTTPS scheme, and port.
+* Request-body, header, connection, and timeout bounds apply. Customer SSE disables
+  proxy buffering and uses a read timeout longer than the 30-minute emitter lifetime.
+* Local Compose builds application images, mounts private secrets at `/run/secrets`,
+  and publishes only NGINX HTTPS on `127.0.0.1`. Redis Pub/Sub is nondurable and
+  has no volume; PostgreSQL and provider credential material remain persistent.
+* `setup.sh` prepares `.env`, validates the complete key set with explicit handling
+  of existing files, preserves the provider master key, and optionally generates
+  local TLS material. Secret directories use `0700` and application key files `0400`.
 
-Restrict hosted web ingress to Cloudflare proxy addresses, trust client-address
-headers only from those addresses, and keep application/data/management ports
-private. Cloudflare caching must bypass the API hostname and service-worker
-script. Public customer tracking and External Integration requests do not
-require Access authentication or interactive browser challenges.
-
-GitHub Actions owns tests, builds, publication of the complete image set,
-explicit manual production approval, deployment of those exact digests, and
-health verification. Serialize deployments and restrict them to main. Production
-credentials become available only after approval through a protected GitHub
-Environment. Frontend public URLs remain build-time values; release images use
-production URLs and local builds use local URLs. Secrets never enter images.
-
-Brief planned deployment and maintenance outages are accepted. Use forward-fix
-deployments rather than rollback automation or parallel application stacks.
-Scheduled, encrypted off-VM backups and tested restoration cover both databases,
-required roles, stable keys, and provider credentials. Additional pre-change
-backups are required for destructive migrations or risky data transformations,
-not ordinary releases. Public-launch preparation includes RLS, gateway
-throttling, live provider/device acceptance, patching/rotation, and monitoring.
-Replace the disposable private-staging runbook with a public-production runbook.
-
-The written design is
-[public deployment design](superpowers/specs/2026-10-06-public-deployment-design.md).
-Its implementation details and proposed operating defaults await written-design
-review. The following deployment descriptions record the existing implementation;
-their tunnel, private-staging, and manual-SSH release behavior is superseded by
-the accepted target above and remains to be changed in code.
-
-The independently deployable services share one production-like Docker Compose
-topology. NGINX is the only normal browser ingress; application and data
-services do not publish host ports.
-
-* The customer, staff-panel, and API HTTPS origins and gateway hostnames are
-  configured in the root environment file from the values documented in
-  `.env.example`.
-* Browser-facing REST and SSE requests go directly to the API origin. Spring
-  allows credentialed CORS from the customer origin only for customer-owned
-  resource families and from the panel origin only for staff-owned resource
-  families. The `/external/**` External Integration API and internal management
-  endpoints such as Actuator do not receive a browser CORS policy.
-* Browser resource families use `/api/{resource-family}/v1`; external resource
-  families use `/api/external/{resource-family}/v1`. Location identifiers
-  remain in validated bodies or query parameters rather than nested resource
-  paths.
-* The Next.js services render frontend concerns only; the Spring API owns API
-  security, scheduled webhook delivery, and customer-push delivery.
-* NGINX, both frontends, and the API share a gateway network. Only the API also
-  joins the internal data network containing PostgreSQL and Redis, so neither
-  the gateway nor a frontend can reach a data service.
-* NGINX selects one of the three applications by exact hostname, rejects
-  unknown hosts, keeps frontend and API path spaces separate, and exposes
-  Spring Actuator only to container-internal health checks. The API hostname
-  forwards only the broad `/api/` namespace; the frontend hostnames reject that
-  namespace rather than maintaining a fragile endpoint-by-endpoint allowlist.
-* NGINX replaces browser-supplied forwarding metadata with one canonical
-  client address, host, HTTPS scheme, and port before proxying. Local traffic
-  does not trust forwarding headers. The deployment overlay gives NGINX and
-  `cloudflared` a dedicated edge subnet and accepts `CF-Connecting-IP` only
-  from that controlled hop. The same core configuration terminates local TLS;
-  hosted tunnel traffic uses plain HTTP on the private same-host edge network.
-* The shared gateway applies bounded request-body, header, connection, and
-  timeout settings. Its tracked-order SSE route disables proxy buffering and
-  keeps the upstream read timeout longer than the API's 30-minute emitter
-  lifetime.
-* Local Compose builds application images from the working tree, mounts
-  disposable secrets at `/run/secrets`, and publishes only NGINX HTTPS on
-  `127.0.0.1`. Direct service ports are not part of the maintained topology.
-* The deployment overlay supports private staging and later production. It
-  constructs all three application image references from one registry and one
-  immutable release version, keeps infrastructure image versions in the
-  repository, adds Cloudflare Tunnel, preserves the same secret paths, applies
-  basic CPU and memory limits, and bounds container logs. It publishes no
-  service port.
-* One standalone repository-owned setup file provides an environment-agnostic
-  preparation flow. Interactive use asks before replacing an existing `.env`,
-  with replacement from `.env.example` as the default, asks for a secrets
-  directory with the Git-ignored repository `secrets/` directory as the
-  default, keeps a complete valid application key set unless replacement is
-  explicitly accepted, and asks whether to generate a local TLS certificate
-  with generation as the default. Explicit options provide the same flow
-  non-interactively for hosted preparation. The private-staging invocation
-  supplies an absolute external secrets directory and disables local TLS. The
-  setup file generates and validates the complete webhook-encryption,
-  VAPID, and push-subscription-encryption key set as one unit, installs it with
-  a directory mode of `0700` and file modes of `0400`, and fails safely on
-  partial, invalid, or existing sets when their handling was not explicit.
-  Staging key material is never generated in the checkout or an application
-  image.
-* The repository versions a non-secret, locally managed Cloudflare Tunnel
-  configuration template with three explicit non-wildcard hostname routes to
-  NGINX over the private edge network and a final `404` catch-all. A deployed
-  copy and its tunnel credential remain external to the repository.
-* Each environment file selects either the local or deployment overlay through
-  `COMPOSE_FILE`, so ordinary Compose commands do not carry repeated file-list
-  arguments.
-* PostgreSQL owns the only data volume. Redis Pub/Sub is nondurable and has no
-  volume.
-
-GitHub Actions validates pull requests and pushes to `main`. A manual workflow
-dispatch for `main` repeats the same validation before publishing. Each
-frontend installs its locked dependencies, runs lint and type-checking, runs
-its `test` script when one is defined, and creates its production build. The
-API runs the complete Maven `verify` lifecycle. Frontend validation and image
-construction require the non-secret `NEXT_PUBLIC_API_BASE_URL` and
-`NEXT_PUBLIC_CUSTOMER_APP_URL` repository variables and fail clearly when a
-required value is absent.
-
-Only a successful manually dispatched `main` workflow may publish application
-images. It builds the customer app, panel app, and API runner images for
-`linux/amd64` and pushes them to the repository-owned GHCR namespace with the
-common immutable `sha-<full-source-revision>` tag. A rerun preserves an
-existing service image under that tag and may complete missing images left by
-an interrupted publish. The complete workflow must be successful before the
-three-image set is eligible for manual deployment. Changing a frontend
-build-time repository variable requires a subsequent `main` commit and manual
-workflow dispatch rather than overwriting an existing commit-tagged image. The
-workflow grants package-write access only to the publishing jobs, does not
-publish a moving `latest` tag, does not create GitHub Releases, and does not
-deploy any environment.
+GitHub Actions validates pull requests and `main` with frontend lint, type checks,
+configured tests and builds, and the complete Maven `verify` lifecycle. Frontend
+validation requires the non-secret `NEXT_PUBLIC_API_BASE_URL` and
+`NEXT_PUBLIC_CUSTOMER_APP_URL` inputs.
 
 ### 7.1 Current HTTP resource families
 
@@ -1274,7 +1171,7 @@ POST   /api/tenant-registrations/v1
 
 GET    /api/locations/v1
 GET    /api/accounts/v1
-PATCH  /api/accounts/v1/{accountId}/status
+PUT    /api/accounts/v1/{accountId}/status
 
 GET    /api/account-invitations/v1
 POST   /api/account-invitations/v1
@@ -1409,21 +1306,10 @@ The customer Next.js application serves the generated service worker with a
 root scope, JavaScript content type, restrictive content-security policy, and
 explicit no-cache headers so update checks do not reuse a stale script.
 
-The Spring API uses one environment-independent configuration rather than
-environment-specific profiles or heuristic staging validation. Hosted
-deployments replace the local origins, credentials, identities, and delivery
-policies through the root environment file and mount externally managed keys at
-the same `/run/secrets` paths used locally. Secure, host-only `SameSite=Lax`
-cookie behavior remains a non-configurable application invariant. The complete
-environment-variable surface is recorded once in `.env.example`. The shared
-deployment overlay mounts environment-specific material at those paths,
-constructs the three application image references from one registry plus one
-immutable source-revision release value, and takes repository-owned
-infrastructure image versions directly from the Compose files. Deployment
-remains a manual, operator-initiated procedure: publish images tagged by the
-source revision, record their registry digests, pull that release on the VPS,
-let API startup apply Flyway migrations, replace dependent services only after
-health succeeds, and verify the internal and external paths.
+The Spring API uses one configuration. The root environment file supplies
+origins, credentials, identities, and delivery policies, while private keys use
+stable `/run/secrets` paths. Secure, host-only `SameSite=Lax` cookie behavior is
+an application invariant. `.env.example` records the environment-variable surface.
 
 ## 8. Resilience and Consistency
 
@@ -1493,10 +1379,6 @@ health succeeds, and verify the internal and external paths.
 * Pull-request and `main` CI runs lint, type-check, optional configured frontend
   tests, production frontend builds, and the complete API test suite. A manual
   `main` workflow repeats those checks before it may publish images.
-* A successful manually dispatched `main` workflow publishes one `linux/amd64`
-  GHCR image for each independently deployable application under the same
-  immutable full-source-revision tag and performs no deployment or GitHub
-  Release creation.
 * Each frontend's handwritten request code and response types match the REST behavior covered by integration tests during the walking vertical slice.
 * REST-backed Client Components use keyed SWR state rather than effects for request orchestration, retain cached data during background revalidation, and do not apply order transitions before the Spring API accepts them.
 * New orders start in `IN_PREPARATION`, receive an immutable label, and create exactly one initial history entry for that resulting state.
@@ -1582,7 +1464,7 @@ health succeeds, and verify the internal and external paths.
   time, and absolute expiration time. Its direct icon-only Revoke action
   requires confirmation, and terminal invitations leave the modal while their
   secret-free metadata is retained indefinitely for audit without a history UI
-  in the current pre-deployment scope.
+  in the current development scope.
 * Redemption requires the issuer to remain enabled and authorized. A signed-in
   browser and the API both require explicit sign-out before redemption, while
   verified completion creates the browser session and opens the assigned
@@ -1651,7 +1533,7 @@ health succeeds, and verify the internal and external paths.
   classification, freshness, jittered retry, `Retry-After`, permanent
   retirement, and retention behavior are covered by protocol-level and
   application-level tests and by current-device acceptance on the required
-  browsers before public deployment.
+  browsers.
 * A valid transition from either the staff panel or an External Integration produces the same persisted state, history record, customer event, and transactional outbox event.
 * Integration, API Key, API Key Version, webhook subscription, and signing-secret lifecycle changes preserve one-time secret handling and historical audit attribution.
 * Exact idempotent creation replays and same-state status commands create no duplicate order, history, outbox, or customer event.
@@ -1691,23 +1573,13 @@ The current walking vertical slice is implemented for local development:
 * one channel-neutral transactional order outbox with Spring API background
   jobs for independent single-attempt webhook and durable retrying Web Push
   delivery;
-* one environment-independent API configuration whose hosted values and
-  externally mounted secrets are supplied by the deployment environment;
-* one standalone, environment-agnostic setup file with interactive defaults for
-  local preparation and explicit non-interactive options for private staging;
-  it creates and validates the complete application key set as one unit, uses
-  restrictive permissions, and requires explicit existing-key handling;
-* a shared, hostname-routing NGINX/application/data Compose topology with small
-  local and hosted deployment overlays selected by the environment file,
-  controlled forwarding metadata, buffered-disabled SSE, internal-only health
-  paths, health-gated dependencies, PostgreSQL-only persistence, nondurable
-  staging-authenticated Redis, stable application-secret paths, and a
-  documented manual version-pinned deployment sequence with recorded registry
-  digests;
-* GitHub Actions validation for pull requests and `main`, plus manually
-  dispatched `main` validation followed by immutable, commit-tagged
-  `linux/amd64` publication of all three application images to GHCR without a
-  deployment or GitHub Release.
+* one API configuration with externally supplied private keys;
+* repository-owned local setup for configuration, complete key validation,
+  restrictive permissions, and explicit existing-key handling;
+* shared hostname-routing NGINX HTTPS ingress, unbuffered SSE, internal health
+  paths, health-gated dependencies, persistent PostgreSQL/provider credentials,
+  and nondurable Redis;
+* GitHub Actions validation for pull requests and `main`.
 
 The panel removes terminal orders from the active queue after an accepted
 transition and shows the customer QR code without a separate tracking-link,
@@ -1730,8 +1602,8 @@ separate decision.
 
 The ZITADEL session design replaces the transitional Google/Clerk work. Source
 and automated provider-isolated checks cover the accepted flow; live acceptance
-against the pinned provider and gateway throttling remain required before public
-deployment. Direct member creation through `POST /api/accounts/v1` remains
+against the pinned provider and gateway throttling remain outstanding. Direct
+member creation through `POST /api/accounts/v1` remains
 unavailable; managers/operators join only through fixed Account Invitations.
 
 The implemented administrative-lifecycle increment provides
@@ -1742,7 +1614,7 @@ Orders, standardizes the managed-resource lifecycle vocabulary, adds Account
 archival through Delete, and applies the Location cascades and contracts
 specified above across the schema, API, panel, and automated verification.
 
-Before any public deployment:
+Outstanding security and acceptance work:
 
 * establish a verified tenant and location database security context and enable
   PostgreSQL Row Level Security for every tenant-owned or ownership-derived

@@ -5,7 +5,7 @@ order-specific QR code to follow its status without creating an account or
 installing an app. Restaurant staff manage orders through a separate
 authenticated panel.
 
-The system consists of three independently deployable applications:
+The system consists of three applications:
 
 * `apps/customer-app` — customer-facing Next.js PWA
 * `apps/panel-app` — staff Next.js panel
@@ -75,6 +75,6 @@ This deletes the Compose volumes and generated keys.
 
 ## Documentation
 
+* [Agent instructions and development workflow](AGENTS.md)
 * [Problem description](docs/PROBLEM_DESCRIPTION.md)
 * [Product requirements and architecture](docs/REQUIREMENTS.md)
-* [Private staging deployment](deployment/RUNBOOK.txt)
