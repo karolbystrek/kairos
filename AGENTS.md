@@ -1,187 +1,54 @@
 # Kairos
 
-## Project
+Virtual pager system for restaurants: customers anonymously track QR-linked
+orders, staff manage queues, and external systems use REST APIs and webhooks.
+Repository: [https://github.com/karolbystrek/kairos](https://github.com/karolbystrek/kairos).
+Use `gh` for all GitHub operations.
 
-Kairos is a virtual pager system for restaurants. Customers anonymously track
-orders from QR codes, staff manage queues through an authenticated panel, and
-external systems integrate through versioned REST APIs and webhooks.
+## Required workflow
 
-- Thesis framing: `docs/PROBLEM_DESCRIPTION.md`
-- Canonical product behavior, architecture, security requirements, contracts,
-  delivery status, and roadmap: `docs/REQUIREMENTS.md`
+Agree the problem and plan with the user, save the plan in a new GitHub issue
+before changing files, and split distinct steps into linked sub-issues. Then
+create a new `codex/` branch from current `main` for each implementation issue.
+Validate, commit all task changes in one Conventional Commit, and open a PR to
+`main`. Stop for user verification and merge; never develop directly on `main`
+or merge the PR yourself. Keep task plans/progress in GitHub, not committed
+`.md` files. See [the full workflow](docs/agents/issue-tracker.md) before changes.
 
-> **Development prerequisite:** Read `docs/REQUIREMENTS.md` in full before
-> planning, implementing, reviewing, refactoring, or otherwise changing code,
-> database migrations, APIs, security, infrastructure, or tests. Treat it as the
-> source of truth throughout the task.
+## Repository and stack
 
-## Repository and Stack
-
-```text
-apps/
-  customer-app/   Next.js customer PWA
-  panel-app/      Next.js staff panel
-  api/            Spring Boot API
-docs/             Canonical product and architecture documentation
-compose.yaml      Local PostgreSQL, Redis, and applications
-```
-
+- `apps/customer-app/`: Next.js customer PWA, Serwist, IndexedDB, Web Push.
+- `apps/panel-app/`: Next.js authenticated staff panel.
 - Both frontends: Next.js 16, React 19, TypeScript, Tailwind CSS 4, HeroUI 3,
   Lucide React, Zod, native `fetch`, and SWR.
-- Customer PWA: Serwist service worker, IndexedDB offline snapshots, and Web
-  Push.
-- API: Java 25, Spring Boot 4, Spring Security, and Spring MVC.
-- Data and real time: PostgreSQL is authoritative; Redis Pub/Sub fans out
-  cross-instance customer events.
-- Infrastructure: Docker Compose.
-- Each application is independently deployable and owns its dependency
-  manifest and Dockerfile.
+- `apps/api/`: Java 25, Spring Boot 4, Spring Security/MVC; PostgreSQL is
+  authoritative, Redis Pub/Sub distributes customer events, ZITADEL owns identity.
+- `compose.yaml`: shared Docker Compose topology with NGINX HTTPS ingress.
+  Applications own their manifests and Dockerfiles.
 
-## Architecture Boundaries
+## Read when relevant
 
-- Spring Boot owns business rules, authentication, authorization, tenant
-  isolation, persistence, browser and external APIs, SSE, Web Push, webhooks,
-  and outbox processing.
-- Keep REST as the boundary between frontends, External Integrations, and the
-  API. Browser families use `/api/{resource-family}/v1`; external families use
-  `/api/external/{resource-family}/v1`.
-- Local browser-facing API and SSE traffic goes directly to the dedicated API
-  origin over HTTP with explicit credentialed CORS scoped by frontend origin
-  and browser resource family.
-- Frontends use small handwritten request modules and response types with
-  native `fetch`. Use SWR for REST-backed client state and Zod for
-  frontend-owned input and event validation.
-- Do not add Next.js Server Actions or proxy route handlers as an API layer in
-  front of Spring.
-- Customer SSE and Web Push are invalidation or notification mechanisms; REST
-  remains authoritative. Tracked-order REST stays network-only in the service
-  worker, and explicit IndexedDB snapshots must be labelled stale when used
-  offline.
-- Enforce security and tenant access in the API. Frontend redirects and hidden
-  controls are user-experience features, not authorization controls.
-- Keep access and refresh credentials unavailable to JavaScript.
-- Keep production migrations free of environment-specific seed data.
+- [Requirements](docs/REQUIREMENTS.md): canonical product, architecture, security,
+  contracts, delivery and roadmap. **Read in full before planning, implementing,
+  reviewing, or changing code, migrations, APIs, security, infrastructure or tests.**
+- [Architecture](docs/agents/architecture.md): before changes across application,
+  API, security, persistence, or real-time boundaries.
+- [Frontend conventions](docs/agents/frontend.md): before frontend changes.
+- [Backend conventions](docs/agents/backend.md): before API/Java changes.
+- [Validation](docs/agents/validation.md): before selecting tests/checks and
+  before declaring work complete.
+- [Local development](docs/agents/local-development.md): before setup, migration,
+  container, data, or runtime work; preserves user-owned containers/data.
+- [Documentation maintenance](docs/agents/documentation.md): before documentation
+  changes or recording accepted decisions. Keep agent guidance focused by purpose
+  and update this index whenever it changes; keep task records in GitHub.
+- [Issue workflow](docs/agents/issue-tracker.md): before planning or changing files,
+  creating commits/PRs, or auditing issues.
+- [Triage labels](docs/agents/triage-labels.md): when setting issue readiness.
+- [Thesis framing](docs/PROBLEM_DESCRIPTION.md): when discussing thesis scope.
+- [Authentication operations](docs/authentication-setup.md): before provider
+  setup, credential rotation, or live authentication acceptance.
 
-## Implementation Conventions
-
-### Frontend
-
-- Always use HeroUI (`@heroui/react`) for UI components.
-- Use Lucide React for interface icons; do not add handwritten inline SVG icon
-  components.
-- Reserve React effects for synchronization with external systems such as
-  EventSource or browser APIs; do not use effects for routine REST request
-  orchestration.
-- Keep the official `eslint-plugin-react-hooks` recommended rules enabled.
-- Route panel REST calls through the shared authenticated native-`fetch`
-  client, scope staff SWR keys by account ID, and clear staff-owned state when
-  the authenticated account changes.
-
-### Backend
-
-- Organize code first by business feature and then by `api`, `application`,
-  `domain`, and `infrastructure`. Add cohesive subpackages only where they
-  represent a real conceptual boundary.
-- Configure the application-wide `/api` base path with
-  `server.servlet.context-path`; controller mappings declare resource-relative
-  paths and do not repeat `/api`.
-- Map projections through a static `from(...)` factory on API response records.
-- Use Lombok `@RequiredArgsConstructor` for routine constructor injection,
-  `@NonNull` for internal runtime null contracts, and `@Slf4j` for logging. Use
-  Jakarta Bean Validation for API input.
-- Prefer Spring Data derived query methods when the property path expresses the
-  query; reserve manual `@Query` declarations for non-derivable or bulk
-  operations.
-- Use `var` when an initializer makes the local type evident. Indent Java with
-  four spaces and never use tabs.
-
-Use Conventional Commits for every commit.
-
-## Documentation
-
-- Record accepted product, architecture, security, data-ownership, scope, and
-  contract decisions in `docs/REQUIREMENTS.md`.
-- Keep `AGENTS.md` limited to durable repository-wide technology, boundaries,
-  conventions, and workflows.
-- Update documentation and implementation together when either changes the
-  other.
-
-## Agent Workflow
-
-- Until the user changes this policy, treat Kairos as a fresh, never-deployed
-  repository. Existing local accounts and data need no migration or backward
-  compatibility. Edit `V1__create_initial_schema.sql` directly when appropriate
-  rather than adding migrations solely to preserve development data. Do not
-  ask again whether existing accounts/data must be preserved. This policy does
-  not itself authorize stopping containers or resetting local data.
-- Before changing files, inspect `git status --short` and preserve unrelated
-  worktree changes.
-- Do not inspect or exercise the running Compose stack unless runtime
-  verification is requested or needed to diagnose a runtime problem.
-- Run automated tests for the affected scope when practical. Browser or manual
-  runtime checks remain opt-in and should run only when the user explicitly
-  requests them or when they are needed to diagnose a runtime problem.
-- Use repository-owned commands:
-  - Customer frontend: `npm --prefix apps/customer-app run check`
-  - Panel frontend: `npm --prefix apps/panel-app run check`
-  - Backend: `apps/api/mvnw` from the repository root, or `./mvnw` from
-    `apps/api`
-  - Frontend dependencies: run `npm install` from the affected application and
-    let it update `package-lock.json`
-- Do not invoke installed frontend tools through `npx`, raw binaries, or
-  `node_modules/.bin`. Use `npm run` or `npm --prefix`.
-- Validate the affected scope when practical and always run
-  `git diff --check`. Reserve production builds for dependency, build,
-  Dockerfile, release-verification, or explicitly requested work.
-- Treat running containers and data as user-owned. Never stop the full stack,
-  run `docker compose down`, delete volumes, reset PostgreSQL, or prune Docker
-  state without explicit authorization.
-- If a changed Flyway migration conflicts with a persistent database checksum,
-  report it and ask before resetting data.
-- Report checks as passed, failed, blocked, or not run.
-
-### Test scope
-
-- Add or change tests only to protect an accepted product behavior, security
-  boundary, data-integrity invariant, external contract, or concrete regression.
-  State the failure the test would catch.
-- Prefer the smallest behavioral test at the owning boundary. Extend existing
-  coverage before adding a suite; do not repeat the same scenario across layers
-  unless each layer verifies a distinct contract.
-- Do not test trivial getters, pass-through wrappers, framework/library behavior,
-  file existence, implementation structure, CSS classes, icon selection, or exact
-  non-contract copy. Keep accessibility assertions about observable semantics
-  and interaction.
-- Assert outcomes independently of the implementation. Mock external boundaries,
-  not the behavior being verified; call counts matter only when repetition itself
-  violates the contract.
-- No coverage-percentage targets or default test-per-function requirement.
-  Presentation-only changes normally need lint/type-checking, not new tests.
-- Keep focused coverage for authorization, tenant isolation, validation,
-  consequential state transitions, atomicity, idempotency, and relevant races.
-
-## Agent skills
-
-### Issue tracker
-
-Track progress in GitHub Issues for `karolbystrek/kairos`, using `gh`.
-See `docs/agents/issue-tracker.md`.
-
-### Triage labels
-
-Use the five default triage labels.
-See `docs/agents/triage-labels.md`.
-
-### Domain docs
-
-Use `docs/REQUIREMENTS.md` as the canonical domain and decision source.
-See `docs/agents/domain.md`.
-
-## Local Setup
-
-Run `./setup.sh` to prepare local configuration and externally managed key
-files. Start Compose separately with `docker compose up --build`. Use
-`./reset.sh` only when the user has authorized resetting containers or data.
-Source is not synchronized into the production-mode containers; rebuild and
-recreate only affected services when runtime verification requires updated
-code.
+Kairos uses a fresh initial development schema until the user changes that policy:
+edit the initial V1 migration when appropriate; no compatibility for local data
+is required. This does not authorize container stops or data resets.
