@@ -1185,9 +1185,49 @@ That artifact contains `release.json` with a full 40-character lowercase Git
 using `ghcr.io/karolbystrek/kairos/<service>@sha256:<64 lowercase hex>`.
 `release.tar.gz` contains the same manifest plus the exact checkout's shared and
 hosted Compose files, both NGINX configuration files, and the ZITADEL bootstrap
-script. An explicit file allowlist excludes environment files, certificates and
-private keys. First-install deployment and protected production approval remain
-separate implementation steps; publication does not deploy the release.
+script and the deployment shell command/Python helper. An explicit file allowlist
+excludes environment files, certificates and private keys. Publication does not
+deploy the release; protected Actions production approval remains separate work.
+
+`deployment/deploy.sh RELEASE_DIRECTORY ENV_FILE` runs on the Linux VM against
+an extracted exact-revision bundle. Both arguments are absolute; the environment
+file and existing application keys/Origin CA certificate material remain outside
+the release directory. The host needs Python 3.9 or newer, Docker with Compose
+supporting `up --wait --wait-timeout` and `config --no-path-resolution`, curl
+with `--max-filesize`, registry pull
+credentials, and a deployment identity able to use Docker and write the release
+and `/srv/kairos` directories. No setup command or key generator runs during
+deployment.
+
+The command validates the complete repository-owned digest manifest and resolved
+hosted Compose configuration before container mutation. A release-owned JSON
+Compose override pins all three application images to their recorded digests.
+The Compose project is always `kairos`, preserving named volumes across release
+directories. A nonblocking host-wide `flock` at `/srv/kairos/deploy.lock` rejects
+concurrent deployments; Python's stdlib `fcntl.flock` provides the lock without
+an additional host command dependency.
+
+Deployment pulls the complete stack, waits for PostgreSQL/Redis health, then
+ZITADEL health, and completes a recreated one-shot bootstrap before starting the
+API. The bootstrap preserves existing provider credentials. Only after API health
+passes does it replace the frontends and recreate NGINX so configuration bind
+mounts follow the deployed revision. Each readiness stage has a 300-second bound;
+bootstrap execution has a 360-second bound and image pulls a 900-second bound.
+Compose's internal health checks include the actual API Actuator endpoint.
+
+Public HTTPS probes require `200` from both frontend roots and the API CSRF
+endpoint, including a nonempty application CSRF token. Probes use normal TLS
+verification, direct DNS-routed requests without local proxies or redirects, and
+at most five attempts
+per endpoint with 5-second connect and 15-second request limits. Only after every
+check passes does the command atomically replace `/srv/kairos/deployed-release.json`
+with the successful revision/digests. Failed stages retain the previous success
+record and report bounded service/state/health diagnostics without raw logs,
+environment values or resolved configuration. A failed update can leave a partially
+updated stack; recovery uses a forward fix, with no automated rollback or reset.
+Command tests use fake Docker/curl and temporary state. First install, reboot
+recovery and real Cloudflare-path acceptance on the selected VM remain launch
+work requiring explicit runtime authorization.
 
 ### 7.1 Current HTTP resource families
 
