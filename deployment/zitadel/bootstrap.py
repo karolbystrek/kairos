@@ -1,5 +1,4 @@
 """Provision only the provider permissions Kairos uses; never expose bootstrap PAT to API."""
-import datetime
 import json
 import os
 from pathlib import Path
@@ -31,8 +30,8 @@ call("/v2/users/new", {"organizationId": org, "userId": "kairos-api",
     "username": "kairos-api", "machine": {"name": "Kairos API"}}, allow_conflict=True)
 call("/management/v1/orgs/me/members", {"userId": "kairos-api", "roles": ["ORG_USER_MANAGER"]}, allow_conflict=True)
 call("/admin/v1/members", {"userId": "kairos-api", "roles": ["IAM_LOGIN_CLIENT"]}, allow_conflict=True)
-expiry = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=365)
-result = call("/v2/users/kairos-api/pats", {"expirationDate": expiry.isoformat().replace("+00:00", "Z")})
+# ZITADEL v4.19.4 requires this field; its no-expiry default is year 9999.
+result = call("/v2/users/kairos-api/pats", {"expirationDate": "9999-12-31T23:59:59Z"})
 token = result["token"]
 if not token:
     raise RuntimeError("ZITADEL did not return a service token")
@@ -40,4 +39,4 @@ os.umask(0o077)
 temporary = TOKEN.with_suffix(".tmp")
 temporary.write_text(token)
 temporary.replace(TOKEN)
-print("ZITADEL API credentials provisioned (one-year PAT; rotate before expiry).")
+print("ZITADEL API credentials provisioned (non-expiring PAT; rotate or revoke through provider administration).")
