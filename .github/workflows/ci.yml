@@ -267,3 +267,49 @@ jobs:
             release/release.tar.gz
           if-no-files-found: error
           retention-days: 30
+
+  deploy:
+    name: Deploy production
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    needs: publish
+    runs-on: ubuntu-24.04
+    timeout-minutes: 70
+    environment: production
+    permissions:
+      contents: read
+    concurrency:
+      group: kairos-production
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Download release
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-manifest
+          path: ${{ runner.temp }}/release
+
+      - name: Transfer and deploy verified release
+        id: deployment
+        env:
+          RELEASE_DIRECTORY: ${{ runner.temp }}/release
+          RELEASE_REVISION: ${{ github.sha }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: python3 deployment/upload_release.py "$RELEASE_DIRECTORY" "$RELEASE_REVISION"
+
+      - name: Deployment result
+        if: always()
+        env:
+          RELEASE_REVISION: ${{ github.sha }}
+          DEPLOYMENT_RESULT: ${{ steps.deployment.outcome }}
+          JOB_RESULT: ${{ job.status }}
+        run: |
+          printf '\nRevision: `%s`\n\nDeployment: **%s**; job: **%s**\n' \
+            "$RELEASE_REVISION" "$DEPLOYMENT_RESULT" "$JOB_RESULT" >> "$GITHUB_STEP_SUMMARY"
