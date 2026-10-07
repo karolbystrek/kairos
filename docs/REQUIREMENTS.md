@@ -1124,7 +1124,7 @@ against current PostgreSQL order state. Authenticated staff queue streaming
 remains deferred. Future genuinely bidirectional features may introduce
 WebSocket independently rather than changing the SSE or Web Push contracts.
 
-## 7. Local Routing
+## 7. Local and Hosted Routing
 
 The local Docker Compose stack uses NGINX HTTPS ingress with mkcert certificates.
 Application and data services do not publish host ports. Browser REST and SSE
@@ -1142,6 +1142,15 @@ requests go directly to the dedicated API origin through the gateway.
   internal data network containing PostgreSQL and Redis.
 * Local traffic does not trust supplied forwarding headers. NGINX replaces them
   with a canonical client address, host, HTTPS scheme, and port.
+* Both overlays share per-client NGINX request throttling. POST login, password
+  change, tenant registration, and invitation redemption share an initial budget
+  of 5 requests/minute with burst 5. External `/api/external/` requests use
+  10 requests/second with burst 20. Bursts are accepted immediately (`nodelay`);
+  excess requests return `429`. CSRF bootstrap, browser reads, preflight, logout,
+  invitation preview, and customer SSE do not consume the authentication budget.
+  These are initial operational defaults; tune the shared template through a
+  reviewed source change. The existing 100 concurrent connections/client bound
+  remains in place.
 * Request-body, header, connection, and timeout bounds apply. Customer SSE disables
   proxy buffering and uses a read timeout longer than the 30-minute emitter lifetime.
 * Local Compose builds application images, mounts private secrets at `/run/secrets`,
@@ -1310,6 +1319,54 @@ The Spring API uses one configuration. The root environment file supplies
 origins, credentials, identities, and delivery policies, while private keys use
 stable `/run/secrets` paths. Secure, host-only `SameSite=Lax` cookie behavior is
 an application invariant. `.env.example` records the environment-variable surface.
+
+### 7.2 Hosted ingress and Cloudflare range maintenance
+
+The hosted Compose overlay publishes only NGINX port 443 directly on the VM;
+application and database ports remain private. Configure Cloudflare to proxy the
+customer, panel, and API hostnames with Full (strict) encryption. There is no tunnel
+service or edge network. The hosted overlay mounts an externally managed Origin
+CA certificate directory supplied as absolute `KAIROS_TLS_DIRECTORY`, containing
+`tls.crt` and `tls.key`, read-only at `/run/secrets/tls`. Keep certificates and
+private keys outside the release checkout. Local development keeps mkcert and
+loopback-only port publication. Origin CA certificates are for Cloudflare's
+connection to the origin; direct browser access is not supported.
+
+Only the hosted overlay includes `nginx/cloudflare-real-ip.conf`. It accepts
+`CF-Connecting-IP` solely from Cloudflare's published IPv4/IPv6 proxy ranges;
+untrusted peers cannot change their rate-limit identity using forwarding
+headers. Both overlays replace upstream forwarding metadata with the resolved
+client address, exact host, HTTPS scheme and port, and remove the original
+Cloudflare and `Forwarded` headers.
+
+Before public operation, restrict VM web ingress to those same Cloudflare ranges
+(including Docker-published ports, whose forwarding can bypass ordinary host
+firewall rules). Keep SSH separately restricted. Operator firewall provisioning
+and real Cloudflare-path acceptance are required launch work, not performed by
+repository configuration checks. Never add a broad Docker/VM subnet to the
+production trust include merely to make forwarded addresses work.
+
+To maintain the ranges:
+
+1. Retrieve both authoritative lists from
+   [Cloudflare IPv4](https://www.cloudflare.com/ips-v4/) and
+   [Cloudflare IPv6](https://www.cloudflare.com/ips-v6/). The checked-in snapshot
+   was retrieved on 2026-10-07.
+2. Review additions/removals; update the `set_real_ip_from` directives and
+   retrieval date in `nginx/cloudflare-real-ip.conf` and coordinate the VM
+   IPv4/IPv6 ingress allowlist update. Do not trust headers from removed ranges.
+3. Run `python3 tests/gateway-test.py` and `git diff --check`, review the change,
+   then deploy that revision and recreate NGINX so the bind mount uses the new
+   include. Verify real client addresses and blocked direct-origin access.
+
+Cloudflare must bypass caching on the complete API hostname and customer service
+worker script, avoid interactive challenges for anonymous customer and External
+Integration access, and avoid broad cache-everything rules on application pages.
+Origin certificate expiry/replacement, edge SSE heartbeat/reconnect behavior,
+cross-origin cookies/CSRF, and origin-bypass blocking require operator acceptance.
+The isolated gateway test covers TLS/configuration, routing/management rejection,
+header replacement/trust, shared throttling, and the SSE buffering response;
+it does not establish behavior through the live edge proxy.
 
 ## 8. Resilience and Consistency
 
@@ -1602,7 +1659,7 @@ separate decision.
 
 The ZITADEL session design replaces the transitional Google/Clerk work. Source
 and automated provider-isolated checks cover the accepted flow; live acceptance
-against the pinned provider and gateway throttling remain outstanding. Direct
+against the pinned provider and hosted gateway remains outstanding. Direct
 member creation through `POST /api/accounts/v1` remains
 unavailable; managers/operators join only through fixed Account Invitations.
 
@@ -1619,10 +1676,9 @@ Outstanding security and acceptance work:
 * establish a verified tenant and location database security context and enable
   PostgreSQL Row Level Security for every tenant-owned or ownership-derived
   table;
-* introduce a non-bypassable API gateway that preserves a trustworthy client
-  address and rate-limits login, password changes, tenant registration, invitation
-  redemption, External Integration access, and future recovery or linking
-  routes;
+* verify hosted gateway client addressing, throttling and origin-bypass blocking
+  through Cloudflare; extend throttling when future recovery or linking routes
+  are introduced;
 * operate and patch ZITADEL, back up its database/master key, rotate backend
   service credentials, and
   provide externally managed webhook-secret encryption keys,
