@@ -1188,8 +1188,25 @@ using `ghcr.io/karolbystrek/kairos/<service>@sha256:<64 lowercase hex>`.
 `release.tar.gz` contains the same manifest plus the exact checkout's shared and
 hosted Compose files, both NGINX configuration files, and the ZITADEL bootstrap
 script and the deployment shell command/Python helper. An explicit file allowlist
-excludes environment files, certificates and private keys. Publication does not
-deploy the release; protected Actions production approval remains separate work.
+excludes environment files, certificates and private keys. A main-only
+production job waits for successful publication and targets the
+`production` GitHub Environment. It downloads this run's artifact, validates
+its manifest/archive against the workflow revision, and transfers it over SSH
+with the supplied verified host keys and ephemeral `0700`/`0600` SSH files.
+The four Environment secrets are `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`,
+and `DEPLOY_KNOWN_HOSTS`; publication jobs receive none of these secrets.
+
+Deployment jobs use `kairos-production` concurrency without canceling an active
+job. The upload activates the complete bundle at `/srv/kairos/releases/<revision>`
+from a private temporary directory, retaining existing revision directories;
+a retry requires an identical archive. It invokes the bundled host command with
+`/srv/kairos/production.env` and retains the host deployment lock. Actions reports
+the validated revision, three digests and deployment result without credentials.
+The host needs GNU `tar`, `mv`, and `cmp` alongside the deployment prerequisites.
+Required reviewer/main-only Environment protection and operator secrets must
+still be provisioned before releases are allowed; the workflow cannot install
+those protections. Live approval/withheld-approval and deployment acceptance
+remain operator launch checks.
 
 `deployment/deploy.sh RELEASE_DIRECTORY ENV_FILE` runs on the Linux VM against
 an extracted exact-revision bundle. Both arguments are absolute; the environment
