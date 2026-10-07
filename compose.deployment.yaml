@@ -7,15 +7,29 @@ x-deployment-logging: &deployment-logging
 services:
   nginx:
     environment:
-      KAIROS_NGINX_REAL_IP_CONFIGURATION: |-
-        set_real_ip_from 172.31.255.0/24;
-        real_ip_header CF-Connecting-IP;
+      KAIROS_NGINX_LISTEN: "443 ssl"
+      KAIROS_NGINX_TLS_CONFIGURATION: |-
+        ssl_certificate /run/secrets/tls/tls.crt;
+        ssl_certificate_key /run/secrets/tls/tls.key;
+      KAIROS_NGINX_REAL_IP_CONFIGURATION: "include /etc/nginx/cloudflare-real-ip.conf;"
+    ports:
+      - "443:443"
+    volumes:
+      - type: bind
+        source: ${KAIROS_TLS_DIRECTORY:?Set KAIROS_TLS_DIRECTORY to an absolute external certificate directory}
+        target: /run/secrets/tls
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./nginx/cloudflare-real-ip.conf
+        target: /etc/nginx/cloudflare-real-ip.conf
+        read_only: true
+        bind:
+          create_host_path: false
     mem_limit: 128m
     cpus: 0.50
     logging: *deployment-logging
-    networks:
-      - gateway
-      - edge
 
   customer-app:
     image: ${KAIROS_IMAGE_REGISTRY:?Set KAIROS_IMAGE_REGISTRY}/customer-app:${KAIROS_RELEASE_VERSION:?Set KAIROS_RELEASE_VERSION}
@@ -86,42 +100,3 @@ services:
     mem_limit: 256m
     cpus: 0.50
     logging: *deployment-logging
-
-  cloudflared:
-    image: cloudflare/cloudflared:2026.7.2
-    command:
-      [
-        "tunnel",
-        "--config",
-        "/etc/cloudflared/config.yml",
-        "--no-autoupdate",
-        "run",
-      ]
-    volumes:
-      - type: bind
-        source: ${CLOUDFLARED_CONFIG_FILE:?Set CLOUDFLARED_CONFIG_FILE}
-        target: /etc/cloudflared/config.yml
-        read_only: true
-        bind:
-          create_host_path: false
-      - type: bind
-        source: ${CLOUDFLARED_CREDENTIALS_FILE:?Set CLOUDFLARED_CREDENTIALS_FILE}
-        target: /run/secrets/cloudflared-credentials.json
-        read_only: true
-        bind:
-          create_host_path: false
-    depends_on:
-      nginx:
-        condition: service_healthy
-    networks:
-      - edge
-    mem_limit: 256m
-    cpus: 0.50
-    logging: *deployment-logging
-    restart: unless-stopped
-
-networks:
-  edge:
-    ipam:
-      config:
-        - subnet: 172.31.255.0/24

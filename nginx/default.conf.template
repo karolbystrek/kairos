@@ -31,6 +31,20 @@ limit_conn_zone $binary_remote_addr zone=kairos_per_client:10m;
 limit_conn kairos_per_client 100;
 limit_conn_status 429;
 
+# Share the authentication budget across all sensitive POST operations.
+# Empty keys leave preflight, read, CSRF and unrelated requests unthrottled.
+map "$request_method:$uri" $kairos_auth_client {
+    default "";
+    ~^POST:/api/(auth/v1/(login|password)|tenant-registrations/v1|account-invitation-redemptions/v1)/?$ $binary_remote_addr;
+}
+map $uri $kairos_external_client {
+    default "";
+    ~^/api/external/ $binary_remote_addr;
+}
+limit_req_zone $kairos_auth_client zone=kairos_auth:10m rate=5r/m;
+limit_req_zone $kairos_external_client zone=kairos_external:10m rate=10r/s;
+limit_req_status 429;
+
 ${KAIROS_NGINX_REAL_IP_CONFIGURATION}
 
 proxy_http_version 1.1;
@@ -133,6 +147,10 @@ server {
         proxy_read_timeout 31m;
         add_header X-Accel-Buffering "no" always;
     }
+
+    # Apply at the API server so all proxy locations keep the same policy.
+    limit_req zone=kairos_auth burst=5 nodelay;
+    limit_req zone=kairos_external burst=20 nodelay;
 
     location /api/ {
         proxy_pass http://kairos_api;

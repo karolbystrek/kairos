@@ -2,6 +2,7 @@ services:
   nginx:
     environment:
       KAIROS_NGINX_LISTEN: "443 ssl"
+      KAIROS_NGINX_REAL_IP_CONFIGURATION: ""
       KAIROS_NGINX_TLS_CONFIGURATION: |-
         ssl_certificate /run/secrets/tls/tls.crt;
         ssl_certificate_key /run/secrets/tls/tls.key;
