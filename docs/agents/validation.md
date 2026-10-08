@@ -1,5 +1,14 @@
 # Validation and test scope
 
+## Contents
+
+- [Validation and test scope](#validation-and-test-scope)
+- [Contents](#contents)
+- [Commands and scope](#commands-and-scope)
+- [Behavioral coverage](#behavioral-coverage)
+
+## Commands and scope
+
 - Run automated tests for the affected scope when practical. Browser or manual
   runtime checks remain opt-in and should run only when the user explicitly
   requests them or when they are needed to diagnose a runtime problem.

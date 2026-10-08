@@ -1,11 +1,26 @@
 # Temporary SSH access through AWS OIDC
 
+## Contents
+
+- [Temporary SSH access through AWS OIDC](#temporary-ssh-access-through-aws-oidc)
+- [Contents](#contents)
+- [Operator setup](#operator-setup)
+- [Read inputs and render policy](#read-inputs-and-render-policy)
+- [Provision IAM with explicit approval](#provision-iam-with-explicit-approval)
+- [Configure deployment variables](#configure-deployment-variables)
+- [Failure and interrupted-run recovery](#failure-and-interrupted-run-recovery)
+
+Agent execution of AWS/Cloudflare resource changes requires explicit user
+approval; read-only inspection is allowed. See [cloud operations](../agents/cloud-operations.md).
+
 The production job obtains AWS credentials only after the protected `production`
 Environment approves it. No long-lived AWS access keys are stored in GitHub.
 The current deployment account/SSH key remains unchanged. This does not deploy
 applications or relax the permanent SSH/HTTPS firewall rules.
 
 ## Operator setup
+
+### Read inputs and render policy
 
 Use a trusted checkout and AWS CLI credentials authorized to create the IAM
 provider/role. The commands below are for this instance; choose the correct
@@ -37,6 +52,8 @@ immutable owner/repository IDs. Keep the `production` Environment reviewer and
 main-only branch restriction in place; the Environment subject itself does not
 include a branch. See [GitHub OIDC in AWS](https://docs.github.com/en/actions/how-tos/secure-your-work/security-harden-deployments/oidc-in-aws).
 
+### Provision IAM with explicit approval
+
 Check whether the provider already exists with
 `aws iam list-open-id-connect-providers`. If absent, create it:
 
@@ -66,6 +83,8 @@ port operations to TCP22. The instance/firewall/operation read APIs require
 `Resource: *`, limited to the selected region. It cannot access SSH private keys,
 manage IAM, replace all firewall rules, reboot/delete instances or change other
 instance tags. See [Lightsail IAM scope](https://docs.aws.amazon.com/service-authorization/latest/reference/list_lightsail.html).
+
+### Configure deployment variables
 
 Set these **production Environment variables**, not secrets. For administrator
 CIDRs, list every permanent administrator IPv4 range, separated by commas. Update

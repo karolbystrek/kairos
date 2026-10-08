@@ -1,5 +1,16 @@
 # Bootstrap an Ubuntu VM
 
+## Contents
+
+- [Bootstrap an Ubuntu VM](#bootstrap-an-ubuntu-vm)
+- [Contents](#contents)
+- [Workstation preparation](#workstation-preparation)
+- [SSH aliases on your Mac](#ssh-aliases-on-your-mac)
+- [Run the bootstrap](#run-the-bootstrap)
+- [Verify, then stop](#verify-then-stop)
+- [Prepare production configuration after bootstrap verification](#prepare-production-configuration-after-bootstrap-verification)
+- [Repository validation](#repository-validation)
+
 This prepares one Ubuntu 24.04 x86-64 host, including the provisioned Lightsail
 instance. Run it from a trusted checkout on your Mac or Linux workstation.
 The workstation architecture does not need to match the VM.

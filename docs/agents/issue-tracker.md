@@ -1,7 +1,17 @@
 # Issue-first development workflow
 
+## Contents
+
+- [Issue-first development workflow](#issue-first-development-workflow)
+- [Contents](#contents)
+- [Issue and implementation cycle](#issue-and-implementation-cycle)
+- [GitHub commands and sub-issues](#github-commands-and-sub-issues)
+- [Issue audits](#issue-audits)
+
 Repository: [karolbystrek/kairos](https://github.com/karolbystrek/kairos).
 Use `gh` for every GitHub operation; use `--body-file` for multiline content.
+
+## Issue and implementation cycle
 
 1. Read the relevant guidance and source, then establish shared understanding
    with the user of the problem, scope, and implementation plan. Before changing
@@ -27,10 +37,14 @@ Use `gh` for every GitHub operation; use `--body-file` for multiline content.
    verification. The user decides whether to merge; agents do not merge or
    continue with another implementation issue without user instruction.
 
+## GitHub commands and sub-issues
+
 Use `gh issue create/view/list/edit/comment/close`, `gh pr create`, and
 `gh api repos/karolbystrek/kairos/issues/<parent>/sub_issues -X POST
 -F sub_issue_id=<child-database-id>` for native parent/child links. Obtain the
 child database ID with `gh api repos/karolbystrek/kairos/issues/<child> --jq .id`.
+
+## Issue audits
 
 During issue audits, compare scope with current source and history. Leave
 unfinished issues open. Close previously implemented issues with a comment

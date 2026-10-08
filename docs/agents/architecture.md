@@ -1,5 +1,14 @@
 # Architecture and ownership
 
+## Contents
+
+- [Architecture and ownership](#architecture-and-ownership)
+- [Contents](#contents)
+- [Ownership and REST boundaries](#ownership-and-rest-boundaries)
+- [Real-time and security invariants](#real-time-and-security-invariants)
+
+## Ownership and REST boundaries
+
 - Spring Boot owns business rules, authentication, authorization, tenant
   isolation, persistence, browser and external APIs, SSE, Web Push, webhooks,
   and outbox processing.
@@ -14,6 +23,8 @@
   frontend-owned input and event validation.
 - Do not add Next.js Server Actions or proxy route handlers as an API layer in
   front of Spring.
+## Real-time and security invariants
+
 - Customer SSE and Web Push are invalidation or notification mechanisms; REST
   remains authoritative. Tracked-order REST stays network-only in the service
   worker, and explicit IndexedDB snapshots must be labelled stale when used
