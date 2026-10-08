@@ -25,8 +25,9 @@ configuration into tickets/logs.
 
 Setup generates the stable ZITADEL master key, webhook and push encryption keys,
 and matching P-256 VAPID pair. Do not use `--replace-keys` to make startup pass.
-Never discard the master key while retaining ZITADEL's database. Back up the
-complete key set and databases consistently before maintenance.
+Never discard the master key while retaining ZITADEL's database. Keep a protected copy of runtime configuration, application keys and TLS material
+outside the VPS for a fresh rebuild. Database backups are deferred under the
+[development operations policy](../requirements/routing-releases.md#development-operations-policy).
 
 | Variables | Production value or responsibility |
 | --- | --- |
