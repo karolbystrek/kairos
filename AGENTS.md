@@ -28,9 +28,10 @@ or merge the PR yourself. Keep task plans/progress in GitHub, not committed
 
 ## Read when relevant
 
-- [Requirements](docs/REQUIREMENTS.md): canonical product, architecture, security,
-  contracts, delivery and roadmap. **Read in full before planning, implementing,
-  reviewing, or changing code, migrations, APIs, security, infrastructure or tests.**
+- [Requirements topic map](docs/REQUIREMENTS.md): start with purpose/ownership
+  and current delivery status, then read the sections relevant to the task.
+  Follow security, persistence and contract links for every affected boundary;
+  the topic files together form the canonical specification.
 - [Architecture](docs/agents/architecture.md): before changes across application,
   API, security, persistence, or real-time boundaries.
 - [Frontend conventions](docs/agents/frontend.md): before frontend changes.
@@ -52,3 +53,6 @@ or merge the PR yourself. Keep task plans/progress in GitHub, not committed
 Kairos uses a fresh initial development schema until the user changes that policy:
 edit the initial V1 migration when appropriate; no compatibility for local data
 is required. This does not authorize container stops or data resets.
+
+Keep all repository documentation Markdown under `docs/`, except the root
+`AGENTS.md` and `README.md`. Deployment guides belong in `docs/deployment/`.

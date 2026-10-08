@@ -1,5 +1,15 @@
 # Kairos
 
+## Contents
+
+- [Kairos](#kairos)
+- [Contents](#contents)
+- [Local development](#local-development)
+- [Hosted VM preparation](#hosted-vm-preparation)
+- [Repository checks](#repository-checks)
+- [Resetting the local environment](#resetting-the-local-environment)
+- [Documentation](#documentation)
+
 Kairos is a virtual pager system for restaurants. Customers scan an
 order-specific QR code to follow its status without creating an account or
 installing an app. Restaurant staff manage orders through a separate
@@ -54,7 +64,7 @@ manually shared invitations. Sessions survive service restarts and expire after
 ## Hosted VM preparation
 
 For a repeatable Ubuntu 24.04 x86-64 host setup, follow the
-[VM bootstrap guide](deployment/BOOTSTRAP.md). It installs host dependencies and
+[VM bootstrap guide](docs/deployment/BOOTSTRAP.md). It installs host dependencies and
 prepares persistent application keys without starting Kairos.
 
 ## Repository checks
@@ -84,4 +94,4 @@ This deletes the Compose volumes and generated keys.
 * [Agent instructions and development workflow](AGENTS.md)
 * [Problem description](docs/PROBLEM_DESCRIPTION.md)
 * [Product requirements and architecture](docs/REQUIREMENTS.md)
-* [Public production operations](deployment/RUNBOOK.md)
+* [Public production operations](docs/deployment/RUNBOOK.md)
