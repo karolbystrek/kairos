@@ -222,7 +222,8 @@ Stop here and confirm bootstrap and the second run before proceeding. Production
 passwords/configuration, registry credentials, Cloudflare DNS/certificate/cache
 rules, Lightsail firewall restrictions, GitHub Environment protection and the
 first application deployment are later steps. Existing launch gates, including
-RLS, backups/restore and live acceptance, still apply. Do not run `reset.sh` during
+RLS and live acceptance still apply. Backups/restore are deferred for the current
+disposable development VPS under the [operations policy](../requirements/routing-releases.md#development-operations-policy). Do not run `reset.sh` during
 host preparation or ordinary production maintenance: it removes volumes and keys.
 
 ## Repository validation

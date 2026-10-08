@@ -9,6 +9,7 @@
 - [OIDC and temporary SSH](#oidc-and-temporary-ssh)
 - [Host deployment and health verification](#host-deployment-and-health-verification)
 - [Repeatable VM bootstrap](#repeatable-vm-bootstrap)
+- [Development operations policy](#development-operations-policy)
 
 ## 7. Local and Hosted Routing
 
@@ -188,3 +189,36 @@ Bootstrap does not run `reset.sh`, start applications, configure provider/networ
 firewalls, DNS, TLS or GitHub Environment settings. Those remain separate operator
 steps. See [VM bootstrap](../deployment/BOOTSTRAP.md); actual host and repeat-run
 acceptance remain operator verification.
+
+### Development operations policy
+
+The owner accepts the public single-VM deployment as a disposable development
+environment with no users. All orders, accounts and ZITADEL state may be lost
+after host failure and recreated. Scheduled database backups, off-host backup
+storage/encryption/retention, destructive-migration backup procedures, data-loss
+and recovery targets, and replacement-host restore rehearsals are deferred.
+Keep protected runtime configuration, application keys and TLS material outside
+the VPS to rebuild a fresh installation. This is not database restoration.
+Acceptance of data loss does not authorize automatic deletion, resets or key
+regeneration; existing runtime approval and data-safety rules still apply.
+The fresh-development V1 policy remains until explicitly changed at launch.
+
+Current alerting uses AWS-native Lightsail email alarms for failed instance/system
+status checks, sustained high CPU and low remaining CPU burst capacity, plus
+GitHub Actions failed-workflow email notifications. Karol Bystrek is the responder;
+the owner selects and verifies the private email destination.
+[Alarm setup](../deployment/MONITORING.md) defines thresholds, provisioning,
+notification tests and pending activation. Disk-space, memory-pressure and public
+HTTPS availability alerts are explicitly deferred. No custom host scripts,
+monitoring agents, additional monitoring stack or external service are required.
+A healthy instance can still have an application outage. Certificate expiry
+remains an operator maintenance check.
+
+Before onboarding real users or retaining valuable data, agree and implement
+backups for both Kairos and ZITADEL databases, roles, provider credentials and
+matching encryption/signing/master keys; define retention and recovery targets
+and verify replacement-host restoration. Reassess application and capacity
+monitoring coverage then. Separate database/Redis instances require their own
+plan and do not themselves establish recoverability. Independent security,
+authentication, device and live deployment acceptance gates remain required
+before public launch.

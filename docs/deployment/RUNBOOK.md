@@ -12,7 +12,11 @@ Kairos runs one Docker Compose stack on an x86-64 Linux VM behind Cloudflare.
 Use this runbook for operator provisioning and approved releases. Repository
 preparation does not provision a VM, configure DNS or GitHub protection, or
 establish public-launch readiness. Those actions require operator inputs and
-explicit authorization. Use synthetic data until the launch gates in
+explicit authorization. The current VPS is a disposable development environment:
+all orders, accounts and ZITADEL state may be lost after host failure. Keep
+protected configuration outside the host for a fresh rebuild; database recovery
+is deferred under the [operations policy](../requirements/routing-releases.md#development-operations-policy).
+Use synthetic data until the launch gates in
 [issue #9](https://github.com/karolbystrek/kairos/issues/9) are verified.
 
 ## Approval before cloud changes
@@ -39,6 +43,7 @@ step and check its prerequisites. Public launch still requires every launch gate
 ## Related procedures
 
 - [Ubuntu VM bootstrap](BOOTSTRAP.md): repeatable host packages, account and keys.
+- [Native Lightsail email alarms](MONITORING.md): reduced development coverage and activation.
 - [AWS OIDC and temporary SSH](AWS-SSH.md): approved firewall lifecycle and recovery.
 - [Authentication operations](../authentication-setup.md): provider acceptance and credentials.
 - [Requirements topic map](../REQUIREMENTS.md): contracts and outstanding launch gates.

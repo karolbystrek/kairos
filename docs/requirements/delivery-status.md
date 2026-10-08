@@ -98,7 +98,7 @@ Outstanding security and acceptance work:
 * verify hosted gateway client addressing, throttling and origin-bypass blocking
   through Cloudflare; extend throttling when future recovery or linking routes
   are introduced;
-* operate and patch ZITADEL, back up its database/master key, rotate backend
+* operate and patch ZITADEL, rotate backend
   service credentials, and
   provide externally managed webhook-secret encryption keys,
   VAPID signing keys, and push-subscription encryption keys, with documented
@@ -108,7 +108,19 @@ Outstanding security and acceptance work:
   service-worker, offline, subscription, notification, click, badge, and
   subscription-replacement acceptance.
 
+The current public single-VM deployment is a disposable development environment.
+Native Lightsail email alarm preparation is documented in
+[monitoring](../deployment/MONITORING.md); live alarm/contact provisioning and
+actual email delivery remain pending operator acceptance.
+
 ### Deferred work
+
+Scheduled backups, retention/recovery targets and restore rehearsals are deferred
+until real users or valuable data under the
+[operations policy](routing-releases.md#development-operations-policy). Disk-space,
+memory-pressure and public HTTPS availability alerts are also deferred in favor
+of native Lightsail status, CPU and CPU burst-capacity alarms. No custom host
+scripts, monitoring agents or external monitoring service are introduced.
 
 Deferred operational and product work includes live staff queue
 synchronization, order archives and search, printable QR artifacts,

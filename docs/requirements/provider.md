@@ -24,7 +24,10 @@ The provider needs the same master key for as long as its database is retained.
 New API PATs use ZITADEL's no-expiry sentinel `9999-12-31T23:59:59Z`; the pinned
 v4.19.4 v2 API requires an explicit expiration timestamp. Operators can revoke
 or rotate them through provider administration. Bootstrap preserves existing PATs and does not change their
-expiration. Provider data, master key and private credential volumes need backups and restricted access.
+expiration. Provider data, master key and private credential volumes require restricted access.
+Backups are deferred for the disposable development VPS under the
+[operations policy](routing-releases.md#development-operations-policy); before
+valuable data is retained, back up provider data and its matching key/credentials.
 No SMTP provider is configured in this increment.
 
 Validate invitation/email availability before provider provisioning. Create and
