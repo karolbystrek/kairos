@@ -40,11 +40,29 @@ fi
 # Fresh bootstrap leaves only a template, never deployable local defaults.
 test ! -e "$test_directory/host/production.env"
 test -f "$test_directory/host/production.env.example"
+python3 - "$test_directory/host/production.env.example" <<'PYENV'
+from pathlib import Path
+import sys
+values = dict(line.split('=', 1) for line in Path(sys.argv[1]).read_text().splitlines() if line and not line.startswith('#'))
+assert values['COMPOSE_FILE'] == 'compose.yaml:compose.deployment.yaml'
+assert values['NEXT_PUBLIC_API_BASE_URL'] == 'https://kairos-api.karolbystrek.pl'
+assert values['PANEL_APP_URL'] == 'https://kairos-panel.karolbystrek.pl'
+assert values['NEXT_PUBLIC_CUSTOMER_APP_URL'] == 'https://kairos.karolbystrek.pl'
+assert values['WEBHOOK_DESTINATION_POLICY'] == values['PUSH_DESTINATION_POLICY'] == 'PUBLIC_HTTPS'
+for key in ['POSTGRES_PASSWORD', 'REDIS_PASSWORD', 'ZITADEL_DB_PASSWORD', 'ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD']:
+    assert values[key] == '', key
+PYENV
+cp "$test_directory/host/production.env.example" "$test_directory/expected-template"
+printf '%s\n' 'stale-local-template' > "$test_directory/host/production.env.example"
+run_configuration || { cat "$test_directory/output" >&2; exit 1; }
+cmp "$test_directory/expected-template" "$test_directory/host/production.env.example"
 cp -R "$test_directory/host/secrets" "$test_directory/expected-secrets"
 printf '%s\n' 'operator-owned-production-configuration' > "$test_directory/host/production.env"
 cp "$test_directory/host/production.env" "$test_directory/expected.env"
+printf "%s\n" stale-template > "$test_directory/host/production.env.example"
 run_configuration || { cat "$test_directory/output" >&2; exit 1; }
 cmp "$test_directory/expected.env" "$test_directory/host/production.env"
+cmp "$test_directory/expected-template" "$test_directory/host/production.env.example"
 for key in zitadel-masterkey webhook-encryption.bin vapid-private.pem vapid-public.pem push-subscription-encryption.bin; do
     cmp "$test_directory/expected-secrets/$key" "$test_directory/host/secrets/$key"
 done
