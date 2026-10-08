@@ -177,10 +177,12 @@
 
         - name: Copy setup inputs from this checkout
           ansible.builtin.copy:
-            src: "{{ playbook_dir }}/../{{ item }}"
-            dest: "{{ bootstrap_workspace.path }}/{{ item }}"
+            src: "{{ playbook_dir }}/../{{ item.source }}"
+            dest: "{{ bootstrap_workspace.path }}/{{ item.destination }}"
             mode: '0600'
-          loop: [setup.sh, .env.example]
+          loop:
+            - {source: setup.sh, destination: setup.sh}
+            - {source: deployment/production.env.example, destination: .env.example}
 
         - name: Check for existing production configuration
           ansible.builtin.stat:
@@ -222,14 +224,11 @@
           register: setup_result
           changed_when: "'Generated and validated the complete application key set' in setup_result.stdout"
 
-        - name: Leave fresh local defaults as a protected template only
+        - name: Publish non-secret production defaults without changing runtime configuration
           ansible.builtin.copy:
-            src: "{{ bootstrap_workspace.path }}/.env"
+            src: "{{ playbook_dir }}/production.env.example"
             dest: "{{ kairos_directory }}/production.env.example"
-            remote_src: true
-            force: false
             mode: '0600'
-          when: not production_environment.stat.exists
 
       always:
         - name: Remove temporary setup files even after failure

@@ -83,40 +83,23 @@ pulled anonymously. See [GHCR authentication](https://docs.github.com/en/package
 
 ## 2. Prepare persistent configuration and keys
 
-Obtain a trusted source checkout using `gh repo clone karolbystrek/kairos` on an
-operator workstation/host. Choose the full 40-character revision of the release
-being prepared and set `KAIROS_REVISION` to it. From that checkout, on the target
-host, use a temporary copy of only the setup inputs. This is first-install
-preparation; it deliberately refuses to overwrite an existing production file:
+Use the verified VM bootstrap described in [BOOTSTRAP.md](BOOTSTRAP.md) to
+prepare application keys and `/srv/kairos/production.env.example`. Bootstrap
+uses the repository-owned `deployment/production.env.example`, which includes
+production hostnames and safe hosted defaults but no passwords. Reruns refresh
+that example, preserve existing `production.env` bytes and validate/reuse keys.
 
-```bash
-set -euo pipefail
-umask 077
-[[ "$KAIROS_REVISION" =~ ^[0-9a-f]{40}$ ]]
-test ! -e /srv/kairos/production.env
-KAIROS_SETUP=$(mktemp -d)
-git show "${KAIROS_REVISION}:setup.sh" > "$KAIROS_SETUP/setup.sh"
-git show "${KAIROS_REVISION}:.env.example" > "$KAIROS_SETUP/.env.example"
-sh "$KAIROS_SETUP/setup.sh" --non-interactive --keep-env --keep-keys \
-  --no-tls --secrets-directory /srv/kairos/secrets
-mv "$KAIROS_SETUP/.env" /srv/kairos/production.env
-rm -r -- "$KAIROS_SETUP"
-chmod 0600 /srv/kairos/production.env
-```
+Follow the administrator SSH and copy/edit commands in that guide to prepare
+`/srv/kairos/production.env` with mode `0600`. Never overwrite an existing
+production file just to adopt new defaults; reconcile public settings while
+preserving credentials. `.env.example` remains the local configuration inventory.
+Do not source environment files as shell scripts or print resolved Compose
+configuration into tickets/logs.
 
-`--keep-keys` generates keys if absent, reuses a complete valid set, and rejects
-partial/invalid sets. Do not substitute `--replace-keys` to make startup pass.
-Setup creates the stable 32-character `zitadel-masterkey`, webhook and push
-32-byte encryption keys, and a matching P-256 VAPID private/public pair. It
-preserves an existing master key even when replacing other keys. Never discard
-or regenerate the master key while retaining ZITADEL's database. Back up the
+Setup generates the stable ZITADEL master key, webhook and push encryption keys,
+and matching P-256 VAPID pair. Do not use `--replace-keys` to make startup pass.
+Never discard the master key while retaining ZITADEL's database. Back up the
 complete key set and databases consistently before maintenance.
-
-The generated environment contains local defaults and is **not production-ready**.
-Edit it privately before deployment. `.env.example` is the complete variable
-inventory; retain its provider policy and internal-network values unless an
-explicitly reviewed change requires otherwise. Do not source it as a shell script
-or print resolved Compose configuration into a ticket/log.
 
 | Variables | Production value or responsibility |
 | --- | --- |

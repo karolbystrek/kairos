@@ -1265,8 +1265,12 @@ reruns; upgrades remain deliberately scheduled maintenance.
 Host preparation reuses this checkout's `setup.sh` with `--keep-env --keep-keys
 --no-tls`, preserves existing production configuration and key bytes, rejects
 invalid/partial key sets, and removes temporary setup inputs even on failure.
-A fresh host receives only `/srv/kairos/production.env.example` with local
-defaults; the operator must provision production configuration separately.
+Bootstrap publishes `/srv/kairos/production.env.example` from repository-owned
+`deployment/production.env.example`, with production hostnames, persistent paths
+and public-HTTPS destination policies. Reruns refresh only this non-secret
+example. Passwords, operator contact and bootstrap PAT expiry are blank for
+operator input; the live `production.env` is never created or overwritten by
+bootstrap. The local `.env.example` remains unchanged.
 Bootstrap does not run `reset.sh`, start applications, configure provider/network
 firewalls, DNS, TLS or GitHub Environment settings. Those remain separate operator
 steps. See [VM bootstrap](../deployment/BOOTSTRAP.md); actual host and repeat-run
