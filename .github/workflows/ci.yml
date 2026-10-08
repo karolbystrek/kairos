@@ -186,6 +186,14 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Install bootstrap validation tools
+        run: python3 -m pip install 'ansible-core==2.19.14'
+
+      - name: Validate VM bootstrap
+        run: |
+          ansible-playbook -i deployment/inventory.example.ini deployment/bootstrap.yml --syntax-check
+          sh tests/bootstrap-test.sh
+
       - name: Test manifest
         run: python3 -m unittest discover -s deployment -p 'test_*.py' -v
 

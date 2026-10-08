@@ -1249,6 +1249,25 @@ Command tests use fake Docker/curl and temporary state. First install, reboot
 recovery and real Cloudflare-path acceptance on the selected VM remain launch
 work requiring explicit runtime authorization.
 
+The operator can prepare an Ubuntu 24.04 x86-64 VM with
+`deployment/bootstrap.yml` from a trusted workstation over verified SSH. The
+playbook installs Docker Engine/Compose from Docker's official apt repository
+and the host tools, enables Docker on boot, creates the dedicated deployment
+identity with a restricted SSH key, and prepares private `/srv/kairos` paths.
+It refuses unsupported hosts, invalid public keys and conflicting Docker packages
+rather than removing existing infrastructure. Installed packages are retained on
+reruns; upgrades remain deliberately scheduled maintenance.
+
+Host preparation reuses this checkout's `setup.sh` with `--keep-env --keep-keys
+--no-tls`, preserves existing production configuration and key bytes, rejects
+invalid/partial key sets, and removes temporary setup inputs even on failure.
+A fresh host receives only `/srv/kairos/production.env.example` with local
+defaults; the operator must provision production configuration separately.
+Bootstrap does not run `reset.sh`, start applications, configure provider/network
+firewalls, DNS, TLS or GitHub Environment settings. Those remain separate operator
+steps. See [VM bootstrap](../deployment/BOOTSTRAP.md); actual host and repeat-run
+acceptance remain operator verification.
+
 ### 7.1 Current HTTP resource families
 
 The implemented browser-facing contract consists of:
