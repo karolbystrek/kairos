@@ -51,6 +51,12 @@ immediately creates a tenant administrator; managers/operators join through
 manually shared invitations. Sessions survive service restarts and expire after
 30 days without activity. See [authentication setup](docs/authentication-setup.md).
 
+## Hosted VM preparation
+
+For a repeatable Ubuntu 24.04 x86-64 host setup, follow the
+[VM bootstrap guide](deployment/BOOTSTRAP.md). It installs host dependencies and
+prepares persistent application keys without starting Kairos.
+
 ## Repository checks
 
 Run the checks from the repository root:
