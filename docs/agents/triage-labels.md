@@ -1,5 +1,13 @@
 # Triage labels
 
+## Contents
+
+- [Triage labels](#triage-labels)
+- [Contents](#contents)
+- [Label mapping](#label-mapping)
+
+## Label mapping
+
 | Role | Tracker label |
 | --- | --- |
 | needs-triage | needs-triage |

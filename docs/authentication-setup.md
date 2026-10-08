@@ -1,5 +1,14 @@
 # Self-hosted ZITADEL authentication setup
 
+## Contents
+
+- [Self-hosted ZITADEL authentication setup](#self-hosted-zitadel-authentication-setup)
+- [Contents](#contents)
+- [Compose startup](#compose-startup)
+- [Sessions and account flows](#sessions-and-account-flows)
+- [Operations and limits](#operations-and-limits)
+- [Provider verification](#provider-verification)
+
 Run `./setup.sh`, then start Compose separately with `docker compose up --build`.
 Setup creates webhook/push secrets, the stable 32-character `zitadel-masterkey`,
 and optional local TLS material. No external provider account or SMTP setup is

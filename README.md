@@ -1,5 +1,15 @@
 # Kairos
 
+## Contents
+
+- [Kairos](#kairos)
+- [Contents](#contents)
+- [Local development](#local-development)
+- [Hosted VM preparation](#hosted-vm-preparation)
+- [Repository checks](#repository-checks)
+- [Resetting the local environment](#resetting-the-local-environment)
+- [Documentation](#documentation)
+
 Kairos is a virtual pager system for restaurants. Customers scan an
 order-specific QR code to follow its status without creating an account or
 installing an app. Restaurant staff manage orders through a separate

@@ -1,11 +1,22 @@
 # Backend conventions
 
+## Contents
+
+- [Backend conventions](#backend-conventions)
+- [Contents](#contents)
+- [Feature structure and API mapping](#feature-structure-and-api-mapping)
+- [Java and persistence conventions](#java-and-persistence-conventions)
+
+## Feature structure and API mapping
+
 - Organize code first by business feature and then by `api`, `application`,
   `domain`, and `infrastructure`. Add cohesive subpackages only where they
   represent a real conceptual boundary.
 - Configure the application-wide `/api` base path with
   `server.servlet.context-path`; controller mappings declare resource-relative
   paths and do not repeat `/api`.
+## Java and persistence conventions
+
 - Map projections through a static `from(...)` factory on API response records.
 - Use Lombok `@RequiredArgsConstructor` for routine constructor injection,
   `@NonNull` for internal runtime null contracts, and `@Slf4j` for logging. Use
