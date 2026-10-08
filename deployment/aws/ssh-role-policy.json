@@ -1,0 +1,28 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadInstanceAndFirewall",
+      "Effect": "Allow",
+      "Action": ["lightsail:GetInstance", "lightsail:GetInstancePortStates", "lightsail:GetOperation", "lightsail:GetOperationsForResource"],
+      "Resource": "*",
+      "Condition": {"StringEquals": {"aws:RequestedRegion": "${AWS_REGION}"}}
+    },
+    {
+      "Sid": "ModifyTargetFirewall",
+      "Effect": "Allow",
+      "Action": ["lightsail:OpenInstancePublicPorts", "lightsail:CloseInstancePublicPorts"],
+      "Resource": "${INSTANCE_ARN}"
+    },
+    {
+      "Sid": "TrackOnlyDeploymentRule",
+      "Effect": "Allow",
+      "Action": ["lightsail:TagResource", "lightsail:UntagResource"],
+      "Resource": "${INSTANCE_ARN}",
+      "Condition": {
+        "ForAllValues:StringEquals": {"aws:TagKeys": ["kairos-deploy-ssh"]},
+        "Null": {"aws:TagKeys": "false"}
+      }
+    }
+  ]
+}
