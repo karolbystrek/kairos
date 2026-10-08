@@ -285,9 +285,17 @@ jobs:
     environment: production
     permissions:
       contents: read
+      id-token: write
     concurrency:
       group: kairos-production
       cancel-in-progress: false
+    env:
+      AWS_REGION: ${{ vars.DEPLOY_AWS_REGION }}
+      AWS_RETRY_MODE: standard
+      AWS_MAX_ATTEMPTS: "5"
+      DEPLOY_INSTANCE: ${{ vars.DEPLOY_INSTANCE }}
+      DEPLOY_ADMIN_CIDRS: ${{ vars.DEPLOY_ADMIN_CIDRS }}
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
@@ -301,6 +309,21 @@ jobs:
           name: release-manifest
           path: ${{ runner.temp }}/release
 
+      - name: AWS credentials for temporary SSH access
+        id: aws
+        uses: aws-actions/configure-aws-credentials@ec61189d14ec14c8efccab744f656cffd0e33f37 # v6.1.0
+        with:
+          aws-region: ${{ vars.DEPLOY_AWS_REGION }}
+          role-to-assume: ${{ vars.DEPLOY_AWS_ROLE_ARN }}
+          role-session-name: kairos-${{ github.run_id }}-${{ github.run_attempt }}
+          role-duration-seconds: 7200
+          allowed-account-ids: ${{ vars.DEPLOY_AWS_ACCOUNT_ID }}
+          unset-current-credentials: true
+
+      - name: Open temporary deployment SSH access
+        id: firewall
+        run: python3 deployment/ssh_firewall.py open
+
       - name: Transfer and deploy verified release
         id: deployment
         env:
@@ -312,12 +335,21 @@ jobs:
           DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
         run: python3 deployment/upload_release.py "$RELEASE_DIRECTORY" "$RELEASE_REVISION"
 
+      - name: Remove temporary deployment SSH access
+        id: firewall_cleanup
+        if: always() && steps.aws.outcome == 'success' && steps.firewall.outcome != 'skipped'
+        env:
+          FIREWALL_OPEN_OUTCOME: ${{ steps.firewall.outcome }}
+        run: python3 deployment/ssh_firewall.py close
+
       - name: Deployment result
         if: always()
         env:
           RELEASE_REVISION: ${{ github.sha }}
           DEPLOYMENT_RESULT: ${{ steps.deployment.outcome }}
           JOB_RESULT: ${{ job.status }}
+          FIREWALL_RESULT: ${{ steps.firewall_cleanup.outcome }}
         run: |
           printf '\nRevision: `%s`\n\nDeployment: **%s**; job: **%s**\n' \
             "$RELEASE_REVISION" "$DEPLOYMENT_RESULT" "$JOB_RESULT" >> "$GITHUB_STEP_SUMMARY"
+          printf '\nTemporary SSH cleanup: **%s**\n' "$FIREWALL_RESULT" >> "$GITHUB_STEP_SUMMARY"

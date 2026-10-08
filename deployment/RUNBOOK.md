@@ -222,6 +222,22 @@ Environment secrets must remain gated. Verify owner self-approval, main-only
 policy, and rejected/withheld approval behavior; record results without secrets.
 Merging a PR or publishing images does not authorize approving deployment.
 
+### Temporary deployment SSH access
+
+Before approving a release, complete [AWS OIDC setup](AWS-SSH.md). Keep the
+administrator and Lightsail browser SSH rules; do not allow GitHub's full runner
+range list or public TCP22. The protected job obtains temporary AWS credentials,
+recovers a tagged stale /32, opens its own /32 and verifies TCP access. Existing
+strict SSH host-key authentication remains mandatory. An `always()` cleanup
+closes and verifies the temporary rule after success or failure. Its outcome is
+included in the job summary and cleanup failure fails the job.
+
+Forced termination and AWS failures can leave a temporary rule. Recover using
+the documented command before retrying; never delete an arbitrary /32 or clear
+the marker without closing its rule. AWS session expiry does not expire firewall
+rules. Do not run manual recovery during an active deployment. Live OIDC, cleanup
+on failure and interrupted-run recovery acceptance remain operator checks.
+
 ## 5. First install and later releases
 
 After provisioning and authorization, use a successful main push run or a manual

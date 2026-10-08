@@ -1196,6 +1196,27 @@ with the supplied verified host keys and ephemeral `0700`/`0600` SSH files.
 The four Environment secrets are `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`,
 and `DEPLOY_KNOWN_HOSTS`; publication jobs receive none of these secrets.
 
+The protected production job alone has `id-token: write` and obtains AWS
+credentials through GitHub OIDC for 7200 seconds, exceeding its 70-minute timeout.
+IAM trust matches this repository's exact production Environment subject and
+`sts.amazonaws.com` audience. Environment policy still restricts deployment to
+main. The role permits firewall changes only on the selected Lightsail instance
+and tag changes only for `kairos-deploy-ssh`; read APIs require region-limited
+`Resource: *`. Lightsail cannot restrict these write permissions to a particular
+port, so workflow code and approval are part of this authority boundary.
+
+`deployment/ssh_firewall.py` records the run identity and validated public runner
+IPv4 /32 before opening TCP22. Before opening, it recovers only a tagged stale
+rule, protects explicit administrator CIDRs and refuses existing unmarked access.
+It preserves browser SSH and HTTPS rules. The same runner verifies TCP readiness
+before the existing host-key-verified SSH transfer. Cleanup runs with `always()`,
+verifies the recorded rule is absent and only then removes its tag; cleanup
+failure fails the job and leaves recoverable state. A different run cannot clean
+an active owner's rule. Forced termination or AWS outages can leave access until
+the next run or explicit operator recovery; rules do not expire with credentials.
+Changing permanent administrator CIDRs requires updating `DEPLOY_ADMIN_CIDRS`
+before reusing an address that might still be tracked by a deployment marker.
+
 Deployment jobs use `kairos-production` concurrency without canceling an active
 job. The upload activates the complete bundle at `/srv/kairos/releases/<revision>`
 from a private temporary directory, retaining existing revision directories;
