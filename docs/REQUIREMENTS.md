@@ -1255,7 +1255,9 @@ The operator can prepare an Ubuntu 24.04 x86-64 VM with
 `deployment/bootstrap.yml` from a trusted workstation over verified SSH. The
 playbook installs Docker Engine/Compose from Docker's official apt repository
 and the host tools, enables Docker on boot, creates the dedicated deployment
-identity with a restricted SSH key, and prepares private `/srv/kairos` paths.
+`kairos-deploy` identity with a restricted SSH key, and prepares private `/srv/kairos` paths.
+It keeps the existing `ubuntu` administrator unchanged and rejects selecting
+`ubuntu` as the deployment identity.
 It refuses unsupported hosts, invalid public keys and conflicting Docker packages
 rather than removing existing infrastructure. Installed packages are retained on
 reruns; upgrades remain deliberately scheduled maintenance.

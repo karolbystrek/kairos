@@ -3,7 +3,7 @@
   hosts: kairos
   become: true
   vars:
-    kairos_deploy_user: kairos
+    kairos_deploy_user: kairos-deploy
     kairos_directory: /srv/kairos
 
   pre_tasks:
@@ -14,6 +14,8 @@
           - kairos_directory != '/'
           - kairos_deploy_user is match('^[a-z_][a-z0-9_-]*$')
           - kairos_deploy_user != 'root'
+          - kairos_deploy_user != 'ubuntu'
+        fail_msg: Deployment must use a separate non-root account, never the Ubuntu administrator.
       tags: always
 
     - name: Validate supported host and required public key input
