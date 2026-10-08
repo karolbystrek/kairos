@@ -5,6 +5,15 @@ orders, staff manage queues, and external systems use REST APIs and webhooks.
 Repository: [https://github.com/karolbystrek/kairos](https://github.com/karolbystrek/kairos).
 Use `gh` for all GitHub operations.
 
+## Contents
+
+- [Kairos](#kairos)
+- [Contents](#contents)
+- [Required workflow](#required-workflow)
+- [Cloud resource approval](#cloud-resource-approval)
+- [Repository and stack](#repository-and-stack)
+- [Read when relevant](#read-when-relevant)
+
 ## Required workflow
 
 Agree the problem and plan with the user, save the plan in a new GitHub issue
@@ -14,6 +23,15 @@ Validate, commit all task changes in one Conventional Commit, and open a PR to
 `main`. Stop for user verification and merge; never develop directly on `main`
 or merge the PR yourself. Keep task plans/progress in GitHub, not committed
 `.md` files. See [the full workflow](docs/agents/issue-tracker.md) before changes.
+
+## Cloud resource approval
+
+Agents may use AWS CLI and Cloudflare CLI/API tools for read-only inspection.
+Never modify AWS or Cloudflare resources without explicit user approval for
+that action and scope, regardless of the tool or automation used. Credentials
+and permission to implement code do not authorize live resource changes.
+See [cloud operations](docs/agents/cloud-operations.md) before accessing either
+service; existing explicit approval remains valid within its stated scope.
 
 ## Repository and stack
 
