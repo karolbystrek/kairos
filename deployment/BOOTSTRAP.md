@@ -5,7 +5,7 @@ instance. Run it from a trusted checkout on your Mac or Linux workstation.
 The workstation architecture does not need to match the VM.
 
 The playbook installs Docker Engine/Compose and host tools, enables Docker at
-boot, creates the `kairos` deployment account, installs its restricted public SSH
+boot, creates the `kairos-deploy` deployment account, installs its restricted public SSH
 key, and creates private `/srv/kairos/releases`, `/srv/kairos/tls` and application
 keys. It uses the existing `setup.sh` and does not start Kairos.
 
@@ -58,6 +58,34 @@ Ansible is run with strict host-key checking below.
 Keep the provider console recovery path available. This bootstrap does not change
 Lightsail firewall rules or the administrator's SSH authentication settings.
 
+## SSH aliases on your Mac
+
+Keep the administrator alias mapped to the existing `ubuntu` account. The
+second alias works after bootstrap creates `kairos-deploy`:
+
+```sshconfig
+Host kairos
+    HostName 52.58.250.75
+    User ubuntu
+    IdentityFile ~/.ssh/LightsailDefaultKey-eu-central-1.pem
+    IdentitiesOnly yes
+    StrictHostKeyChecking yes
+    ControlMaster auto
+    ControlPath ~/.ssh/cm-%C
+    ControlPersist 5m
+
+Host kairos-deploy
+    HostName 52.58.250.75
+    User kairos-deploy
+    IdentityFile ~/.ssh/kairos-deploy
+    IdentitiesOnly yes
+    StrictHostKeyChecking yes
+```
+
+Bootstrap does not create another administrator, rename `ubuntu`, modify its
+keys or change its sudo permissions. Use `ssh kairos` for administration and
+`ssh kairos-deploy 'docker version'` for deployment checks after bootstrap.
+
 ## Run the bootstrap
 
 Copy the example inventory to a private location outside the checkout and replace
@@ -88,19 +116,37 @@ existing Docker/container tooling; resolve such a conflict as separate maintenan
 Docker installation follows its
 [official Ubuntu apt repository instructions](https://docs.docker.com/engine/install/ubuntu/).
 
-The `kairos` account has a locked password and Docker group access, with password
+The `kairos-deploy` account has a locked password and Docker group access, with password
 and keyboard-interactive SSH authentication disabled. The installed key disables
 PTY allocation and agent, TCP and X11 forwarding. SCP and ordinary non-interactive
 SSH commands remain available to the existing release uploader. Administrator
 access continues through `ubuntu`; final root/password SSH policy and restricted
 network ingress are separate production preparation.
 
+If you already configured the `kairos` SSH alias above, your inventory can be:
+
+```ini
+[kairos]
+kairos-production ansible_host=kairos
+
+[kairos:vars]
+ansible_python_interpreter=/usr/bin/python3
+```
+
+Do not keep an explicit `ansible_user` that disagrees with the alias. The
+simplified command then uses SSH configuration for the administrator key:
+
+```sh
+ansible-playbook -i "$HOME/.config/kairos/inventory.ini" deployment/bootstrap.yml \
+  -e "kairos_deploy_public_key_file=$HOME/.ssh/kairos-deploy.pub"
+```
+
 ## Verify, then stop
 
 Connect as the deployment account using its separate private key:
 
 ```sh
-ssh -o StrictHostKeyChecking=yes -i "$HOME/.ssh/kairos-deploy" kairos@52.58.250.75 \
+ssh -o StrictHostKeyChecking=yes -i "$HOME/.ssh/kairos-deploy" kairos-deploy@52.58.250.75 \
   'docker info --format "{{.ServerVersion}}"; docker compose version; python3 --version'
 ```
 

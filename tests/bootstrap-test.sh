@@ -23,6 +23,15 @@ run_configuration() {
         --tags configuration -e "@$test_directory/vars.json" \
         > "$test_directory/output" 2>&1
 }
+# Deployment must never repurpose the existing Ubuntu administrator.
+if ansible-playbook -i "$test_directory/inventory.ini" \
+    "$repository_directory/deployment/bootstrap.yml" --tags configuration \
+    -e "@$test_directory/vars.json" -e kairos_deploy_user=ubuntu \
+    > "$test_directory/output" 2>&1; then
+    echo 'Bootstrap accepted ubuntu as the deployment identity.' >&2
+    exit 1
+fi
+test ! -e "$test_directory/host"
 if ! run_configuration; then
     cat "$test_directory/output" >&2
     echo 'Bootstrap failed to prepare isolated configuration.' >&2
