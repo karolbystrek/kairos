@@ -84,3 +84,4 @@ This deletes the Compose volumes and generated keys.
 * [Agent instructions and development workflow](AGENTS.md)
 * [Problem description](docs/PROBLEM_DESCRIPTION.md)
 * [Product requirements and architecture](docs/REQUIREMENTS.md)
+* [Public production operations](deployment/RUNBOOK.md)
