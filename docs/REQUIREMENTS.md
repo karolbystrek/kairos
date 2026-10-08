@@ -1204,8 +1204,10 @@ a retry requires an identical archive. It invokes the bundled host command with
 the validated revision, three digests and deployment result without credentials.
 The host needs GNU `tar`, `mv`, and `cmp` alongside the deployment prerequisites.
 Required reviewer/main-only Environment protection and operator secrets must
-still be provisioned before releases are allowed; the workflow cannot install
-those protections. Live approval/withheld-approval and deployment acceptance
+be provisioned before releases are allowed; the workflow cannot install
+those protections. The owner may approve their own initiated runs
+(`prevent_self_review=false`), and administrator bypass remains allowed
+(`can_admins_bypass=true`) under the owner-approved policy. Live approval/withheld-approval and deployment acceptance
 remain operator launch checks.
 
 `deployment/deploy.sh RELEASE_DIRECTORY ENV_FILE` runs on the Linux VM against
