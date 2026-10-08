@@ -57,7 +57,7 @@ aws lightsail get-alarms --region eu-central-1 --monitored-resource-name kairos-
 Inspect contact output privately; it contains email addresses. Reuse the owner's
 existing verified regional Email contact when present. Otherwise add the chosen
 address through the Lightsail console's regional notification contacts, or run
-`aws lightsail create-contact-method` with `--notification-protocol Email` and
+`aws lightsail create-contact-method` with `--protocol Email` and
 the private `--contact-endpoint` supplied through protected CLI input. Never
 record the real address in Git or issues. Open AWS's verification email and
 confirm the contact is `Valid` in `eu-central-1` before enabling notifications.
@@ -141,6 +141,9 @@ resources and must not be deleted as routine Kairos cleanup.
 
 ## Activation status
 
-Repository preparation supplies this procedure. Regional contact verification,
-three live alarms and email-delivery evidence are **pending operator activation**.
-No active alert coverage or public-launch readiness is claimed.
+Activated on 2026-10-08: the regional Email contact is verified, all three alarms
+have notifications enabled, and AWS accepted all three alarm tests plus the
+status-alarm recovery test. The owner confirmed receiving emails. See
+[activation evidence](https://github.com/karolbystrek/kairos/issues/18#issuecomment-6068946175).
+GitHub failed-workflow email delivery was not verified. These native alarms
+provide the limited coverage described above, not public-launch readiness.

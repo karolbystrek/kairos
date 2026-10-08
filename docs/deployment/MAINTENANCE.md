@@ -38,7 +38,7 @@ applied migrations become immutable and later changes use forward migrations.
 [Step six](https://github.com/karolbystrek/kairos/issues/18) prepares native Lightsail
 email alarms for status-check failures, sustained high CPU and low CPU burst
 capacity. Follow [alarm setup](MONITORING.md) for provisioning, notification tests
-and response guidance. Live activation and email receipt remain pending. Disk,
+and response guidance. Live alarms and email delivery were verified on 2026-10-08. Disk,
 memory and public HTTPS alerts are deferred; no custom host monitoring runs.
 Backups, retention/recovery targets and restore rehearsals are also deferred
 until real users or valuable data; confirm those targets at that stage.
