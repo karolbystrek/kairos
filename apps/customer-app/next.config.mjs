@@ -20,7 +20,7 @@ const nextConfig = {
           },
           {
             key: "Content-Security-Policy",
-            value: `default-src 'self'; script-src 'self'; connect-src ${apiOrigin}`,
+            value: `default-src 'self'; script-src 'self'; connect-src 'self' ${apiOrigin}`,
           },
           {
             key: "Content-Type",
