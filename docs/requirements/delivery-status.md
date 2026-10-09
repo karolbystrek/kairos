@@ -114,9 +114,11 @@ Outstanding security and acceptance work:
   subscription-replacement acceptance.
 
 The current public single-VM deployment is a disposable development environment.
-Native Lightsail email alarm preparation is documented in
-[monitoring](../deployment/MONITORING.md); live alarm/contact provisioning and
-actual email delivery remain pending operator acceptance.
+Native Lightsail email alarms were activated on 2026-10-08 with a verified
+regional contact, enabled notifications and successful AWS notification tests;
+the owner confirmed email receipt. See [monitoring](../deployment/MONITORING.md)
+for coverage and [activation evidence](https://github.com/karolbystrek/kairos/issues/18#issuecomment-6068946175).
+GitHub failed-workflow email delivery remains unverified.
 
 ### Deferred work
 
