@@ -19,6 +19,7 @@ import pl.karolbystrek.kairos.api.account.domain.TenantRole;
 import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
 import tools.jackson.databind.ObjectMapper;
 
+import java.sql.Timestamp;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Duration;
@@ -83,13 +84,14 @@ class AccountInvitationApiIntegrationTests extends RedisListenerIsolatedIntegrat
         );
         jdbcTemplate.update(
             """
-                INSERT INTO accounts (id, provider_subject, tenant_id, email, tenant_role, status, created_at, updated_at) VALUES (?, CAST(RANDOM_UUID() AS VARCHAR), ?, ?, 'ADMIN', 'ENABLED', ?, ?)
+                INSERT INTO accounts (id, provider_subject, tenant_id, email, tenant_role, status, created_at, updated_at) VALUES (?, ?, ?, ?, 'ADMIN', 'ENABLED', ?, ?)
                 """,
             accountId,
+            UUID.randomUUID().toString(),
             tenantId,
             "invitation-admin-" + accountId + "@example.com",
-            now,
-            now
+            Timestamp.from(now),
+            Timestamp.from(now)
         );
     }
 
@@ -307,9 +309,9 @@ class AccountInvitationApiIntegrationTests extends RedisListenerIsolatedIntegrat
         var createdAt = Instant.now().minus(Duration.ofDays(8));
         jdbcTemplate.update(
             "UPDATE account_invitations SET created_at = ?, updated_at = ?, expires_at = ? WHERE id = ?",
-            createdAt,
-            createdAt,
-            createdAt.plus(Duration.ofDays(7)),
+            Timestamp.from(createdAt),
+            Timestamp.from(createdAt),
+            Timestamp.from(createdAt.plus(Duration.ofDays(7))),
             invitationId
         );
         entityManager.clear();
@@ -363,13 +365,14 @@ class AccountInvitationApiIntegrationTests extends RedisListenerIsolatedIntegrat
         var now = Instant.now();
         jdbcTemplate.update(
             """
-                INSERT INTO accounts (id, provider_subject, tenant_id, email, tenant_role, status, created_at, updated_at) VALUES (?, CAST(RANDOM_UUID() AS VARCHAR), ?, ?, 'MEMBER', 'ENABLED', ?, ?)
+                INSERT INTO accounts (id, provider_subject, tenant_id, email, tenant_role, status, created_at, updated_at) VALUES (?, ?, ?, ?, 'MEMBER', 'ENABLED', ?, ?)
                 """,
             accountId,
+            UUID.randomUUID().toString(),
             tenantId,
             "invitation-member-" + accountId + "@example.com",
-            now,
-            now
+            Timestamp.from(now),
+            Timestamp.from(now)
         );
         jdbcTemplate.update(
             """
@@ -381,8 +384,8 @@ class AccountInvitationApiIntegrationTests extends RedisListenerIsolatedIntegrat
             assignedLocationId,
             tenantId,
             role,
-            now,
-            now
+            Timestamp.from(now),
+            Timestamp.from(now)
         );
         return new StaffPrincipal(accountId, tenantId, TenantRole.MEMBER);
     }

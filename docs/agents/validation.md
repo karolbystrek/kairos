@@ -50,3 +50,9 @@
   new tests.
 - Keep focused coverage for authorization, tenant isolation, validation,
   consequential state transitions, atomicity, idempotency, and relevant races.
+
+Backend verification uses disposable PostgreSQL 18 through the JUnit launcher.
+Docker is required; missing Docker fails the suite rather than skipping it.
+Run `./mvnw --batch-mode verify` from `apps/api`, or add
+`-f apps/api/pom.xml` when invoking the wrapper from the repository root.
+See [local development](local-development.md) for container and fixture safety.

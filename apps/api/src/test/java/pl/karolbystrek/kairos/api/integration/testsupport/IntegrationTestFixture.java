@@ -5,6 +5,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
 import pl.karolbystrek.kairos.api.account.domain.TenantRole;
 
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -34,17 +35,17 @@ public final class IntegrationTestFixture {
                 "First location",
                 "first location",
                 "first location",
-                now,
-                now,
-                now,
+                Timestamp.from(now),
+                Timestamp.from(now),
+                Timestamp.from(now),
                 secondLocationId,
                 tenantId,
                 "Second location",
                 "second location",
                 "second location",
-                now,
-                now,
-                now
+                Timestamp.from(now),
+                Timestamp.from(now),
+                Timestamp.from(now)
         );
         var administrator = createAccount(tenantId, TenantRole.ADMIN, null, null);
         var manager = createAccount(
@@ -72,14 +73,15 @@ public final class IntegrationTestFixture {
         var now = Instant.parse("2026-07-26T10:00:00Z");
         jdbcTemplate.update(
                 """
-                INSERT INTO accounts (id, provider_subject, tenant_id, email, tenant_role, status, created_at, updated_at) VALUES (?, CAST(RANDOM_UUID() AS VARCHAR), ?, ?, ?, 'ENABLED', ?, ?)
+                INSERT INTO accounts (id, provider_subject, tenant_id, email, tenant_role, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'ENABLED', ?, ?)
                 """,
             accountId,
+            UUID.randomUUID().toString(),
             tenantId,
             "integration-test-" + accountId + "@example.com",
             tenantRole.name(),
-            now,
-            now
+            Timestamp.from(now),
+            Timestamp.from(now)
         );
         if (locationId != null) {
             jdbcTemplate.update(
@@ -92,8 +94,8 @@ public final class IntegrationTestFixture {
                     locationId,
                     tenantId,
                     assignmentRole,
-                    now,
-                    now
+                    Timestamp.from(now),
+                    Timestamp.from(now)
             );
         }
         return new StaffPrincipal(accountId, tenantId, tenantRole);

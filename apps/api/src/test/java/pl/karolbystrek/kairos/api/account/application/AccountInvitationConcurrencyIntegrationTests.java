@@ -10,6 +10,7 @@ import pl.karolbystrek.kairos.api.account.domain.TenantRole;
 import pl.karolbystrek.kairos.api.account.domain.assignment.AssignmentRole;
 import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
 
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -43,13 +44,14 @@ class AccountInvitationConcurrencyIntegrationTests extends RedisListenerIsolated
         );
         jdbcTemplate.update(
             """
-                INSERT INTO accounts (id, provider_subject, tenant_id, email, tenant_role, status, created_at, updated_at) VALUES (?, CAST(RANDOM_UUID() AS VARCHAR), ?, ?, 'ADMIN', 'ENABLED', ?, ?)
+                INSERT INTO accounts (id, provider_subject, tenant_id, email, tenant_role, status, created_at, updated_at) VALUES (?, ?, ?, ?, 'ADMIN', 'ENABLED', ?, ?)
                 """,
             administratorId,
+            UUID.randomUUID().toString(),
             tenantId,
             "concurrent-invitation-admin-" + administratorId + "@example.com",
-            now,
-            now
+            Timestamp.from(now),
+            Timestamp.from(now)
         );
         var created = invitationService.create(
             new StaffPrincipal(administratorId, tenantId, TenantRole.ADMIN),

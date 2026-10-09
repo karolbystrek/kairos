@@ -11,6 +11,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 import org.springframework.transaction.annotation.Transactional;
 import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
 
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -93,8 +94,8 @@ class TrackedOrderApiIntegrationTests extends RedisListenerIsolatedIntegrationTe
                 trackingReference,
                 label,
                 status,
-                now,
-                now
+                Timestamp.from(now),
+                Timestamp.from(now)
         );
         return trackingReference;
     }

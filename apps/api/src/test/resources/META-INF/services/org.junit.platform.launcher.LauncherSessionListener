@@ -1,1 +1,2 @@
 pl.karolbystrek.kairos.api.authentication.testsupport.TestNotificationKeyLauncherSessionListener
+pl.karolbystrek.kairos.api.testsupport.PostgresLauncherSessionListener

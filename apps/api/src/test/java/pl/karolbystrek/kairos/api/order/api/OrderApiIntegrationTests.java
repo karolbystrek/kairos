@@ -21,6 +21,7 @@ import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
 import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
 import tools.jackson.databind.ObjectMapper;
 
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -76,13 +77,14 @@ class OrderApiIntegrationTests extends RedisListenerIsolatedIntegrationTest {
         );
         jdbcTemplate.update(
             """
-                INSERT INTO accounts (id, provider_subject, tenant_id, email, tenant_role, status, created_at, updated_at) VALUES (?, CAST(RANDOM_UUID() AS VARCHAR), ?, ?, 'ADMIN', 'ENABLED', ?, ?)
+                INSERT INTO accounts (id, provider_subject, tenant_id, email, tenant_role, status, created_at, updated_at) VALUES (?, ?, ?, ?, 'ADMIN', 'ENABLED', ?, ?)
                 """,
             accountId,
+            UUID.randomUUID().toString(),
             tenantId,
             "order-api-admin-" + accountId + "@example.com",
-            now,
-            now
+            Timestamp.from(now),
+            Timestamp.from(now)
         );
     }
 
