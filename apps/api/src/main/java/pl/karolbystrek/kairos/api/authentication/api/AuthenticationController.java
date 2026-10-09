@@ -6,8 +6,10 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
+import pl.karolbystrek.kairos.api.account.application.exception.StaffAccessDeniedException;
 import pl.karolbystrek.kairos.api.account.application.model.PanelPrincipal;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
 import pl.karolbystrek.kairos.api.authentication.api.model.*;
@@ -16,6 +18,7 @@ import pl.karolbystrek.kairos.api.authentication.application.exception.InvalidLo
 import pl.karolbystrek.kairos.api.authentication.infrastructure.web.CsrfTokenService;
 import pl.karolbystrek.kairos.api.authentication.infrastructure.zitadel.ZitadelClient;
 
+import java.time.Clock;
 import java.util.Locale;
 
 @RestController
@@ -26,7 +29,7 @@ public class AuthenticationController {
     private final AuthenticationSessionService sessions;
     private final CurrentAccountService current;
     private final StaffAuthenticationService authentication;
-    private final java.time.Clock clock;
+    private final Clock clock;
     private final CsrfTokenService csrf;
 
     @GetMapping("/auth/v1/csrf")
@@ -38,7 +41,7 @@ public class AuthenticationController {
         try {
             StaffPrincipal principal;
             try { principal = authentication.authenticate(identity, clock.instant()); }
-            catch (pl.karolbystrek.kairos.api.account.application.exception.StaffAccessDeniedException exception) {
+            catch (StaffAccessDeniedException exception) {
                 throw new InvalidLoginException();
             }
             return finish(principal, identity, request, response);
@@ -64,8 +67,8 @@ public class AuthenticationController {
             HttpServletRequest request, HttpServletResponse response) {
         var existing = request.getSession(false);
         if ((existing != null && existing.getAttribute(AuthenticationSessionService.IDENTITY) != null)
-            || (org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication() != null
-                && org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getPrincipal() instanceof PanelPrincipal))
+            || (SecurityContextHolder.getContext().getAuthentication() != null
+                && SecurityContextHolder.getContext().getAuthentication().getPrincipal() instanceof PanelPrincipal))
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Sign out before registering");
         if (invited && (input.token() == null || input.token().isBlank()))
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invitation is required");

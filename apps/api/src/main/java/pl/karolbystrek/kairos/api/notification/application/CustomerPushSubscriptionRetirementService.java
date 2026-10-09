@@ -1,9 +1,10 @@
 package pl.karolbystrek.kairos.api.notification.application;
 
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
-import pl.karolbystrek.kairos.api.notification.infrastructure.persistence.CustomerPushEnrollmentRepository;
 import pl.karolbystrek.kairos.api.notification.infrastructure.persistence.CustomerPushDeliveryRepository;
+import pl.karolbystrek.kairos.api.notification.infrastructure.persistence.CustomerPushEnrollmentRepository;
 import pl.karolbystrek.kairos.api.notification.infrastructure.persistence.CustomerPushSubscriptionRepository;
 
 import java.time.Instant;
@@ -16,7 +17,7 @@ class CustomerPushSubscriptionRetirementService {
     private final CustomerPushSubscriptionRepository subscriptionRepository;
     private final CustomerPushEnrollmentRepository enrollmentRepository;
     private final CustomerPushDeliveryRepository deliveryRepository;
-    private final jakarta.persistence.EntityManager entityManager;
+    private final EntityManager entityManager;
 
     void retire(UUID subscriptionId, Instant now) {
         if (subscriptionId == null) {

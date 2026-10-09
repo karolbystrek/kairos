@@ -10,8 +10,10 @@ import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
 import pl.karolbystrek.kairos.api.account.domain.TenantRole;
 import pl.karolbystrek.kairos.api.location.application.LocationService;
 import pl.karolbystrek.kairos.api.location.application.model.LocationView;
+import pl.karolbystrek.kairos.api.order.application.exception.ResourceNotFoundException;
 import pl.karolbystrek.kairos.api.order.application.model.StaffOrderView;
 import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
+import pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase;
 import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
 
 import java.sql.Timestamp;
@@ -30,7 +32,7 @@ class OrderAuthorizationIntegrationTests extends RedisListenerIsolatedIntegratio
     @Autowired
     private LocationService locationService;
 
-    private final JdbcTemplate jdbcTemplate = pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase.ownerDatabase();
+    private final JdbcTemplate jdbcTemplate = PostgresTestDatabase.ownerDatabase();
 
     private UUID tenantId;
     private UUID locationId;
@@ -113,7 +115,7 @@ class OrderAuthorizationIntegrationTests extends RedisListenerIsolatedIntegratio
 
         var otherOrder = orderService.createOrder(otherAdmin, otherLocationId, null);
         assertThatThrownBy(() -> orderService.updateStatus(manager, otherOrder.id(), OrderStatus.READY))
-            .isInstanceOf(pl.karolbystrek.kairos.api.order.application.exception.ResourceNotFoundException.class);
+            .isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test

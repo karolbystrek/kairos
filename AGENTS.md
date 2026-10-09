@@ -16,19 +16,25 @@ Use `gh` for all GitHub operations.
 
 ## Required workflow
 
-Agree the problem and plan with the user, save the plan in a new GitHub issue
-before changing files, and split substantial, independently reviewable scopes
-into linked sub-issues. Create a new `<issue>-<topic>` branch from current
-`main` for each implementation issue.
-Validate, commit all task changes in one Conventional Commit, and open a PR to
-`main`. Stop for user verification and merge; never develop directly on `main`
-or merge the PR yourself. Keep task plans/progress in GitHub, not committed
-`.md` files. See [the full workflow](docs/agents/issue-tracker.md) before changes.
+Establish shared understanding with the user of the problem, scope, constraints,
+and acceptance criteria before proposing an implementation plan. Scale planning
+and review to the task's complexity and risk. Track substantial work in GitHub
+issues; small documentation edits and mechanical cleanups do not require an
+issue. Issues describe context, goals and acceptance criteria, not implementation
+details. Discuss implementation choices when implementing the issue.
 
-Use subagents to implement atomic, independent tasks in parallel when their
-changes do not overlap or interfere with one another. Small subagent tasks
-share the parent implementation issue and branch; create separate issues and
-branches only for substantial, independently reviewable scopes.
+Create a new `<issue>-<topic>` branch from current `main` for tracked work, or a
+descriptive branch for issue-exempt work. Validate, commit all task changes in
+one Conventional Commit, and open a PR to `main`. Stop for user verification
+and merge; never develop directly on `main` or merge the PR yourself. Keep
+tracked task plans/progress in GitHub, not committed `.md` files. See
+[the full workflow](docs/agents/issue-tracker.md) before changes.
+
+Handle small tasks that can be completed quickly in the current session yourself.
+Use subagents only for larger tasks with substantial, independent work where
+parallel execution meaningfully reduces completion time. Avoid delegation when
+coordination costs outweigh the benefit or changes overlap. Delegation alone
+never requires a separate issue or branch.
 
 ## Cloud resource approval
 

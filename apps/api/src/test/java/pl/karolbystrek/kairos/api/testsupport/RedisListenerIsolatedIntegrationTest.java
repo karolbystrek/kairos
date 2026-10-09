@@ -1,17 +1,23 @@
 package pl.karolbystrek.kairos.api.testsupport;
 
+import org.junit.jupiter.api.BeforeEach;
+import org.mockito.ArgumentMatchers;
+import org.mockito.Mockito;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 import org.springframework.test.context.bean.override.convention.TestBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import pl.karolbystrek.kairos.api.authentication.application.exception.InvalidLoginException;
+import pl.karolbystrek.kairos.api.authentication.infrastructure.zitadel.ZitadelClient;
 
 public abstract class RedisListenerIsolatedIntegrationTest {
-    @org.springframework.test.context.bean.override.mockito.MockitoBean
-    protected pl.karolbystrek.kairos.api.authentication.infrastructure.zitadel.ZitadelClient identityProvider;
+    @MockitoBean
+    protected ZitadelClient identityProvider;
 
-    @org.junit.jupiter.api.BeforeEach
+    @BeforeEach
     void rejectUnconfiguredProviderCalls() {
         PostgresTestDatabase.ownerDatabase().execute("TRUNCATE tenants,customer_push_subscriptions,spring_session RESTART IDENTITY CASCADE");
-        org.mockito.Mockito.when(identityProvider.signIn(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString()))
-            .thenThrow(new pl.karolbystrek.kairos.api.authentication.application.exception.InvalidLoginException());
+        Mockito.when(identityProvider.signIn(ArgumentMatchers.anyString(), ArgumentMatchers.anyString()))
+            .thenThrow(new InvalidLoginException());
     }
 
     @TestBean(enforceOverride = true)

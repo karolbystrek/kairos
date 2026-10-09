@@ -21,11 +21,13 @@ import pl.karolbystrek.kairos.api.order.application.exception.InvalidOrderReques
 import pl.karolbystrek.kairos.api.order.application.exception.ResourceNotFoundException;
 import pl.karolbystrek.kairos.api.order.domain.InvalidOrderTransitionException;
 import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
+import pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase;
 import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
 
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Set;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -46,7 +48,7 @@ class ExternalOrderServiceIntegrationTests extends RedisListenerIsolatedIntegrat
     @Autowired
     private ApiKeyAuthenticationService authenticationService;
 
-    private final JdbcTemplate jdbcTemplate = pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase.ownerDatabase();
+    private final JdbcTemplate jdbcTemplate = PostgresTestDatabase.ownerDatabase();
 
     @Autowired
     private MutableTestClock clock;
@@ -218,7 +220,7 @@ class ExternalOrderServiceIntegrationTests extends RedisListenerIsolatedIntegrat
                 WHERE order_id = ?
                 ORDER BY id
                 """,
-                java.util.UUID.class,
+                UUID.class,
                 created.order().id()
         )).containsOnly(integration.id());
         assertThat(jdbcTemplate.queryForList(
@@ -228,7 +230,7 @@ class ExternalOrderServiceIntegrationTests extends RedisListenerIsolatedIntegrat
                 WHERE order_id = ?
                 ORDER BY id
                 """,
-                java.util.UUID.class,
+                UUID.class,
                 created.order().id()
         )).containsOnly(issuedKey.apiKey().id());
         assertThat(jdbcTemplate.queryForList(
@@ -238,7 +240,7 @@ class ExternalOrderServiceIntegrationTests extends RedisListenerIsolatedIntegrat
                 WHERE order_id = ?
                 ORDER BY id
                 """,
-                java.util.UUID.class,
+                UUID.class,
                 created.order().id()
         )).containsOnly(issuedKey.version().id());
 
@@ -331,7 +333,7 @@ class ExternalOrderServiceIntegrationTests extends RedisListenerIsolatedIntegrat
             String.class, created.id())).isEqualTo("IN_PREPARATION");
     }
 
-    private long countRows(String table, java.util.UUID orderId) {
+    private long countRows(String table, UUID orderId) {
         var query = "SELECT COUNT(*) FROM " + table + " WHERE order_id = ?";
         return jdbcTemplate.queryForObject(query, Long.class, orderId);
     }

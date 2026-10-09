@@ -13,6 +13,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 import pl.karolbystrek.kairos.api.integration.application.ApiKeyManagementService;
 import pl.karolbystrek.kairos.api.integration.application.ExternalIntegrationManagementService;
 import pl.karolbystrek.kairos.api.integration.testsupport.IntegrationTestFixture;
+import pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase;
 import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
 import tools.jackson.databind.ObjectMapper;
 
@@ -38,7 +39,7 @@ class ExternalOrderApiIntegrationTests extends RedisListenerIsolatedIntegrationT
     @Autowired
     private ObjectMapper objectMapper;
 
-    private final JdbcTemplate jdbcTemplate = pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase.ownerDatabase();
+    private final JdbcTemplate jdbcTemplate = PostgresTestDatabase.ownerDatabase();
 
     @Autowired
     private ExternalIntegrationManagementService integrationService;

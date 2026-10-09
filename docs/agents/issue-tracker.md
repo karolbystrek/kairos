@@ -1,8 +1,8 @@
-# Issue-first development workflow
+# Task development workflow
 
 ## Contents
 
-- [Issue-first development workflow](#issue-first-development-workflow)
+- [Task development workflow](#task-development-workflow)
 - [Contents](#contents)
 - [Issue and implementation cycle](#issue-and-implementation-cycle)
 - [GitHub commands and sub-issues](#github-commands-and-sub-issues)
@@ -15,29 +15,43 @@ Use descriptive issue titles without an agent prefix.
 ## Issue and implementation cycle
 
 1. Read the relevant guidance and source, then establish shared understanding
-   with the user of the problem, scope, and implementation plan. Before changing
-   repository files, save that agreed plan as a new GitHub issue with acceptance
-   criteria and validation. For an existing issue, record the agreed plan there
-   rather than duplicating it.
-2. Split substantial, independently reviewable scopes into native GitHub
-   sub-issues linked to their parent. Small subagent tasks share the parent
-   implementation issue and branch; delegation alone does not require a new
-   issue or branch. Keep plans and progress in GitHub rather than task Markdown.
-3. After recording the plan, inspect `git status --short`, preserve unrelated
-   work, and create a new `<issue>-<topic>` branch from current `main`
-   (normally `origin/main`). All repository changes happen on branches, never
-   directly on `main`. Each implementation sub-issue follows this same cycle;
-   coordinate dependencies through reviewed/merged PRs.
-4. Implement only the issue's agreed scope, update durable documentation, and run
-   the affected checks plus `git diff --check`. Commit all task changes in one
-   Conventional Commit, excluding unrelated changes and secrets. Split large
-   work into issues before implementation rather than multiple commits.
-5. Push the branch and create a PR targeting `main`, linking the implementation
-   issue and its parent, describing the outcome and checks. Use closing keywords
-   for completed implementation issues; close a parent only when all its scope
-   is complete. Mark the issue `ready-for-human` and stop development for user
-   verification. The user decides whether to merge; agents do not merge or
-   continue with another implementation issue without user instruction.
+   with the user of the problem, scope, constraints and acceptance criteria
+   before proposing an implementation plan. Resolve material ambiguity first;
+   keep simple tasks brief and expand planning only for complexity or risk.
+2. Create an issue for substantial work that benefits from durable tracking.
+   Small documentation edits and mechanical cleanups do not require an issue;
+   keep their scope and validation in the conversation and resulting PR.
+   Reuse an existing issue when it already covers the task. Issue descriptions
+   explain the context, goal and observable acceptance criteria; do not include
+   implementation details such as class names, file-by-file edits or algorithms.
+   Discuss and agree implementation choices when implementing the issue, and
+   record tracked plans and progress in issue comments rather than task Markdown.
+3. Split substantial, independently reviewable scopes into native GitHub
+   sub-issues linked to their parent. Handle quick tasks in the current session
+   yourself. Use subagents only for larger tasks with substantial independent
+   work, non-overlapping changes and a meaningful benefit from parallel execution.
+   Delegation alone does not require another issue or branch; small work within
+   a larger delegated scope shares its implementation issue and branch.
+4. Inspect `git status --short`, preserve unrelated work, and create a new
+   `<issue>-<topic>` branch from current `main` (normally `origin/main`), or a
+   descriptive branch for issue-exempt work. Never change files directly on
+   `main`. Each implementation sub-issue follows this same cycle; coordinate
+   dependencies through reviewed/merged PRs.
+5. Implement only the agreed scope, reuse existing patterns, and avoid unrelated
+   refactoring or speculative abstractions. Update durable documentation and run
+   checks appropriate to the affected behavior and risk plus `git diff --check`.
+   Revisit the plan only when new evidence or scope changes require it. Report
+   checks as passed, failed, blocked or not run, including material limitations.
+   Commit all task changes in one Conventional Commit, excluding unrelated
+   changes and secrets. Split large work into issues before implementation.
+6. Push the branch and create a PR targeting `main`, describing the outcome and
+   checks. Link the implementation issue and parent when applicable, using
+   closing keywords for completed implementation issues; close a parent only
+   when all its scope is complete. Mark tracked issues `ready-for-human` and stop
+   for user verification. The user decides whether to merge; agents do not merge
+   or continue with another implementation issue without user instruction.
+   Deployment is a separate action: code approval does not authorize live cloud
+   changes. Follow [cloud resource approval](cloud-operations.md).
 
 ## GitHub commands and sub-issues
 

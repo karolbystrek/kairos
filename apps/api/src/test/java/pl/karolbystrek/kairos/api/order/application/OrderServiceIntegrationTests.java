@@ -6,21 +6,22 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
 import pl.karolbystrek.kairos.api.account.domain.TenantRole;
 import pl.karolbystrek.kairos.api.order.domain.InvalidOrderTransitionException;
 import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
+import pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase;
 import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
 
 import java.sql.Timestamp;
 import java.time.Clock;
-import java.util.UUID;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -32,7 +33,7 @@ class OrderServiceIntegrationTests extends RedisListenerIsolatedIntegrationTest 
     @Autowired
     private OrderService orderService;
 
-    private final JdbcTemplate jdbcTemplate = pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase.ownerDatabase();
+    private final JdbcTemplate jdbcTemplate = PostgresTestDatabase.ownerDatabase();
 
     @Autowired
     private MutableClock clock;

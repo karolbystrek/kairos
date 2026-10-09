@@ -7,8 +7,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import pl.karolbystrek.kairos.api.integration.application.model.ApiKeyPrincipal;
 import pl.karolbystrek.kairos.api.integration.application.exception.IntegrationAccessDeniedException;
+import pl.karolbystrek.kairos.api.integration.application.model.ApiKeyPrincipal;
 import pl.karolbystrek.kairos.api.integration.domain.ApiKeyScope;
 import pl.karolbystrek.kairos.api.location.infrastructure.persistence.LocationRepository;
 import pl.karolbystrek.kairos.api.order.application.exception.ExternalOrderConflictException;
@@ -28,6 +28,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.UUID;
@@ -196,7 +197,7 @@ public class ExternalOrderService {
                 predicates.add(criteriaBuilder.equal(root.get("status"), status));
             }
             if (cursor != null) {
-                var createdAt = root.<java.time.Instant>get("createdAt");
+                var createdAt = root.<Instant>get("createdAt");
                 var id = root.<UUID>get("id");
                 predicates.add(criteriaBuilder.or(
                         criteriaBuilder.lessThan(createdAt, cursor.createdAt()),

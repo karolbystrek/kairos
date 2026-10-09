@@ -7,10 +7,11 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import pl.karolbystrek.kairos.api.integration.webhook.domain.WebhookSubscription;
 
+import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.Collection;
 
 public interface WebhookSubscriptionRepository extends JpaRepository<WebhookSubscription, UUID> {
 
@@ -67,6 +68,6 @@ public interface WebhookSubscriptionRepository extends JpaRepository<WebhookSubs
             @Param("tenantId") UUID tenantId,
             @Param("locationId") UUID locationId,
             @Param("eventType") String eventType,
-            @Param("occurredAt") java.time.Instant occurredAt
+            @Param("occurredAt") Instant occurredAt
     );
 }

@@ -11,14 +11,20 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.AnonymousAuthenticationFilter;
+import org.springframework.security.web.authentication.session.NullAuthenticatedSessionStrategy;
+import org.springframework.security.web.context.NullSecurityContextRepository;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
-import org.springframework.security.web.authentication.session.NullAuthenticatedSessionStrategy;
+import org.springframework.session.web.http.HttpSessionIdResolver;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import pl.karolbystrek.kairos.api.authentication.application.StaffAuthenticationService;
 import pl.karolbystrek.kairos.api.authentication.infrastructure.web.SecurityProblemDetailsHandler;
 import pl.karolbystrek.kairos.api.authentication.infrastructure.web.SpaCsrfTokenRequestHandler;
+import pl.karolbystrek.kairos.api.authentication.infrastructure.web.StaffSessionFilter;
+import pl.karolbystrek.kairos.api.authentication.infrastructure.zitadel.ZitadelClient;
 
 import java.util.List;
 
@@ -97,9 +103,9 @@ public class SecurityConfig {
             HttpSecurity http,
             CsrfTokenRepository csrfTokenRepository,
             SpaCsrfTokenRequestHandler csrfTokenRequestHandler,
-            pl.karolbystrek.kairos.api.authentication.infrastructure.zitadel.ZitadelClient provider,
-            pl.karolbystrek.kairos.api.authentication.application.StaffAuthenticationService authentication,
-            org.springframework.session.web.http.HttpSessionIdResolver cookies,
+            ZitadelClient provider,
+            StaffAuthenticationService authentication,
+            HttpSessionIdResolver cookies,
             SecurityProblemDetailsHandler problemDetailsHandler
     ) {
         return http
@@ -110,9 +116,9 @@ public class SecurityConfig {
                         .sessionAuthenticationStrategy(new NullAuthenticatedSessionStrategy()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.NEVER)
                     .sessionAuthenticationStrategy(new NullAuthenticatedSessionStrategy()))
-                .securityContext(context -> context.securityContextRepository(new org.springframework.security.web.context.NullSecurityContextRepository()))
-                .addFilterBefore(new pl.karolbystrek.kairos.api.authentication.infrastructure.web.StaffSessionFilter(
-                    provider, authentication, cookies, problemDetailsHandler), org.springframework.security.web.authentication.AnonymousAuthenticationFilter.class)
+                .securityContext(context -> context.securityContextRepository(new NullSecurityContextRepository()))
+                .addFilterBefore(new StaffSessionFilter(
+                    provider, authentication, cookies, problemDetailsHandler), AnonymousAuthenticationFilter.class)
                 .requestCache(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)

@@ -12,8 +12,8 @@ import pl.karolbystrek.kairos.api.account.application.model.StaffAccessContext;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
 import pl.karolbystrek.kairos.api.account.application.port.AccountSessionRevoker;
 import pl.karolbystrek.kairos.api.account.domain.Account;
-import pl.karolbystrek.kairos.api.account.domain.invitation.AccountInvitationRevocationReason;
 import pl.karolbystrek.kairos.api.account.domain.assignment.LocationAssignment;
+import pl.karolbystrek.kairos.api.account.domain.invitation.AccountInvitationRevocationReason;
 import pl.karolbystrek.kairos.api.account.infrastructure.persistence.AccountRepository;
 import pl.karolbystrek.kairos.api.account.infrastructure.persistence.LocationAssignmentRepository;
 import pl.karolbystrek.kairos.api.integration.infrastructure.persistence.ApiKeyRepository;
@@ -32,6 +32,7 @@ import pl.karolbystrek.kairos.api.order.infrastructure.persistence.CustomerOrder
 import pl.karolbystrek.kairos.api.tenant.infrastructure.persistence.TenantRepository;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
@@ -258,7 +259,7 @@ public class LocationService {
         return accountRepository.findAllForUpdateByIdIn(accountIds);
     }
 
-    private void removeIntegrationSelections(Location location, java.time.Instant now) {
+    private void removeIntegrationSelections(Location location, Instant now) {
         var apiKeys = apiKeyRepository.findAllForUpdateByTenantIdAndLocationId(
             location.getTenantId(),
             location.getId()

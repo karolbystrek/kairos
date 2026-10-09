@@ -2,14 +2,15 @@ package pl.karolbystrek.kairos.api.notification.application;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
-import pl.karolbystrek.kairos.api.persistence.infrastructure.DatabaseAccessContext;
-import pl.karolbystrek.kairos.api.persistence.infrastructure.WorkerOperation;
-import pl.karolbystrek.kairos.api.persistence.infrastructure.WorkerDiscoveryRepository;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 import pl.karolbystrek.kairos.api.notification.infrastructure.config.CustomerNotificationProperties;
 import pl.karolbystrek.kairos.api.notification.infrastructure.persistence.CustomerPushDeliveryRepository;
 import pl.karolbystrek.kairos.api.notification.infrastructure.persistence.CustomerPushSubscriptionRepository;
+import pl.karolbystrek.kairos.api.persistence.infrastructure.DatabaseAccessContext;
+import pl.karolbystrek.kairos.api.persistence.infrastructure.WorkerDiscoveryRepository;
+import pl.karolbystrek.kairos.api.persistence.infrastructure.WorkerOperation;
 
 import java.time.Clock;
 
@@ -28,7 +29,7 @@ public class CustomerPushCleanupService {
 
     public int clean() {
         var transactionTemplate = new TransactionTemplate(transactionManager);
-        transactionTemplate.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        transactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         var now = clock.instant();
         var count = 0;
         for (var index = 0; index < properties.worker().batchSize(); index++) {

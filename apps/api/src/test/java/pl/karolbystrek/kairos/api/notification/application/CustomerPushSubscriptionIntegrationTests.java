@@ -9,17 +9,22 @@ import org.springframework.context.annotation.Import;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.convention.TestBean;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import pl.karolbystrek.kairos.api.integration.testsupport.IntegrationTestFixture;
 import pl.karolbystrek.kairos.api.integration.testsupport.MutableTestClock;
 import pl.karolbystrek.kairos.api.integration.testsupport.MutableTestClockConfiguration;
 import pl.karolbystrek.kairos.api.notification.application.exception.CustomerPushEnrollmentLimitException;
 import pl.karolbystrek.kairos.api.notification.application.exception.InvalidCustomerPushSubscriptionException;
 import pl.karolbystrek.kairos.api.notification.application.model.CustomerPushSubscriptionInput;
+import pl.karolbystrek.kairos.api.notification.application.model.WebPushResult;
 import pl.karolbystrek.kairos.api.notification.domain.CustomerPushDeliveryStatus;
 import pl.karolbystrek.kairos.api.notification.infrastructure.security.VapidKeyLoader;
 import pl.karolbystrek.kairos.api.order.application.OrderService;
 import pl.karolbystrek.kairos.api.order.application.model.StaffOrderView;
 import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
+import pl.karolbystrek.kairos.api.persistence.infrastructure.DatabaseAccessContext;
+import pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase;
 import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
 
 import java.nio.charset.StandardCharsets;
@@ -29,6 +34,7 @@ import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.security.interfaces.ECPublicKey;
 import java.security.spec.ECGenParameterSpec;
+import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -36,6 +42,9 @@ import java.util.Base64;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -62,16 +71,16 @@ class CustomerPushSubscriptionIntegrationTests extends RedisListenerIsolatedInte
     @Autowired
     private OrderService orderService;
 
-    private final JdbcTemplate jdbcTemplate = pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase.ownerDatabase();
+    private final JdbcTemplate jdbcTemplate = PostgresTestDatabase.ownerDatabase();
 
     @Autowired
     private JdbcTemplate runtimeJdbc;
 
     @Autowired
-    private org.springframework.transaction.PlatformTransactionManager transactionManager;
+    private PlatformTransactionManager transactionManager;
 
     @Autowired
-    private pl.karolbystrek.kairos.api.persistence.infrastructure.DatabaseAccessContext databaseAccessContext;
+    private DatabaseAccessContext databaseAccessContext;
 
 
     @Autowired
@@ -187,8 +196,8 @@ class CustomerPushSubscriptionIntegrationTests extends RedisListenerIsolatedInte
     void concurrentReconciliationCreatesOneSubscriptionAndEnrollment() throws Exception {
         var order = createOrder();
         var input = newSubscription();
-        var start = new java.util.concurrent.CountDownLatch(1);
-        try (var requests = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+        var start = new CountDownLatch(1);
+        try (var requests = Executors.newFixedThreadPool(2)) {
             var first = requests.submit(() -> {
                 start.await();
                 subscriptionService.reconcile(input, List.of(order.trackingReference()));
@@ -200,8 +209,8 @@ class CustomerPushSubscriptionIntegrationTests extends RedisListenerIsolatedInte
                 return null;
             });
             start.countDown();
-            first.get(10, java.util.concurrent.TimeUnit.SECONDS);
-            second.get(10, java.util.concurrent.TimeUnit.SECONDS);
+            first.get(10, TimeUnit.SECONDS);
+            second.get(10, TimeUnit.SECONDS);
         }
         assertThat(count("customer_push_subscriptions")).isEqualTo(1);
         assertThat(count("customer_push_enrollments")).isEqualTo(1);
@@ -290,7 +299,7 @@ class CustomerPushSubscriptionIntegrationTests extends RedisListenerIsolatedInte
         assertThat(count("customer_push_deliveries")).isEqualTo(2);
         var subscriptionId = jdbcTemplate.queryForObject(
                 "SELECT id FROM customer_push_subscriptions WHERE endpoint_hash = ?", UUID.class, sha256(input.endpoint()));
-        new org.springframework.transaction.support.TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
             databaseAccessContext.pushCapability(List.of(subscriptionId), List.of(secondOrder.trackingReference()));
             assertThat(runtimeJdbc.queryForList("SELECT id FROM orders", UUID.class)).containsExactly(secondOrder.id());
             assertThat(runtimeJdbc.queryForObject("SELECT count(*) FROM order_history", Integer.class)).isZero();
@@ -367,8 +376,8 @@ class CustomerPushSubscriptionIntegrationTests extends RedisListenerIsolatedInte
         while (fanoutService.fanOutAvailable() > 0) {
             // Drain creation and READY markers.
         }
-        var start = new java.util.concurrent.CountDownLatch(1);
-        try (var workers = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+        var start = new CountDownLatch(1);
+        try (var workers = Executors.newFixedThreadPool(2)) {
             var first = workers.submit(() -> { start.await(); return claimService.claimAvailable(); });
             var second = workers.submit(() -> { start.await(); return claimService.claimAvailable(); });
             start.countDown();
@@ -380,7 +389,7 @@ class CustomerPushSubscriptionIntegrationTests extends RedisListenerIsolatedInte
             var renewed = claimService.claimAvailable().getFirst();
             assertThat(renewed.id()).isEqualTo(old.id());
             assertThat(renewed.claimToken()).isNotEqualTo(old.claimToken());
-            var accepted = new pl.karolbystrek.kairos.api.notification.application.model.WebPushResult(201, null, null, null);
+            var accepted = new WebPushResult(201, null, null, null);
             assertThat(completionService.complete(old.id(), old.claimToken(), old.subscriptionId(),
                     clock.instant(), accepted)).isFalse();
             assertThat(completionService.complete(renewed.id(), renewed.claimToken(), renewed.subscriptionId(),
@@ -407,7 +416,7 @@ class CustomerPushSubscriptionIntegrationTests extends RedisListenerIsolatedInte
         assertThat(subscriptionCount(active)).isEqualTo(1);
         assertThat(count("customer_push_enrollments")).isEqualTo(1);
         jdbcTemplate.update("UPDATE customer_push_deliveries SET completed_at = ? WHERE status = 'CANCELED'",
-                java.sql.Timestamp.from(clock.instant().minus(Duration.ofDays(365))));
+                Timestamp.from(clock.instant().minus(Duration.ofDays(365))));
         assertThat(cleanupService.clean()).isEqualTo(1);
         assertThat(jdbcTemplate.queryForList("SELECT status FROM customer_push_deliveries", String.class))
                 .containsExactly("PENDING");

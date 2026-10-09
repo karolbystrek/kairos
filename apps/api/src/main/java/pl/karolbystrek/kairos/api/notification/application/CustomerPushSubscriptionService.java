@@ -1,7 +1,6 @@
 package pl.karolbystrek.kairos.api.notification.application;
 
 import lombok.RequiredArgsConstructor;
-import pl.karolbystrek.kairos.api.persistence.infrastructure.DatabaseAccessContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pl.karolbystrek.kairos.api.notification.application.exception.CustomerPushEnrollmentLimitException;
@@ -11,21 +10,25 @@ import pl.karolbystrek.kairos.api.notification.application.model.ValidatedPushSu
 import pl.karolbystrek.kairos.api.notification.domain.CustomerPushEnrollment;
 import pl.karolbystrek.kairos.api.notification.domain.CustomerPushSubscription;
 import pl.karolbystrek.kairos.api.notification.infrastructure.config.CustomerNotificationProperties;
-import pl.karolbystrek.kairos.api.notification.infrastructure.persistence.CustomerPushEnrollmentRepository;
 import pl.karolbystrek.kairos.api.notification.infrastructure.persistence.CustomerPushDeliveryRepository;
+import pl.karolbystrek.kairos.api.notification.infrastructure.persistence.CustomerPushEnrollmentRepository;
 import pl.karolbystrek.kairos.api.notification.infrastructure.persistence.CustomerPushSubscriptionRepository;
 import pl.karolbystrek.kairos.api.notification.infrastructure.security.PushSubscriptionCipher;
 import pl.karolbystrek.kairos.api.notification.infrastructure.security.VapidKeyMaterial;
 import pl.karolbystrek.kairos.api.order.domain.CustomerOrder;
 import pl.karolbystrek.kairos.api.order.infrastructure.persistence.CustomerOrderRepository;
+import pl.karolbystrek.kairos.api.persistence.infrastructure.DatabaseAccessContext;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Clock;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -72,7 +75,7 @@ public class CustomerPushSubscriptionService {
         var current = validator.validate(currentInput);
         // Lock endpoint capabilities in a stable order before installing the immutable union.
         var capabilities = new ArrayList<>(List.of(previous, current));
-        capabilities.sort(java.util.Comparator.comparing(ValidatedPushSubscription::endpointHash));
+        capabilities.sort(Comparator.comparing(ValidatedPushSubscription::endpointHash));
         var ids = new ArrayList<UUID>();
         UUID currentId = null;
         for (var capability : capabilities) {
@@ -130,7 +133,7 @@ public class CustomerPushSubscriptionService {
         var orderIds = trackingReferences.stream()
                 .distinct()
                 .map(orderRepository::findByTrackingReference)
-                .flatMap(java.util.Optional::stream)
+                .flatMap(Optional::stream)
                 .map(CustomerOrder::getId)
                 .toList();
         if (orderIds.isEmpty()) {
@@ -169,7 +172,7 @@ public class CustomerPushSubscriptionService {
                 .distinct()
                 .sorted()
                 .map(orderRepository::findForUpdateByTrackingReference)
-                .flatMap(java.util.Optional::stream)
+                .flatMap(Optional::stream)
                 .filter(order -> order.getStatus().isActive())
                 .collect(Collectors.toMap(
                         CustomerOrder::getId,
@@ -225,7 +228,7 @@ public class CustomerPushSubscriptionService {
         return capability.getId();
     }
 
-    private CustomerPushSubscription createSubscription(ValidatedPushSubscription validated, java.time.Instant now) {
+    private CustomerPushSubscription createSubscription(ValidatedPushSubscription validated, Instant now) {
         if (validated.expirationTime() != null && !validated.expirationTime().isAfter(now)) {
             throw new InvalidCustomerPushSubscriptionException("Push subscription has already expired");
         }
@@ -241,7 +244,7 @@ public class CustomerPushSubscriptionService {
     private CustomerPushSubscription refreshSubscription(
             CustomerPushSubscription subscription,
             ValidatedPushSubscription validated,
-            java.time.Instant now
+            Instant now
     ) {
         var encryptedEndpoint = cipher.encrypt(
                 validated.endpoint().getBytes(StandardCharsets.UTF_8),

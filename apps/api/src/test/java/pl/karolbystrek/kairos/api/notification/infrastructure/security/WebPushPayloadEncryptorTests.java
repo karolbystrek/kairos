@@ -8,6 +8,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.AlgorithmParameters;
 import java.security.KeyFactory;
 import java.security.spec.ECGenParameterSpec;
+import java.security.spec.ECParameterSpec;
 import java.security.spec.ECPrivateKeySpec;
 import java.time.Duration;
 import java.util.Base64;
@@ -23,7 +24,7 @@ class WebPushPayloadEncryptorTests {
         var encryptor = new WebPushPayloadEncryptor(properties());
         var parameters = AlgorithmParameters.getInstance("EC");
         parameters.init(new ECGenParameterSpec("secp256r1"));
-        var ec = parameters.getParameterSpec(java.security.spec.ECParameterSpec.class);
+        var ec = parameters.getParameterSpec(ECParameterSpec.class);
         var senderPrivateKey = KeyFactory.getInstance("EC").generatePrivate(
                 new ECPrivateKeySpec(unsignedInteger(
                         "yfWPiYE-n46HLnH0KqZOF1fJJU3MYrct3AELtAQ-oRw"

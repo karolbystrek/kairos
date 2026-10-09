@@ -9,6 +9,8 @@ import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
 import pl.karolbystrek.kairos.api.integration.application.exception.IntegrationAccessDeniedException;
 import pl.karolbystrek.kairos.api.integration.application.model.ApiKeyPrincipal;
 
+import java.sql.Timestamp;
+import java.time.Clock;
 import java.util.Collection;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -17,7 +19,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class DatabaseAccessContext {
     private final JdbcTemplate database;
-    private final java.time.Clock clock;
+    private final Clock clock;
 
     public void staff(StaffPrincipal principal) {
         requireTransaction();
@@ -55,7 +57,7 @@ public class DatabaseAccessContext {
                 "SELECT public.valid_integration(?, ?, ?, ?, ?::text[], ?::uuid[], ?)", Boolean.class,
                 principal.apiKeyVersionId(), principal.apiKeyId(), principal.integrationId(), principal.tenantId(),
                 principal.scopes().stream().map(Enum::name).sorted().collect(Collectors.joining(",", "{", "}")),
-                principal.locationIds().stream().map(UUID::toString).sorted().collect(Collectors.joining(",", "{", "}")), java.sql.Timestamp.from(clock.instant())))) {
+                principal.locationIds().stream().map(UUID::toString).sorted().collect(Collectors.joining(",", "{", "}")), Timestamp.from(clock.instant())))) {
             throw new IntegrationAccessDeniedException("The API Key is not eligible");
         }
         bind(scope, principal.apiKeyVersionId().toString(), "", "");

@@ -7,6 +7,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
 import pl.karolbystrek.kairos.api.account.domain.TenantRole;
+import pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase;
 import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
 
 import java.sql.Timestamp;
@@ -14,6 +15,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
@@ -26,7 +28,7 @@ class ConcurrentOrderCreationIntegrationTests extends RedisListenerIsolatedInteg
     @Autowired
     private OrderService orderService;
 
-    private final JdbcTemplate jdbcTemplate = pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase.ownerDatabase();
+    private final JdbcTemplate jdbcTemplate = PostgresTestDatabase.ownerDatabase();
 
     private final List<UUID> tenantIds = new ArrayList<>();
 
@@ -107,7 +109,7 @@ class ConcurrentOrderCreationIntegrationTests extends RedisListenerIsolatedInteg
                 locationId,
                 tenantId,
                 name,
-                name.toLowerCase(java.util.Locale.ROOT)
+                name.toLowerCase(Locale.ROOT)
         );
         return locationId;
     }

@@ -15,8 +15,8 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
-import lombok.NonNull;
 import lombok.NoArgsConstructor;
+import lombok.NonNull;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Entity
 @Table(name = "api_keys")
@@ -111,7 +112,7 @@ public class ApiKey {
     public Set<UUID> getLocationIds() {
         return locationAccess.stream()
                 .map(ApiKeyLocationAccess::getLocationId)
-                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+                .collect(Collectors.toUnmodifiableSet());
     }
 
     public boolean grants(ApiKeyScope required) {

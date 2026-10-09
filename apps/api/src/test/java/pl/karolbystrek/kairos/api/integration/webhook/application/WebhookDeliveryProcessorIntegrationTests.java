@@ -17,7 +17,11 @@ import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTe
 
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -60,8 +64,8 @@ class WebhookDeliveryProcessorIntegrationTests
         server.createContext("/failure", exchange -> {
             requests.incrementAndGet();
             receivedSignature.set(exchange.getRequestHeaders().getFirst("Kairos-Signature"));
-            receivedPayload.set(new String(exchange.getRequestBody().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8));
-            var response = "recipient failed".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            receivedPayload.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            var response = "recipient failed".getBytes(StandardCharsets.UTF_8);
             exchange.sendResponseHeaders(503, response.length);
             try (var body = exchange.getResponseBody()) {
                 body.write(response);
@@ -117,8 +121,8 @@ class WebhookDeliveryProcessorIntegrationTests
                 assertThat(receivedPayload.get()).isEqualTo(claimed.payload());
                 var timestamp = Long.parseLong(receivedSignature.get().split(",")[0].substring(2));
                 var expectedSignature = new WebhookSignatureService().createHeader(
-                        java.time.Instant.ofEpochSecond(timestamp), claimed.payload(),
-                        java.util.List.of(issued.signingSecret().getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+                        Instant.ofEpochSecond(timestamp), claimed.payload(),
+                        List.of(issued.signingSecret().getBytes(StandardCharsets.UTF_8)));
                 assertThat(receivedSignature.get()).isEqualTo(expectedSignature);
                 assertThat(jdbcTemplate.queryForObject("SELECT response_status FROM webhook_deliveries WHERE id = ?", Integer.class, claimed.id())).isEqualTo(503);
                 assertThat(jdbcTemplate.queryForObject("SELECT error_type FROM webhook_deliveries WHERE id = ?", String.class, claimed.id())).isEqualTo("NON_2XX_RESPONSE");
@@ -136,7 +140,7 @@ class WebhookDeliveryProcessorIntegrationTests
         }
     }
 
-    private void removeCommittedFixture(java.util.UUID tenantId) {
+    private void removeCommittedFixture(UUID tenantId) {
         jdbcTemplate.update("DELETE FROM webhook_delivery_signing_versions WHERE delivery_id IN (SELECT id FROM webhook_deliveries WHERE outbox_event_id IN (SELECT id FROM order_outbox_events WHERE tenant_id = ?))", tenantId);
         jdbcTemplate.update("DELETE FROM webhook_deliveries WHERE outbox_event_id IN (SELECT id FROM order_outbox_events WHERE tenant_id = ?)", tenantId);
         jdbcTemplate.update("DELETE FROM order_outbox_events WHERE tenant_id = ?", tenantId);

@@ -8,6 +8,7 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase;
 import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
 
 import java.sql.Timestamp;
@@ -29,7 +30,7 @@ class TrackedOrderApiIntegrationTests extends RedisListenerIsolatedIntegrationTe
     @Autowired
     private MockMvc mockMvc;
 
-    private final JdbcTemplate jdbcTemplate = pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase.ownerDatabase();
+    private final JdbcTemplate jdbcTemplate = PostgresTestDatabase.ownerDatabase();
 
     @Test
     void returnsTheAnonymousCustomerRepresentationIncludingTerminalOrders() throws Exception {

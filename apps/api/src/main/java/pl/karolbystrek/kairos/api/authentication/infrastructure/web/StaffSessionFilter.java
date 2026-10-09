@@ -5,6 +5,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -53,7 +54,7 @@ public class StaffSessionFilter extends OncePerRequestFilter {
             } catch (StaffAccessDeniedException exception) {
                 session.invalidate();
                 cookies.expireSession(request, response);
-                errors.commence(request, response, new org.springframework.security.authentication.BadCredentialsException("Invalid session"));
+                errors.commence(request, response, new BadCredentialsException("Invalid session"));
                 return;
             } catch (ResponseStatusException exception) {
                 errors.unavailable(response);
