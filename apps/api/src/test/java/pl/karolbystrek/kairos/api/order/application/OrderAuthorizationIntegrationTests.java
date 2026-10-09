@@ -5,7 +5,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.transaction.annotation.Transactional;
 import pl.karolbystrek.kairos.api.account.application.exception.StaffAccessDeniedException;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
 import pl.karolbystrek.kairos.api.account.domain.TenantRole;
@@ -23,7 +22,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
-@Transactional
 class OrderAuthorizationIntegrationTests extends RedisListenerIsolatedIntegrationTest {
 
     @Autowired
@@ -32,8 +30,7 @@ class OrderAuthorizationIntegrationTests extends RedisListenerIsolatedIntegratio
     @Autowired
     private LocationService locationService;
 
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
+    private final JdbcTemplate jdbcTemplate = pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase.ownerDatabase();
 
     private UUID tenantId;
     private UUID locationId;
@@ -53,19 +50,17 @@ class OrderAuthorizationIntegrationTests extends RedisListenerIsolatedIntegratio
         jdbcTemplate.update("INSERT INTO tenants (id) VALUES (?)", tenantId);
         jdbcTemplate.update("INSERT INTO tenants (id) VALUES (?)", otherTenantId);
         jdbcTemplate.update(
-            "INSERT INTO locations (id, tenant_id, name, normalized_name, live_normalized_name) VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO locations (id, tenant_id, name, normalized_name) VALUES (?, ?, ?, ?)",
             locationId,
             tenantId,
             "Test location",
-            "test location",
             "test location"
         );
         jdbcTemplate.update(
-            "INSERT INTO locations (id, tenant_id, name, normalized_name, live_normalized_name) VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO locations (id, tenant_id, name, normalized_name) VALUES (?, ?, ?, ?)",
             otherLocationId,
             otherTenantId,
             "Other location",
-            "other location",
             "other location"
         );
 
@@ -118,7 +113,7 @@ class OrderAuthorizationIntegrationTests extends RedisListenerIsolatedIntegratio
 
         var otherOrder = orderService.createOrder(otherAdmin, otherLocationId, null);
         assertThatThrownBy(() -> orderService.updateStatus(manager, otherOrder.id(), OrderStatus.READY))
-            .isInstanceOf(StaffAccessDeniedException.class);
+            .isInstanceOf(pl.karolbystrek.kairos.api.order.application.exception.ResourceNotFoundException.class);
     }
 
     @Test

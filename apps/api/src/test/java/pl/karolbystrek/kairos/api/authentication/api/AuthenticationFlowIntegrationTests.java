@@ -29,7 +29,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegrationTest {
     @Autowired private MockMvc mvc;
-    @Autowired private JdbcTemplate database;
+    private final JdbcTemplate database = pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase.ownerDatabase();
+    @Autowired private JdbcTemplate runtimeDatabase;
     @Autowired private AccountInvitationService invitations;
 
     @Test
@@ -48,6 +49,7 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
             WHERE tenant_id = (SELECT tenant_id FROM accounts WHERE email = ?)
             """, email);
         assertThat(locations).isEmpty();
+        assertThat(runtimeDatabase.queryForObject("SELECT COUNT(*) FROM accounts WHERE email = ?", Integer.class, email)).isZero();
         var cookie = result.getResponse().getCookie("__Host-session");
         assertThat(cookie.getDomain()).isNull();
         assertThat(database.queryForObject("SELECT COUNT(*) FROM accounts WHERE email = ?", Integer.class, email)).isOne();
@@ -79,9 +81,10 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
     }
 
     @Test
-    void existingEmailHasAnEmailFieldError() throws Exception {
+    void archivedIdentityStillHasAnEmailFieldError() throws Exception {
         var email = email();
         register(email);
+        database.update("UPDATE accounts SET status = 'ARCHIVED', archived_at = CURRENT_TIMESTAMP WHERE email = ?", email);
         mvc.perform(csrf(postApi("/tenant-registrations/v1").content(registration(email, null))))
             .andExpect(status().isConflict())
             .andExpect(jsonPath("$.fieldErrors.email").isNotEmpty());

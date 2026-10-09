@@ -5,9 +5,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
+import pl.karolbystrek.kairos.api.account.application.AccountCreationService;
 import pl.karolbystrek.kairos.api.account.application.AccountInvitationService;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
-import pl.karolbystrek.kairos.api.account.infrastructure.persistence.AccountRepository;
 import pl.karolbystrek.kairos.api.authentication.application.exception.RegistrationValidationException;
 import pl.karolbystrek.kairos.api.authentication.infrastructure.zitadel.ZitadelClient;
 import pl.karolbystrek.kairos.api.tenant.application.TenantRegistrationService;
@@ -17,14 +17,14 @@ import pl.karolbystrek.kairos.api.tenant.application.TenantRegistrationService;
 @Slf4j
 public class OnboardingService {
     public record Registration(StaffPrincipal principal, ZitadelClient.ProviderSession session) {}
-    private final AccountRepository accounts;
+    private final AccountCreationService accounts;
     private final AccountInvitationService invitations;
     private final OneTimeBearerTokenService tokens;
     private final TenantRegistrationService tenants;
     private final ZitadelClient provider;
 
     public Registration register(String email, String password, String invitation) {
-        if (accounts.existsByEmail(email))
+        if (accounts.identityConflict(email, null))
             throw new RegistrationValidationException(HttpStatus.CONFLICT, "email", "An account with this email already exists. Sign in instead.");
         if (invitation != null) invitations.preview(invitation);
         String subject;

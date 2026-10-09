@@ -15,6 +15,9 @@ SERVICES = ("customer-app", "panel-app", "api")
 RUNTIME_FILES = (
     "compose.yaml", "compose.deployment.yaml", "nginx/default.conf.template",
     "nginx/cloudflare-real-ip.conf", "deployment/zitadel/bootstrap.py",
+    "deployment/postgres/bootstrap.sh", "deployment/postgres/upgrade_rls.sql",
+    "deployment/postgres/prepare_upgrade.py",
+    "apps/api/src/main/resources/db/migration/V1__create_initial_schema.sql",
 )
 
 
@@ -184,6 +187,7 @@ def main(arguments=None):
             healthy = [*up, "--wait", "--wait-timeout", "300"]
             for stage, args in (
                 ("postgres/redis", [*healthy, "postgres", "redis"]),
+                ("postgres-bootstrap", [*up, "--force-recreate", "--exit-code-from", "postgres-bootstrap", "postgres-bootstrap"]),
                 ("zitadel", [*healthy, "zitadel"]),
                 ("zitadel-bootstrap", [*up, "--force-recreate", "--exit-code-from", "zitadel-bootstrap", "zitadel-bootstrap"]),
                 ("api", [*healthy, "--force-recreate", "api"]),

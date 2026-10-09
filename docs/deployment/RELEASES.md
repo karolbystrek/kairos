@@ -29,8 +29,11 @@ bash "/srv/kairos/releases/${KAIROS_REVISION}/deployment/deploy.sh" \
 
 The command validates inputs/Compose and external read-only secrets, writes a
 release-owned `compose.images.json` override, pulls images, then waits in order
-for PostgreSQL/Redis, ZITADEL, a successfully recreated one-shot bootstrap, API,
-frontends and recreated NGINX. Bootstrap initializes missing provider credentials
+for PostgreSQL/Redis, the recreated `postgres-bootstrap` role initializer,
+ZITADEL, the recreated provider bootstrap, API,
+frontends and recreated NGINX. The database bootstrap rejects an old applied V1: complete the separately
+approved [operator database upgrade](DATABASE.md) first. It never runs that
+upgrade or repairs Flyway history. Provider bootstrap initializes missing credentials
 and preserves existing ones. Never start the API first with `--no-deps` on an
 empty host. No setup or key generation is part of deployment.
 

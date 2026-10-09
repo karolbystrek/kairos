@@ -19,6 +19,7 @@ import pl.karolbystrek.kairos.api.account.domain.assignment.LocationAssignment;
 import pl.karolbystrek.kairos.api.account.domain.invitation.AccountInvitationRevocationReason;
 import pl.karolbystrek.kairos.api.account.infrastructure.persistence.AccountRepository;
 import pl.karolbystrek.kairos.api.account.infrastructure.persistence.LocationAssignmentRepository;
+import pl.karolbystrek.kairos.api.persistence.infrastructure.DatabaseAccessContext;
 
 import java.time.Clock;
 import java.util.Comparator;
@@ -33,6 +34,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class AccountProvisioningService {
 
+    private final DatabaseAccessContext databaseAccess;
     private final AccountRepository accountRepository;
     private final LocationAssignmentRepository assignmentRepository;
     private final StaffAccessService staffAccessService;
@@ -86,6 +88,7 @@ public class AccountProvisioningService {
         }
 
         var access = staffAccessService.resolveForUpdate(actor);
+        if (!databaseAccess.lockAccountLocation(accountId)) throw new AccountNotFoundException("Account was not found");
         var target = accountRepository.findForUpdateById(accountId)
             .orElseThrow(() -> new AccountNotFoundException("Account was not found"));
         var assignment = assignmentRepository.findForUpdateByIdAccountId(accountId)
@@ -120,6 +123,7 @@ public class AccountProvisioningService {
     @Transactional
     public void delete(StaffPrincipal actor, UUID accountId) {
         var access = staffAccessService.resolveForUpdate(actor);
+        if (!databaseAccess.lockAccountLocation(accountId)) throw new AccountNotFoundException("Account was not found");
         var target = accountRepository.findForUpdateById(accountId)
             .orElseThrow(() -> new AccountNotFoundException("Account was not found"));
         var assignment = assignmentRepository.findForUpdateByIdAccountId(accountId)

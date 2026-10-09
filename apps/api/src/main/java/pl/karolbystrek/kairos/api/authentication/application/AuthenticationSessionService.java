@@ -2,11 +2,14 @@ package pl.karolbystrek.kairos.api.authentication.application;
 
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
-import org.springframework.session.FindByIndexNameSessionRepository;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.session.FindByIndexNameSessionRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import pl.karolbystrek.kairos.api.account.application.StaffAccessService;
+import pl.karolbystrek.kairos.api.account.application.exception.StaffAccessDeniedException;
 import pl.karolbystrek.kairos.api.account.application.model.PanelPrincipal;
+import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
 import pl.karolbystrek.kairos.api.account.application.port.AccountSessionRevoker;
 import pl.karolbystrek.kairos.api.account.infrastructure.persistence.AccountRepository;
 import pl.karolbystrek.kairos.api.authentication.infrastructure.zitadel.ZitadelClient;
@@ -22,6 +25,7 @@ public class AuthenticationSessionService implements AccountSessionRevoker {
     public static final String SIGNED_IN_AT = "kairos.signedInAt";
     private final JdbcTemplate database;
     private final AccountRepository accounts;
+    private final StaffAccessService access;
     private final ZitadelClient provider;
     private final Clock clock;
 
@@ -54,5 +58,11 @@ public class AuthenticationSessionService implements AccountSessionRevoker {
     public void revokeAll(Collection<UUID> ids) { ids.stream().sorted().forEach(this::revokeAll); }
 
     @Transactional
-    public void logoutAll(PanelPrincipal principal) { revokeAll(principal.accountId()); }
+    public void logoutAll(PanelPrincipal principal) {
+        if (!(principal instanceof StaffPrincipal staff)) {
+            throw new StaffAccessDeniedException("Staff authentication is required");
+        }
+        access.resolveForUpdate(staff);
+        revokeAll(principal.accountId());
+    }
 }

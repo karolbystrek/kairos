@@ -8,15 +8,13 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
-import pl.karolbystrek.kairos.api.account.application.StaffAccessService;
 import pl.karolbystrek.kairos.api.account.application.model.PanelPrincipal;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
-import pl.karolbystrek.kairos.api.account.infrastructure.persistence.AccountRepository;
 import pl.karolbystrek.kairos.api.authentication.api.model.*;
 import pl.karolbystrek.kairos.api.authentication.application.*;
 import pl.karolbystrek.kairos.api.authentication.application.exception.InvalidLoginException;
-import pl.karolbystrek.kairos.api.authentication.infrastructure.zitadel.ZitadelClient;
 import pl.karolbystrek.kairos.api.authentication.infrastructure.web.CsrfTokenService;
+import pl.karolbystrek.kairos.api.authentication.infrastructure.zitadel.ZitadelClient;
 
 import java.util.Locale;
 
@@ -27,8 +25,8 @@ public class AuthenticationController {
     private final OnboardingService onboarding;
     private final AuthenticationSessionService sessions;
     private final CurrentAccountService current;
-    private final AccountRepository accounts;
-    private final StaffAccessService access;
+    private final StaffAuthenticationService authentication;
+    private final java.time.Clock clock;
     private final CsrfTokenService csrf;
 
     @GetMapping("/auth/v1/csrf")
@@ -38,9 +36,11 @@ public class AuthenticationController {
     CurrentAccountResponse login(@Valid @RequestBody LoginRequest input, HttpServletRequest request, HttpServletResponse response) {
         var identity = provider.signIn(normalize(input.email()), input.password());
         try {
-            var account = accounts.findByProviderSubject(identity.userId()).orElseThrow(InvalidLoginException::new);
-            var principal = new StaffPrincipal(account.getId(), account.getTenantId(), account.getTenantRole());
-            access.resolve(principal);
+            StaffPrincipal principal;
+            try { principal = authentication.authenticate(identity, clock.instant()); }
+            catch (pl.karolbystrek.kairos.api.account.application.exception.StaffAccessDeniedException exception) {
+                throw new InvalidLoginException();
+            }
             return finish(principal, identity, request, response);
         } catch (RuntimeException exception) {
             provider.terminate(identity);
@@ -100,8 +100,7 @@ public class AuthenticationController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     void changePassword(@AuthenticationPrincipal PanelPrincipal principal, @Valid @RequestBody ChangePasswordRequest input,
             HttpServletRequest request, HttpServletResponse response) {
-        var account = accounts.findById(principal.accountId()).orElseThrow(InvalidLoginException::new);
-        provider.changePassword(account.getProviderSubject(), input.currentPassword(), input.password());
+        provider.changePassword(current.providerSubject(principal), input.currentPassword(), input.password());
         sessions.logoutAll(principal);
         sessions.logout(request);
         csrf.rotate(request, response);

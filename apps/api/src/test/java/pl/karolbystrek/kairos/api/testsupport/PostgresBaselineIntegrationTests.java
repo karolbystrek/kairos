@@ -18,7 +18,7 @@ class PostgresBaselineIntegrationTests extends RedisListenerIsolatedIntegrationT
     @Test
     void migratesPostgres18AndPersistsSessions() {
         assertThat(database.queryForObject("SELECT version()", String.class)).startsWith("PostgreSQL 18.");
-        assertThat(database.queryForObject("SELECT count(*) FROM flyway_schema_history WHERE version = '1' AND success", Integer.class)).isEqualTo(1);
+        assertThat(PostgresTestDatabase.ownerDatabase().queryForObject("SELECT count(*) FROM flyway_schema_history WHERE version = '1' AND success", Integer.class)).isEqualTo(1);
         Session session = sessions.createSession();
         session.setAttribute("baseline", "persisted");
         sessions.save(session);

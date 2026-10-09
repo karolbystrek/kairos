@@ -2,7 +2,12 @@ package pl.karolbystrek.kairos.api.notification.application;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import pl.karolbystrek.kairos.api.persistence.infrastructure.DatabaseAccessContext;
+import pl.karolbystrek.kairos.api.persistence.infrastructure.WorkerOperation;
+
 import pl.karolbystrek.kairos.api.notification.domain.CustomerPushDelivery;
 import pl.karolbystrek.kairos.api.notification.domain.CustomerPushDeliveryStatus;
 import pl.karolbystrek.kairos.api.notification.infrastructure.config.CustomerNotificationProperties;
@@ -28,16 +33,29 @@ public class CustomerPushOutboxFanoutService {
     private final CustomerPushPayloadFactory payloadFactory;
     private final CustomerNotificationProperties properties;
     private final Clock clock;
+    private final JdbcTemplate jdbcTemplate;
+    private final PlatformTransactionManager transactionManager;
+    private final DatabaseAccessContext databaseAccessContext;
 
-    @Transactional
     public int fanOutAvailable() {
-        var events = outboxRepository.findAvailableForPushFanout(
-                properties.worker().batchSize()
-        );
-        for (var event : events) {
-            fanOut(event);
+        var transactionTemplate = new TransactionTemplate(transactionManager);
+        transactionTemplate.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        var count = 0;
+        for (var index = 0; index < properties.worker().batchSize(); index++) {
+            var processed = transactionTemplate.execute(status -> {
+                var id = jdbcTemplate.queryForObject("SELECT public.next_push_fanout()", java.util.UUID.class);
+                if (id == null || !databaseAccessContext.worker(WorkerOperation.PUSH_FANOUT, id, null)) {
+                    return false;
+                }
+                fanOut(outboxRepository.findById(id).orElseThrow());
+                return true;
+            });
+            if (!Boolean.TRUE.equals(processed)) {
+                break;
+            }
+            count++;
         }
-        return events.size();
+        return count;
     }
 
     private void fanOut(OrderOutboxEvent event) {
@@ -76,8 +94,6 @@ public class CustomerPushOutboxFanoutService {
                     event.getId(),
                     enrollment.getSubscriptionId(),
                     event.getOrderId(),
-                    subscription.getEndpointHash(),
-                    subscription.getEndpointOrigin(),
                     payload,
                     deadline,
                     now

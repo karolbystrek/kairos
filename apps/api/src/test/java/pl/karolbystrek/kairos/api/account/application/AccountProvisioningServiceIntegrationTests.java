@@ -4,14 +4,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.transaction.annotation.Transactional;
 import pl.karolbystrek.kairos.api.account.application.exception.AccountNotFoundException;
 import pl.karolbystrek.kairos.api.account.application.exception.StaffAccessDeniedException;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
 import pl.karolbystrek.kairos.api.account.domain.AccountStatus;
 import pl.karolbystrek.kairos.api.account.domain.assignment.AssignmentRole;
 import pl.karolbystrek.kairos.api.account.domain.TenantRole;
-import pl.karolbystrek.kairos.api.account.infrastructure.persistence.AccountRepository;
 import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
 
 import java.sql.Timestamp;
@@ -23,7 +21,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
-@Transactional
 class AccountProvisioningServiceIntegrationTests extends RedisListenerIsolatedIntegrationTest {
 
     private static final Instant FIXTURE_TIME = Instant.parse("2026-07-20T12:00:00Z");
@@ -34,10 +31,9 @@ class AccountProvisioningServiceIntegrationTests extends RedisListenerIsolatedIn
     private AccountInvitationService invitationService;
 
     @Autowired
-    private AccountRepository accountRepository;
+    private pl.karolbystrek.kairos.api.location.application.LocationService locationService;
 
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
+    private final JdbcTemplate jdbcTemplate = pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase.ownerDatabase();
 
     @Test
     void listsOnlyAccountsManageableByTheCurrentAdministratorOrManager() {
@@ -89,7 +85,7 @@ class AccountProvisioningServiceIntegrationTests extends RedisListenerIsolatedIn
         );
 
         assertThat(disabled.status()).isEqualTo(AccountStatus.DISABLED);
-        assertThat(accountRepository.findById(managerId).orElseThrow().getStatus())
+        assertThat(AccountStatus.valueOf(jdbcTemplate.queryForObject("SELECT status FROM accounts WHERE id = ?", String.class, managerId)))
             .isEqualTo(AccountStatus.DISABLED);
         assertThat(jdbcTemplate.queryForObject(
             "SELECT authentication_cutoff IS NOT NULL FROM accounts WHERE id = ?",
@@ -197,6 +193,34 @@ class AccountProvisioningServiceIntegrationTests extends RedisListenerIsolatedIn
         )).isInstanceOf(AccountNotFoundException.class);
     }
 
+    @Test
+    void concurrentAccountAndLocationDisableFinishWithoutConflictingLocks() throws Exception {
+        var tenant = new pl.karolbystrek.kairos.api.integration.testsupport.IntegrationTestFixture(jdbcTemplate).createTenant();
+        var otherAdminId = insertAccount(tenant.tenantId(), "cascade-race-" + UUID.randomUUID(), TenantRole.ADMIN, AccountStatus.ENABLED);
+        var otherAdmin = new StaffPrincipal(otherAdminId, tenant.tenantId(), TenantRole.ADMIN);
+        var start = new java.util.concurrent.CountDownLatch(1);
+        try (var executor = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            var accountChange = executor.submit(() -> {
+                start.await();
+                provisioningService.updateStatus(otherAdmin, tenant.manager().accountId(), AccountStatus.DISABLED);
+                return null;
+            });
+            var locationChange = executor.submit(() -> {
+                start.await();
+                locationService.updateStatus(tenant.administrator(), tenant.firstLocationId(),
+                    pl.karolbystrek.kairos.api.location.domain.LocationStatus.DISABLED);
+                return null;
+            });
+            start.countDown();
+            accountChange.get(15, java.util.concurrent.TimeUnit.SECONDS);
+            locationChange.get(15, java.util.concurrent.TimeUnit.SECONDS);
+        }
+        assertThat(jdbcTemplate.queryForObject("SELECT status FROM accounts WHERE id = ?",
+            String.class, tenant.manager().accountId())).isEqualTo("DISABLED");
+        assertThat(jdbcTemplate.queryForObject("SELECT status FROM locations WHERE id = ?",
+            String.class, tenant.firstLocationId())).isEqualTo("DISABLED");
+    }
+
     private UUID insertTenant() {
         var tenantId = UUID.randomUUID();
         jdbcTemplate.update("INSERT INTO tenants (id) VALUES (?)", tenantId);
@@ -207,11 +231,10 @@ class AccountProvisioningServiceIntegrationTests extends RedisListenerIsolatedIn
         var locationId = UUID.randomUUID();
         var name = "Test location " + locationId;
         jdbcTemplate.update(
-            "INSERT INTO locations (id, tenant_id, name, normalized_name, live_normalized_name) VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO locations (id, tenant_id, name, normalized_name) VALUES (?, ?, ?, ?)",
             locationId,
             tenantId,
             name,
-            name.toLowerCase(java.util.Locale.ROOT),
             name.toLowerCase(java.util.Locale.ROOT)
         );
         return locationId;

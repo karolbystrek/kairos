@@ -1,0 +1,661 @@
+CREATE TABLE tenants
+(
+    id UUID PRIMARY KEY
+);
+
+CREATE TABLE locations
+(
+    id              UUID PRIMARY KEY,
+    tenant_id       UUID                     NOT NULL REFERENCES tenants (id),
+    name            VARCHAR(120)             NOT NULL,
+    normalized_name VARCHAR(120)             NOT NULL,
+    live_normalized_name VARCHAR(120),
+    time_zone       VARCHAR(64)              NOT NULL DEFAULT 'UTC',
+    status          VARCHAR(32)              NOT NULL DEFAULT 'ENABLED',
+    created_at      TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_enabled_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    archived_at     TIMESTAMP WITH TIME ZONE,
+    CONSTRAINT locations_name_not_blank_check CHECK (TRIM(name) <> ''),
+    CONSTRAINT locations_name_stripped_check CHECK (name = TRIM(name)),
+    CONSTRAINT locations_normalized_name_check CHECK (
+        TRIM(normalized_name) <> '' AND normalized_name = LOWER(TRIM(name))
+        ),
+    CONSTRAINT locations_live_normalized_name_check CHECK (
+        (status = 'ARCHIVED' AND live_normalized_name IS NULL)
+            OR (status <> 'ARCHIVED' AND live_normalized_name = normalized_name)
+        ),
+    CONSTRAINT locations_time_zone_not_blank_check CHECK (TRIM(time_zone) <> ''),
+    CONSTRAINT locations_time_zone_utc_check CHECK (time_zone = 'UTC'),
+    CONSTRAINT locations_status_check CHECK (status IN ('ENABLED', 'DISABLED', 'ARCHIVED')),
+    CONSTRAINT locations_archive_check CHECK (
+        (status = 'ARCHIVED' AND archived_at IS NOT NULL)
+            OR (status <> 'ARCHIVED' AND archived_at IS NULL)
+        ),
+    CONSTRAINT locations_updated_at_check CHECK (updated_at >= created_at),
+    CONSTRAINT locations_last_enabled_check CHECK (
+        last_enabled_at >= created_at AND last_enabled_at <= updated_at
+        ),
+    CONSTRAINT locations_id_tenant_key UNIQUE (id, tenant_id),
+    CONSTRAINT locations_tenant_live_name_key UNIQUE (tenant_id, live_normalized_name)
+);
+
+CREATE INDEX locations_tenant_status_idx ON locations (tenant_id, status, normalized_name, id);
+
+CREATE TABLE external_integrations
+(
+    id              UUID PRIMARY KEY,
+    tenant_id       UUID                     NOT NULL REFERENCES tenants (id),
+    name            VARCHAR(64)              NOT NULL,
+    normalized_name VARCHAR(128)             NOT NULL,
+    status          VARCHAR(32)              NOT NULL,
+    created_at      TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at      TIMESTAMP WITH TIME ZONE NOT NULL,
+    last_enabled_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    archived_at     TIMESTAMP WITH TIME ZONE,
+    CONSTRAINT external_integrations_name_not_blank_check CHECK (TRIM(name) <> ''),
+    CONSTRAINT external_integrations_name_stripped_check CHECK (name = TRIM(name)),
+    CONSTRAINT external_integrations_normalized_name_not_blank_check CHECK (TRIM(normalized_name) <> ''),
+    CONSTRAINT external_integrations_status_check CHECK (status IN ('ENABLED', 'DISABLED', 'ARCHIVED')),
+    CONSTRAINT external_integrations_archive_check CHECK (
+        (status = 'ARCHIVED' AND archived_at IS NOT NULL)
+            OR (status <> 'ARCHIVED' AND archived_at IS NULL)
+        ),
+    CONSTRAINT external_integrations_last_enabled_check CHECK (
+        last_enabled_at >= created_at AND last_enabled_at <= updated_at
+        ),
+    CONSTRAINT external_integrations_tenant_name_key UNIQUE (tenant_id, normalized_name),
+    CONSTRAINT external_integrations_id_tenant_key UNIQUE (id, tenant_id)
+);
+
+CREATE INDEX external_integrations_tenant_status_idx
+    ON external_integrations (tenant_id, status, created_at);
+
+CREATE TABLE api_keys
+(
+    id              UUID PRIMARY KEY,
+    integration_id  UUID                     NOT NULL,
+    tenant_id       UUID                     NOT NULL,
+    name            VARCHAR(64)              NOT NULL,
+    normalized_name VARCHAR(128)             NOT NULL,
+    expires_at      TIMESTAMP WITH TIME ZONE,
+    revoked_at      TIMESTAMP WITH TIME ZONE,
+    created_at      TIMESTAMP WITH TIME ZONE NOT NULL,
+    CONSTRAINT api_keys_integration_tenant_fk
+        FOREIGN KEY (integration_id, tenant_id)
+            REFERENCES external_integrations (id, tenant_id),
+    CONSTRAINT api_keys_name_not_blank_check CHECK (TRIM(name) <> ''),
+    CONSTRAINT api_keys_name_stripped_check CHECK (name = TRIM(name)),
+    CONSTRAINT api_keys_normalized_name_not_blank_check CHECK (TRIM(normalized_name) <> ''),
+    CONSTRAINT api_keys_expiry_check CHECK (expires_at IS NULL OR expires_at > created_at),
+    CONSTRAINT api_keys_revoked_at_check CHECK (revoked_at IS NULL OR revoked_at >= created_at),
+    CONSTRAINT api_keys_integration_name_key UNIQUE (integration_id, normalized_name),
+    CONSTRAINT api_keys_id_tenant_key UNIQUE (id, tenant_id),
+    CONSTRAINT api_keys_id_integration_key UNIQUE (id, integration_id)
+);
+
+CREATE INDEX api_keys_integration_id_idx ON api_keys (integration_id, created_at);
+
+CREATE TABLE api_key_scopes
+(
+    api_key_id UUID        NOT NULL REFERENCES api_keys (id),
+    scope      VARCHAR(32) NOT NULL,
+    PRIMARY KEY (api_key_id, scope),
+    CONSTRAINT api_key_scopes_scope_check CHECK (scope IN ('ORDERS_READ', 'ORDERS_WRITE'))
+);
+
+CREATE TABLE api_key_location_access
+(
+    api_key_id UUID NOT NULL,
+    location_id UUID NOT NULL,
+    tenant_id  UUID NOT NULL,
+    PRIMARY KEY (api_key_id, location_id),
+    CONSTRAINT api_key_location_access_key_tenant_fk
+        FOREIGN KEY (api_key_id, tenant_id)
+            REFERENCES api_keys (id, tenant_id),
+    CONSTRAINT api_key_location_access_location_tenant_fk
+        FOREIGN KEY (location_id, tenant_id)
+            REFERENCES locations (id, tenant_id)
+);
+
+CREATE INDEX api_key_location_access_location_idx
+    ON api_key_location_access (location_id, api_key_id);
+
+CREATE TABLE api_key_versions
+(
+    id          UUID PRIMARY KEY,
+    api_key_id  UUID                     NOT NULL REFERENCES api_keys (id),
+    secret_hash VARCHAR(64)              NOT NULL UNIQUE,
+    issued_at   TIMESTAMP WITH TIME ZONE NOT NULL,
+    valid_until TIMESTAMP WITH TIME ZONE,
+    retired_at  TIMESTAMP WITH TIME ZONE,
+    CONSTRAINT api_key_versions_valid_until_check CHECK (
+        valid_until IS NULL OR valid_until > issued_at
+        ),
+    CONSTRAINT api_key_versions_retired_at_check CHECK (
+        retired_at IS NULL OR retired_at >= issued_at
+        ),
+    CONSTRAINT api_key_versions_id_key_key UNIQUE (id, api_key_id)
+);
+
+CREATE INDEX api_key_versions_key_issued_idx
+    ON api_key_versions (api_key_id, issued_at DESC);
+
+CREATE TABLE webhook_subscriptions
+(
+    id              UUID PRIMARY KEY,
+    integration_id  UUID                     NOT NULL,
+    tenant_id       UUID                     NOT NULL,
+    name            VARCHAR(64)              NOT NULL,
+    normalized_name VARCHAR(128)             NOT NULL,
+    destination_url VARCHAR(2048)            NOT NULL,
+    status          VARCHAR(32)              NOT NULL,
+    created_at      TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at      TIMESTAMP WITH TIME ZONE NOT NULL,
+    last_enabled_at TIMESTAMP WITH TIME ZONE,
+    archived_at     TIMESTAMP WITH TIME ZONE,
+    CONSTRAINT webhook_subscriptions_integration_tenant_fk
+        FOREIGN KEY (integration_id, tenant_id)
+            REFERENCES external_integrations (id, tenant_id),
+    CONSTRAINT webhook_subscriptions_name_not_blank_check CHECK (TRIM(name) <> ''),
+    CONSTRAINT webhook_subscriptions_name_stripped_check CHECK (name = TRIM(name)),
+    CONSTRAINT webhook_subscriptions_normalized_name_not_blank_check CHECK (TRIM(normalized_name) <> ''),
+    CONSTRAINT webhook_subscriptions_destination_not_blank_check CHECK (TRIM(destination_url) <> ''),
+    CONSTRAINT webhook_subscriptions_status_check CHECK (status IN ('ENABLED', 'DISABLED', 'ARCHIVED')),
+    CONSTRAINT webhook_subscriptions_archive_check CHECK (
+        (status = 'ARCHIVED' AND archived_at IS NOT NULL)
+            OR (status <> 'ARCHIVED' AND archived_at IS NULL)
+        ),
+    CONSTRAINT webhook_subscriptions_last_enabled_check CHECK (
+        (status = 'ENABLED' AND last_enabled_at IS NOT NULL)
+            OR status <> 'ENABLED'
+        ),
+    CONSTRAINT webhook_subscriptions_last_enabled_time_check CHECK (
+        last_enabled_at IS NULL
+            OR (last_enabled_at >= created_at AND last_enabled_at <= updated_at)
+        ),
+    CONSTRAINT webhook_subscriptions_integration_name_key UNIQUE (integration_id, normalized_name),
+    CONSTRAINT webhook_subscriptions_id_tenant_key UNIQUE (id, tenant_id)
+);
+
+CREATE INDEX webhook_subscriptions_integration_status_idx
+    ON webhook_subscriptions (integration_id, status, created_at);
+
+CREATE TABLE webhook_subscription_location_access
+(
+    subscription_id UUID NOT NULL,
+    location_id     UUID NOT NULL,
+    tenant_id       UUID NOT NULL,
+    PRIMARY KEY (subscription_id, location_id),
+    CONSTRAINT webhook_subscription_location_subscription_tenant_fk
+        FOREIGN KEY (subscription_id, tenant_id)
+            REFERENCES webhook_subscriptions (id, tenant_id),
+    CONSTRAINT webhook_subscription_location_location_tenant_fk
+        FOREIGN KEY (location_id, tenant_id)
+            REFERENCES locations (id, tenant_id)
+);
+
+CREATE INDEX webhook_subscription_location_location_idx
+    ON webhook_subscription_location_access (location_id, subscription_id);
+
+CREATE TABLE webhook_subscription_event_types
+(
+    subscription_id UUID        NOT NULL REFERENCES webhook_subscriptions (id),
+    event_type      VARCHAR(32) NOT NULL,
+    PRIMARY KEY (subscription_id, event_type),
+    CONSTRAINT webhook_subscription_event_types_type_check CHECK (
+        event_type IN ('ORDER_CREATED', 'ORDER_READY', 'ORDER_COMPLETED', 'ORDER_CANCELED')
+        )
+);
+
+CREATE TABLE webhook_signing_secret_versions
+(
+    id                UUID PRIMARY KEY,
+    subscription_id   UUID                     NOT NULL REFERENCES webhook_subscriptions (id),
+    encrypted_secret  BYTEA                    NOT NULL,
+    encryption_nonce  BYTEA                    NOT NULL,
+    issued_at          TIMESTAMP WITH TIME ZONE NOT NULL,
+    valid_until       TIMESTAMP WITH TIME ZONE,
+    retired_at         TIMESTAMP WITH TIME ZONE,
+    CONSTRAINT webhook_signing_secret_nonce_length_check CHECK (OCTET_LENGTH(encryption_nonce) = 12),
+    CONSTRAINT webhook_signing_secret_valid_until_check CHECK (
+        valid_until IS NULL OR valid_until > issued_at
+        ),
+    CONSTRAINT webhook_signing_secret_retired_at_check CHECK (
+        retired_at IS NULL OR retired_at >= issued_at
+        ),
+    CONSTRAINT webhook_signing_secret_id_subscription_key UNIQUE (id, subscription_id)
+);
+
+CREATE INDEX webhook_signing_secret_subscription_issued_idx
+    ON webhook_signing_secret_versions (subscription_id, issued_at DESC);
+
+CREATE TABLE accounts
+(
+    id UUID PRIMARY KEY,
+    tenant_id UUID NOT NULL REFERENCES tenants (id),
+    email VARCHAR(254) NOT NULL UNIQUE,
+    provider_subject VARCHAR(128) NOT NULL UNIQUE,
+    authentication_cutoff TIMESTAMP WITH TIME ZONE,
+    tenant_role VARCHAR(32) NOT NULL,
+    status VARCHAR(32) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    archived_at TIMESTAMP WITH TIME ZONE,
+    CONSTRAINT accounts_email_check CHECK (TRIM(email) <> '' AND email = LOWER(TRIM(email))),
+    CONSTRAINT accounts_id_tenant_key UNIQUE (id, tenant_id),
+    CONSTRAINT accounts_tenant_role_check CHECK (tenant_role IN ('ADMIN', 'MEMBER')),
+    CONSTRAINT accounts_status_check CHECK (status IN ('ENABLED', 'DISABLED', 'ARCHIVED')),
+    CONSTRAINT accounts_archive_check CHECK (
+        (status = 'ARCHIVED' AND archived_at IS NOT NULL) OR (status <> 'ARCHIVED' AND archived_at IS NULL)),
+    CONSTRAINT accounts_updated_at_check CHECK (updated_at >= created_at)
+);
+CREATE INDEX accounts_tenant_id_idx ON accounts (tenant_id);
+
+CREATE TABLE account_invitations
+(
+    id                   UUID PRIMARY KEY,
+    tenant_id            UUID                     NOT NULL,
+    location_id          UUID                     NOT NULL,
+    issued_by_account_id UUID                     NOT NULL,
+    assignment_role      VARCHAR(32)              NOT NULL,
+    token_hash           VARCHAR(64)              NOT NULL UNIQUE,
+    state                VARCHAR(32)              NOT NULL,
+    revocation_reason    VARCHAR(32),
+    revoked_at           TIMESTAMP WITH TIME ZONE,
+    redeemed_account_id  UUID,
+    redeemed_at          TIMESTAMP WITH TIME ZONE,
+    expires_at           TIMESTAMP WITH TIME ZONE NOT NULL,
+    created_at           TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at           TIMESTAMP WITH TIME ZONE NOT NULL,
+    CONSTRAINT account_invitations_location_tenant_fk
+        FOREIGN KEY (location_id, tenant_id)
+            REFERENCES locations (id, tenant_id),
+    CONSTRAINT account_invitations_issuer_tenant_fk
+        FOREIGN KEY (issued_by_account_id, tenant_id)
+            REFERENCES accounts (id, tenant_id),
+    CONSTRAINT account_invitations_redeemed_account_tenant_fk
+        FOREIGN KEY (redeemed_account_id, tenant_id)
+            REFERENCES accounts (id, tenant_id),
+    CONSTRAINT account_invitations_assignment_role_check
+        CHECK (assignment_role IN ('MANAGER', 'OPERATOR')),
+    CONSTRAINT account_invitations_token_hash_check
+        CHECK (token_hash ~ '^[0-9a-f]{64}$'),
+    CONSTRAINT account_invitations_state_check
+        CHECK (state IN ('PENDING', 'REDEEMED', 'REVOKED')),
+    CONSTRAINT account_invitations_expiry_check
+        CHECK (expires_at = created_at + INTERVAL '7' DAY),
+    CONSTRAINT account_invitations_updated_at_check
+        CHECK (updated_at >= created_at),
+    CONSTRAINT account_invitations_terminal_time_check CHECK (
+        (revoked_at IS NULL OR (revoked_at >= created_at AND updated_at = revoked_at))
+        AND (redeemed_at IS NULL OR (redeemed_at >= created_at AND updated_at = redeemed_at))
+        ),
+    CONSTRAINT account_invitations_lifecycle_check CHECK (
+        (state = 'PENDING'
+            AND revocation_reason IS NULL
+            AND revoked_at IS NULL
+            AND redeemed_account_id IS NULL
+            AND redeemed_at IS NULL)
+        OR (state = 'REVOKED'
+            AND revocation_reason IS NOT NULL
+            AND revoked_at IS NOT NULL
+            AND redeemed_account_id IS NULL
+            AND redeemed_at IS NULL)
+        OR (state = 'REDEEMED'
+            AND revocation_reason IS NULL
+            AND revoked_at IS NULL
+            AND redeemed_account_id IS NOT NULL
+            AND redeemed_at IS NOT NULL)
+        ),
+    CONSTRAINT account_invitations_revocation_reason_check
+        CHECK (revocation_reason IS NULL OR revocation_reason IN (
+            'STAFF_REVOKED',
+            'ISSUER_DISABLED',
+            'ISSUER_ARCHIVED',
+            'LOCATION_DISABLED',
+            'LOCATION_ARCHIVED'
+            ))
+);
+
+CREATE INDEX account_invitations_tenant_pending_idx
+    ON account_invitations (tenant_id, state, expires_at, created_at DESC);
+CREATE INDEX account_invitations_location_pending_idx
+    ON account_invitations (tenant_id, location_id, assignment_role, state, expires_at, created_at DESC);
+CREATE INDEX account_invitations_issuer_pending_idx
+    ON account_invitations (issued_by_account_id, state, expires_at);
+
+CREATE TABLE location_assignments
+(
+    account_id  UUID                     NOT NULL,
+    location_id UUID                     NOT NULL,
+    tenant_id   UUID                     NOT NULL,
+    role        VARCHAR(32)              NOT NULL,
+    created_at  TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at  TIMESTAMP WITH TIME ZONE NOT NULL,
+    PRIMARY KEY (account_id, location_id),
+    CONSTRAINT location_assignments_account_key UNIQUE (account_id),
+    CONSTRAINT location_assignments_account_tenant_fk
+        FOREIGN KEY (account_id, tenant_id)
+            REFERENCES accounts (id, tenant_id),
+    CONSTRAINT location_assignments_location_tenant_fk
+        FOREIGN KEY (location_id, tenant_id)
+            REFERENCES locations (id, tenant_id),
+    CONSTRAINT location_assignments_role_check CHECK (role IN ('MANAGER', 'OPERATOR'))
+);
+
+CREATE INDEX location_assignments_location_id_idx
+    ON location_assignments (location_id, account_id);
+
+CREATE TABLE SPRING_SESSION (
+    PRIMARY_ID CHAR(36) NOT NULL PRIMARY KEY,
+    SESSION_ID CHAR(36) NOT NULL UNIQUE,
+    CREATION_TIME BIGINT NOT NULL,
+    LAST_ACCESS_TIME BIGINT NOT NULL,
+    MAX_INACTIVE_INTERVAL INT NOT NULL,
+    EXPIRY_TIME BIGINT NOT NULL,
+    PRINCIPAL_NAME VARCHAR(100)
+);
+CREATE INDEX SPRING_SESSION_EXPIRY_IDX ON SPRING_SESSION (EXPIRY_TIME);
+CREATE INDEX SPRING_SESSION_PRINCIPAL_IDX ON SPRING_SESSION (PRINCIPAL_NAME);
+CREATE TABLE SPRING_SESSION_ATTRIBUTES (
+    SESSION_PRIMARY_ID CHAR(36) NOT NULL REFERENCES SPRING_SESSION (PRIMARY_ID) ON DELETE CASCADE,
+    ATTRIBUTE_NAME VARCHAR(200) NOT NULL,
+    ATTRIBUTE_BYTES BYTEA NOT NULL,
+    PRIMARY KEY (SESSION_PRIMARY_ID, ATTRIBUTE_NAME)
+);
+
+CREATE TABLE orders
+(
+    id                           UUID PRIMARY KEY,
+    location_id                  UUID                     NOT NULL REFERENCES locations (id),
+    tracking_reference           UUID                     NOT NULL UNIQUE,
+    label                        VARCHAR(32)              NOT NULL,
+    status                       VARCHAR(32)              NOT NULL,
+    external_integration_id      UUID REFERENCES external_integrations (id),
+    external_idempotency_key     VARCHAR(255),
+    external_request_fingerprint VARCHAR(64),
+    created_at                   TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at                   TIMESTAMP WITH TIME ZONE NOT NULL,
+    CONSTRAINT orders_label_not_blank_check CHECK (TRIM(label) <> ''),
+    CONSTRAINT orders_label_stripped_check CHECK (label = TRIM(label)),
+    CONSTRAINT orders_status_check CHECK (
+        status IN ('IN_PREPARATION', 'READY', 'COMPLETED', 'CANCELED')
+        ),
+    CONSTRAINT orders_external_creation_check CHECK (
+        (external_integration_id IS NULL
+            AND external_idempotency_key IS NULL
+            AND external_request_fingerprint IS NULL)
+        OR
+        (external_integration_id IS NOT NULL
+            AND external_idempotency_key IS NOT NULL
+            AND external_request_fingerprint IS NOT NULL
+            AND OCTET_LENGTH(external_idempotency_key) BETWEEN 1 AND 255)
+        ),
+    CONSTRAINT orders_external_creation_key UNIQUE (
+        external_integration_id,
+        location_id,
+        external_idempotency_key
+        )
+);
+
+CREATE INDEX orders_location_created_at_idx ON orders (location_id, created_at DESC);
+
+CREATE TABLE order_history
+(
+    id                           BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    order_id                     UUID                     NOT NULL REFERENCES orders (id),
+    status                       VARCHAR(32)              NOT NULL,
+    created_at                   TIMESTAMP WITH TIME ZONE NOT NULL,
+    initiator_type               VARCHAR(32),
+    initiator_id                 UUID,
+    initiator_api_key_id         UUID,
+    initiator_api_key_version_id UUID,
+    CONSTRAINT order_history_integration_key_fk
+        FOREIGN KEY (initiator_api_key_id, initiator_id)
+            REFERENCES api_keys (id, integration_id),
+    CONSTRAINT order_history_integration_key_version_fk
+        FOREIGN KEY (initiator_api_key_version_id, initiator_api_key_id)
+            REFERENCES api_key_versions (id, api_key_id),
+    CONSTRAINT order_history_initiator_check CHECK (
+        (initiator_type IS NULL
+            AND initiator_id IS NULL
+            AND initiator_api_key_id IS NULL
+            AND initiator_api_key_version_id IS NULL)
+        OR (initiator_type = 'SYSTEM'
+            AND initiator_id IS NULL
+            AND initiator_api_key_id IS NULL
+            AND initiator_api_key_version_id IS NULL)
+        OR (initiator_type = 'USER'
+            AND initiator_id IS NOT NULL
+            AND initiator_api_key_id IS NULL
+            AND initiator_api_key_version_id IS NULL)
+        OR (initiator_type = 'INTEGRATION'
+            AND initiator_id IS NOT NULL
+            AND initiator_api_key_id IS NOT NULL
+            AND initiator_api_key_version_id IS NOT NULL)
+        )
+);
+
+CREATE INDEX order_history_order_id_idx ON order_history (order_id, id);
+
+CREATE TABLE customer_push_subscriptions
+(
+    id                       UUID PRIMARY KEY,
+    endpoint_hash            VARCHAR(64)              NOT NULL UNIQUE,
+    endpoint_origin          VARCHAR(255)             NOT NULL,
+    encrypted_endpoint       BYTEA                    NOT NULL,
+    endpoint_nonce           BYTEA                    NOT NULL,
+    p256dh_key               BYTEA                    NOT NULL,
+    encrypted_auth_secret    BYTEA                    NOT NULL,
+    auth_secret_nonce        BYTEA                    NOT NULL,
+    vapid_key_fingerprint    VARCHAR(64)              NOT NULL,
+    created_at               TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at               TIMESTAMP WITH TIME ZONE NOT NULL,
+    last_seen_at             TIMESTAMP WITH TIME ZONE NOT NULL,
+    expires_at               TIMESTAMP WITH TIME ZONE,
+    CONSTRAINT customer_push_subscriptions_endpoint_hash_check
+        CHECK (endpoint_hash ~ '^[0-9a-f]{64}$'),
+    CONSTRAINT customer_push_subscriptions_endpoint_origin_check
+        CHECK (TRIM(endpoint_origin) <> ''),
+    CONSTRAINT customer_push_subscriptions_endpoint_nonce_check
+        CHECK (OCTET_LENGTH(endpoint_nonce) = 12),
+    CONSTRAINT customer_push_subscriptions_p256dh_check
+        CHECK (OCTET_LENGTH(p256dh_key) = 65),
+    CONSTRAINT customer_push_subscriptions_auth_nonce_check
+        CHECK (OCTET_LENGTH(auth_secret_nonce) = 12),
+    CONSTRAINT customer_push_subscriptions_vapid_fingerprint_check
+        CHECK (TRIM(vapid_key_fingerprint) <> ''),
+    CONSTRAINT customer_push_subscriptions_time_check
+        CHECK (
+            updated_at >= created_at
+            AND last_seen_at >= created_at
+            AND (expires_at IS NULL OR expires_at > created_at)
+        )
+);
+
+CREATE INDEX customer_push_subscriptions_dormant_idx
+    ON customer_push_subscriptions (expires_at, last_seen_at, id);
+
+CREATE TABLE customer_push_enrollments
+(
+    id              UUID PRIMARY KEY,
+    subscription_id UUID                     NOT NULL
+        REFERENCES customer_push_subscriptions (id) ON DELETE CASCADE,
+    order_id        UUID                     NOT NULL REFERENCES orders (id),
+    created_at      TIMESTAMP WITH TIME ZONE NOT NULL,
+    CONSTRAINT customer_push_enrollments_subscription_order_key
+        UNIQUE (subscription_id, order_id)
+);
+
+CREATE INDEX customer_push_enrollments_order_idx
+    ON customer_push_enrollments (order_id, subscription_id);
+
+CREATE TABLE order_outbox_events
+(
+    id                          UUID PRIMARY KEY,
+    order_id                    UUID                     NOT NULL REFERENCES orders (id),
+    tenant_id                   UUID                     NOT NULL REFERENCES tenants (id),
+    location_id                 UUID                     NOT NULL,
+    tracking_reference          UUID                     NOT NULL,
+    event_type                  VARCHAR(32)              NOT NULL,
+    status                      VARCHAR(32)              NOT NULL,
+    occurred_at                 TIMESTAMP WITH TIME ZONE NOT NULL,
+    webhook_payload             TEXT                     NOT NULL,
+    created_at                  TIMESTAMP WITH TIME ZONE NOT NULL,
+    webhook_fanout_completed_at TIMESTAMP WITH TIME ZONE,
+    push_fanout_completed_at    TIMESTAMP WITH TIME ZONE,
+    CONSTRAINT order_outbox_location_tenant_fk
+        FOREIGN KEY (location_id, tenant_id)
+            REFERENCES locations (id, tenant_id),
+    CONSTRAINT order_outbox_event_type_check CHECK (
+        event_type IN ('ORDER_CREATED', 'ORDER_READY', 'ORDER_COMPLETED', 'ORDER_CANCELED')
+        ),
+    CONSTRAINT order_outbox_status_check CHECK (
+        status IN ('IN_PREPARATION', 'READY', 'COMPLETED', 'CANCELED')
+        ),
+    CONSTRAINT order_outbox_event_status_check CHECK (
+        (event_type = 'ORDER_CREATED' AND status = 'IN_PREPARATION')
+        OR (event_type = 'ORDER_READY' AND status = 'READY')
+        OR (event_type = 'ORDER_COMPLETED' AND status = 'COMPLETED')
+        OR (event_type = 'ORDER_CANCELED' AND status = 'CANCELED')
+        ),
+    CONSTRAINT order_outbox_webhook_payload_not_blank_check
+        CHECK (TRIM(webhook_payload) <> ''),
+    CONSTRAINT order_outbox_webhook_fanout_check CHECK (
+        webhook_fanout_completed_at IS NULL OR webhook_fanout_completed_at >= created_at
+        ),
+    CONSTRAINT order_outbox_push_fanout_check CHECK (
+        push_fanout_completed_at IS NULL OR push_fanout_completed_at >= created_at
+        )
+);
+
+CREATE INDEX order_outbox_webhook_available_idx
+    ON order_outbox_events (webhook_fanout_completed_at, occurred_at, id);
+
+CREATE INDEX order_outbox_push_available_idx
+    ON order_outbox_events (push_fanout_completed_at, occurred_at, id);
+
+CREATE TABLE webhook_deliveries
+(
+    id                 UUID PRIMARY KEY,
+    outbox_event_id    UUID                     NOT NULL REFERENCES order_outbox_events (id),
+    subscription_id    UUID                     NOT NULL REFERENCES webhook_subscriptions (id),
+    destination_url    VARCHAR(2048)            NOT NULL,
+    payload            TEXT                     NOT NULL,
+    status             VARCHAR(32)              NOT NULL,
+    created_at         TIMESTAMP WITH TIME ZONE NOT NULL,
+    claim_token        UUID,
+    claimed_at         TIMESTAMP WITH TIME ZONE,
+    claim_until        TIMESTAMP WITH TIME ZONE,
+    attempted_at       TIMESTAMP WITH TIME ZONE,
+    completed_at       TIMESTAMP WITH TIME ZONE,
+    response_status    INTEGER,
+    response_body      TEXT,
+    response_truncated BOOLEAN                  NOT NULL DEFAULT FALSE,
+    error_type         VARCHAR(64),
+    error_detail       VARCHAR(1024),
+    CONSTRAINT webhook_deliveries_event_subscription_key UNIQUE (outbox_event_id, subscription_id),
+    CONSTRAINT webhook_deliveries_destination_not_blank_check CHECK (TRIM(destination_url) <> ''),
+    CONSTRAINT webhook_deliveries_payload_not_blank_check CHECK (TRIM(payload) <> ''),
+    CONSTRAINT webhook_deliveries_status_check CHECK (
+        status IN ('PENDING', 'PROCESSING', 'SUCCEEDED', 'DEAD_LETTERED')
+        ),
+    CONSTRAINT webhook_deliveries_claim_check CHECK (
+        (status = 'PENDING'
+            AND claim_token IS NULL
+            AND claimed_at IS NULL
+            AND claim_until IS NULL
+            AND completed_at IS NULL)
+        OR (status = 'PROCESSING'
+            AND claim_token IS NOT NULL
+            AND claimed_at IS NOT NULL
+            AND claim_until IS NOT NULL
+            AND completed_at IS NULL)
+        OR (status IN ('SUCCEEDED', 'DEAD_LETTERED')
+            AND claim_token IS NULL
+            AND claimed_at IS NOT NULL
+            AND claim_until IS NULL
+            AND attempted_at IS NOT NULL
+            AND completed_at IS NOT NULL)
+        )
+);
+
+CREATE INDEX webhook_deliveries_available_idx
+    ON webhook_deliveries (status, claim_until, created_at, id);
+
+CREATE TABLE webhook_delivery_signing_versions
+(
+    delivery_id              UUID NOT NULL REFERENCES webhook_deliveries (id),
+    signing_secret_version_id UUID NOT NULL REFERENCES webhook_signing_secret_versions (id),
+    PRIMARY KEY (delivery_id, signing_secret_version_id)
+);
+
+CREATE INDEX webhook_delivery_signing_version_idx
+    ON webhook_delivery_signing_versions (signing_secret_version_id, delivery_id);
+
+CREATE TABLE customer_push_deliveries
+(
+    id                   UUID PRIMARY KEY,
+    outbox_event_id      UUID                     NOT NULL REFERENCES order_outbox_events (id),
+    subscription_id      UUID REFERENCES customer_push_subscriptions (id) ON DELETE SET NULL,
+    order_id             UUID                     NOT NULL REFERENCES orders (id),
+    endpoint_fingerprint VARCHAR(64)              NOT NULL,
+    push_service_origin  VARCHAR(255)             NOT NULL,
+    payload              TEXT,
+    status               VARCHAR(32)              NOT NULL,
+    attempt_count        INTEGER                  NOT NULL DEFAULT 0,
+    next_attempt_at      TIMESTAMP WITH TIME ZONE NOT NULL,
+    deadline_at          TIMESTAMP WITH TIME ZONE NOT NULL,
+    created_at           TIMESTAMP WITH TIME ZONE NOT NULL,
+    claim_token          UUID,
+    claimed_at           TIMESTAMP WITH TIME ZONE,
+    claim_until          TIMESTAMP WITH TIME ZONE,
+    completed_at         TIMESTAMP WITH TIME ZONE,
+    response_status      INTEGER,
+    outcome              VARCHAR(64),
+    diagnostic           VARCHAR(1024),
+    CONSTRAINT customer_push_deliveries_event_subscription_key
+        UNIQUE (outbox_event_id, subscription_id),
+    CONSTRAINT customer_push_deliveries_endpoint_fingerprint_check
+        CHECK (endpoint_fingerprint ~ '^[0-9a-f]{64}$'),
+    CONSTRAINT customer_push_deliveries_origin_check
+        CHECK (TRIM(push_service_origin) <> ''),
+    CONSTRAINT customer_push_deliveries_status_check CHECK (
+        status IN (
+            'PENDING',
+            'PROCESSING',
+            'ACCEPTED',
+            'DEAD_LETTERED',
+            'EXPIRED',
+            'SUPERSEDED',
+            'CANCELED'
+            )
+        ),
+    CONSTRAINT customer_push_deliveries_attempt_count_check
+        CHECK (attempt_count >= 0),
+    CONSTRAINT customer_push_deliveries_state_check CHECK (
+        (status = 'PENDING'
+            AND payload IS NOT NULL
+            AND claim_token IS NULL
+            AND claim_until IS NULL
+            AND completed_at IS NULL)
+        OR (status = 'PROCESSING'
+            AND payload IS NOT NULL
+            AND claim_token IS NOT NULL
+            AND claimed_at IS NOT NULL
+            AND claim_until IS NOT NULL
+            AND completed_at IS NULL)
+        OR (status IN ('ACCEPTED', 'DEAD_LETTERED', 'EXPIRED', 'SUPERSEDED', 'CANCELED')
+            AND payload IS NULL
+            AND claim_token IS NULL
+            AND claim_until IS NULL
+            AND completed_at IS NOT NULL)
+        )
+);
+
+CREATE INDEX customer_push_deliveries_available_idx
+    ON customer_push_deliveries (status, next_attempt_at, claim_until, created_at, id);
+
+CREATE INDEX customer_push_deliveries_cleanup_idx
+    ON customer_push_deliveries (status, completed_at, id);

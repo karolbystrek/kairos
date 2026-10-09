@@ -205,8 +205,9 @@ chmod 0600 production.env
 nano production.env
 ```
 
-Fill the four blank passwords (`POSTGRES_PASSWORD`, `REDIS_PASSWORD`,
-`ZITADEL_DB_PASSWORD`, `ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD`) with different
+Fill the six blank passwords (`POSTGRES_PASSWORD`, `KAIROS_DB_OWNER_PASSWORD`,
+`KAIROS_DB_RUNTIME_PASSWORD`, `REDIS_PASSWORD`, `ZITADEL_DB_PASSWORD`,
+`ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD`) with different
 strong values. Set `VAPID_SUBJECT` to your `mailto:` contact and set a deliberate
 `ZITADEL_FIRSTINSTANCE_ORG_MACHINE_PAT_EXPIRATIONDATE` (UTC ISO 8601), with renewal
 scheduled before expiry. Do not leave these fields blank at deployment.
@@ -214,6 +215,11 @@ If `production.env` already exists, edit those settings and reconcile public
 settings against the example; do not overwrite existing credentials with a new
 copy. Hostnames and browser origins must match Cloudflare and the GitHub build
 variables. Deployment supplies the blank registry/release fields.
+
+Owner and runtime database roles must differ from each other and from the
+initial PostgreSQL administrator. An existing applied database requires the
+reviewed [database upgrade](DATABASE.md) before its first RLS release; fresh
+databases use the one-shot role bootstrap.
 
 The template is safe to commit; the live environment, keys and certificates are
 not. No password generation, container start or deployment occurs in bootstrap.

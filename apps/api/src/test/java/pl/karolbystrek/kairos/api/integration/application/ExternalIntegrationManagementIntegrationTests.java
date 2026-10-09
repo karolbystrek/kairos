@@ -7,7 +7,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.transaction.annotation.Transactional;
 import pl.karolbystrek.kairos.api.integration.application.exception.IntegrationAccessDeniedException;
 import pl.karolbystrek.kairos.api.integration.application.exception.IntegrationConflictException;
 import pl.karolbystrek.kairos.api.integration.domain.ExternalIntegrationStatus;
@@ -24,7 +23,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
-@Transactional
 @Import(MutableTestClockConfiguration.class)
 class ExternalIntegrationManagementIntegrationTests
         extends RedisListenerIsolatedIntegrationTest {
@@ -38,8 +36,7 @@ class ExternalIntegrationManagementIntegrationTests
     @Autowired
     private ApiKeyAuthenticationService authenticationService;
 
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
+    private final JdbcTemplate jdbcTemplate = pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase.ownerDatabase();
 
     @Autowired
     private MutableTestClock clock;

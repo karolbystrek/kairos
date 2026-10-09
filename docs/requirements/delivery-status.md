@@ -49,6 +49,10 @@ The current walking vertical slice is implemented for local development:
 * shared hostname-routing NGINX HTTPS ingress, unbuffered SSE, internal health
   paths, health-gated dependencies, persistent PostgreSQL/provider credentials,
   and nondurable Redis;
+* restricted PostgreSQL runtime identity, transaction-local tenant/location and
+  capability scopes, command-specific RLS, narrow authentication/onboarding
+  bootstrap helpers, per-item workers and startup verification;
+* fresh database role bootstrap and an operator-only reviewed old-V1 upgrade;
 * GitHub Actions validation for pull requests and `main`.
 
 ### Implemented behavior and development schema
@@ -92,9 +96,10 @@ specified in [location lifecycle](locations.md) and [HTTP contracts](http-contra
 
 Outstanding security and acceptance work:
 
-* establish a verified tenant and location database security context and enable
-  PostgreSQL Row Level Security for every tenant-owned or ownership-derived
-  table;
+* perform the explicitly approved existing-database upgrade where required and
+  verify restricted-role RLS and scoped application/worker behavior on the hosted
+  runtime; repository implementation and disposable PostgreSQL tests do not
+  establish live acceptance;
 * verify hosted gateway client addressing, throttling and origin-bypass blocking
   through Cloudflare; extend throttling when future recovery or linking routes
   are introduced;

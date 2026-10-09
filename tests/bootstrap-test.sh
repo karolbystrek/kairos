@@ -49,8 +49,9 @@ assert values['NEXT_PUBLIC_API_BASE_URL'] == 'https://kairos-api.karolbystrek.pl
 assert values['PANEL_APP_URL'] == 'https://kairos-panel.karolbystrek.pl'
 assert values['NEXT_PUBLIC_CUSTOMER_APP_URL'] == 'https://kairos.karolbystrek.pl'
 assert values['WEBHOOK_DESTINATION_POLICY'] == values['PUSH_DESTINATION_POLICY'] == 'PUBLIC_HTTPS'
-for key in ['POSTGRES_PASSWORD', 'REDIS_PASSWORD', 'ZITADEL_DB_PASSWORD', 'ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD']:
+for key in ['POSTGRES_PASSWORD', 'KAIROS_DB_OWNER_PASSWORD', 'KAIROS_DB_RUNTIME_PASSWORD', 'REDIS_PASSWORD', 'ZITADEL_DB_PASSWORD', 'ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD']:
     assert values[key] == '', key
+assert len({values['POSTGRES_USER'], values['KAIROS_DB_OWNER_USER'], values['KAIROS_DB_RUNTIME_USER']}) == 3
 PYENV
 cp "$test_directory/host/production.env.example" "$test_directory/expected-template"
 printf '%s\n' 'stale-local-template' > "$test_directory/host/production.env.example"

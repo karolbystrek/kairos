@@ -32,7 +32,9 @@ outside the VPS for a fresh rebuild. Database backups are deferred under the
 | Variables | Production value or responsibility |
 | --- | --- |
 | `COMPOSE_FILE` | `compose.yaml:compose.deployment.yaml` for manual Compose use; deploy.sh explicitly selects its files |
-| `POSTGRES_USER`, `POSTGRES_DB`, `POSTGRES_PASSWORD` | Selected database identity/name and unique strong password; see privilege blocker below |
+| `POSTGRES_USER`, `POSTGRES_DB`, `POSTGRES_PASSWORD` | Initialization/admin identity and database name; never the API datasource |
+| `KAIROS_DB_OWNER_USER`, `KAIROS_DB_OWNER_PASSWORD` | Restricted migration owner; unique role/password |
+| `KAIROS_DB_RUNTIME_USER`, `KAIROS_DB_RUNTIME_PASSWORD` | Restricted application datasource role; separate unique role/password |
 | `ZITADEL_DB`, `ZITADEL_DB_USER`, `ZITADEL_DB_PASSWORD` | Separate provider database/user and strong password; keep names stable |
 | `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD` | `redis`, `6379`, and a unique strong password |
 | `NEXT_PUBLIC_CUSTOMER_APP_URL`, `PANEL_APP_URL`, `NEXT_PUBLIC_API_BASE_URL` | Three distinct `https://` origins without path/query/fragment; match exact gateway hosts |
@@ -53,10 +55,8 @@ Changing passwords in the environment does not rotate existing PostgreSQL roles
 or an already initialized provider administrator. Coordinate credential changes
 with their owning service; never reinitialize databases to apply them.
 
-**Database launch blocker:** the current Compose setup shares `POSTGRES_USER`
-between PostgreSQL initialization, ZITADEL administration and the API/Flyway.
-That initial role is privileged; this is not a verified non-bypass runtime role.
-Do not claim RLS protection or improvise GRANT/role changes here. The separately
-approved RLS increment must define migration, API runtime and provider metadata
-privileges plus verified tenant/location transaction context before public use.
-See [tenant isolation and launch requirements](../requirements/access-isolation.md#44-tenant-isolation).
+Database role separation and transaction-local RLS are implemented in the
+repository. Follow [PostgreSQL roles and reviewed upgrade](DATABASE.md) for fresh
+bootstrap and the explicitly approved, data-preserving upgrade of an existing
+V1 database. Ordinary deployment never repairs an old checksum. Live runtime
+isolation and application acceptance remain required before public launch.

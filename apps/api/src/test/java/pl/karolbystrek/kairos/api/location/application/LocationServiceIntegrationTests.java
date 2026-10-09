@@ -26,14 +26,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
-@Transactional
 class LocationServiceIntegrationTests extends RedisListenerIsolatedIntegrationTest {
 
     @Autowired
     private LocationService locationService;
 
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
+    private final JdbcTemplate jdbcTemplate = pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase.ownerDatabase();
 
     @Test
     void createsRenamesSortsAndReusesAnArchivedNormalizedName() {
@@ -68,6 +66,15 @@ class LocationServiceIntegrationTests extends RedisListenerIsolatedIntegrationTe
             kitchen.id()
         )).isEqualTo("ARCHIVED");
         assertThat(alpha.id()).isNotEqualTo(reused.id());
+    }
+
+    @Test
+    void persistsMaximumLengthNameWhoseNormalizationExpands() {
+        var tenantId = insertTenant();
+        var administrator = insertAccount(tenantId, TenantRole.ADMIN, AccountStatus.ENABLED);
+        var location = locationService.create(administrator, "İ".repeat(120));
+        assertThat(jdbcTemplate.queryForObject("SELECT normalized_name FROM locations WHERE id = ?",
+            String.class, location.id())).isEqualTo("i\u0307".repeat(120));
     }
 
     @Test

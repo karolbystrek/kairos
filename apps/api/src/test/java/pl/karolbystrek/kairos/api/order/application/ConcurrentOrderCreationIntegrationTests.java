@@ -26,8 +26,7 @@ class ConcurrentOrderCreationIntegrationTests extends RedisListenerIsolatedInteg
     @Autowired
     private OrderService orderService;
 
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
+    private final JdbcTemplate jdbcTemplate = pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase.ownerDatabase();
 
     private final List<UUID> tenantIds = new ArrayList<>();
 
@@ -104,11 +103,10 @@ class ConcurrentOrderCreationIntegrationTests extends RedisListenerIsolatedInteg
         var locationId = UUID.randomUUID();
         var name = "Test location " + locationId;
         jdbcTemplate.update(
-                "INSERT INTO locations (id, tenant_id, name, normalized_name, live_normalized_name) VALUES (?, ?, ?, ?, ?)",
+                "INSERT INTO locations (id, tenant_id, name, normalized_name) VALUES (?, ?, ?, ?)",
                 locationId,
                 tenantId,
                 name,
-                name.toLowerCase(java.util.Locale.ROOT),
                 name.toLowerCase(java.util.Locale.ROOT)
         );
         return locationId;

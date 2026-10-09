@@ -5,16 +5,20 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import pl.karolbystrek.kairos.api.integration.application.ExternalIntegrationManagementService;
 import pl.karolbystrek.kairos.api.integration.testsupport.IntegrationTestFixture;
 import pl.karolbystrek.kairos.api.integration.webhook.application.model.ClaimedWebhookDelivery;
-import pl.karolbystrek.kairos.api.integration.webhook.domain.WebhookDeliveryStatus;
-import pl.karolbystrek.kairos.api.order.domain.OrderEventType;
 import pl.karolbystrek.kairos.api.integration.webhook.domain.WebhookSubscriptionStatus;
 import pl.karolbystrek.kairos.api.integration.webhook.infrastructure.http.WebhookHttpResult;
-import pl.karolbystrek.kairos.api.integration.webhook.infrastructure.persistence.WebhookDeliveryRepository;
 import pl.karolbystrek.kairos.api.order.application.OrderService;
+import pl.karolbystrek.kairos.api.order.domain.OrderEventType;
+import pl.karolbystrek.kairos.api.persistence.infrastructure.DatabaseAccessContext;
+import pl.karolbystrek.kairos.api.persistence.infrastructure.WorkerOperation;
+import pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase;
 import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
 
 import java.time.Instant;
@@ -46,13 +50,18 @@ class WebhookDeliveryIntegrationTests extends RedisListenerIsolatedIntegrationTe
     private WebhookDeliveryCompletionService completionService;
 
     @Autowired
-    private WebhookDeliveryRepository deliveryRepository;
-
-    @Autowired
     private OrderService orderService;
 
+    private final JdbcTemplate jdbcTemplate = PostgresTestDatabase.ownerDatabase();
+
     @Autowired
-    private JdbcTemplate jdbcTemplate;
+    private JdbcTemplate runtimeDatabase;
+
+    @Autowired
+    private DatabaseAccessContext databaseAccess;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     private IntegrationTestFixture.TenantFixture tenant;
     private UUID subscriptionId;
@@ -217,14 +226,11 @@ class WebhookDeliveryIntegrationTests extends RedisListenerIsolatedIntegrationTe
                 )
         )).isTrue();
 
-        var succeeded = deliveryRepository.findById(success.id()).orElseThrow();
-        var deadLettered = deliveryRepository.findById(failure.id()).orElseThrow();
-        assertThat(succeeded.getStatus()).isEqualTo(WebhookDeliveryStatus.SUCCEEDED);
-        assertThat(succeeded.getResponseBody()).isEqualTo("ok\uFFFDbody");
-        assertThat(deadLettered.getStatus())
-                .isEqualTo(WebhookDeliveryStatus.DEAD_LETTERED);
-        assertThat(deadLettered.getResponseBody()).isEqualTo("bad\uFFFDbody");
-        assertThat(deadLettered.getErrorDetail()).isEqualTo("bad\uFFFDdetail");
+        assertThat(jdbcTemplate.queryForObject("SELECT status FROM webhook_deliveries WHERE id = ?", String.class, success.id())).isEqualTo("SUCCEEDED");
+        assertThat(jdbcTemplate.queryForObject("SELECT response_body FROM webhook_deliveries WHERE id = ?", String.class, success.id())).isEqualTo("ok\uFFFDbody");
+        assertThat(jdbcTemplate.queryForObject("SELECT status FROM webhook_deliveries WHERE id = ?", String.class, failure.id())).isEqualTo("DEAD_LETTERED");
+        assertThat(jdbcTemplate.queryForObject("SELECT response_body FROM webhook_deliveries WHERE id = ?", String.class, failure.id())).isEqualTo("bad\uFFFDbody");
+        assertThat(jdbcTemplate.queryForObject("SELECT error_detail FROM webhook_deliveries WHERE id = ?", String.class, failure.id())).isEqualTo("bad\uFFFDdetail");
         assertThat(claimService.claimAvailable()).isEmpty();
         assertThat(jdbcTemplate.queryForObject(
                 """
@@ -270,6 +276,42 @@ class WebhookDeliveryIntegrationTests extends RedisListenerIsolatedIntegrationTe
                 Long.class,
                 subscriptionId
         )).isEqualTo(12);
+    }
+
+    @Test
+    void expiredLeaseReclaimsDeliveryAndRejectsPreviousToken() {
+        createOrders(1);
+        fanOutAll();
+        var previous = claimService.claimAvailable().getFirst();
+        jdbcTemplate.update("UPDATE webhook_deliveries SET claim_until = ? WHERE id = ?",
+                java.sql.Timestamp.from(Instant.now().minusSeconds(1)), previous.id());
+        var current = claimService.claimAvailable().getFirst();
+        assertThat(current.id()).isEqualTo(previous.id());
+        assertThat(current.claimToken()).isNotEqualTo(previous.claimToken());
+        var now = Instant.now();
+        var result = new WebhookHttpResult(204, null, false, null, null);
+        assertThat(completionService.complete(previous.id(), previous.claimToken(), now, now, result)).isFalse();
+        assertThat(completionService.complete(current.id(), current.claimToken(), now, now, result)).isTrue();
+    }
+
+    @Test
+    void fanoutScopeCannotReadOrCreateDeliveryForAnotherEvent() {
+        createOrders(2);
+        var events = jdbcTemplate.queryForList("SELECT id FROM order_outbox_events WHERE tenant_id = ? ORDER BY occurred_at, id", UUID.class, tenant.tenantId());
+        var transaction = new TransactionTemplate(transactionManager);
+        transaction.executeWithoutResult(status -> {
+            assertThat(runtimeDatabase.queryForObject("SELECT public.next_webhook_fanout()", UUID.class)).isEqualTo(events.getFirst());
+            assertThat(databaseAccess.worker(WorkerOperation.WEBHOOK_FANOUT, events.getFirst(), null)).isTrue();
+            assertThat(runtimeDatabase.queryForObject("SELECT count(*) FROM order_outbox_events WHERE id = ?", Long.class, events.getLast())).isZero();
+        });
+        var forbiddenId = UUID.randomUUID();
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> transaction.executeWithoutResult(status -> {
+            assertThat(runtimeDatabase.queryForObject("SELECT public.next_webhook_fanout()", UUID.class)).isEqualTo(events.getFirst());
+            assertThat(databaseAccess.worker(WorkerOperation.WEBHOOK_FANOUT, events.getFirst(), null)).isTrue();
+            runtimeDatabase.update("INSERT INTO webhook_deliveries (id, outbox_event_id, subscription_id, destination_url, payload, status, created_at) VALUES (?, ?, ?, ?, ?, 'PENDING', now())",
+                    forbiddenId, events.getLast(), subscriptionId, "http://127.0.0.1:9080/events", "{}");
+        })).isInstanceOf(DataAccessException.class);
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM webhook_deliveries WHERE id = ?", Long.class, forbiddenId)).isZero();
     }
 
     private void createOrders(int count) {

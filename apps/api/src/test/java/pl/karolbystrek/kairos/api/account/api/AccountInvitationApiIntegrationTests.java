@@ -1,7 +1,6 @@
 package pl.karolbystrek.kairos.api.account.api;
 
 import jakarta.servlet.http.Cookie;
-import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,7 +12,6 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
-import org.springframework.transaction.annotation.Transactional;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
 import pl.karolbystrek.kairos.api.account.domain.TenantRole;
 import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
@@ -38,7 +36,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@Transactional
 class AccountInvitationApiIntegrationTests extends RedisListenerIsolatedIntegrationTest {
 
     private static final String API_CONTEXT_PATH = "/api";
@@ -48,14 +45,10 @@ class AccountInvitationApiIntegrationTests extends RedisListenerIsolatedIntegrat
     @Autowired
     private MockMvc mockMvc;
 
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
+    private final JdbcTemplate jdbcTemplate = pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase.ownerDatabase();
 
     @Autowired
     private ObjectMapper objectMapper;
-
-    @Autowired
-    private EntityManager entityManager;
 
     private UUID tenantId;
     private UUID locationId;
@@ -75,11 +68,10 @@ class AccountInvitationApiIntegrationTests extends RedisListenerIsolatedIntegrat
         var now = Instant.parse("2026-08-01T12:00:00Z");
         jdbcTemplate.update("INSERT INTO tenants (id) VALUES (?)", tenantId);
         jdbcTemplate.update(
-            "INSERT INTO locations (id, tenant_id, name, normalized_name, live_normalized_name) VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO locations (id, tenant_id, name, normalized_name) VALUES (?, ?, ?, ?)",
             locationId,
             tenantId,
             "Main restaurant",
-            "main restaurant",
             "main restaurant"
         );
         jdbcTemplate.update(
@@ -232,11 +224,10 @@ class AccountInvitationApiIntegrationTests extends RedisListenerIsolatedIntegrat
     void managerCanInviteOnlyOperatorsAtItsLocationAndOperatorCannotInvite() throws Exception {
         var otherLocationId = UUID.randomUUID();
         jdbcTemplate.update(
-            "INSERT INTO locations (id, tenant_id, name, normalized_name, live_normalized_name) VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO locations (id, tenant_id, name, normalized_name) VALUES (?, ?, ?, ?)",
             otherLocationId,
             tenantId,
             "Other restaurant",
-            "other restaurant",
             "other restaurant"
         );
         var manager = insertMember(locationId, "MANAGER");
@@ -314,7 +305,6 @@ class AccountInvitationApiIntegrationTests extends RedisListenerIsolatedIntegrat
             Timestamp.from(createdAt.plus(Duration.ofDays(7))),
             invitationId
         );
-        entityManager.clear();
 
         mockMvc.perform(withAuthentication(apiGet("/account-invitations/v1")))
             .andExpect(status().isOk())

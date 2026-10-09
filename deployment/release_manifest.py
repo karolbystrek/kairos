@@ -12,6 +12,9 @@ RUNTIME_FILES = (
     "nginx/default.conf.template",
     "nginx/cloudflare-real-ip.conf",
     "deployment/zitadel/bootstrap.py",
+    "deployment/postgres/bootstrap.sh", "deployment/postgres/upgrade_rls.sql",
+    "deployment/postgres/prepare_upgrade.py",
+    "apps/api/src/main/resources/db/migration/V1__create_initial_schema.sql",
     "deployment/deploy.sh",
     "deployment/deploy.py",
 )

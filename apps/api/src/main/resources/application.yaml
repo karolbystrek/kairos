@@ -18,10 +18,16 @@ spring:
     time-zone: UTC
   datasource:
     url: "jdbc:postgresql://postgres:5432/${POSTGRES_DB}"
-    username: "${POSTGRES_USER}"
-    password: "${POSTGRES_PASSWORD}"
+    username: "${KAIROS_DB_RUNTIME_USER}"
+    password: "${KAIROS_DB_RUNTIME_PASSWORD}"
     hikari:
       connection-init-sql: SET TIME ZONE 'UTC'
+  flyway:
+    url: "jdbc:postgresql://postgres:5432/${POSTGRES_DB}"
+    user: "${KAIROS_DB_OWNER_USER}"
+    password: "${KAIROS_DB_OWNER_PASSWORD}"
+    placeholders:
+      runtimeUser: "${KAIROS_DB_RUNTIME_USER}"
   data:
     redis:
       host: "${REDIS_HOST}"

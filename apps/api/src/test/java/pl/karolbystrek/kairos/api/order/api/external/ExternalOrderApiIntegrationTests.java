@@ -10,7 +10,6 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
-import org.springframework.transaction.annotation.Transactional;
 import pl.karolbystrek.kairos.api.integration.application.ApiKeyManagementService;
 import pl.karolbystrek.kairos.api.integration.application.ExternalIntegrationManagementService;
 import pl.karolbystrek.kairos.api.integration.testsupport.IntegrationTestFixture;
@@ -29,7 +28,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@Transactional
 class ExternalOrderApiIntegrationTests extends RedisListenerIsolatedIntegrationTest {
 
     private static final String API_CONTEXT_PATH = "/api";
@@ -40,8 +38,7 @@ class ExternalOrderApiIntegrationTests extends RedisListenerIsolatedIntegrationT
     @Autowired
     private ObjectMapper objectMapper;
 
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
+    private final JdbcTemplate jdbcTemplate = pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase.ownerDatabase();
 
     @Autowired
     private ExternalIntegrationManagementService integrationService;

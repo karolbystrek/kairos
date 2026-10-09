@@ -32,6 +32,17 @@ public class CurrentAccountService {
         return getTenantAccount(staffPrincipal);
     }
 
+    @Transactional(readOnly = true)
+    public String providerSubject(PanelPrincipal principal) {
+        if (!(principal instanceof StaffPrincipal staffPrincipal)) {
+            throw new StaffAccessDeniedException("The panel account is not eligible");
+        }
+        var access = staffAccessService.resolve(staffPrincipal);
+        return accountRepository.findById(access.accountId())
+            .orElseThrow(() -> new StaffAccessDeniedException("The staff account is not eligible"))
+            .getProviderSubject();
+    }
+
     private CurrentAccountView getTenantAccount(StaffPrincipal principal) {
         var access = staffAccessService.resolve(principal);
         var account = accountRepository.findById(access.accountId())

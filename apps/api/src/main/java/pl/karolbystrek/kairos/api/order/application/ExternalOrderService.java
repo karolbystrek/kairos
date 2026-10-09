@@ -8,6 +8,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pl.karolbystrek.kairos.api.integration.application.model.ApiKeyPrincipal;
+import pl.karolbystrek.kairos.api.integration.application.exception.IntegrationAccessDeniedException;
 import pl.karolbystrek.kairos.api.integration.domain.ApiKeyScope;
 import pl.karolbystrek.kairos.api.location.infrastructure.persistence.LocationRepository;
 import pl.karolbystrek.kairos.api.order.application.exception.ExternalOrderConflictException;
@@ -21,6 +22,7 @@ import pl.karolbystrek.kairos.api.order.application.model.OrderInitiator;
 import pl.karolbystrek.kairos.api.order.domain.CustomerOrder;
 import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
 import pl.karolbystrek.kairos.api.order.infrastructure.persistence.CustomerOrderRepository;
+import pl.karolbystrek.kairos.api.persistence.infrastructure.DatabaseAccessContext;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -38,6 +40,7 @@ public class ExternalOrderService {
     public static final int MAXIMUM_PAGE_SIZE = 100;
     public static final int MAXIMUM_IDEMPOTENCY_KEY_BYTES = 255;
 
+    private final DatabaseAccessContext databaseAccess;
     private final CustomerOrderRepository orderRepository;
     private final LocationRepository locationRepository;
     private final OrderCommandService commandService;
@@ -52,7 +55,10 @@ public class ExternalOrderService {
             String cursorValue,
             Integer requestedLimit
     ) {
-        principal.requireScope(ApiKeyScope.ORDERS_READ);
+        databaseAccess.integration(principal);
+        if (!principal.scopes().contains(ApiKeyScope.ORDERS_READ)) {
+            throw new IntegrationAccessDeniedException("The API Key does not grant the required scope");
+        }
         if (requestedLocationId != null) {
             principal.requireLocationAccess(requestedLocationId);
         }
@@ -89,7 +95,10 @@ public class ExternalOrderService {
 
     @Transactional(readOnly = true)
     public ExternalOrderView find(ApiKeyPrincipal principal, UUID orderId) {
-        principal.requireScope(ApiKeyScope.ORDERS_READ);
+        databaseAccess.integration(principal);
+        if (!principal.scopes().contains(ApiKeyScope.ORDERS_READ)) {
+            throw new IntegrationAccessDeniedException("The API Key does not grant the required scope");
+        }
         var order = orderRepository.findByIdAndLocationIdIn(orderId, principal.locationIds())
                 .orElseThrow(ExternalOrderService::orderNotFound);
         return ExternalOrderView.from(order);
@@ -102,6 +111,7 @@ public class ExternalOrderService {
             String customLabel,
             String idempotencyKey
     ) {
+        databaseAccess.integrationCommand(principal);
         principal.requireScope(ApiKeyScope.ORDERS_WRITE);
         principal.requireLocationAccess(locationId);
         var validatedIdempotencyKey = validateIdempotencyKey(idempotencyKey);
@@ -148,6 +158,7 @@ public class ExternalOrderService {
             UUID orderId,
             OrderStatus target
     ) {
+        databaseAccess.integrationCommand(principal);
         principal.requireScope(ApiKeyScope.ORDERS_WRITE);
         var order = orderRepository.findForUpdateByIdAndLocationIdIn(
                         orderId,
