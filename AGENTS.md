@@ -18,11 +18,15 @@ Use `gh` for all GitHub operations.
 
 Agree the problem and plan with the user, save the plan in a new GitHub issue
 before changing files, and split distinct steps into linked sub-issues. Then
-create a new `codex/` branch from current `main` for each implementation issue.
+create a new `<issue>-<topic>` branch from current `main` for each implementation
+issue.
 Validate, commit all task changes in one Conventional Commit, and open a PR to
 `main`. Stop for user verification and merge; never develop directly on `main`
 or merge the PR yourself. Keep task plans/progress in GitHub, not committed
 `.md` files. See [the full workflow](docs/agents/issue-tracker.md) before changes.
+
+Use subagents to implement atomic, independent tasks in parallel when their
+changes do not overlap or interfere with one another.
 
 ## Cloud resource approval
 

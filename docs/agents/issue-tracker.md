@@ -10,6 +10,7 @@
 
 Repository: [karolbystrek/kairos](https://github.com/karolbystrek/kairos).
 Use `gh` for every GitHub operation; use `--body-file` for multiline content.
+Use descriptive issue titles without an agent prefix.
 
 ## Issue and implementation cycle
 
@@ -22,7 +23,7 @@ Use `gh` for every GitHub operation; use `--body-file` for multiline content.
    linked to its parent. Give each implementation issue a focused, independently
    reviewable scope; keep plans and progress in GitHub rather than task Markdown.
 3. After recording the plan, inspect `git status --short`, preserve unrelated
-   work, and create a new `codex/<issue>-<topic>` branch from current `main`
+   work, and create a new `<issue>-<topic>` branch from current `main`
    (normally `origin/main`). All repository changes happen on branches, never
    directly on `main`. Each implementation sub-issue follows this same cycle;
    coordinate dependencies through reviewed/merged PRs.
