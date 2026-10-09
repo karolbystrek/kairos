@@ -15,6 +15,7 @@ import pl.karolbystrek.kairos.api.order.application.model.StaffOrderView;
 import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
 import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
 
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -141,15 +142,16 @@ class OrderAuthorizationIntegrationTests extends RedisListenerIsolatedIntegratio
         var now = Instant.now();
         jdbcTemplate.update(
             """
-            INSERT INTO accounts (id, provider_subject, tenant_id, email, tenant_role, status, created_at, updated_at) VALUES (?, CAST(RANDOM_UUID() AS VARCHAR), ?, ?, ?, ?, ?, ?)
+            INSERT INTO accounts (id, provider_subject, tenant_id, email, tenant_role, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             accountId,
+            UUID.randomUUID().toString(),
             accountTenantId,
             "account-" + accountId + "@example.com",
             tenantRole.name(),
             accountStatus,
-            now,
-            now
+            Timestamp.from(now),
+            Timestamp.from(now)
         );
         if (assignedLocationId != null) {
             jdbcTemplate.update(
@@ -162,8 +164,8 @@ class OrderAuthorizationIntegrationTests extends RedisListenerIsolatedIntegratio
                 assignedLocationId,
                 accountTenantId,
                 assignmentRole,
-                now,
-                now
+                Timestamp.from(now),
+                Timestamp.from(now)
             );
         }
         return new StaffPrincipal(accountId, accountTenantId, tenantRole);

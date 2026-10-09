@@ -31,9 +31,11 @@
 - Add or change tests only to protect an accepted product behavior, security
   boundary, data-integrity invariant, external contract, or concrete regression.
   State the failure the test would catch.
-- Prefer the smallest behavioral test at the owning boundary. Extend existing
-  coverage before adding a suite; do not repeat the same scenario across layers
-  unless each layer verifies a distinct contract.
+- Keep tests focused and compact. Prefer integration tests that exercise a
+  complete scenario or path across the relevant components, rather than tests
+  organized around individual files or functions. Extend existing scenarios
+  before adding a suite; do not repeat them across layers unless each layer
+  verifies a distinct contract.
 - Do not test trivial getters, pass-through wrappers, framework/library behavior,
   file existence, implementation structure, CSS classes, icon selection, or exact
   non-contract copy. Keep accessibility assertions about observable semantics
@@ -41,7 +43,16 @@
 - Assert outcomes independently of the implementation. Mock external boundaries,
   not the behavior being verified; call counts matter only when repetition itself
   violates the contract.
-- No coverage-percentage targets or default test-per-function requirement.
-  Presentation-only changes normally need lint/type-checking, not new tests.
+- Not everything needs a test. There is no 100% coverage requirement,
+  coverage-percentage target, or test-per-file/function rule. Choose scenarios
+  by consequence and regression risk; leave trivial or low-risk behavior
+  untested. Presentation-only changes normally need lint/type-checking, not
+  new tests.
 - Keep focused coverage for authorization, tenant isolation, validation,
   consequential state transitions, atomicity, idempotency, and relevant races.
+
+Backend verification uses disposable PostgreSQL 18 through the JUnit launcher.
+Docker is required; missing Docker fails the suite rather than skipping it.
+Run `./mvnw --batch-mode verify` from `apps/api`, or add
+`-f apps/api/pom.xml` when invoking the wrapper from the repository root.
+See [local development](local-development.md) for container and fixture safety.

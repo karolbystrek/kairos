@@ -36,3 +36,11 @@ files. Start Compose separately with `docker compose up --build`. Use
 Source is not synchronized into the production-mode containers; rebuild and
 recreate only affected services when runtime verification requires updated
 code.
+
+Backend verification requires a running Docker engine. Run `./mvnw --batch-mode verify`
+from `apps/api` (or `apps/api/mvnw -f apps/api/pom.xml --batch-mode verify`
+from the repository root). The JUnit launcher starts one disposable PostgreSQL 18
+container per session and removes it afterward. Missing Docker fails verification;
+there is no H2 fallback or silently skipped database suite. Tests never reuse
+Compose containers or user-owned volumes. Fixture setup can use
+`PostgresTestDatabase.ownerDatabase()`; this baseline does not enforce RLS yet.

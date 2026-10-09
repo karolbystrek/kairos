@@ -14,6 +14,7 @@ import pl.karolbystrek.kairos.api.location.application.exception.LocationConflic
 import pl.karolbystrek.kairos.api.location.domain.LocationStatus;
 import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
 
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
@@ -255,15 +256,16 @@ class LocationServiceIntegrationTests extends RedisListenerIsolatedIntegrationTe
         var now = Instant.now();
         jdbcTemplate.update(
             """
-            INSERT INTO accounts (id, provider_subject, tenant_id, email, tenant_role, status, created_at, updated_at) VALUES (?, CAST(RANDOM_UUID() AS VARCHAR), ?, ?, ?, ?, ?, ?)
+            INSERT INTO accounts (id, provider_subject, tenant_id, email, tenant_role, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             accountId,
+            UUID.randomUUID().toString(),
             tenantId,
             "location-test-" + accountId + "@example.com",
             tenantRole.name(),
             status.name(),
-            now,
-            now
+            Timestamp.from(now),
+            Timestamp.from(now)
         );
         return new StaffPrincipal(accountId, tenantId, tenantRole);
     }
@@ -285,8 +287,8 @@ class LocationServiceIntegrationTests extends RedisListenerIsolatedIntegrationTe
             locationId,
             tenantId,
             role.name(),
-            now,
-            now
+            Timestamp.from(now),
+            Timestamp.from(now)
         );
     }
 
@@ -328,9 +330,9 @@ class LocationServiceIntegrationTests extends RedisListenerIsolatedIntegrationTe
             locationId,
             issuerId,
             "a".repeat(64),
-            now.plus(7, ChronoUnit.DAYS),
-            now,
-            now
+            Timestamp.from(now.plus(7, ChronoUnit.DAYS)),
+            Timestamp.from(now),
+            Timestamp.from(now)
         );
         return id;
     }
@@ -348,8 +350,8 @@ class LocationServiceIntegrationTests extends RedisListenerIsolatedIntegrationTe
             locationId,
             UUID.randomUUID(),
             status,
-            now,
-            now
+            Timestamp.from(now),
+            Timestamp.from(now)
         );
         return id;
     }
@@ -370,9 +372,9 @@ class LocationServiceIntegrationTests extends RedisListenerIsolatedIntegrationTe
             """,
             integrationId,
             tenantId,
-            now,
-            now,
-            now
+            Timestamp.from(now),
+            Timestamp.from(now),
+            Timestamp.from(now)
         );
         var singleKeyId = insertApiKey(
             integrationId,
@@ -434,7 +436,7 @@ class LocationServiceIntegrationTests extends RedisListenerIsolatedIntegrationTe
             tenantId,
             name,
             normalizedName,
-            Instant.now()
+            Timestamp.from(Instant.now())
         );
         jdbcTemplate.update(
             "INSERT INTO api_key_location_access (api_key_id, location_id, tenant_id) VALUES (?, ?, ?)",
@@ -475,9 +477,9 @@ class LocationServiceIntegrationTests extends RedisListenerIsolatedIntegrationTe
             tenantId,
             name,
             normalizedName,
-            now,
-            now,
-            now
+            Timestamp.from(now),
+            Timestamp.from(now),
+            Timestamp.from(now)
         );
         jdbcTemplate.update(
             """
