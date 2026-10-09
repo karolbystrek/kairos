@@ -3,6 +3,8 @@ package pl.karolbystrek.kairos.api.notification.application;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
@@ -424,6 +426,31 @@ class CustomerPushSubscriptionIntegrationTests extends RedisListenerIsolatedInte
 
     private static StringRedisTemplate stringRedisTemplate() {
         return new NoOpStringRedisTemplate();
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = OrderStatus.class, names = {"COMPLETED", "CANCELED"})
+    void reconciliationPreservesTheFinalPushBeforeAndAfterFanout(OrderStatus terminalStatus) {
+        var order = createOrder();
+        var input = newSubscription();
+        subscriptionService.reconcile(input, List.of(order.trackingReference()));
+        if (terminalStatus == OrderStatus.COMPLETED) {
+            orderService.updateStatus(tenant.administrator(), order.id(), OrderStatus.READY);
+        }
+        orderService.updateStatus(tenant.administrator(), order.id(), terminalStatus);
+
+        subscriptionService.reconcile(input, List.of(order.trackingReference()));
+        assertThat(count("customer_push_enrollments")).isEqualTo(1);
+        while (fanoutService.fanOutAvailable() > 0) {
+            // The final event owns removal after its delivery is materialized.
+        }
+        assertThat(count("customer_push_enrollments")).isZero();
+        subscriptionService.reconcile(input, List.of(order.trackingReference()));
+
+        assertThat(count("customer_push_enrollments")).isZero();
+        var claimed = claimService.claimAvailable();
+        assertThat(claimed).hasSize(1);
+        assertThat(claimed.getFirst().payload()).contains("\"status\":\"" + terminalStatus + "\"");
     }
 
     private StaffOrderView createOrder() {

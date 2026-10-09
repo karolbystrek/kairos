@@ -25,7 +25,7 @@ import { updateApplicationBadge } from "@/src/pwa/badge";
 import {
   pruneTerminalTrackedOrders,
   readNotificationMetadata,
-  readTrackedOrders,
+  readNotificationTrackingReferences,
   removeTrackedOrder,
   type SerializedPushSubscription,
   updateNotificationMetadata,
@@ -393,10 +393,7 @@ async function synchronizeGrantedSubscription(): Promise<void> {
     userVisibleOnly: true,
     applicationServerKey,
   });
-  const orders = await readTrackedOrders();
-  const trackingReferences = orders.map(
-    ({ trackingReference }) => trackingReference,
-  );
+  const trackingReferences = await readNotificationTrackingReferences();
   const serialized = serializePushSubscription(subscription);
   const metadata = await readNotificationMetadata();
   const previousSubscription =

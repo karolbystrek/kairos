@@ -169,6 +169,10 @@ the state without disclosing the order label, and their click target is the
 order route. Notifications use one replacement tag per order. The service worker
 validates a versioned payload, deduplicates its stable event ID, and applies the
 transition only when it is reachable from the locally stored state graph.
+REST or SSE reaching the same state does not consume that notification. Terminal
+snapshot cleanup preserves eligibility for the final notification during the
+push freshness window; explicit tracking removal or notification opt-out
+suppresses pending notifications.
 Malformed or unprocessable payloads produce a generic, privacy-preserving
 notification. The foreground tracking page continues to use REST and SSE and
 may issue one short vibration pulse for a newly observed transition when the

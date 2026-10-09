@@ -173,7 +173,6 @@ public class CustomerPushSubscriptionService {
                 .sorted()
                 .map(orderRepository::findForUpdateByTrackingReference)
                 .flatMap(Optional::stream)
-                .filter(order -> order.getStatus().isActive())
                 .collect(Collectors.toMap(
                         CustomerOrder::getId,
                         order -> order,
@@ -198,7 +197,8 @@ public class CustomerPushSubscriptionService {
                 .map(CustomerPushEnrollment::getOrderId)
                 .collect(Collectors.toSet());
         for (var order : desiredOrdersById.values()) {
-            if (existingOrderIds.contains(order.getId())) {
+            // Fan-out retires terminal enrollments after creating their final delivery.
+            if (!order.getStatus().isActive() || existingOrderIds.contains(order.getId())) {
                 continue;
             }
             if (enrollmentRepository.countForTrackingReference(order.getTrackingReference())

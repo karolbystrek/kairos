@@ -30,6 +30,7 @@ const tombstoneSchema = z
     mode: z.enum(["terminal", "suppressed"]),
     status: orderStatusSchema.optional(),
     transitionedAt: z.iso.datetime({ offset: true }).optional(),
+    notificationPending: z.boolean().optional(),
     expiresAt: z.number().finite(),
   })
   .strict();
@@ -194,6 +195,39 @@ export async function readTrackedOrder(
   }
 }
 
+export async function readNotificationTrackingReferences(): Promise<string[]> {
+  return withDatabase(async (database) => {
+    const transaction = database.transaction(
+      [ORDER_STORE, TOMBSTONE_STORE],
+      "readonly",
+    );
+    const [orders, tombstones] = await Promise.all([
+      requestResult(transaction.objectStore(ORDER_STORE).getAll()),
+      requestResult(transaction.objectStore(TOMBSTONE_STORE).getAll()),
+    ]);
+
+    return [
+      ...orders
+        .map((value) => storedOrderSchema.safeParse(value))
+        .filter((result) => result.success)
+        .map((result) => result.data)
+        .filter((order) => isActiveOrderStatus(order.status))
+        .map((order) => order.trackingReference),
+      ...tombstones
+        .map((value) => tombstoneSchema.safeParse(value))
+        .filter((result) => result.success)
+        .map((result) => result.data)
+        .filter(
+          (tombstone) =>
+            tombstone.mode === "terminal" &&
+            tombstone.notificationPending === true &&
+            tombstone.expiresAt > Date.now(),
+        )
+        .map((tombstone) => tombstone.trackingReference),
+    ];
+  });
+}
+
 export async function readLastStableDestination(): Promise<StableCustomerDestination | null> {
   try {
     return await withDatabase(async (database) => {
@@ -268,15 +302,25 @@ export async function rememberTrackedOrder(
           tombstoneStore.delete(parsed.data.trackingReference);
         }
       } else {
+        const metadata = await readMetadataFromTransaction(transaction);
+
         orderStore.delete(parsed.data.trackingReference);
         tombstoneStore.put({
           trackingReference: parsed.data.trackingReference,
           mode: "terminal",
           status: parsed.data.status,
           transitionedAt: parsed.data.updatedAt,
+          // REST can finish tracking before the final Push notification arrives.
+          notificationPending:
+            (metadata.notificationsEnabled === true &&
+              (metadata.enrolledTrackingReferences ?? []).includes(
+                parsed.data.trackingReference,
+              )) ||
+            (terminalTombstoneIsCurrent &&
+              tombstoneResult.data.status === parsed.data.status &&
+              tombstoneResult.data.notificationPending === true),
           expiresAt: Date.now() + PUSH_FRESHNESS_MILLISECONDS,
         });
-        const metadata = await readMetadataFromTransaction(transaction);
 
         await putMetadataInTransaction(transaction, {
           enrolledTrackingReferences: (
@@ -421,11 +465,26 @@ export async function updateNotificationMetadata(
   update: Partial<NotificationMetadata>,
 ): Promise<NotificationMetadata> {
   return withDatabase(async (database) => {
-    const transaction = database.transaction(METADATA_STORE, "readwrite");
+    const transaction = database.transaction(
+      [METADATA_STORE, TOMBSTONE_STORE],
+      "readwrite",
+    );
     const current = await readMetadataFromTransaction(transaction);
     const next = { ...current, ...update };
 
     transaction.objectStore(METADATA_STORE).put(next, "notification");
+    if (update.notificationsEnabled === false) {
+      const tombstones = transaction.objectStore(TOMBSTONE_STORE);
+      const values = await requestResult(tombstones.getAll());
+
+      for (const value of values) {
+        const result = tombstoneSchema.safeParse(value);
+
+        if (result.success && result.data.notificationPending === true) {
+          tombstones.put({ ...result.data, notificationPending: false });
+        }
+      }
+    }
     await transactionComplete(transaction);
 
     return next;
@@ -471,12 +530,18 @@ export async function applyPushTransition(
         .get(transition.trackingReference),
     );
     const tombstoneResult = tombstoneSchema.safeParse(tombstoneValue);
+    const pendingTerminalNotification =
+      tombstoneResult.success &&
+      tombstoneResult.data.mode === "terminal" &&
+      tombstoneResult.data.status === transition.status &&
+      tombstoneResult.data.notificationPending === true;
 
     if (
       (tombstoneResult.success && tombstoneResult.data.mode === "suppressed") ||
-      !(metadata.enrolledTrackingReferences ?? []).includes(
-        transition.trackingReference,
-      )
+      (!pendingTerminalNotification &&
+        !(metadata.enrolledTrackingReferences ?? []).includes(
+          transition.trackingReference,
+        ))
     ) {
       await transactionComplete(transaction);
 
@@ -506,7 +571,7 @@ export async function applyPushTransition(
 
     if (
       currentResult.success &&
-      !canAdvanceStatus(currentResult.data.status, transition.status)
+      !canApplyStatus(currentResult.data.status, transition.status)
     ) {
       await transactionComplete(transaction);
 
@@ -627,12 +692,9 @@ async function removeExpiredPushMetadata(
   }
 }
 
-function canAdvanceStatus(
-  current: OrderStatus,
-  candidate: OrderStatus,
-): boolean {
+function canApplyStatus(current: OrderStatus, candidate: OrderStatus): boolean {
   if (current === candidate) {
-    return false;
+    return true;
   }
 
   return (
