@@ -7,13 +7,17 @@ import pl.karolbystrek.kairos.api.notification.application.model.CustomerPushSub
 import pl.karolbystrek.kairos.api.notification.application.model.ValidatedPushSubscription;
 import pl.karolbystrek.kairos.api.notification.infrastructure.http.PushDestinationPolicy;
 
+import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
 import java.security.AlgorithmParameters;
 import java.security.GeneralSecurityException;
 import java.security.KeyFactory;
 import java.security.MessageDigest;
 import java.security.spec.ECGenParameterSpec;
+import java.security.spec.ECParameterSpec;
 import java.security.spec.ECPoint;
 import java.security.spec.ECPublicKeySpec;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.HexFormat;
 
@@ -63,14 +67,14 @@ class CustomerPushSubscriptionValidator {
         try {
             var parameters = AlgorithmParameters.getInstance("EC");
             parameters.init(new ECGenParameterSpec("secp256r1"));
-            var specification = parameters.getParameterSpec(java.security.spec.ECParameterSpec.class);
+            var specification = parameters.getParameterSpec(ECParameterSpec.class);
             var coordinateBytes = (P256_KEY_BYTES - 1) / 2;
-            var x = new java.math.BigInteger(1, java.util.Arrays.copyOfRange(
+            var x = new BigInteger(1, Arrays.copyOfRange(
                     encoded,
                     1,
                     1 + coordinateBytes
             ));
-            var y = new java.math.BigInteger(1, java.util.Arrays.copyOfRange(
+            var y = new BigInteger(1, Arrays.copyOfRange(
                     encoded,
                     1 + coordinateBytes,
                     encoded.length
@@ -89,7 +93,7 @@ class CustomerPushSubscriptionValidator {
     private static String sha256(String value) {
         try {
             var digest = MessageDigest.getInstance("SHA-256")
-                    .digest(value.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                    .digest(value.getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(digest);
         } catch (GeneralSecurityException exception) {
             throw new IllegalStateException("SHA-256 is unavailable", exception);

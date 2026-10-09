@@ -8,14 +8,22 @@ import pl.karolbystrek.kairos.api.account.application.exception.AccountNotFoundE
 import pl.karolbystrek.kairos.api.account.application.exception.StaffAccessDeniedException;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
 import pl.karolbystrek.kairos.api.account.domain.AccountStatus;
-import pl.karolbystrek.kairos.api.account.domain.assignment.AssignmentRole;
 import pl.karolbystrek.kairos.api.account.domain.TenantRole;
+import pl.karolbystrek.kairos.api.account.domain.assignment.AssignmentRole;
+import pl.karolbystrek.kairos.api.integration.testsupport.IntegrationTestFixture;
+import pl.karolbystrek.kairos.api.location.application.LocationService;
+import pl.karolbystrek.kairos.api.location.domain.LocationStatus;
+import pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase;
 import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
 
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Locale;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -31,9 +39,9 @@ class AccountProvisioningServiceIntegrationTests extends RedisListenerIsolatedIn
     private AccountInvitationService invitationService;
 
     @Autowired
-    private pl.karolbystrek.kairos.api.location.application.LocationService locationService;
+    private LocationService locationService;
 
-    private final JdbcTemplate jdbcTemplate = pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase.ownerDatabase();
+    private final JdbcTemplate jdbcTemplate = PostgresTestDatabase.ownerDatabase();
 
     @Test
     void listsOnlyAccountsManageableByTheCurrentAdministratorOrManager() {
@@ -195,11 +203,11 @@ class AccountProvisioningServiceIntegrationTests extends RedisListenerIsolatedIn
 
     @Test
     void concurrentAccountAndLocationDisableFinishWithoutConflictingLocks() throws Exception {
-        var tenant = new pl.karolbystrek.kairos.api.integration.testsupport.IntegrationTestFixture(jdbcTemplate).createTenant();
+        var tenant = new IntegrationTestFixture(jdbcTemplate).createTenant();
         var otherAdminId = insertAccount(tenant.tenantId(), "cascade-race-" + UUID.randomUUID(), TenantRole.ADMIN, AccountStatus.ENABLED);
         var otherAdmin = new StaffPrincipal(otherAdminId, tenant.tenantId(), TenantRole.ADMIN);
-        var start = new java.util.concurrent.CountDownLatch(1);
-        try (var executor = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+        var start = new CountDownLatch(1);
+        try (var executor = Executors.newFixedThreadPool(2)) {
             var accountChange = executor.submit(() -> {
                 start.await();
                 provisioningService.updateStatus(otherAdmin, tenant.manager().accountId(), AccountStatus.DISABLED);
@@ -208,12 +216,12 @@ class AccountProvisioningServiceIntegrationTests extends RedisListenerIsolatedIn
             var locationChange = executor.submit(() -> {
                 start.await();
                 locationService.updateStatus(tenant.administrator(), tenant.firstLocationId(),
-                    pl.karolbystrek.kairos.api.location.domain.LocationStatus.DISABLED);
+                    LocationStatus.DISABLED);
                 return null;
             });
             start.countDown();
-            accountChange.get(15, java.util.concurrent.TimeUnit.SECONDS);
-            locationChange.get(15, java.util.concurrent.TimeUnit.SECONDS);
+            accountChange.get(15, TimeUnit.SECONDS);
+            locationChange.get(15, TimeUnit.SECONDS);
         }
         assertThat(jdbcTemplate.queryForObject("SELECT status FROM accounts WHERE id = ?",
             String.class, tenant.manager().accountId())).isEqualTo("DISABLED");
@@ -235,7 +243,7 @@ class AccountProvisioningServiceIntegrationTests extends RedisListenerIsolatedIn
             locationId,
             tenantId,
             name,
-            name.toLowerCase(java.util.Locale.ROOT)
+            name.toLowerCase(Locale.ROOT)
         );
         return locationId;
     }

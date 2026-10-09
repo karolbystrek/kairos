@@ -1,6 +1,7 @@
 package pl.karolbystrek.kairos.api.authentication.api;
 
 import jakarta.servlet.http.Cookie;
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -15,6 +16,7 @@ import pl.karolbystrek.kairos.api.account.application.AccountInvitationService;
 import pl.karolbystrek.kairos.api.account.domain.assignment.AssignmentRole;
 import pl.karolbystrek.kairos.api.authentication.infrastructure.zitadel.ZitadelClient.ProviderSession;
 import pl.karolbystrek.kairos.api.integration.testsupport.IntegrationTestFixture;
+import pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase;
 import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
 
 import java.util.UUID;
@@ -29,7 +31,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegrationTest {
     @Autowired private MockMvc mvc;
-    private final JdbcTemplate database = pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase.ownerDatabase();
+    private final JdbcTemplate database = PostgresTestDatabase.ownerDatabase();
     @Autowired private JdbcTemplate runtimeDatabase;
     @Autowired private AccountInvitationService invitations;
 
@@ -98,7 +100,7 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
         mvc.perform(csrf(postApi("/tenant-registrations/v1").content(registration(email, null))))
             .andExpect(status().isConflict())
             .andExpect(jsonPath("$.fieldErrors.email").isNotEmpty())
-            .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("private provider"))));
+            .andExpect(content().string(Matchers.not(Matchers.containsString("private provider"))));
     }
 
     @Test

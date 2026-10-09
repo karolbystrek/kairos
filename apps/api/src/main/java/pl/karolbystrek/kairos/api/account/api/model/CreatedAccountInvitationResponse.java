@@ -1,6 +1,7 @@
 package pl.karolbystrek.kairos.api.account.api.model;
 
 import pl.karolbystrek.kairos.api.account.application.model.CreatedAccountInvitation;
+import pl.karolbystrek.kairos.api.account.domain.assignment.AssignmentRole;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -9,7 +10,7 @@ public record CreatedAccountInvitationResponse(
     UUID id,
     UUID locationId,
     String locationName,
-    pl.karolbystrek.kairos.api.account.domain.assignment.AssignmentRole role,
+    AssignmentRole role,
     String issuedByEmail,
     Instant createdAt,
     Instant expiresAt,

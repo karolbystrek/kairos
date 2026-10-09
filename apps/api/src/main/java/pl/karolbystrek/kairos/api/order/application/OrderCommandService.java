@@ -19,6 +19,7 @@ import pl.karolbystrek.kairos.api.order.infrastructure.persistence.OrderHistoryR
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -103,7 +104,7 @@ public class OrderCommandService {
         };
     }
 
-    private long nextAutomaticLabelNumber(java.util.UUID locationId, Instant now) {
+    private long nextAutomaticLabelNumber(UUID locationId, Instant now) {
         var utcDate = LocalDate.ofInstant(now, ZoneOffset.UTC);
         var startInclusive = utcDate.atStartOfDay(ZoneOffset.UTC).toInstant();
         var endExclusive = utcDate.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();

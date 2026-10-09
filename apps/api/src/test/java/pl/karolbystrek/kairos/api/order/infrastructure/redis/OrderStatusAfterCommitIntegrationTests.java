@@ -1,12 +1,12 @@
 package pl.karolbystrek.kairos.api.order.infrastructure.redis;
 
+import jakarta.annotation.Resource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase;
 import org.springframework.jdbc.support.JdbcTransactionManager;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -14,10 +14,12 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 import org.springframework.transaction.annotation.Transactional;
 import pl.karolbystrek.kairos.api.order.application.model.OrderStatusChangedEvent;
 import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
+import pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
 import javax.sql.DataSource;
+
 import java.time.Instant;
 import java.util.UUID;
 
@@ -27,10 +29,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @SpringJUnitConfig(OrderStatusAfterCommitIntegrationTests.TestConfiguration.class)
 class OrderStatusAfterCommitIntegrationTests {
 
-    @jakarta.annotation.Resource
+    @Resource
     private TransactionalEventSource eventSource;
 
-    @jakarta.annotation.Resource
+    @Resource
     private RecordingStringRedisTemplate redisTemplate;
 
     @BeforeEach

@@ -14,10 +14,12 @@ import pl.karolbystrek.kairos.api.integration.webhook.infrastructure.persistence
 import pl.karolbystrek.kairos.api.integration.webhook.infrastructure.persistence.WebhookSigningSecretVersionRepository;
 import pl.karolbystrek.kairos.api.integration.webhook.infrastructure.security.SigningSecretCipher;
 import pl.karolbystrek.kairos.api.persistence.infrastructure.DatabaseAccessContext;
-import pl.karolbystrek.kairos.api.persistence.infrastructure.WorkerOperation;
 import pl.karolbystrek.kairos.api.persistence.infrastructure.WorkerDiscoveryRepository;
+import pl.karolbystrek.kairos.api.persistence.infrastructure.WorkerOperation;
 
 import java.time.Clock;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
@@ -38,7 +40,7 @@ public class WebhookDeliveryClaimService {
     public List<ClaimedWebhookDelivery> claimAvailable() {
         var transaction = new TransactionTemplate(transactionManager);
         transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
-        var claimed = new java.util.ArrayList<ClaimedWebhookDelivery>();
+        var claimed = new ArrayList<ClaimedWebhookDelivery>();
         for (var index = 0; index < properties.worker().batchSize(); index++) {
             var delivery = transaction.execute(status -> claimNext());
             if (delivery == null) break;
@@ -59,7 +61,7 @@ public class WebhookDeliveryClaimService {
             var ids = deliverySigningRepository.findAllByDeliveryId(id).stream()
                     .map(WebhookDeliverySigningVersion::getSigningSecretVersionId).toList();
             var versions = signingSecretRepository.findAllById(ids).stream()
-                    .sorted(java.util.Comparator.comparing(WebhookSigningSecretVersion::getIssuedAt).reversed()).toList();
+                    .sorted(Comparator.comparing(WebhookSigningSecretVersion::getIssuedAt).reversed()).toList();
             if (ids.isEmpty() || versions.size() != ids.size()) {
                 throw new IllegalStateException("Webhook delivery references missing signing material");
             }

@@ -26,3 +26,10 @@
   operations.
 - Use `var` when an initializer makes the local type evident. Indent Java with
   four spaces and never use tabs.
+- Import Java classes and use their simple names in production and test code,
+  including annotations and generic types. Avoid fully qualified class names
+  in code; qualify only when a name collision makes it necessary. Use explicit
+  imports rather than wildcard imports.
+- Prefer straightforward control flow and existing feature patterns. Extract
+  helpers for a repeated operation or a meaningful responsibility, not merely
+  to wrap a single call; avoid speculative interfaces and abstractions.

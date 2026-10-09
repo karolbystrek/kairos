@@ -1,6 +1,8 @@
 package pl.karolbystrek.kairos.api.authentication.infrastructure.zitadel;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
@@ -22,6 +24,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
+import java.util.function.Supplier;
 
 @Component
 @Slf4j
@@ -32,7 +35,7 @@ public class ZitadelClient {
     private final RestClient client;
     private final Clock clock;
 
-    @org.springframework.beans.factory.annotation.Autowired
+    @Autowired
     public ZitadelClient(AuthenticationProperties properties, Clock clock) throws IOException {
         this.clock = clock;
         var transport = new JdkClientHttpRequestFactory(HttpClient.newBuilder()
@@ -118,7 +121,7 @@ public class ZitadelClient {
 
     public void terminate(ProviderSession session) {
         try {
-            call(() -> client.method(org.springframework.http.HttpMethod.DELETE)
+            call(() -> client.method(HttpMethod.DELETE)
                 .uri("/v2/sessions/{id}", session.id()).contentType(MediaType.APPLICATION_JSON)
                 .body(Map.of()).retrieve().toBodilessEntity());
         } catch (ResponseStatusException exception) {
@@ -127,7 +130,7 @@ public class ZitadelClient {
         }
     }
 
-    private <T> T call(java.util.function.Supplier<T> operation) {
+    private <T> T call(Supplier<T> operation) {
         try { return operation.get(); }
         catch (RestClientResponseException exception) {
             if (exception.getStatusCode().value() == 404)

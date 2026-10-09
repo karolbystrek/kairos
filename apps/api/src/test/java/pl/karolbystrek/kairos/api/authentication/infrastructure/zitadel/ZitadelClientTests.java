@@ -2,15 +2,18 @@ package pl.karolbystrek.kairos.api.authentication.infrastructure.zitadel;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.server.ResponseStatusException;
+import pl.karolbystrek.kairos.api.authentication.application.exception.RegistrationValidationException;
+import pl.karolbystrek.kairos.api.authentication.infrastructure.config.AuthenticationProperties;
 
 import java.time.Clock;
-import pl.karolbystrek.kairos.api.authentication.application.exception.RegistrationValidationException;
 import java.time.Instant;
 import java.time.ZoneOffset;
 
@@ -32,10 +35,10 @@ class ZitadelClientTests {
 
     @Test
     void springConstructsTheRealClientFromConfiguredBackendCredentials() {
-        new org.springframework.boot.test.context.runner.ApplicationContextRunner()
-            .withBean(pl.karolbystrek.kairos.api.authentication.infrastructure.config.AuthenticationProperties.class,
-                () -> new pl.karolbystrek.kairos.api.authentication.infrastructure.config.AuthenticationProperties(
-                    "http://zitadel:8080", new org.springframework.core.io.ClassPathResource("keys/test-provider-token.txt")))
+        new ApplicationContextRunner()
+            .withBean(AuthenticationProperties.class,
+                () -> new AuthenticationProperties(
+                    "http://zitadel:8080", new ClassPathResource("keys/test-provider-token.txt")))
             .withBean(Clock.class, Clock::systemUTC)
             .withUserConfiguration(ZitadelClient.class)
             .run(context -> assertThat(context).hasSingleBean(ZitadelClient.class));

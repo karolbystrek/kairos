@@ -17,6 +17,7 @@ import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.client5.http.impl.io.ManagedHttpClientConnectionFactory;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
 import org.apache.hc.core5.http.ContentType;
+import org.apache.hc.core5.http.Header;
 import org.apache.hc.core5.http.config.Http1Config;
 import org.apache.hc.core5.http.io.entity.ByteArrayEntity;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
@@ -34,6 +35,7 @@ import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 import java.time.Clock;
@@ -44,6 +46,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.Base64;
 import java.util.Date;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -227,7 +230,7 @@ public class JavaWebPushSender implements WebPushSender {
                 .build();
     }
 
-    private static Instant parseRetryAfter(org.apache.hc.core5.http.Header header, Instant now) {
+    private static Instant parseRetryAfter(Header header, Instant now) {
         if (header == null) {
             return null;
         }
@@ -244,10 +247,10 @@ public class JavaWebPushSender implements WebPushSender {
         }
     }
 
-    private static String topic(java.util.UUID eventId) {
+    private static String topic(UUID eventId) {
         try {
             var digest = MessageDigest.getInstance("SHA-256")
-                    .digest(eventId.toString().getBytes(java.nio.charset.StandardCharsets.US_ASCII));
+                    .digest(eventId.toString().getBytes(StandardCharsets.US_ASCII));
             return Base64.getUrlEncoder().withoutPadding().encodeToString(digest).substring(0, 32);
         } catch (GeneralSecurityException exception) {
             throw new IllegalStateException("SHA-256 is unavailable", exception);

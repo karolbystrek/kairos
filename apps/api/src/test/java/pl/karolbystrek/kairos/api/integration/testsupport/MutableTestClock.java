@@ -1,6 +1,7 @@
 package pl.karolbystrek.kairos.api.integration.testsupport;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
@@ -15,7 +16,7 @@ public final class MutableTestClock extends Clock {
         instant.set(value);
     }
 
-    public void advance(java.time.Duration duration) {
+    public void advance(Duration duration) {
         instant.updateAndGet(current -> current.plus(duration));
     }
 

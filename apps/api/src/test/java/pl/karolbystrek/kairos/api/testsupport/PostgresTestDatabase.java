@@ -2,7 +2,11 @@ package pl.karolbystrek.kairos.api.testsupport;
 
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.testcontainers.containers.Container;
 import org.testcontainers.postgresql.PostgreSQLContainer;
+import org.testcontainers.utility.MountableFile;
+
+import java.nio.file.Path;
 
 public final class PostgresTestDatabase {
     private static final PostgreSQLContainer DATABASE = new PostgreSQLContainer("postgres:18-alpine");
@@ -40,8 +44,8 @@ public final class PostgresTestDatabase {
         return DATABASE.getJdbcUrl().replace("/test?", "/" + name + "?");
     }
 
-    public static org.testcontainers.containers.Container.ExecResult execute(java.nio.file.Path directory, String... arguments) throws Exception {
-        DATABASE.copyFileToContainer(org.testcontainers.utility.MountableFile.forHostPath(directory), "/tmp/rls-bootstrap");
+    public static Container.ExecResult execute(Path directory, String... arguments) throws Exception {
+        DATABASE.copyFileToContainer(MountableFile.forHostPath(directory), "/tmp/rls-bootstrap");
         return DATABASE.execInContainer(arguments);
     }
 

@@ -2,12 +2,9 @@ package pl.karolbystrek.kairos.api.notification.application;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
-import pl.karolbystrek.kairos.api.persistence.infrastructure.DatabaseAccessContext;
-import pl.karolbystrek.kairos.api.persistence.infrastructure.WorkerOperation;
-import pl.karolbystrek.kairos.api.persistence.infrastructure.WorkerDiscoveryRepository;
-
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 import pl.karolbystrek.kairos.api.notification.application.model.ClaimedCustomerPushDelivery;
 import pl.karolbystrek.kairos.api.notification.infrastructure.config.CustomerNotificationProperties;
 import pl.karolbystrek.kairos.api.notification.infrastructure.persistence.CustomerPushDeliveryRepository;
@@ -16,6 +13,9 @@ import pl.karolbystrek.kairos.api.notification.infrastructure.security.PushSubsc
 import pl.karolbystrek.kairos.api.notification.infrastructure.security.VapidKeyMaterial;
 import pl.karolbystrek.kairos.api.order.infrastructure.persistence.CustomerOrderRepository;
 import pl.karolbystrek.kairos.api.order.infrastructure.persistence.OrderOutboxEventRepository;
+import pl.karolbystrek.kairos.api.persistence.infrastructure.DatabaseAccessContext;
+import pl.karolbystrek.kairos.api.persistence.infrastructure.WorkerDiscoveryRepository;
+import pl.karolbystrek.kairos.api.persistence.infrastructure.WorkerOperation;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
@@ -45,7 +45,7 @@ public class CustomerPushDeliveryClaimService {
 
     public List<ClaimedCustomerPushDelivery> claimAvailable() {
         var transactionTemplate = new TransactionTemplate(transactionManager);
-        transactionTemplate.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        transactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         var claimed = new ArrayList<ClaimedCustomerPushDelivery>();
         for (var index = 0; index < properties.worker().batchSize(); index++) {
             var processed = transactionTemplate.execute(status -> claimOne(claimed));

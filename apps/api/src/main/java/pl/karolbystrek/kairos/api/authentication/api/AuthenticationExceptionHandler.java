@@ -2,8 +2,10 @@ package pl.karolbystrek.kairos.api.authentication.api;
 
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -43,12 +45,12 @@ class AuthenticationExceptionHandler {
         return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, exception.getMessage());
     }
 
-    @ExceptionHandler({org.springframework.security.core.AuthenticationException.class})
+    @ExceptionHandler({AuthenticationException.class})
     ProblemDetail handleInvalidIdentity(RuntimeException exception) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, "Invalid authentication");
     }
 
-    @ExceptionHandler({org.springframework.dao.DataIntegrityViolationException.class, AccountConflictException.class})
+    @ExceptionHandler({DataIntegrityViolationException.class, AccountConflictException.class})
     ProblemDetail handleConcurrentRegistration(RuntimeException exception) {
         var problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, "Registration conflicts with an existing account.");
         problem.setProperty("fieldErrors", Map.of("email", "An account with this email already exists. Sign in instead."));

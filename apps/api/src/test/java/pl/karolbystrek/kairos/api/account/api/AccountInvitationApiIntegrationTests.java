@@ -1,8 +1,11 @@
 package pl.karolbystrek.kairos.api.account.api;
 
 import jakarta.servlet.http.Cookie;
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -14,16 +17,19 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
 import pl.karolbystrek.kairos.api.account.domain.TenantRole;
+import pl.karolbystrek.kairos.api.authentication.infrastructure.zitadel.ZitadelClient;
+import pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase;
 import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
 import tools.jackson.databind.ObjectMapper;
 
-import java.sql.Timestamp;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -45,7 +51,7 @@ class AccountInvitationApiIntegrationTests extends RedisListenerIsolatedIntegrat
     @Autowired
     private MockMvc mockMvc;
 
-    private final JdbcTemplate jdbcTemplate = pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase.ownerDatabase();
+    private final JdbcTemplate jdbcTemplate = PostgresTestDatabase.ownerDatabase();
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -56,11 +62,11 @@ class AccountInvitationApiIntegrationTests extends RedisListenerIsolatedIntegrat
 
     @BeforeEach
     void createAdministratorFixture() {
-        org.mockito.Mockito.when(identityProvider.createUser(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString()))
+        Mockito.when(identityProvider.createUser(ArgumentMatchers.anyString(), ArgumentMatchers.anyString()))
             .thenAnswer(call -> call.getArgument(0));
-        org.mockito.Mockito.doAnswer(call -> new pl.karolbystrek.kairos.api.authentication.infrastructure.zitadel.ZitadelClient.ProviderSession(
+        Mockito.doAnswer(call -> new ZitadelClient.ProviderSession(
                 UUID.randomUUID().toString(), call.getArgument(0)))
-            .when(identityProvider).signIn(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString());
+            .when(identityProvider).signIn(ArgumentMatchers.anyString(), ArgumentMatchers.anyString());
         tenantId = UUID.randomUUID();
         locationId = UUID.randomUUID();
         var accountId = UUID.randomUUID();
@@ -99,7 +105,7 @@ class AccountInvitationApiIntegrationTests extends RedisListenerIsolatedIntegrat
             .andExpect(jsonPath("$.locationId").value(locationId.toString()))
             .andExpect(jsonPath("$.locationName").value("Main restaurant"))
             .andExpect(jsonPath("$.role").value("MANAGER"))
-            .andExpect(jsonPath("$.invitationLink").value(org.hamcrest.Matchers.startsWith(
+            .andExpect(jsonPath("$.invitationLink").value(Matchers.startsWith(
                 "http://localhost:3001/account-registration#invitation="
             )))
             .andReturn();
@@ -141,7 +147,7 @@ class AccountInvitationApiIntegrationTests extends RedisListenerIsolatedIntegrat
 
         mockMvc.perform(withCsrf(apiPost("/account-invitation-previews/v1")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(java.util.Map.of("token", token))), csrf))
+                .content(objectMapper.writeValueAsString(Map.of("token", token))), csrf))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.locationName").value("Main restaurant"))
             .andExpect(jsonPath("$.role").value("OPERATOR"));
@@ -186,7 +192,7 @@ class AccountInvitationApiIntegrationTests extends RedisListenerIsolatedIntegrat
 
         mockMvc.perform(withCsrf(apiPost("/account-invitation-previews/v1")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(java.util.Map.of("token", token))), csrf))
+                .content(objectMapper.writeValueAsString(Map.of("token", token))), csrf))
             .andExpect(status().isGone())
             .andExpect(jsonPath("$.type").value(
                 "urn:kairos:problem:account-invitation-redeemed"
@@ -287,7 +293,7 @@ class AccountInvitationApiIntegrationTests extends RedisListenerIsolatedIntegrat
 
         mockMvc.perform(withCsrf(apiPost("/account-invitation-previews/v1")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(java.util.Map.of("token", token))), csrf))
+                .content(objectMapper.writeValueAsString(Map.of("token", token))), csrf))
             .andExpect(status().isOk());
     }
 
@@ -314,20 +320,20 @@ class AccountInvitationApiIntegrationTests extends RedisListenerIsolatedIntegrat
         var preview = apiPost("/account-invitation-previews/v1")
             .secure(true)
             .contentType(MediaType.APPLICATION_JSON)
-            .content(objectMapper.writeValueAsString(java.util.Map.of("token", token)));
+            .content(objectMapper.writeValueAsString(Map.of("token", token)));
         mockMvc.perform(preview)
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.type").value("urn:kairos:problem:csrf-token-missing"));
         mockMvc.perform(withCsrf(apiPost("/account-invitation-previews/v1")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(java.util.Map.of("token", token))), csrf))
+                .content(objectMapper.writeValueAsString(Map.of("token", token))), csrf))
             .andExpect(status().isGone())
             .andExpect(jsonPath("$.type").value(
                 "urn:kairos:problem:account-invitation-expired"
             ));
         mockMvc.perform(withCsrf(apiPost("/account-invitation-previews/v1")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(java.util.Map.of(
+                .content(objectMapper.writeValueAsString(Map.of(
                     "token",
                     "unknown-token"
                 ))), csrf))
@@ -342,7 +348,7 @@ class AccountInvitationApiIntegrationTests extends RedisListenerIsolatedIntegrat
         throws Exception {
         return apiPost("/account-invitations/v1")
             .contentType(MediaType.APPLICATION_JSON)
-            .content(objectMapper.writeValueAsString(java.util.Map.of(
+            .content(objectMapper.writeValueAsString(Map.of(
                 "locationId",
                 targetLocationId,
                 "role",

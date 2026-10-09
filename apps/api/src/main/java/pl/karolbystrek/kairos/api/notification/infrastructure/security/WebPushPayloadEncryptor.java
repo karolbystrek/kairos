@@ -10,7 +10,9 @@ import javax.crypto.KeyAgreement;
 import javax.crypto.Mac;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+
 import java.io.ByteArrayOutputStream;
+import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.AlgorithmParameters;
@@ -21,8 +23,10 @@ import java.security.PrivateKey;
 import java.security.SecureRandom;
 import java.security.interfaces.ECPublicKey;
 import java.security.spec.ECGenParameterSpec;
+import java.security.spec.ECParameterSpec;
 import java.security.spec.ECPoint;
 import java.security.spec.ECPublicKeySpec;
+import java.util.Arrays;
 
 @Component
 public class WebPushPayloadEncryptor {
@@ -107,7 +111,7 @@ public class WebPushPayloadEncryptor {
                 "Content-Encoding: nonce\0".getBytes(StandardCharsets.US_ASCII),
                 NONCE_BYTES
         );
-        var record = java.util.Arrays.copyOf(plaintext, plaintext.length + 1);
+        var record = Arrays.copyOf(plaintext, plaintext.length + 1);
         record[record.length - 1] = 0x02;
         var cipher = Cipher.getInstance("AES/GCM/NoPadding");
         cipher.init(
@@ -133,10 +137,10 @@ public class WebPushPayloadEncryptor {
         }
         var parameters = AlgorithmParameters.getInstance("EC");
         parameters.init(new ECGenParameterSpec("secp256r1"));
-        var specification = parameters.getParameterSpec(java.security.spec.ECParameterSpec.class);
+        var specification = parameters.getParameterSpec(ECParameterSpec.class);
         var point = new ECPoint(
-                new java.math.BigInteger(1, java.util.Arrays.copyOfRange(encoded, 1, 33)),
-                new java.math.BigInteger(1, java.util.Arrays.copyOfRange(encoded, 33, 65))
+                new BigInteger(1, Arrays.copyOfRange(encoded, 1, 33)),
+                new BigInteger(1, Arrays.copyOfRange(encoded, 33, 65))
         );
         return (ECPublicKey) KeyFactory.getInstance("EC").generatePublic(
                 new ECPublicKeySpec(point, specification)

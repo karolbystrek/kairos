@@ -16,7 +16,6 @@ import pl.karolbystrek.kairos.api.integration.webhook.application.model.IssuedWe
 import pl.karolbystrek.kairos.api.integration.webhook.application.model.IssuedWebhookSubscriptionView;
 import pl.karolbystrek.kairos.api.integration.webhook.application.model.WebhookSigningSecretVersionView;
 import pl.karolbystrek.kairos.api.integration.webhook.application.model.WebhookSubscriptionView;
-import pl.karolbystrek.kairos.api.order.domain.OrderEventType;
 import pl.karolbystrek.kairos.api.integration.webhook.domain.WebhookSigningSecretVersion;
 import pl.karolbystrek.kairos.api.integration.webhook.domain.WebhookSubscription;
 import pl.karolbystrek.kairos.api.integration.webhook.domain.WebhookSubscriptionEventSelection;
@@ -31,8 +30,10 @@ import pl.karolbystrek.kairos.api.integration.webhook.infrastructure.persistence
 import pl.karolbystrek.kairos.api.integration.webhook.infrastructure.persistence.WebhookSubscriptionRepository;
 import pl.karolbystrek.kairos.api.integration.webhook.infrastructure.security.SigningSecretCipher;
 import pl.karolbystrek.kairos.api.location.infrastructure.persistence.LocationRepository;
+import pl.karolbystrek.kairos.api.order.domain.OrderEventType;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -230,7 +231,7 @@ public class WebhookSubscriptionManagementService {
         return WebhookSigningSecretVersionView.from(version);
     }
 
-    private IssuedWebhookSigningSecretView issueSigningSecret(UUID subscriptionId, java.time.Instant now) {
+    private IssuedWebhookSigningSecretView issueSigningSecret(UUID subscriptionId, Instant now) {
         var versionId = UUID.randomUUID();
         var issued = signingSecretCipher.issue(subscriptionId, versionId);
         var version = signingSecretRepository.save(WebhookSigningSecretVersion.issue(

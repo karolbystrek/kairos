@@ -6,15 +6,16 @@ import org.springframework.transaction.annotation.Transactional;
 import pl.karolbystrek.kairos.api.account.application.StaffAccessService;
 import pl.karolbystrek.kairos.api.account.application.model.StaffAccessContext;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
+import pl.karolbystrek.kairos.api.location.domain.Location;
+import pl.karolbystrek.kairos.api.location.infrastructure.persistence.LocationRepository;
 import pl.karolbystrek.kairos.api.order.application.exception.InvalidOrderRequestException;
 import pl.karolbystrek.kairos.api.order.application.exception.ResourceNotFoundException;
 import pl.karolbystrek.kairos.api.order.application.model.OrderInitiator;
 import pl.karolbystrek.kairos.api.order.application.model.StaffOrderView;
 import pl.karolbystrek.kairos.api.order.application.model.TrackedOrderView;
-import pl.karolbystrek.kairos.api.location.domain.Location;
-import pl.karolbystrek.kairos.api.location.infrastructure.persistence.LocationRepository;
 import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
 import pl.karolbystrek.kairos.api.order.infrastructure.persistence.CustomerOrderRepository;
+import pl.karolbystrek.kairos.api.persistence.infrastructure.DatabaseAccessContext;
 
 import java.time.Clock;
 import java.util.List;
@@ -30,7 +31,7 @@ public class OrderService {
     private final StaffAccessService staffAccessService;
     private final OrderCommandService commandService;
     private final Clock clock;
-    private final pl.karolbystrek.kairos.api.persistence.infrastructure.DatabaseAccessContext databaseAccess;
+    private final DatabaseAccessContext databaseAccess;
 
     @Transactional(readOnly = true)
     public List<StaffOrderView> listOrders(

@@ -1,5 +1,6 @@
 package pl.karolbystrek.kairos.api.integration.webhook.application;
 
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,6 +22,7 @@ import pl.karolbystrek.kairos.api.persistence.infrastructure.WorkerOperation;
 import pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase;
 import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
 
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -284,7 +286,7 @@ class WebhookDeliveryIntegrationTests extends RedisListenerIsolatedIntegrationTe
         fanOutAll();
         var previous = claimService.claimAvailable().getFirst();
         jdbcTemplate.update("UPDATE webhook_deliveries SET claim_until = ? WHERE id = ?",
-                java.sql.Timestamp.from(Instant.now().minusSeconds(1)), previous.id());
+                Timestamp.from(Instant.now().minusSeconds(1)), previous.id());
         var current = claimService.claimAvailable().getFirst();
         assertThat(current.id()).isEqualTo(previous.id());
         assertThat(current.claimToken()).isNotEqualTo(previous.claimToken());
@@ -305,7 +307,7 @@ class WebhookDeliveryIntegrationTests extends RedisListenerIsolatedIntegrationTe
             assertThat(runtimeDatabase.queryForObject("SELECT count(*) FROM order_outbox_events WHERE id = ?", Long.class, events.getLast())).isZero();
         });
         var forbiddenId = UUID.randomUUID();
-        org.assertj.core.api.Assertions.assertThatThrownBy(() -> transaction.executeWithoutResult(status -> {
+        Assertions.assertThatThrownBy(() -> transaction.executeWithoutResult(status -> {
             assertThat(runtimeDatabase.queryForObject("SELECT public.next_webhook_fanout()", UUID.class)).isEqualTo(events.getFirst());
             assertThat(databaseAccess.worker(WorkerOperation.WEBHOOK_FANOUT, events.getFirst(), null)).isTrue();
             runtimeDatabase.update("INSERT INTO webhook_deliveries (id, outbox_event_id, subscription_id, destination_url, payload, status, created_at) VALUES (?, ?, ?, ?, ?, 'PENDING', now())",

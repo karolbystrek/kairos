@@ -1,7 +1,5 @@
 package pl.karolbystrek.kairos.api.account.api;
 
-import java.net.URI;
-
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -11,10 +9,14 @@ import pl.karolbystrek.kairos.api.account.application.exception.AccountInvitatio
 import pl.karolbystrek.kairos.api.account.application.exception.AccountInvitationUnavailableException;
 import pl.karolbystrek.kairos.api.account.application.exception.AccountNotFoundException;
 import pl.karolbystrek.kairos.api.account.application.exception.InvalidAccountRequestException;
-import pl.karolbystrek.kairos.api.account.application.exception.StaffAccessDeniedException;
 import pl.karolbystrek.kairos.api.account.application.exception.SignedInRedemptionException;
+import pl.karolbystrek.kairos.api.account.application.exception.StaffAccessDeniedException;
+import pl.karolbystrek.kairos.api.authentication.api.AuthenticationController;
 
-@RestControllerAdvice(basePackageClasses = {AccountController.class, pl.karolbystrek.kairos.api.authentication.api.AuthenticationController.class})
+import java.net.URI;
+import java.util.Locale;
+
+@RestControllerAdvice(basePackageClasses = {AccountController.class, AuthenticationController.class})
 class AccountExceptionHandler {
 
     @ExceptionHandler(AccountNotFoundException.class)
@@ -49,7 +51,7 @@ class AccountExceptionHandler {
         var problem = ProblemDetail.forStatusAndDetail(HttpStatus.GONE, exception.getMessage());
         problem.setType(URI.create(
             "urn:kairos:problem:account-invitation-"
-                + exception.reason().name().toLowerCase(java.util.Locale.ROOT)
+                + exception.reason().name().toLowerCase(Locale.ROOT)
         ));
         return problem;
     }

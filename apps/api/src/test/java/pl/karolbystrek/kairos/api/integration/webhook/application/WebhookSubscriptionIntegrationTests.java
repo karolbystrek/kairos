@@ -13,12 +13,14 @@ import pl.karolbystrek.kairos.api.integration.domain.ExternalIntegrationStatus;
 import pl.karolbystrek.kairos.api.integration.testsupport.IntegrationTestFixture;
 import pl.karolbystrek.kairos.api.integration.testsupport.MutableTestClock;
 import pl.karolbystrek.kairos.api.integration.testsupport.MutableTestClockConfiguration;
+import pl.karolbystrek.kairos.api.integration.webhook.application.model.IssuedWebhookSubscriptionView;
+import pl.karolbystrek.kairos.api.integration.webhook.domain.WebhookSubscriptionStatus;
 import pl.karolbystrek.kairos.api.location.application.LocationService;
 import pl.karolbystrek.kairos.api.location.domain.LocationStatus;
-import pl.karolbystrek.kairos.api.order.domain.OrderEventType;
-import pl.karolbystrek.kairos.api.integration.webhook.domain.WebhookSubscriptionStatus;
 import pl.karolbystrek.kairos.api.order.application.OrderService;
+import pl.karolbystrek.kairos.api.order.domain.OrderEventType;
 import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
+import pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase;
 import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
 import tools.jackson.databind.ObjectMapper;
 
@@ -26,6 +28,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Set;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -49,7 +52,7 @@ class WebhookSubscriptionIntegrationTests extends RedisListenerIsolatedIntegrati
     @Autowired
     private LocationService locationService;
 
-    private final JdbcTemplate jdbcTemplate = pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase.ownerDatabase();
+    private final JdbcTemplate jdbcTemplate = PostgresTestDatabase.ownerDatabase();
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -58,7 +61,7 @@ class WebhookSubscriptionIntegrationTests extends RedisListenerIsolatedIntegrati
     private MutableTestClock clock;
 
     private IntegrationTestFixture.TenantFixture tenant;
-    private java.util.UUID integrationId;
+    private UUID integrationId;
 
     @BeforeEach
     void createFixture() {
@@ -283,7 +286,7 @@ class WebhookSubscriptionIntegrationTests extends RedisListenerIsolatedIntegrati
         assertThat(fanoutService.fanOutAvailable()).isZero();
     }
 
-    private pl.karolbystrek.kairos.api.integration.webhook.application.model.IssuedWebhookSubscriptionView
+    private IssuedWebhookSubscriptionView
     createSubscription(Set<OrderEventType> eventTypes) {
         return subscriptionService.create(
                 tenant.administrator(),

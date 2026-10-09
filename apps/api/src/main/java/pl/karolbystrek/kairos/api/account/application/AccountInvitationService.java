@@ -17,20 +17,21 @@ import pl.karolbystrek.kairos.api.account.application.model.StaffAccessContext;
 import pl.karolbystrek.kairos.api.account.application.model.StaffLocation;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
 import pl.karolbystrek.kairos.api.account.application.port.StaffLocationDirectory;
-import pl.karolbystrek.kairos.api.account.domain.TenantRole;
 import pl.karolbystrek.kairos.api.account.domain.Account;
-import pl.karolbystrek.kairos.api.account.domain.assignment.LocationAssignment;
-import pl.karolbystrek.kairos.api.account.infrastructure.persistence.LocationAssignmentRepository;
-import pl.karolbystrek.kairos.api.persistence.infrastructure.DatabaseAccessContext;
+import pl.karolbystrek.kairos.api.account.domain.TenantRole;
 import pl.karolbystrek.kairos.api.account.domain.assignment.AssignmentRole;
+import pl.karolbystrek.kairos.api.account.domain.assignment.LocationAssignment;
 import pl.karolbystrek.kairos.api.account.domain.invitation.AccountInvitation;
 import pl.karolbystrek.kairos.api.account.domain.invitation.AccountInvitationRevocationReason;
 import pl.karolbystrek.kairos.api.account.domain.invitation.AccountInvitationState;
 import pl.karolbystrek.kairos.api.account.infrastructure.persistence.AccountInvitationRepository;
 import pl.karolbystrek.kairos.api.account.infrastructure.persistence.AccountRepository;
+import pl.karolbystrek.kairos.api.account.infrastructure.persistence.LocationAssignmentRepository;
 import pl.karolbystrek.kairos.api.authentication.application.OneTimeBearerTokenService;
+import pl.karolbystrek.kairos.api.persistence.infrastructure.DatabaseAccessContext;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -263,7 +264,7 @@ public class AccountInvitationService {
         }
     }
 
-    private static void requireAvailable(AccountInvitation invitation, java.time.Instant now) {
+    private static void requireAvailable(AccountInvitation invitation, Instant now) {
         if (invitation.getState() == AccountInvitationState.REDEEMED) {
             throw unavailable(AccountInvitationUnavailableException.Reason.REDEEMED);
         }

@@ -8,13 +8,23 @@ import pl.karolbystrek.kairos.api.account.application.exception.AccountInvitatio
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
 import pl.karolbystrek.kairos.api.account.domain.TenantRole;
 import pl.karolbystrek.kairos.api.account.domain.assignment.AssignmentRole;
+import pl.karolbystrek.kairos.api.integration.testsupport.IntegrationTestFixture;
+import pl.karolbystrek.kairos.api.location.application.LocationService;
+import pl.karolbystrek.kairos.api.location.domain.LocationStatus;
+import pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase;
 import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.HexFormat;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -25,9 +35,9 @@ class AccountInvitationConcurrencyIntegrationTests extends RedisListenerIsolated
     private AccountInvitationService invitationService;
 
     @Autowired
-    private pl.karolbystrek.kairos.api.location.application.LocationService locationService;
+    private LocationService locationService;
 
-    private final JdbcTemplate jdbcTemplate = pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase.ownerDatabase();
+    private final JdbcTemplate jdbcTemplate = PostgresTestDatabase.ownerDatabase();
 
     @Test
     void concurrentRedemptionCreatesExactlyOneAccountAndConsumesInvitationOnce() throws Exception {
@@ -75,7 +85,7 @@ class AccountInvitationConcurrencyIntegrationTests extends RedisListenerIsolated
             ));
             start.countDown();
 
-            assertThat(java.util.List.of(first.get(), second.get()))
+            assertThat(List.of(first.get(), second.get()))
                 .containsExactlyInAnyOrder(true, false);
         }
 
@@ -93,7 +103,7 @@ class AccountInvitationConcurrencyIntegrationTests extends RedisListenerIsolated
 
     @Test
     void concurrentLocationDisableAndRedemptionFinishWithNoEnabledNewMember() throws Exception {
-        var tenant = new pl.karolbystrek.kairos.api.integration.testsupport.IntegrationTestFixture(jdbcTemplate).createTenant();
+        var tenant = new IntegrationTestFixture(jdbcTemplate).createTenant();
         var created = invitationService.create(tenant.administrator(), tenant.firstLocationId(), AssignmentRole.OPERATOR);
         var email = "location-race-" + UUID.randomUUID() + "@example.com";
         var start = new CountDownLatch(1);
@@ -110,12 +120,12 @@ class AccountInvitationConcurrencyIntegrationTests extends RedisListenerIsolated
             var disable = executor.submit(() -> {
                 start.await();
                 locationService.updateStatus(tenant.administrator(), tenant.firstLocationId(),
-                    pl.karolbystrek.kairos.api.location.domain.LocationStatus.DISABLED);
+                    LocationStatus.DISABLED);
                 return null;
             });
             start.countDown();
-            redemption.get(15, java.util.concurrent.TimeUnit.SECONDS);
-            disable.get(15, java.util.concurrent.TimeUnit.SECONDS);
+            redemption.get(15, TimeUnit.SECONDS);
+            disable.get(15, TimeUnit.SECONDS);
         }
         assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM accounts WHERE email = ? AND status = 'ENABLED'",
             Integer.class, email)).isZero();
@@ -123,9 +133,9 @@ class AccountInvitationConcurrencyIntegrationTests extends RedisListenerIsolated
             String.class, created.invitation().id())).isIn("REDEEMED", "REVOKED");
     }
 
-    private static String hash(String token) throws java.security.NoSuchAlgorithmException {
-        return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
-            .digest(token.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+    private static String hash(String token) throws NoSuchAlgorithmException {
+        return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+            .digest(token.getBytes(StandardCharsets.UTF_8)));
     }
 
     private boolean redeemAfterStart(CountDownLatch start, String token, String emailPrefix)
