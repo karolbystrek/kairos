@@ -19,9 +19,10 @@ Use descriptive issue titles without an agent prefix.
    repository files, save that agreed plan as a new GitHub issue with acceptance
    criteria and validation. For an existing issue, record the agreed plan there
    rather than duplicating it.
-2. Split a plan with distinct implementation steps into native GitHub sub-issues
-   linked to its parent. Give each implementation issue a focused, independently
-   reviewable scope; keep plans and progress in GitHub rather than task Markdown.
+2. Split substantial, independently reviewable scopes into native GitHub
+   sub-issues linked to their parent. Small subagent tasks share the parent
+   implementation issue and branch; delegation alone does not require a new
+   issue or branch. Keep plans and progress in GitHub rather than task Markdown.
 3. After recording the plan, inspect `git status --short`, preserve unrelated
    work, and create a new `<issue>-<topic>` branch from current `main`
    (normally `origin/main`). All repository changes happen on branches, never
