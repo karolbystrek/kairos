@@ -6,7 +6,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase;
 import org.springframework.jdbc.support.JdbcTransactionManager;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -71,11 +71,7 @@ class OrderStatusAfterCommitIntegrationTests {
 
         @Bean
         DataSource dataSource() {
-            return new DriverManagerDataSource(
-                    "jdbc:h2:mem:order-event-boundary;DB_CLOSE_DELAY=-1",
-                    "sa",
-                    ""
-            );
+            return PostgresTestDatabase.ownerDatabase().getDataSource();
         }
 
         @Bean

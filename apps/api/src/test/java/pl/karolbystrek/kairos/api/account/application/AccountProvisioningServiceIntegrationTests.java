@@ -14,6 +14,7 @@ import pl.karolbystrek.kairos.api.account.domain.TenantRole;
 import pl.karolbystrek.kairos.api.account.infrastructure.persistence.AccountRepository;
 import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
 
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
@@ -225,15 +226,16 @@ class AccountProvisioningServiceIntegrationTests extends RedisListenerIsolatedIn
         var accountId = UUID.randomUUID();
         jdbcTemplate.update(
             """
-                INSERT INTO accounts (id, provider_subject, tenant_id, email, tenant_role, status, created_at, updated_at) VALUES (?, CAST(RANDOM_UUID() AS VARCHAR), ?, ?, ?, ?, ?, ?)
+                INSERT INTO accounts (id, provider_subject, tenant_id, email, tenant_role, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
             accountId,
+            UUID.randomUUID().toString(),
             tenantId,
             emailPrefix + "@example.com",
             tenantRole.name(),
             status.name(),
-            FIXTURE_TIME,
-            FIXTURE_TIME
+            Timestamp.from(FIXTURE_TIME),
+            Timestamp.from(FIXTURE_TIME)
         );
         return accountId;
     }
@@ -254,8 +256,8 @@ class AccountProvisioningServiceIntegrationTests extends RedisListenerIsolatedIn
             locationId,
             tenantId,
             role.name(),
-            FIXTURE_TIME,
-            FIXTURE_TIME
+            Timestamp.from(FIXTURE_TIME),
+            Timestamp.from(FIXTURE_TIME)
         );
     }
 

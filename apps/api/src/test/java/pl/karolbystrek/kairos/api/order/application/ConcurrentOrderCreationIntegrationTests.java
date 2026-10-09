@@ -9,6 +9,7 @@ import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
 import pl.karolbystrek.kairos.api.account.domain.TenantRole;
 import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
 
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -118,13 +119,14 @@ class ConcurrentOrderCreationIntegrationTests extends RedisListenerIsolatedInteg
         var now = Instant.now();
         jdbcTemplate.update(
                 """
-                INSERT INTO accounts (id, provider_subject, tenant_id, email, tenant_role, status, created_at, updated_at) VALUES (?, CAST(RANDOM_UUID() AS VARCHAR), ?, ?, 'ADMIN', 'ENABLED', ?, ?)
+                INSERT INTO accounts (id, provider_subject, tenant_id, email, tenant_role, status, created_at, updated_at) VALUES (?, ?, ?, ?, 'ADMIN', 'ENABLED', ?, ?)
                 """,
             accountId,
+            UUID.randomUUID().toString(),
             tenantId,
             "concurrent-admin-" + accountId + "@example.com",
-            now,
-            now
+            Timestamp.from(now),
+            Timestamp.from(now)
         );
         return new StaffPrincipal(accountId, tenantId, TenantRole.ADMIN);
     }
