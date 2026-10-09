@@ -10,13 +10,33 @@ Use [the production runbook](RUNBOOK.md) for prerequisites and the sequence.
 
 ## 5. First install and later releases
 
-After provisioning and authorization, use a successful main push run or a manual
-main dispatch (`gh workflow run ci.yml --ref main`). The workflow validates,
-publishes a complete `release-manifest` artifact, then waits for owner approval.
-Review the run's full revision, all three digests, launch blockers and maintenance
-window before approval. Retain the artifact/run ID as release evidence.
+CI validates main pushes and publishes a complete `release-manifest` artifact;
+it does not request production approval or deploy. After provisioning and
+authorization, start the separate deployment workflow from `main`:
 
-Actions verifies the bundled manifest against the run revision, uploads through
+```bash
+gh workflow run deploy.yml --ref main
+```
+
+The optional `revision` input accepts a 7–40-character hexadecimal commit SHA:
+
+```bash
+gh workflow run deploy.yml --ref main -f revision=<commit-sha>
+```
+
+Without that input, deployment selects the latest `main` commit when the run
+resolves the release. A selected commit must belong to `main` history and have a
+successful CI run with an unexpired `release-manifest` artifact. Selection fails
+before requesting approval if no eligible release exists; wait for CI, or rebuild
+the selected release if its artifact expired. The selected full revision stays
+fixed even if `main` advances while approval is pending.
+
+Review the selected CI run, full revision, all three digests, launch blockers and
+maintenance window before approving `Deploy production`. Retain both workflow
+run IDs as release evidence. New main pushes create no deployment approval waits;
+actual deployments remain serialized and do not cancel an active deployment.
+
+Actions verifies the bundled manifest against the selected revision, uploads through
 a private incoming directory, activates `/srv/kairos/releases/<revision>`, then
 invokes the command below with absolute paths. A retry of an existing revision
 requires an identical archive. For an authorized manual invocation, use that

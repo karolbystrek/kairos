@@ -49,8 +49,10 @@ files or secure prompts, never literal secret arguments or repository-level copi
 | `DEPLOY_KNOWN_HOSTS` | Independently verified OpenSSH host-key entries |
 
 Do not reuse the GitHub publication token as host GHCR credentials. Before the
-first authorized release, inspect the main CI run: validation and all three
-image publications must finish before `Deploy production` waits for approval.
+first authorized release, inspect the successful main CI run and manually start
+[the deployment workflow](RELEASES.md). Its release-selection job resolves an
+eligible published artifact before `Deploy production` waits for approval.
+CI publication never requests production approval.
 While approval is withheld, no deployment steps/SSH connection may run and
 Environment secrets must remain gated. Verify owner self-approval, main-only
 policy, and rejected/withheld approval behavior; record results without secrets.
