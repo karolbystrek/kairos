@@ -76,10 +76,19 @@ using `ghcr.io/karolbystrek/kairos/<service>@sha256:<64 lowercase hex>`.
 hosted Compose files, both NGINX configuration files, and the ZITADEL bootstrap
 script, PostgreSQL entrypoint role initialization script,
 exact V1 SQL, and the deployment shell command/Python helper. An explicit file allowlist
-excludes environment files, certificates and private keys. A main-only
-production job waits for successful publication and targets the
-`production` GitHub Environment. It downloads this run's artifact, validates
-its manifest/archive against the workflow revision, and transfers it over SSH
+excludes environment files, certificates and private keys. CI ends after
+publication and never requests production approval. The separate `deploy.yml`
+workflow runs only by manual dispatch on `main`. Its optional `revision` input
+accepts a 7–40-character hexadecimal commit SHA; omission selects the latest
+`main` commit when release selection runs. Selection resolves a full revision,
+requires it to be an ancestor of `main`, and locates a successful CI run with an
+unexpired `release-manifest` artifact before the production approval gate.
+Missing or expired releases fail selection without requesting approval. The
+selected revision remains fixed if `main` advances afterward.
+
+The production job targets the `production` GitHub Environment, downloads the
+selected CI run's artifact, validates its manifest/archive against the selected
+revision, and transfers it over SSH
 with the supplied verified host keys and ephemeral `0700`/`0600` SSH files.
 The four Environment secrets are `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`,
 and `DEPLOY_KNOWN_HOSTS`; publication jobs receive none of these secrets.
