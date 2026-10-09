@@ -17,9 +17,7 @@ DOCKER = shutil.which("docker")
 RUNTIME_FILES = (
     "compose.yaml", "compose.deployment.yaml", "nginx/default.conf.template",
     "nginx/cloudflare-real-ip.conf", "deployment/zitadel/bootstrap.py",
-    "deployment/postgres/bootstrap.sh", "deployment/postgres/upgrade_rls.sql",
-    "deployment/postgres/prepare_upgrade.py",
-    "apps/api/src/main/resources/db/migration/V1__create_initial_schema.sql",
+    "deployment/postgres/bootstrap.sh",
 )
 
 
@@ -57,7 +55,7 @@ class DeployTest(unittest.TestCase):
         }
         self.config = {"services": {
             name: {"image": self.manifest["images"].get(name, "fixture:infra"), "environment": {}}
-            for name in (*SERVICES, "nginx", "postgres", "redis", "zitadel", "zitadel-bootstrap", "postgres-bootstrap")
+            for name in (*SERVICES, "nginx", "postgres", "redis", "zitadel", "zitadel-bootstrap")
         }}
         self.config["services"]["api"]["environment"] = {
             **origins, "WEBHOOK_DESTINATION_POLICY": "PUBLIC_HTTPS", "PUSH_DESTINATION_POLICY": "PUBLIC_HTTPS",
@@ -93,7 +91,7 @@ if name == 'docker':
             print(result.stdout, end='')
             sys.exit(result.returncode)
         print(Path(os.environ['CONFIG_FIXTURE']).read_text())
-    if os.environ.get('FAIL_STAGE') in ('pull', 'redis', 'zitadel', 'api', 'zitadel-bootstrap', 'postgres-bootstrap', 'nginx'):
+    if os.environ.get('FAIL_STAGE') in ('pull', 'redis', 'zitadel', 'api', 'zitadel-bootstrap', 'nginx'):
         stage = os.environ['FAIL_STAGE']
         if (stage == 'pull' and 'pull' in args) or ('up' in args and args[-1] == stage):
             print('do-not-print-this-secret', file=sys.stderr)
@@ -199,12 +197,11 @@ sys.exit(deploy.main(sys.argv[1:]))
         self.assertEqual(result.returncode, 0, result.stderr)
         calls = self.commands()
         stages = [call for call in calls if call[0] == "docker" and "up" in call]
-        self.assertEqual([call[-1] for call in stages], ["redis", "postgres-bootstrap", "zitadel", "zitadel-bootstrap", "api", "panel-app", "nginx"])
+        self.assertEqual([call[-1] for call in stages], ["redis", "zitadel", "zitadel-bootstrap", "api", "panel-app", "nginx"])
         self.assertEqual(stages[0][-2:], ["postgres", "redis"])
-        for bootstrap in (stages[1], stages[3]):
-            self.assertIn("--exit-code-from", bootstrap)
-            self.assertIn("--force-recreate", bootstrap)
-        for call in (stages[0], stages[2], *stages[4:]):
+        self.assertIn("--exit-code-from", stages[2])
+        self.assertIn("--force-recreate", stages[2])
+        for call in (stages[0], stages[1], *stages[3:]):
             self.assertIn("--wait", call)
             self.assertIn("--wait-timeout", call)
         for call in calls:
@@ -219,18 +216,16 @@ sys.exit(deploy.main(sys.argv[1:]))
         self.assertEqual(self.env_file.read_text(), "POSTGRES_PASSWORD=do-not-print-this-secret\n")
 
     def test_failed_stage_stops_rollout_and_preserves_previous_record(self):
-        for stage in ("pull", "redis", "postgres-bootstrap", "zitadel", "zitadel-bootstrap", "api", "nginx"):
+        for stage in ("pull", "redis", "zitadel", "zitadel-bootstrap", "api", "nginx"):
             with self.subTest(stage=stage):
                 self.log.unlink(missing_ok=True)
                 result = self.run_deploy(FAIL_STAGE=stage)
                 self.assert_failed_safely(result)
                 self.assertIn(stage, result.stderr)
                 updates = [call[-1] for call in self.commands() if "up" in call]
-                if stage in ("pull", "redis", "postgres-bootstrap", "zitadel", "zitadel-bootstrap", "api"):
+                if stage in ("pull", "redis", "zitadel", "zitadel-bootstrap", "api"):
                     self.assertNotIn("panel-app", updates)
                     self.assertNotIn("nginx", updates)
-                if stage == "postgres-bootstrap":
-                    self.assertNotIn("api", updates)
                 self.assertFalse(any(call[0] == "curl" for call in self.commands()))
 
     def test_failed_external_probe_never_records_success(self):
@@ -282,6 +277,24 @@ sys.exit(deploy.main(sys.argv[1:]))
         result = self.run_deploy(REAL_COMPOSE=DOCKER)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(json.loads(self.record.read_text()), self.manifest)
+        config_call = next(call for call in self.commands() if "config" in call)
+        resolved = subprocess.run(
+            [DOCKER, *config_call[1:]], capture_output=True, text=True, check=True,
+            env={**os.environ, "KAIROS_IMAGE_REGISTRY": "ghcr.io/karolbystrek/kairos",
+                 "KAIROS_RELEASE_VERSION": REVISION},
+        )
+        services = json.loads(resolved.stdout)["services"]
+        postgres = services["postgres"]
+        self.assertNotIn("postgres-bootstrap", services)
+        self.assertNotIn("POSTGRES_USER", services["api"]["environment"])
+        self.assertNotIn("POSTGRES_PASSWORD", services["api"]["environment"])
+        for name in ("KAIROS_DB_OWNER_USER", "KAIROS_DB_OWNER_PASSWORD",
+                     "KAIROS_DB_RUNTIME_USER", "KAIROS_DB_RUNTIME_PASSWORD"):
+            self.assertEqual(postgres["environment"][name], services["api"]["environment"][name])
+        role_init = next(volume for volume in postgres["volumes"]
+                         if volume["target"] == "/docker-entrypoint-initdb.d/10-kairos-roles.sh")
+        self.assertEqual(role_init["source"], "./deployment/postgres/bootstrap.sh")
+        self.assertTrue(role_init["read_only"])
 
     @unittest.skipUnless(DOCKER, "Docker Compose CLI required for path-resolution regression")
     def test_relative_secret_paths_rejected_before_docker_mutation(self):

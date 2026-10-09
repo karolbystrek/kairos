@@ -1,10 +1,7 @@
 package pl.karolbystrek.kairos.api.notification.application;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.jdbc.core.JdbcTemplate;
 import pl.karolbystrek.kairos.api.persistence.infrastructure.DatabaseAccessContext;
-import java.sql.Timestamp;
-import java.util.ArrayList;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pl.karolbystrek.kairos.api.notification.application.exception.CustomerPushEnrollmentLimitException;
@@ -15,6 +12,7 @@ import pl.karolbystrek.kairos.api.notification.domain.CustomerPushEnrollment;
 import pl.karolbystrek.kairos.api.notification.domain.CustomerPushSubscription;
 import pl.karolbystrek.kairos.api.notification.infrastructure.config.CustomerNotificationProperties;
 import pl.karolbystrek.kairos.api.notification.infrastructure.persistence.CustomerPushEnrollmentRepository;
+import pl.karolbystrek.kairos.api.notification.infrastructure.persistence.CustomerPushDeliveryRepository;
 import pl.karolbystrek.kairos.api.notification.infrastructure.persistence.CustomerPushSubscriptionRepository;
 import pl.karolbystrek.kairos.api.notification.infrastructure.security.PushSubscriptionCipher;
 import pl.karolbystrek.kairos.api.notification.infrastructure.security.VapidKeyMaterial;
@@ -24,6 +22,7 @@ import pl.karolbystrek.kairos.api.order.infrastructure.persistence.CustomerOrder
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Clock;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -45,7 +44,7 @@ public class CustomerPushSubscriptionService {
     private final VapidKeyMaterial vapidKeyMaterial;
     private final CustomerNotificationProperties properties;
     private final Clock clock;
-    private final JdbcTemplate jdbcTemplate;
+    private final CustomerPushDeliveryRepository deliveryRepository;
     private final DatabaseAccessContext databaseAccessContext;
 
     @Transactional
@@ -55,10 +54,11 @@ public class CustomerPushSubscriptionService {
     ) {
         var validated = validator.validate(input);
         var id = verifiedSubscriptionId(validated);
-        if (id == null) {
-            id = createSubscriptionId(validated, clock.instant());
+        var created = id == null ? createSubscription(validated, clock.instant()) : null;
+        databaseAccessContext.pushCapability(List.of(created == null ? id : created.getId()), trackingReferences);
+        if (created != null) {
+            subscriptionRepository.saveAndFlush(created);
         }
-        databaseAccessContext.pushCapability(List.of(id), trackingReferences);
         reconcileValidated(validated, trackingReferences);
     }
 
@@ -84,10 +84,14 @@ public class CustomerPushSubscriptionService {
                 }
             }
         }
-        if (currentId == null) {
-            ids.add(createSubscriptionId(current, clock.instant()));
+        var created = currentId == null ? createSubscription(current, clock.instant()) : null;
+        if (created != null) {
+            ids.add(created.getId());
         }
         databaseAccessContext.pushCapability(ids, trackingReferences);
+        if (created != null) {
+            subscriptionRepository.saveAndFlush(created);
+        }
         if (!previous.endpointHash().equals(current.endpointHash())) {
             removeSubscription(previous);
         }
@@ -194,7 +198,7 @@ public class CustomerPushSubscriptionService {
             if (existingOrderIds.contains(order.getId())) {
                 continue;
             }
-            if (jdbcTemplate.queryForObject("SELECT public.count_push_enrollments(?)", Long.class, order.getTrackingReference())
+            if (enrollmentRepository.countForTrackingReference(order.getTrackingReference())
                     >= properties.subscription().maximumEnrollmentsPerOrder()) {
                 throw new CustomerPushEnrollmentLimitException(order.getTrackingReference());
             }
@@ -207,42 +211,31 @@ public class CustomerPushSubscriptionService {
     }
 
     private UUID verifiedSubscriptionId(ValidatedPushSubscription candidate) {
-        return jdbcTemplate.query("SELECT * FROM public.verify_push_subscription(?)", rows -> {
-            if (!rows.next()) {
-                return null;
-            }
-            var id = rows.getObject("id", UUID.class);
-            var auth = cipher.decrypt(rows.getBytes("encrypted_auth_secret"),
-                    rows.getBytes("auth_secret_nonce"), id, AUTH_SECRET_PURPOSE);
-            if (!MessageDigest.isEqual(rows.getBytes("p256dh_key"), candidate.p256dhKey())
-                    || !MessageDigest.isEqual(auth, candidate.authSecret())) {
-                throw new InvalidCustomerPushSubscriptionException(
-                        "Push subscription capability does not match the registered endpoint");
-            }
-            return id;
-        }, candidate.endpointHash());
+        var capability = subscriptionRepository.verifyCapability(candidate.endpointHash()).orElse(null);
+        if (capability == null) {
+            return null;
+        }
+        var auth = cipher.decrypt(capability.getEncryptedAuthSecret(),
+                capability.getAuthSecretNonce(), capability.getId(), AUTH_SECRET_PURPOSE);
+        if (!MessageDigest.isEqual(capability.getP256dhKey(), candidate.p256dhKey())
+                || !MessageDigest.isEqual(auth, candidate.authSecret())) {
+            throw new InvalidCustomerPushSubscriptionException(
+                    "Push subscription capability does not match the registered endpoint");
+        }
+        return capability.getId();
     }
 
-    private UUID createSubscriptionId(ValidatedPushSubscription validated, java.time.Instant now) {
+    private CustomerPushSubscription createSubscription(ValidatedPushSubscription validated, java.time.Instant now) {
         if (validated.expirationTime() != null && !validated.expirationTime().isAfter(now)) {
             throw new InvalidCustomerPushSubscriptionException("Push subscription has already expired");
         }
         var id = UUID.randomUUID();
         var endpoint = cipher.encrypt(validated.endpoint().getBytes(StandardCharsets.UTF_8), id, ENDPOINT_PURPOSE);
         var auth = cipher.encrypt(validated.authSecret(), id, AUTH_SECRET_PURPOSE);
-        var created = jdbcTemplate.queryForObject(
-                "SELECT public.create_push_subscription(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", UUID.class,
+        return CustomerPushSubscription.create(
                 id, validated.endpointHash(), validated.endpointOrigin(), endpoint.ciphertext(), endpoint.nonce(),
                 validated.p256dhKey(), auth.ciphertext(), auth.nonce(), vapidKeyMaterial.fingerprint(),
-                validated.expirationTime() == null ? null : Timestamp.from(validated.expirationTime()), Timestamp.from(now));
-        if (created != null) {
-            return created;
-        }
-        var existing = verifiedSubscriptionId(validated);
-        if (existing == null) {
-            throw new InvalidCustomerPushSubscriptionException("Push subscription changed concurrently; retry the request");
-        }
-        return existing;
+                validated.expirationTime(), now);
     }
 
     private CustomerPushSubscription refreshSubscription(
@@ -306,8 +299,6 @@ public class CustomerPushSubscriptionService {
     }
 
     private void cancelPending(UUID subscriptionId, List<UUID> orderIds) {
-        jdbcTemplate.queryForObject("SELECT public.cancel_push_deliveries(?, ?::uuid[], ?)", Integer.class,
-                subscriptionId, orderIds == null ? null : orderIds.stream().map(UUID::toString).collect(Collectors.joining(",", "{", "}")),
-                Timestamp.from(clock.instant()));
+        deliveryRepository.cancelPending(subscriptionId, orderIds, clock.instant());
     }
 }

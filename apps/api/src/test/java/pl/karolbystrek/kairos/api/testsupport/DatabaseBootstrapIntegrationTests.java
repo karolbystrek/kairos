@@ -2,6 +2,9 @@ package pl.karolbystrek.kairos.api.testsupport;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.flywaydb.core.Flyway;
+import org.testcontainers.postgresql.PostgreSQLContainer;
+import org.testcontainers.utility.MountableFile;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import java.nio.file.Files;
@@ -10,6 +13,27 @@ import static org.assertj.core.api.Assertions.*;
 
 class DatabaseBootstrapIntegrationTests {
     @TempDir Path directory;
+
+    @Test
+    void freshPostgresInitializationCreatesRolesBeforeFlywayConnects() {
+        var script=Path.of("../../deployment/postgres/bootstrap.sh").toAbsolutePath().normalize();
+        try (var postgres=new PostgreSQLContainer("postgres:18-alpine")
+                .withEnv("KAIROS_DB_OWNER_USER","initial_owner")
+                .withEnv("KAIROS_DB_OWNER_PASSWORD","owner-test")
+                .withEnv("KAIROS_DB_RUNTIME_USER","initial_runtime")
+                .withEnv("KAIROS_DB_RUNTIME_PASSWORD","runtime-test")
+                .withCopyFileToContainer(MountableFile.forHostPath(script),"/docker-entrypoint-initdb.d/10-kairos-roles.sh")) {
+            postgres.start();
+            Flyway.configure().dataSource(postgres.getJdbcUrl(),"initial_owner","owner-test")
+                .placeholders(java.util.Map.of("runtimeUser","initial_runtime"))
+                .locations("classpath:db/migration").load().migrate();
+            var runtime=new JdbcTemplate(new DriverManagerDataSource(postgres.getJdbcUrl(),"initial_runtime","runtime-test"));
+            new pl.karolbystrek.kairos.api.persistence.infrastructure.DatabaseIsolationVerifier(runtime).run(null);
+            assertThat(runtime.queryForObject("SELECT count(*) FROM tenants",Integer.class)).isZero();
+            assertThatThrownBy(() -> runtime.update("INSERT INTO tenants(id) VALUES(gen_random_uuid())"))
+                .isInstanceOf(org.springframework.dao.DataAccessException.class);
+        }
+    }
 
     @Test
     void provisionsRestrictedRolesIdempotentlyAndRejectsPrivilegeEscalation() throws Exception {

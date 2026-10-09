@@ -71,13 +71,14 @@ response contract retained for write-only keys.
 Anonymous tracking grants exact-reference order reads without history or DML.
 Push mutation requires complete cryptographic capability verification before
 binding subscription IDs; replacement binds only the immutable union of verified
-old/new capabilities. Bootstrap helpers have fixed projections/operations and
-cannot browse arbitrary tenants. Workers lock one eligible identity per transaction
+old/new capabilities. Registration and invitation redemption use ordinary
+Hibernate persistence under exact new-account/bearer scopes. Credential bootstrap
+helpers expose fixed projections and cannot browse arbitrary tenants. Workers lock one eligible identity per transaction
 and completion validates the exact current claim token. Captured webhook delivery
 configuration and signing versions remain available after disablement, archival
 or signing-version retirement; HTTP occurs outside database transactions.
 
-Role/bootstrap/startup checks and a reviewed operator-only old-V1 upgrade are
+Role initialization, Spring persistence and startup checks are
 specified in [database operations](../deployment/DATABASE.md). Repository security
 verification uses the actual restricted runtime role; live rollout and hosted
 isolation acceptance remain separate authorized operator work.

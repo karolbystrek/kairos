@@ -56,7 +56,8 @@ or an already initialized provider administrator. Coordinate credential changes
 with their owning service; never reinitialize databases to apply them.
 
 Database role separation and transaction-local RLS are implemented in the
-repository. Follow [PostgreSQL roles and reviewed upgrade](DATABASE.md) for fresh
-bootstrap and the explicitly approved, data-preserving upgrade of an existing
-V1 database. Ordinary deployment never repairs an old checksum. Live runtime
+repository. Follow [PostgreSQL roles and initialization](DATABASE.md) for fresh
+startup and the disposable development schema policy. The operator will recreate
+the VPS database for this revision; ordinary deployment never resets volumes or
+repairs an old checksum. Live runtime
 isolation and application acceptance remain required before public launch.

@@ -49,9 +49,7 @@ class ReleaseManifestTest(unittest.TestCase):
                 "release.json", "compose.yaml", "compose.deployment.yaml",
                 "nginx/default.conf.template", "nginx/cloudflare-real-ip.conf",
                 "deployment/zitadel/bootstrap.py", "deployment/deploy.sh", "deployment/deploy.py",
-                "deployment/postgres/bootstrap.sh", "deployment/postgres/upgrade_rls.sql",
-                "deployment/postgres/prepare_upgrade.py",
-                "apps/api/src/main/resources/db/migration/V1__create_initial_schema.sql",
+                "deployment/postgres/bootstrap.sh",
             })
             self.assertEqual(json.load(archive.extractfile("release.json")), manifest)
             for name in archive.getnames():

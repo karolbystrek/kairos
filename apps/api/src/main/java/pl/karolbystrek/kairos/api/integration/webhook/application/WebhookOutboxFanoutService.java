@@ -1,7 +1,6 @@
 package pl.karolbystrek.kairos.api.integration.webhook.application;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
@@ -17,9 +16,9 @@ import pl.karolbystrek.kairos.api.order.domain.OrderOutboxEvent;
 import pl.karolbystrek.kairos.api.order.infrastructure.persistence.OrderOutboxEventRepository;
 import pl.karolbystrek.kairos.api.persistence.infrastructure.DatabaseAccessContext;
 import pl.karolbystrek.kairos.api.persistence.infrastructure.WorkerOperation;
+import pl.karolbystrek.kairos.api.persistence.infrastructure.WorkerDiscoveryRepository;
 
 import java.time.Clock;
-import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -32,7 +31,7 @@ public class WebhookOutboxFanoutService {
     private final WebhookDeliverySigningVersionRepository deliverySigningRepository;
     private final WebhookProperties properties;
     private final Clock clock;
-    private final JdbcTemplate jdbcTemplate;
+    private final WorkerDiscoveryRepository workerDiscoveryRepository;
     private final PlatformTransactionManager transactionManager;
     private final DatabaseAccessContext databaseAccess;
 
@@ -42,7 +41,7 @@ public class WebhookOutboxFanoutService {
         var processed = 0;
         for (; processed < properties.worker().batchSize(); processed++) {
             var found = transaction.execute(status -> {
-                var eventId = jdbcTemplate.queryForObject("SELECT public.next_webhook_fanout()", UUID.class);
+                var eventId = workerDiscoveryRepository.nextWebhookFanout();
                 if (eventId == null || !databaseAccess.worker(WorkerOperation.WEBHOOK_FANOUT, eventId, null)) {
                     return false;
                 }

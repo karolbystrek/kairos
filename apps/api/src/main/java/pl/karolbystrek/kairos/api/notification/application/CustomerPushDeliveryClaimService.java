@@ -2,11 +2,11 @@ package pl.karolbystrek.kairos.api.notification.application;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import pl.karolbystrek.kairos.api.persistence.infrastructure.DatabaseAccessContext;
 import pl.karolbystrek.kairos.api.persistence.infrastructure.WorkerOperation;
+import pl.karolbystrek.kairos.api.persistence.infrastructure.WorkerDiscoveryRepository;
 
 import pl.karolbystrek.kairos.api.notification.application.model.ClaimedCustomerPushDelivery;
 import pl.karolbystrek.kairos.api.notification.infrastructure.config.CustomerNotificationProperties;
@@ -39,7 +39,7 @@ public class CustomerPushDeliveryClaimService {
     private final CustomerPushSubscriptionRetirementService retirementService;
     private final CustomerNotificationProperties properties;
     private final Clock clock;
-    private final JdbcTemplate jdbcTemplate;
+    private final WorkerDiscoveryRepository workerDiscoveryRepository;
     private final PlatformTransactionManager transactionManager;
     private final DatabaseAccessContext databaseAccessContext;
 
@@ -58,8 +58,7 @@ public class CustomerPushDeliveryClaimService {
 
     private boolean claimOne(List<ClaimedCustomerPushDelivery> claimed) {
         var now = clock.instant();
-        var id = jdbcTemplate.queryForObject("SELECT public.next_push_delivery(?)", UUID.class,
-                java.sql.Timestamp.from(now));
+        var id = workerDiscoveryRepository.nextPushDelivery(now);
         if (id == null || !databaseAccessContext.worker(WorkerOperation.PUSH_CLAIM, id, null)) {
             return false;
         }

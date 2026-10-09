@@ -3,6 +3,7 @@ package pl.karolbystrek.kairos.api.notification.application;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import pl.karolbystrek.kairos.api.notification.infrastructure.persistence.CustomerPushEnrollmentRepository;
+import pl.karolbystrek.kairos.api.notification.infrastructure.persistence.CustomerPushDeliveryRepository;
 import pl.karolbystrek.kairos.api.notification.infrastructure.persistence.CustomerPushSubscriptionRepository;
 
 import java.time.Instant;
@@ -14,7 +15,7 @@ class CustomerPushSubscriptionRetirementService {
 
     private final CustomerPushSubscriptionRepository subscriptionRepository;
     private final CustomerPushEnrollmentRepository enrollmentRepository;
-    private final org.springframework.jdbc.core.JdbcTemplate database;
+    private final CustomerPushDeliveryRepository deliveryRepository;
     private final jakarta.persistence.EntityManager entityManager;
 
     void retire(UUID subscriptionId, Instant now) {
@@ -26,8 +27,7 @@ class CustomerPushSubscriptionRetirementService {
             return;
         }
         entityManager.flush();
-        database.queryForObject("SELECT public.cancel_push_deliveries(?, NULL, ?)", Integer.class,
-                subscriptionId, java.sql.Timestamp.from(now));
+        deliveryRepository.cancelPending(subscriptionId, null, now);
         enrollmentRepository.deleteAllBySubscriptionId(subscriptionId);
         subscriptionRepository.delete(subscription);
     }

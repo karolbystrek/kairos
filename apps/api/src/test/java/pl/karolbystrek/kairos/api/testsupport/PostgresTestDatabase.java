@@ -45,13 +45,6 @@ public final class PostgresTestDatabase {
         return DATABASE.execInContainer(arguments);
     }
 
-    public static org.testcontainers.containers.Container.ExecResult psql(java.nio.file.Path directory, String... arguments) throws Exception {
-        DATABASE.copyFileToContainer(org.testcontainers.utility.MountableFile.forHostPath(directory), "/tmp/rls-upgrade");
-        var command = new java.util.ArrayList<String>(java.util.List.of("psql", "-X", "-U", DATABASE.getUsername()));
-        command.addAll(java.util.List.of(arguments));
-        return DATABASE.execInContainer(command.toArray(String[]::new));
-    }
-
     public static JdbcTemplate ownerDatabase() {
         return new JdbcTemplate(new DriverManagerDataSource(
                 DATABASE.getJdbcUrl(), DATABASE.getUsername(), DATABASE.getPassword()));

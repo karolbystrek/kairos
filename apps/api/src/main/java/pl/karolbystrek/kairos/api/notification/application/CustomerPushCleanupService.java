@@ -2,13 +2,11 @@ package pl.karolbystrek.kairos.api.notification.application;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import pl.karolbystrek.kairos.api.persistence.infrastructure.DatabaseAccessContext;
 import pl.karolbystrek.kairos.api.persistence.infrastructure.WorkerOperation;
-import java.sql.Timestamp;
-import java.util.UUID;
+import pl.karolbystrek.kairos.api.persistence.infrastructure.WorkerDiscoveryRepository;
 import pl.karolbystrek.kairos.api.notification.infrastructure.config.CustomerNotificationProperties;
 import pl.karolbystrek.kairos.api.notification.infrastructure.persistence.CustomerPushDeliveryRepository;
 import pl.karolbystrek.kairos.api.notification.infrastructure.persistence.CustomerPushSubscriptionRepository;
@@ -24,7 +22,7 @@ public class CustomerPushCleanupService {
     private final CustomerPushSubscriptionRetirementService retirementService;
     private final CustomerNotificationProperties properties;
     private final Clock clock;
-    private final JdbcTemplate jdbcTemplate;
+    private final WorkerDiscoveryRepository workerDiscoveryRepository;
     private final PlatformTransactionManager transactionManager;
     private final DatabaseAccessContext databaseAccessContext;
 
@@ -35,11 +33,10 @@ public class CustomerPushCleanupService {
         var count = 0;
         for (var index = 0; index < properties.worker().batchSize(); index++) {
             var processed = transactionTemplate.execute(status -> {
-                var id = jdbcTemplate.queryForObject("SELECT public.next_expired_push_subscription(?)",
-                        UUID.class, Timestamp.from(now));
+                var id = workerDiscoveryRepository.nextExpiredPushSubscription(now);
                 if (id == null) {
-                    id = jdbcTemplate.queryForObject("SELECT public.next_dormant_push_subscription(?)",
-                            UUID.class, Timestamp.from(now.minus(properties.subscription().dormantRetention())));
+                    id = workerDiscoveryRepository.nextDormantPushSubscription(
+                            now.minus(properties.subscription().dormantRetention()));
                 }
                 if (id == null || !databaseAccessContext.worker(WorkerOperation.SUBSCRIPTION_RETIRE, id, null)) {
                     return false;
@@ -54,9 +51,9 @@ public class CustomerPushCleanupService {
         }
         for (var index = 0; index < properties.worker().batchSize(); index++) {
             var processed = transactionTemplate.execute(status -> {
-                var id = jdbcTemplate.queryForObject("SELECT public.next_terminal_push_delivery(?, ?)",
-                        UUID.class, Timestamp.from(now.minus(properties.delivery().successfulRetention())),
-                        Timestamp.from(now.minus(properties.delivery().failedRetention())));
+                var id = workerDiscoveryRepository.nextTerminalPushDelivery(
+                        now.minus(properties.delivery().successfulRetention()),
+                        now.minus(properties.delivery().failedRetention()));
                 if (id == null || !databaseAccessContext.worker(WorkerOperation.PUSH_CLEANUP, id, null)) {
                     return false;
                 }

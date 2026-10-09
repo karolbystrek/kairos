@@ -26,9 +26,9 @@
   run `docker compose down`, delete volumes, reset PostgreSQL, or prune Docker
   state without explicit authorization.
 - If a changed Flyway migration conflicts with a persistent database checksum,
-  report it. Use the explicitly approved [operator upgrade](../deployment/DATABASE.md)
-  for its supported old V1, or ask before resetting data; never run Flyway repair
-  automatically.
+  report it and ask before resetting data; never run Flyway repair automatically.
+  The initial-schema policy uses fresh databases; see
+  [database initialization](../deployment/DATABASE.md).
 
 ## Setup
 

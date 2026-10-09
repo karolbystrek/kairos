@@ -9,7 +9,7 @@ done
 [ "$POSTGRES_USER" != "$KAIROS_DB_RUNTIME_USER" ] || exit 1
 : "${KAIROS_DB_OWNER_PASSWORD:?Set owner password}" "${KAIROS_DB_RUNTIME_PASSWORD:?Set runtime password}"
 export PGPASSWORD="$POSTGRES_PASSWORD"
-psql -X --no-psqlrc -v ON_ERROR_STOP=1 -h "${PGHOST:-postgres}" -U "$POSTGRES_USER" -d "$POSTGRES_DB" <<'SQL'
+psql -X --no-psqlrc -v ON_ERROR_STOP=1 -h "${PGHOST:-/var/run/postgresql}" -U "$POSTGRES_USER" -d "$POSTGRES_DB" <<'SQL'
 \getenv owner_user KAIROS_DB_OWNER_USER
 \getenv owner_password KAIROS_DB_OWNER_PASSWORD
 \getenv runtime_user KAIROS_DB_RUNTIME_USER
@@ -31,10 +31,6 @@ BEGIN
     END LOOP;
     IF EXISTS(SELECT 1 FROM pg_class c JOIN pg_roles r ON r.oid=c.relowner WHERE r.rolname=current_setting('bootstrap.runtime')) THEN
         RAISE EXCEPTION 'Runtime must not own database objects';
-    END IF;
-    IF to_regclass('public.flyway_schema_history') IS NOT NULL AND
-        (SELECT n.nspowner<>r.oid FROM pg_namespace n CROSS JOIN pg_roles r WHERE n.nspname='public' AND r.rolname=current_setting('bootstrap.owner')) THEN
-        RAISE EXCEPTION 'Applied development schema requires the reviewed operator upgrade';
     END IF;
 END $$;
 SELECT format('ALTER ROLE %I PASSWORD %L', :'owner_user', :'owner_password') \gexec

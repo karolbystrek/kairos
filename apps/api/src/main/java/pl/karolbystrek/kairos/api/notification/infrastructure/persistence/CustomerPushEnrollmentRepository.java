@@ -1,6 +1,7 @@
 package pl.karolbystrek.kairos.api.notification.infrastructure.persistence;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import pl.karolbystrek.kairos.api.notification.domain.CustomerPushEnrollment;
 
 import java.util.Collection;
@@ -12,6 +13,9 @@ public interface CustomerPushEnrollmentRepository
         extends JpaRepository<CustomerPushEnrollment, UUID> {
 
     long countByOrderId(UUID orderId);
+
+    @Query(value = "SELECT public.count_push_enrollments(:trackingReference)", nativeQuery = true)
+    long countForTrackingReference(UUID trackingReference);
 
     boolean existsBySubscriptionIdAndOrderId(UUID subscriptionId, UUID orderId);
 

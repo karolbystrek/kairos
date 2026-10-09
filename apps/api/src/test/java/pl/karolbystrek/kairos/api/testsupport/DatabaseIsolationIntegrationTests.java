@@ -11,6 +11,8 @@ import static org.assertj.core.api.Assertions.*;
 class DatabaseIsolationIntegrationTests extends RedisListenerIsolatedIntegrationTest {
     @Autowired JdbcTemplate runtime;
     @Autowired org.springframework.transaction.PlatformTransactionManager transactionManager;
+    @Autowired pl.karolbystrek.kairos.api.account.application.AccountInvitationService invitations;
+    @Autowired pl.karolbystrek.kairos.api.authentication.application.OneTimeBearerTokenService tokens;
     @Autowired pl.karolbystrek.kairos.api.persistence.infrastructure.DatabaseAccessContext context;
     @Autowired pl.karolbystrek.kairos.api.order.application.OrderService orders;
     @Autowired pl.karolbystrek.kairos.api.order.infrastructure.persistence.CustomerOrderRepository repository;
@@ -70,7 +72,50 @@ class DatabaseIsolationIntegrationTests extends RedisListenerIsolatedIntegration
         assertThatThrownBy(() -> runtime.execute("CREATE TABLE public.shadow(id uuid)")).isInstanceOf(org.springframework.dao.DataAccessException.class);
         assertThatThrownBy(() -> runtime.execute("CREATE TEMP TABLE accounts(id uuid)")).isInstanceOf(org.springframework.dao.DataAccessException.class);
         assertThatThrownBy(() -> runtime.execute("SET ROLE kairos_owner")).isInstanceOf(org.springframework.dao.DataAccessException.class);
-        assertThat(runtime.queryForObject("SELECT has_function_privilege('public', 'public.register_tenant(text,text,timestamptz)', 'EXECUTE')",Boolean.class)).isFalse();
+        assertThat(runtime.queryForObject("SELECT has_function_privilege('public', 'public.staff_authentication(text)', 'EXECUTE')",Boolean.class)).isFalse();
+    }
+
+    @Test
+    void registrationScopeAllowsOnlyItsNewTenantAndAdministrator() {
+        var tenant=UUID.randomUUID(); var account=UUID.randomUUID();
+        var transaction=new org.springframework.transaction.support.TransactionTemplate(transactionManager);
+        assertThatNoException().isThrownBy(() -> transaction.executeWithoutResult(status -> {
+            runtime.queryForMap("SELECT set_config('kairos.scope','registration',true),set_config('kairos.identity',?,true),set_config('kairos.references',?,true)",tenant.toString(),account.toString());
+            runtime.update("INSERT INTO tenants(id) VALUES(?)",tenant);
+            runtime.update("INSERT INTO accounts(id,tenant_id,email,provider_subject,tenant_role,status,created_at,updated_at) VALUES(?,?,'registered@example.com','registered','ADMIN','ENABLED',now(),now())",account,tenant);
+            assertThat(runtime.queryForObject("SELECT count(*) FROM accounts",Integer.class)).isEqualTo(1);
+        }));
+        assertThatThrownBy(() -> transaction.executeWithoutResult(status -> {
+            runtime.queryForMap("SELECT set_config('kairos.scope','registration',true),set_config('kairos.identity',?,true),set_config('kairos.references',?,true)",tenant.toString(),account.toString());
+            runtime.update("INSERT INTO accounts(id,tenant_id,email,provider_subject,tenant_role,status,created_at,updated_at) VALUES(?,?,'unrelated@example.com','unrelated','ADMIN','ENABLED',now(),now())",UUID.randomUUID(),tenant);
+        })).isInstanceOf(org.springframework.dao.DataAccessException.class);
+        assertThatThrownBy(() -> transaction.executeWithoutResult(status -> {
+            runtime.queryForMap("SELECT set_config('kairos.scope','registration',true),set_config('kairos.identity',?,true)",tenant.toString());
+            runtime.update("INSERT INTO tenants(id) VALUES(?)",UUID.randomUUID());
+        })).isInstanceOf(org.springframework.dao.DataAccessException.class);
+        assertThat(runtime.queryForObject("SELECT count(*) FROM accounts",Integer.class)).isZero();
+    }
+
+    @Test
+    void invitationScopeCannotBrowseOrChangeUnrelatedAccountsAndInvitations() {
+        var fixture=new pl.karolbystrek.kairos.api.integration.testsupport.IntegrationTestFixture(PostgresTestDatabase.ownerDatabase());
+        var own=fixture.createTenant(); var other=fixture.createTenant();
+        var invitation=invitations.create(own.administrator(),own.firstLocationId(),pl.karolbystrek.kairos.api.account.domain.assignment.AssignmentRole.OPERATOR);
+        invitations.create(other.administrator(),other.firstLocationId(),pl.karolbystrek.kairos.api.account.domain.assignment.AssignmentRole.OPERATOR);
+        var transaction=new org.springframework.transaction.support.TransactionTemplate(transactionManager);
+        transaction.executeWithoutResult(status -> {
+            context.invitation(tokens.hash(invitation.token()),UUID.randomUUID());
+            assertThat(runtime.queryForObject("SELECT count(*) FROM account_invitations",Integer.class)).isEqualTo(1);
+            assertThat(runtime.queryForObject("SELECT count(*) FROM locations",Integer.class)).isEqualTo(1);
+            assertThat(runtime.queryForObject("SELECT count(*) FROM accounts",Integer.class)).isEqualTo(1);
+            assertThat(runtime.queryForObject("SELECT count(*) FROM orders",Integer.class)).isZero();
+            assertThat(runtime.update("UPDATE accounts SET status='DISABLED' WHERE id=?",own.administrator().accountId())).isZero();
+            assertThat(runtime.update("UPDATE account_invitations SET state='REVOKED',revocation_reason='STAFF_REVOKED',revoked_at=now() WHERE tenant_id=?",other.tenantId())).isZero();
+        });
+        assertThatThrownBy(() -> transaction.executeWithoutResult(status -> {
+            context.invitation(tokens.hash(invitation.token()),UUID.randomUUID());
+            runtime.update("UPDATE account_invitations SET state='REVOKED',revocation_reason='STAFF_REVOKED',revoked_at=now() WHERE id=?",invitation.invitation().id());
+        })).isInstanceOf(org.springframework.dao.DataAccessException.class);
     }
 
     @Test

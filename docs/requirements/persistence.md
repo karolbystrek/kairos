@@ -96,8 +96,15 @@ startup verifies role flags, ownership, expected policy/helper revision and gran
 Migration credentials remain in the startup process, so this protects ordinary
 runtime database queries rather than a fully compromised API process.
 
-Fresh development still edits the consolidated V1. Existing databases at
-`66d35d7` have an explicitly reviewed, operator-only data-preserving upgrade;
-unknown old schema/checksum aborts and no startup repair is permitted. See
-[database roles and upgrade](../deployment/DATABASE.md) for maintenance and the
-post-commit rollback boundary. This procedure does not authorize live execution.
+Business workflows and entity reads/writes remain in Java and Hibernate.
+PostgreSQL-specific context, minimal credential projections, worker discovery and
+capability aggregate/cancellation operations stay in persistence infrastructure.
+Registration and invitation redemption use exact new-identity/bearer scopes;
+they do not execute privileged database business workflows.
+
+Development edits the consolidated V1. The owner will recreate the disposable VPS
+database for this revision; no retained-data upgrade or automatic checksum repair
+is supplied. Fresh PostgreSQL entrypoint initialization provisions restricted
+roles before Spring Flyway applies V1. See
+[database roles and initialization](../deployment/DATABASE.md). Volume resets are
+separately authorized operator actions.

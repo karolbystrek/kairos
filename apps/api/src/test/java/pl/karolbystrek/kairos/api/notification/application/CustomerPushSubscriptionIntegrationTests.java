@@ -184,6 +184,30 @@ class CustomerPushSubscriptionIntegrationTests extends RedisListenerIsolatedInte
     }
 
     @Test
+    void concurrentReconciliationCreatesOneSubscriptionAndEnrollment() throws Exception {
+        var order = createOrder();
+        var input = newSubscription();
+        var start = new java.util.concurrent.CountDownLatch(1);
+        try (var requests = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            var first = requests.submit(() -> {
+                start.await();
+                subscriptionService.reconcile(input, List.of(order.trackingReference()));
+                return null;
+            });
+            var second = requests.submit(() -> {
+                start.await();
+                subscriptionService.reconcile(input, List.of(order.trackingReference()));
+                return null;
+            });
+            start.countDown();
+            first.get(10, java.util.concurrent.TimeUnit.SECONDS);
+            second.get(10, java.util.concurrent.TimeUnit.SECONDS);
+        }
+        assertThat(count("customer_push_subscriptions")).isEqualTo(1);
+        assertThat(count("customer_push_enrollments")).isEqualTo(1);
+    }
+
+    @Test
     void requiresTheCompleteCapabilityForAnExistingEndpoint() {
         var order = createOrder();
         var input = newSubscription();

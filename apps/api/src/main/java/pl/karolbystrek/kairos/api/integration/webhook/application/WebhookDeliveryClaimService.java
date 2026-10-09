@@ -1,7 +1,6 @@
 package pl.karolbystrek.kairos.api.integration.webhook.application;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
@@ -16,6 +15,7 @@ import pl.karolbystrek.kairos.api.integration.webhook.infrastructure.persistence
 import pl.karolbystrek.kairos.api.integration.webhook.infrastructure.security.SigningSecretCipher;
 import pl.karolbystrek.kairos.api.persistence.infrastructure.DatabaseAccessContext;
 import pl.karolbystrek.kairos.api.persistence.infrastructure.WorkerOperation;
+import pl.karolbystrek.kairos.api.persistence.infrastructure.WorkerDiscoveryRepository;
 
 import java.time.Clock;
 import java.util.List;
@@ -29,7 +29,7 @@ public class WebhookDeliveryClaimService {
     private final WebhookDeliverySigningVersionRepository deliverySigningRepository;
     private final WebhookProperties properties;
     private final Clock clock;
-    private final JdbcTemplate jdbcTemplate;
+    private final WorkerDiscoveryRepository workerDiscoveryRepository;
     private final PlatformTransactionManager transactionManager;
     private final DatabaseAccessContext databaseAccess;
     private final WebhookSigningSecretVersionRepository signingSecretRepository;
@@ -49,7 +49,7 @@ public class WebhookDeliveryClaimService {
 
     private ClaimedWebhookDelivery claimNext() {
         var now = clock.instant();
-        var id = jdbcTemplate.queryForObject("SELECT public.next_webhook_delivery(?)", UUID.class, java.sql.Timestamp.from(now));
+        var id = workerDiscoveryRepository.nextWebhookDelivery(now);
         if (id == null || !databaseAccess.worker(WorkerOperation.WEBHOOK_CLAIM, id, null)) return null;
         var delivery = deliveryRepository.findById(id).orElseThrow();
         var claimToken = UUID.randomUUID();

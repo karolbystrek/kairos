@@ -61,6 +61,14 @@ public class DatabaseAccessContext {
         bind(scope, principal.apiKeyVersionId().toString(), "", "");
     }
 
+    public void registration(UUID tenantId, UUID accountId) {
+        bind("registration", tenantId.toString(), accountId.toString(), "");
+    }
+
+    public void invitation(String tokenHash, UUID accountId) {
+        bind("invitation", tokenHash, accountId == null ? "" : accountId.toString(), "");
+    }
+
     public void trackedOrders(Collection<UUID> references) {
         bind("tracking", "", identifiers(references), "");
     }

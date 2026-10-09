@@ -50,9 +50,9 @@ The current walking vertical slice is implemented for local development:
   paths, health-gated dependencies, persistent PostgreSQL/provider credentials,
   and nondurable Redis;
 * restricted PostgreSQL runtime identity, transaction-local tenant/location and
-  capability scopes, command-specific RLS, narrow authentication/onboarding
-  bootstrap helpers, per-item workers and startup verification;
-* fresh database role bootstrap and an operator-only reviewed old-V1 upgrade;
+  capability scopes, command-specific RLS, narrow credential-bootstrap
+  projections, Hibernate onboarding workflows, per-item workers and startup verification;
+* fresh PostgreSQL entrypoint role initialization and automatic Spring Flyway V1;
 * GitHub Actions validation for pull requests and `main`.
 
 ### Implemented behavior and development schema
@@ -96,8 +96,8 @@ specified in [location lifecycle](locations.md) and [HTTP contracts](http-contra
 
 Outstanding security and acceptance work:
 
-* perform the explicitly approved existing-database upgrade where required and
-  verify restricted-role RLS and scoped application/worker behavior on the hosted
+* recreate the disposable VPS stack for the revised V1 and verify restricted-role
+  RLS and scoped application/worker behavior on the hosted
   runtime; repository implementation and disposable PostgreSQL tests do not
   establish live acceptance;
 * verify hosted gateway client addressing, throttling and origin-bypass blocking

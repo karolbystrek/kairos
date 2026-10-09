@@ -809,17 +809,6 @@ CREATE FUNCTION public.identity_conflict(email text,subject text) RETURNS boolea
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
     SELECT EXISTS(SELECT 1 FROM public.accounts a WHERE a.email=identity_conflict.email OR a.provider_subject=subject)
 $$;
-CREATE FUNCTION public.register_tenant(email text,subject text,at_time timestamptz)
-RETURNS TABLE(account_id uuid,tenant_id uuid,tenant_role text)
-LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
-DECLARE tenant uuid := gen_random_uuid(); account uuid := gen_random_uuid();
-BEGIN
-    IF public.identity_conflict(email,subject) THEN RAISE EXCEPTION 'IDENTITY_CONFLICT'; END IF;
-    INSERT INTO public.tenants(id) VALUES(tenant);
-    INSERT INTO public.accounts(id,tenant_id,email,provider_subject,tenant_role,status,created_at,updated_at)
-        VALUES(account,tenant,email,subject,'ADMIN','ENABLED',at_time,at_time);
-    RETURN QUERY SELECT account,tenant,'ADMIN'::text;
-END $$;
 CREATE FUNCTION kairos_security.issuer_eligible(invitation uuid) RETURNS boolean
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
     SELECT EXISTS(SELECT 1 FROM public.account_invitations i JOIN public.accounts a ON a.id=i.issued_by_account_id
@@ -827,49 +816,33 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
         AND (a.tenant_role='ADMIN' OR (i.assignment_role='OPERATOR' AND EXISTS(SELECT 1 FROM public.location_assignments x
             WHERE x.account_id=a.id AND x.location_id=i.location_id AND x.role='MANAGER'))))
 $$;
-CREATE FUNCTION public.invitation_preview(hash text,at_time timestamptz)
-RETURNS TABLE(location_name varchar,assignment_role varchar,expires_at timestamptz,state varchar,issuer_eligible boolean,location_enabled boolean)
+-- Bearer bootstrap reads only the invitation and its exact related location/issuer.
+CREATE FUNCTION kairos_security.invitation_access(invitation uuid DEFAULT NULL,tenant uuid DEFAULT NULL,
+    location uuid DEFAULT NULL,issuer uuid DEFAULT NULL) RETURNS boolean
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
-    SELECT l.name,i.assignment_role,i.expires_at,i.state,kairos_security.issuer_eligible(i.id),l.status='ENABLED'
-        FROM public.account_invitations i JOIN public.locations l ON l.id=i.location_id WHERE i.token_hash=hash
+    SELECT kairos_security.setting('scope')='invitation' AND EXISTS(SELECT 1 FROM public.account_invitations i
+        WHERE i.token_hash=kairos_security.setting('identity') AND (invitation IS NULL OR i.id=invitation)
+        AND (tenant IS NULL OR i.tenant_id=tenant) AND (location IS NULL OR i.location_id=location)
+        AND (issuer IS NULL OR i.issued_by_account_id=issuer))
 $$;
-CREATE FUNCTION public.redeem_invitation(hash text,email text,subject text,at_time timestamptz)
-RETURNS TABLE(account_id uuid,tenant_id uuid,tenant_role text)
-LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
-DECLARE invitation public.account_invitations; account uuid := gen_random_uuid();
-BEGIN
-    SELECT * INTO invitation FROM public.account_invitations i WHERE i.token_hash=hash;
-    IF NOT FOUND THEN RAISE EXCEPTION 'INVITATION_NOT_FOUND'; END IF;
-    -- Location-before-invitation avoids cascade/FK lock inversion; issuer revocation uses the invitation lock.
-    PERFORM 1 FROM public.locations l WHERE l.id=invitation.location_id FOR SHARE;
-    SELECT * INTO invitation FROM public.account_invitations i WHERE i.token_hash=hash FOR UPDATE;
-    IF NOT FOUND THEN RAISE EXCEPTION 'INVITATION_NOT_FOUND'; END IF;
-    IF invitation.state='REDEEMED' THEN RAISE EXCEPTION 'INVITATION_REDEEMED'; END IF;
-    IF invitation.state='REVOKED' THEN RAISE EXCEPTION 'INVITATION_REVOKED'; END IF;
-    IF at_time>=invitation.expires_at THEN RAISE EXCEPTION 'INVITATION_EXPIRED'; END IF;
-    IF NOT kairos_security.issuer_eligible(invitation.id) THEN RAISE EXCEPTION 'INVITATION_REVOKED'; END IF;
-    IF public.identity_conflict(email,subject) THEN RAISE EXCEPTION 'IDENTITY_CONFLICT'; END IF;
-    INSERT INTO public.accounts(id,tenant_id,email,provider_subject,tenant_role,status,created_at,updated_at)
-        VALUES(account,invitation.tenant_id,email,subject,'MEMBER','ENABLED',at_time,at_time);
-    INSERT INTO public.location_assignments(account_id,location_id,tenant_id,role,created_at,updated_at)
-        VALUES(account,invitation.location_id,invitation.tenant_id,invitation.assignment_role,at_time,at_time);
-    UPDATE public.account_invitations SET state='REDEEMED',redeemed_account_id=account,redeemed_at=at_time,updated_at=at_time WHERE id=invitation.id;
-    RETURN QUERY SELECT account,invitation.tenant_id,'MEMBER'::text;
-END $$;
+CREATE FUNCTION kairos_security.new_account(account uuid,tenant uuid) RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
+    SELECT kairos_security.includes('references',account) AND (
+        (kairos_security.setting('scope')='registration' AND tenant=kairos_security.identity())
+        OR (kairos_security.invitation_access(tenant=>tenant) AND EXISTS(SELECT 1 FROM public.account_invitations i
+            WHERE i.token_hash=kairos_security.setting('identity') AND (i.state='PENDING' OR (i.state='REDEEMED' AND i.redeemed_account_id=account))
+            AND i.expires_at>NULLIF(kairos_security.setting('at_time'),'')::timestamptz
+            AND kairos_security.issuer_eligible(i.id))))
+$$;
 CREATE FUNCTION public.verify_push_subscription(hash text)
 RETURNS TABLE(id uuid,p256dh_key bytea,encrypted_auth_secret bytea,auth_secret_nonce bytea)
-LANGUAGE sql SECURITY DEFINER SET search_path=pg_catalog AS $$
-    SELECT s.id,s.p256dh_key,s.encrypted_auth_secret,s.auth_secret_nonce FROM public.customer_push_subscriptions s
-        WHERE s.endpoint_hash=hash FOR UPDATE
-$$;
-CREATE FUNCTION public.create_push_subscription(id uuid,hash text,origin text,endpoint bytea,endpoint_nonce bytea,
-    p256dh bytea,auth bytea,auth_nonce bytea,fingerprint text,expiry timestamptz,at_time timestamptz) RETURNS uuid
-LANGUAGE sql SECURITY DEFINER SET search_path=pg_catalog AS $$
-    INSERT INTO public.customer_push_subscriptions(id,endpoint_hash,endpoint_origin,encrypted_endpoint,endpoint_nonce,p256dh_key,
-        encrypted_auth_secret,auth_secret_nonce,vapid_key_fingerprint,expires_at,created_at,updated_at,last_seen_at)
-    VALUES(id,hash,origin,endpoint,endpoint_nonce,p256dh,auth,auth_nonce,fingerprint,expiry,at_time,at_time,at_time)
-    ON CONFLICT(endpoint_hash) DO NOTHING RETURNING id
-$$;
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
+BEGIN
+    -- Serialize absent endpoints too, so scoped Hibernate inserts retain uniqueness without a retry transaction.
+    PERFORM pg_advisory_xact_lock(hashtextextended(hash,0));
+    RETURN QUERY SELECT s.id,s.p256dh_key,s.encrypted_auth_secret,s.auth_secret_nonce FROM public.customer_push_subscriptions s
+        WHERE s.endpoint_hash=hash FOR UPDATE;
+END $$;
 CREATE FUNCTION public.count_push_enrollments(reference uuid) RETURNS bigint
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
     SELECT count(*) FROM public.customer_push_enrollments x JOIN public.orders o ON o.id=x.order_id
@@ -904,20 +877,33 @@ END $$;
 ALTER TABLE tenants ENABLE ROW LEVEL SECURITY;
 CREATE POLICY scoped_select ON tenants FOR SELECT USING (kairos_security.staff_tenant(id));
 CREATE POLICY scoped_update ON tenants FOR UPDATE USING (kairos_security.staff_tenant(id,true)) WITH CHECK (false);
+CREATE POLICY scoped_insert ON tenants FOR INSERT WITH CHECK (kairos_security.setting('scope')='registration' AND id=kairos_security.identity());
 ALTER TABLE locations ENABLE ROW LEVEL SECURITY;
-CREATE POLICY scoped_select ON locations FOR SELECT USING (kairos_security.staff_location(id) OR kairos_security.integration_location(id,false) OR EXISTS(SELECT 1 FROM orders o WHERE o.location_id=locations.id AND kairos_security.order_access(o.id,false,true)));
+CREATE POLICY scoped_select ON locations FOR SELECT USING (kairos_security.invitation_access(location=>id) OR kairos_security.staff_location(id) OR kairos_security.integration_location(id,false) OR EXISTS(SELECT 1 FROM orders o WHERE o.location_id=locations.id AND kairos_security.order_access(o.id,false,true)));
 CREATE POLICY scoped_insert ON locations FOR INSERT WITH CHECK (kairos_security.staff_tenant(tenant_id,true));
-CREATE POLICY scoped_update ON locations FOR UPDATE USING (kairos_security.staff_location(id) OR kairos_security.integration_location(id,false) OR EXISTS(SELECT 1 FROM orders o WHERE o.location_id=locations.id AND kairos_security.order_access(o.id,false,true))) WITH CHECK (kairos_security.staff_tenant(tenant_id,true));
+CREATE POLICY scoped_update ON locations FOR UPDATE USING (kairos_security.invitation_access(location=>id) OR kairos_security.staff_location(id) OR kairos_security.integration_location(id,false) OR EXISTS(SELECT 1 FROM orders o WHERE o.location_id=locations.id AND kairos_security.order_access(o.id,false,true))) WITH CHECK (kairos_security.staff_tenant(tenant_id,true));
 ALTER TABLE accounts ENABLE ROW LEVEL SECURITY;
-CREATE POLICY scoped_select ON accounts FOR SELECT USING (kairos_security.account_access(id,tenant_id));
+CREATE POLICY scoped_select ON accounts FOR SELECT USING (kairos_security.account_access(id,tenant_id)
+    OR kairos_security.new_account(id,tenant_id) OR kairos_security.invitation_access(tenant=>tenant_id,issuer=>id));
+CREATE POLICY scoped_insert ON accounts FOR INSERT WITH CHECK (kairos_security.new_account(id,tenant_id)
+    AND status='ENABLED' AND provider_subject IS NOT NULL AND (
+        (kairos_security.setting('scope')='registration' AND tenant_role='ADMIN')
+        OR (kairos_security.setting('scope')='invitation' AND tenant_role='MEMBER')));
 CREATE POLICY scoped_update ON accounts FOR UPDATE USING (kairos_security.account_access(id,tenant_id)) WITH CHECK (kairos_security.account_access(id,tenant_id));
 ALTER TABLE location_assignments ENABLE ROW LEVEL SECURITY;
-CREATE POLICY scoped_select ON location_assignments FOR SELECT USING (kairos_security.account_access(account_id,tenant_id));
+CREATE POLICY scoped_select ON location_assignments FOR SELECT USING (kairos_security.account_access(account_id,tenant_id)
+    OR kairos_security.new_account(account_id,tenant_id)
+    OR kairos_security.invitation_access(tenant=>tenant_id,location=>location_id,issuer=>account_id));
+CREATE POLICY scoped_insert ON location_assignments FOR INSERT WITH CHECK (kairos_security.setting('scope')='invitation'
+    AND kairos_security.new_account(account_id,tenant_id) AND EXISTS(SELECT 1 FROM account_invitations i
+        WHERE i.token_hash=kairos_security.setting('identity') AND i.location_id=location_assignments.location_id
+            AND i.tenant_id=location_assignments.tenant_id AND i.assignment_role=location_assignments.role));
 CREATE POLICY scoped_update ON location_assignments FOR UPDATE USING (kairos_security.account_access(account_id,tenant_id)) WITH CHECK (kairos_security.staff_tenant(tenant_id,true));
 ALTER TABLE account_invitations ENABLE ROW LEVEL SECURITY;
-CREATE POLICY scoped_select ON account_invitations FOR SELECT USING (kairos_security.staff_tenant(tenant_id,true) OR (assignment_role='OPERATOR' AND kairos_security.staff_location(location_id,true)));
+CREATE POLICY scoped_select ON account_invitations FOR SELECT USING (kairos_security.invitation_access(id) OR kairos_security.staff_tenant(tenant_id,true) OR (assignment_role='OPERATOR' AND kairos_security.staff_location(location_id,true)));
 CREATE POLICY scoped_insert ON account_invitations FOR INSERT WITH CHECK (kairos_security.staff_tenant(tenant_id,true) OR (assignment_role='OPERATOR' AND kairos_security.staff_location(location_id,true)));
-CREATE POLICY scoped_update ON account_invitations FOR UPDATE USING (kairos_security.staff_tenant(tenant_id,true) OR (assignment_role='OPERATOR' AND kairos_security.staff_location(location_id,true))) WITH CHECK (kairos_security.staff_tenant(tenant_id,true) OR (assignment_role='OPERATOR' AND kairos_security.staff_location(location_id,true)));
+CREATE POLICY scoped_update ON account_invitations FOR UPDATE USING (kairos_security.invitation_access(id) OR kairos_security.staff_tenant(tenant_id,true) OR (assignment_role='OPERATOR' AND kairos_security.staff_location(location_id,true))) WITH CHECK (kairos_security.staff_tenant(tenant_id,true) OR (assignment_role='OPERATOR' AND kairos_security.staff_location(location_id,true))
+    OR (kairos_security.invitation_access(id) AND state='REDEEMED' AND kairos_security.new_account(redeemed_account_id,tenant_id)));
 ALTER TABLE external_integrations ENABLE ROW LEVEL SECURITY;
 CREATE POLICY scoped_select ON external_integrations FOR SELECT USING (kairos_security.integration_access(id,tenant_id));
 CREATE POLICY scoped_insert ON external_integrations FOR INSERT WITH CHECK (kairos_security.staff_tenant(tenant_id,true));
@@ -979,6 +965,7 @@ ALTER TABLE webhook_delivery_signing_versions ENABLE ROW LEVEL SECURITY;
 CREATE POLICY scoped_select ON webhook_delivery_signing_versions FOR SELECT USING (EXISTS(SELECT 1 FROM webhook_deliveries d WHERE d.id=delivery_id AND kairos_security.worker('WEBHOOK_FANOUT',d.outbox_event_id)) OR kairos_security.worker('WEBHOOK_CLAIM',delivery_id));
 CREATE POLICY scoped_insert ON webhook_delivery_signing_versions FOR INSERT WITH CHECK (EXISTS(SELECT 1 FROM webhook_deliveries d WHERE d.id=delivery_id AND kairos_security.worker('WEBHOOK_FANOUT',d.outbox_event_id)));
 ALTER TABLE customer_push_subscriptions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY scoped_insert ON customer_push_subscriptions FOR INSERT WITH CHECK (kairos_security.setting('scope')='push' AND kairos_security.subscription_access(id));
 CREATE POLICY scoped_select ON customer_push_subscriptions FOR SELECT USING (kairos_security.subscription_access(id));
 CREATE POLICY scoped_update ON customer_push_subscriptions FOR UPDATE USING (kairos_security.setting('scope') IN ('push','SUBSCRIPTION_RETIRE','PUSH_CLAIM','PUSH_COMPLETE') AND kairos_security.subscription_access(id)) WITH CHECK (kairos_security.setting('scope') IN ('push','SUBSCRIPTION_RETIRE','PUSH_CLAIM','PUSH_COMPLETE') AND kairos_security.subscription_access(id));
 CREATE POLICY scoped_delete ON customer_push_subscriptions FOR DELETE USING (kairos_security.setting('scope') IN ('push','SUBSCRIPTION_RETIRE','PUSH_CLAIM','PUSH_COMPLETE') AND kairos_security.subscription_access(id));
@@ -1133,9 +1120,7 @@ GRANT USAGE ON SEQUENCE order_history_id_seq TO "${runtimeUser}";
 GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA kairos_security TO "${runtimeUser}";
 GRANT EXECUTE ON FUNCTION public.valid_staff(uuid,uuid,text),public.lock_staff_location(),public.lock_account_location(uuid),
     public.api_key_authentication(uuid,timestamptz),public.valid_integration(uuid,uuid,uuid,uuid,text[],uuid[],timestamptz),
-    public.staff_authentication(text),public.identity_conflict(text,text),public.register_tenant(text,text,timestamptz),
-    public.invitation_preview(text,timestamptz),public.redeem_invitation(text,text,text,timestamptz),
-    public.verify_push_subscription(text),public.create_push_subscription(uuid,text,text,bytea,bytea,bytea,bytea,bytea,text,timestamptz,timestamptz),
+    public.staff_authentication(text),public.identity_conflict(text,text),public.verify_push_subscription(text),
     public.count_push_enrollments(uuid),public.cancel_push_deliveries(uuid,uuid[],timestamptz),public.next_webhook_fanout(),public.next_push_fanout(),
     public.next_webhook_delivery(timestamptz),public.next_push_delivery(timestamptz),
     public.next_expired_push_subscription(timestamptz),public.next_dormant_push_subscription(timestamptz),
