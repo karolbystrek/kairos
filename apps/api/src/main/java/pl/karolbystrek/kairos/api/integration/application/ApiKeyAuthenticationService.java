@@ -5,12 +5,14 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pl.karolbystrek.kairos.api.integration.application.model.ApiKeyPrincipal;
-import pl.karolbystrek.kairos.api.integration.infrastructure.persistence.ApiKeyVersionRepository;
-import pl.karolbystrek.kairos.api.location.domain.LocationStatus;
-import pl.karolbystrek.kairos.api.location.infrastructure.persistence.LocationRepository;
+import pl.karolbystrek.kairos.api.integration.domain.ApiKeyScope;
+import pl.karolbystrek.kairos.api.integration.infrastructure.persistence.ApiKeyAuthenticationRepository;
+import pl.karolbystrek.kairos.api.persistence.infrastructure.DatabaseAccessContext;
 
 import java.time.Clock;
+import java.util.Arrays;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -18,39 +20,26 @@ public class ApiKeyAuthenticationService {
 
     private static final String INVALID_CREDENTIAL_MESSAGE = "Invalid API Key";
 
-    private final ApiKeyVersionRepository versionRepository;
+    private final ApiKeyAuthenticationRepository credentialsRepository;
+    private final DatabaseAccessContext databaseAccess;
     private final ApiKeyCredentialService credentialService;
-    private final LocationRepository locationRepository;
     private final Clock clock;
 
     @Transactional(readOnly = true)
     public ApiKeyPrincipal authenticate(String credential) {
         var versionId = parseVersionId(credential);
-        var version = versionRepository.findById(versionId)
-                .orElseThrow(ApiKeyAuthenticationService::invalidCredential);
-        var now = clock.instant();
-        if (!credentialService.matches(credential, version.getSecretHash())
-                || !version.isValidAt(now)
-                || !version.getApiKey().canAuthenticateAt(now)) {
-            throw invalidCredential();
-        }
-
-        var apiKey = version.getApiKey();
-        var enabledLocationIds = locationRepository.findAllByIdInAndStatus(
-                apiKey.getLocationIds(),
-                LocationStatus.ENABLED
-            ).stream()
-            .filter(location -> location.getTenantId().equals(apiKey.getTenantId()))
-            .map(location -> location.getId())
-            .collect(java.util.stream.Collectors.toUnmodifiableSet());
-        return new ApiKeyPrincipal(
-                apiKey.getTenantId(),
-                apiKey.getIntegrationId(),
-                apiKey.getId(),
-                version.getId(),
-                apiKey.getScopes(),
-                enabledLocationIds
-        );
+        var credentials = credentialsRepository.findCredentials(versionId, clock.instant())
+            .orElseThrow(ApiKeyAuthenticationService::invalidCredential);
+        if (!credentialService.matches(credential, credentials.getSecretHash())) throw invalidCredential();
+        var scopes = Arrays.stream(credentials.getScopes())
+            .map(ApiKeyScope::valueOf)
+            .collect(Collectors.toUnmodifiableSet());
+        var locations = Arrays.stream(credentials.getLocationIds())
+            .collect(Collectors.toUnmodifiableSet());
+        var principal = new ApiKeyPrincipal(credentials.getTenantId(), credentials.getIntegrationId(),
+            credentials.getApiKeyId(), credentials.getApiKeyVersionId(), scopes, locations);
+        databaseAccess.integration(principal);
+        return principal;
     }
 
     private UUID parseVersionId(String credential) {

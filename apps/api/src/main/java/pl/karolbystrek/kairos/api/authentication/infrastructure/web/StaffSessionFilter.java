@@ -11,11 +11,9 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.session.web.http.HttpSessionIdResolver;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.server.ResponseStatusException;
-import pl.karolbystrek.kairos.api.account.application.StaffAccessService;
 import pl.karolbystrek.kairos.api.account.application.exception.StaffAccessDeniedException;
-import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
-import pl.karolbystrek.kairos.api.account.infrastructure.persistence.AccountRepository;
 import pl.karolbystrek.kairos.api.authentication.application.AuthenticationSessionService;
+import pl.karolbystrek.kairos.api.authentication.application.StaffAuthenticationService;
 import pl.karolbystrek.kairos.api.authentication.infrastructure.zitadel.ZitadelClient;
 
 import java.io.IOException;
@@ -25,8 +23,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class StaffSessionFilter extends OncePerRequestFilter {
     private final ZitadelClient provider;
-    private final AccountRepository accounts;
-    private final StaffAccessService access;
+    private final StaffAuthenticationService authentication;
     private final HttpSessionIdResolver cookies;
     private final SecurityProblemDetailsHandler errors;
 
@@ -46,14 +43,8 @@ public class StaffSessionFilter extends OncePerRequestFilter {
         if (session != null && session.getAttribute(AuthenticationSessionService.IDENTITY) instanceof ZitadelClient.ProviderSession identity) {
             try {
                 if (!provider.isValid(identity)) throw new StaffAccessDeniedException("Provider session is invalid");
-                var account = accounts.findByProviderSubject(identity.userId())
-                    .orElseThrow(() -> new StaffAccessDeniedException("Account is unavailable"));
                 var signedIn = (Instant) session.getAttribute(AuthenticationSessionService.SIGNED_IN_AT);
-                if (signedIn == null || (account.getAuthenticationCutoff() != null
-                    && !signedIn.isAfter(account.getAuthenticationCutoff())))
-                    throw new StaffAccessDeniedException("Session was revoked");
-                var principal = new StaffPrincipal(account.getId(), account.getTenantId(), account.getTenantRole());
-                access.resolve(principal);
+                var principal = authentication.authenticate(identity, signedIn);
                 var context = SecurityContextHolder.createEmptyContext();
                 context.setAuthentication(UsernamePasswordAuthenticationToken.authenticated(principal, null,
                     List.of(new SimpleGrantedAuthority("ROLE_TENANT_ACCOUNT"))));

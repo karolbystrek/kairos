@@ -30,6 +30,7 @@ public class OrderService {
     private final StaffAccessService staffAccessService;
     private final OrderCommandService commandService;
     private final Clock clock;
+    private final pl.karolbystrek.kairos.api.persistence.infrastructure.DatabaseAccessContext databaseAccess;
 
     @Transactional(readOnly = true)
     public List<StaffOrderView> listOrders(
@@ -102,6 +103,7 @@ public class OrderService {
 
     @Transactional(readOnly = true)
     public TrackedOrderView findTrackedOrder(UUID trackingReference) {
+        databaseAccess.trackedOrders(List.of(trackingReference));
         var order = orderRepository.findByTrackingReference(trackingReference)
                 .orElseThrow(() -> new ResourceNotFoundException("Tracked order was not found"));
         return TrackedOrderView.from(order);
@@ -113,6 +115,7 @@ public class OrderService {
     }
 
     private Location requireAccessibleLocation(StaffAccessContext access, UUID locationId) {
+        access.requireLocationAccess(access.tenantId(), locationId);
         var location = requireLocation(locationId);
         access.requireLocationAccess(location.getTenantId(), location.getId());
         requireEnabledLocation(location);
@@ -120,6 +123,7 @@ public class OrderService {
     }
 
     private Location requireAccessibleLocationForUpdate(StaffAccessContext access, UUID locationId) {
+        access.requireLocationAccess(access.tenantId(), locationId);
         var location = locationRepository.findForUpdateById(locationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Location was not found"));
         access.requireLocationAccess(location.getTenantId(), location.getId());

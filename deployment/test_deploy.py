@@ -17,6 +17,7 @@ DOCKER = shutil.which("docker")
 RUNTIME_FILES = (
     "compose.yaml", "compose.deployment.yaml", "nginx/default.conf.template",
     "nginx/cloudflare-real-ip.conf", "deployment/zitadel/bootstrap.py",
+    "deployment/postgres/bootstrap.sh",
 )
 
 
@@ -200,7 +201,7 @@ sys.exit(deploy.main(sys.argv[1:]))
         self.assertEqual(stages[0][-2:], ["postgres", "redis"])
         self.assertIn("--exit-code-from", stages[2])
         self.assertIn("--force-recreate", stages[2])
-        for call in (*stages[:2], *stages[3:]):
+        for call in (stages[0], stages[1], *stages[3:]):
             self.assertIn("--wait", call)
             self.assertIn("--wait-timeout", call)
         for call in calls:
@@ -276,6 +277,24 @@ sys.exit(deploy.main(sys.argv[1:]))
         result = self.run_deploy(REAL_COMPOSE=DOCKER)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(json.loads(self.record.read_text()), self.manifest)
+        config_call = next(call for call in self.commands() if "config" in call)
+        resolved = subprocess.run(
+            [DOCKER, *config_call[1:]], capture_output=True, text=True, check=True,
+            env={**os.environ, "KAIROS_IMAGE_REGISTRY": "ghcr.io/karolbystrek/kairos",
+                 "KAIROS_RELEASE_VERSION": REVISION},
+        )
+        services = json.loads(resolved.stdout)["services"]
+        postgres = services["postgres"]
+        self.assertNotIn("postgres-bootstrap", services)
+        self.assertNotIn("POSTGRES_USER", services["api"]["environment"])
+        self.assertNotIn("POSTGRES_PASSWORD", services["api"]["environment"])
+        for name in ("KAIROS_DB_OWNER_USER", "KAIROS_DB_OWNER_PASSWORD",
+                     "KAIROS_DB_RUNTIME_USER", "KAIROS_DB_RUNTIME_PASSWORD"):
+            self.assertEqual(postgres["environment"][name], services["api"]["environment"][name])
+        role_init = next(volume for volume in postgres["volumes"]
+                         if volume["target"] == "/docker-entrypoint-initdb.d/10-kairos-roles.sh")
+        self.assertEqual(role_init["source"], "./deployment/postgres/bootstrap.sh")
+        self.assertTrue(role_init["read_only"])
 
     @unittest.skipUnless(DOCKER, "Docker Compose CLI required for path-resolution regression")
     def test_relative_secret_paths_rejected_before_docker_mutation(self):

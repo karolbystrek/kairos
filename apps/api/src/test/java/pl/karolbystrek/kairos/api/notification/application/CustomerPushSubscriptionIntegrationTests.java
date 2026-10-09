@@ -54,10 +54,25 @@ class CustomerPushSubscriptionIntegrationTests extends RedisListenerIsolatedInte
     private CustomerPushDeliveryClaimService claimService;
 
     @Autowired
-    private OrderService orderService;
+    private CustomerPushDeliveryCompletionService completionService;
 
     @Autowired
-    private JdbcTemplate jdbcTemplate;
+    private CustomerPushCleanupService cleanupService;
+
+    @Autowired
+    private OrderService orderService;
+
+    private final JdbcTemplate jdbcTemplate = pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase.ownerDatabase();
+
+    @Autowired
+    private JdbcTemplate runtimeJdbc;
+
+    @Autowired
+    private org.springframework.transaction.PlatformTransactionManager transactionManager;
+
+    @Autowired
+    private pl.karolbystrek.kairos.api.persistence.infrastructure.DatabaseAccessContext databaseAccessContext;
+
 
     @Autowired
     private MutableTestClock clock;
@@ -169,6 +184,30 @@ class CustomerPushSubscriptionIntegrationTests extends RedisListenerIsolatedInte
     }
 
     @Test
+    void concurrentReconciliationCreatesOneSubscriptionAndEnrollment() throws Exception {
+        var order = createOrder();
+        var input = newSubscription();
+        var start = new java.util.concurrent.CountDownLatch(1);
+        try (var requests = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            var first = requests.submit(() -> {
+                start.await();
+                subscriptionService.reconcile(input, List.of(order.trackingReference()));
+                return null;
+            });
+            var second = requests.submit(() -> {
+                start.await();
+                subscriptionService.reconcile(input, List.of(order.trackingReference()));
+                return null;
+            });
+            start.countDown();
+            first.get(10, java.util.concurrent.TimeUnit.SECONDS);
+            second.get(10, java.util.concurrent.TimeUnit.SECONDS);
+        }
+        assertThat(count("customer_push_subscriptions")).isEqualTo(1);
+        assertThat(count("customer_push_enrollments")).isEqualTo(1);
+    }
+
+    @Test
     void requiresTheCompleteCapabilityForAnExistingEndpoint() {
         var order = createOrder();
         var input = newSubscription();
@@ -194,6 +233,10 @@ class CustomerPushSubscriptionIntegrationTests extends RedisListenerIsolatedInte
         var previous = newSubscription();
         var current = newSubscription();
         subscriptionService.reconcile(previous, List.of(order.trackingReference()));
+        orderService.updateStatus(tenant.administrator(), order.id(), OrderStatus.READY);
+        while (fanoutService.fanOutAvailable() > 0) {
+            // Materialize the pending delivery before replacing the capability.
+        }
 
         subscriptionService.replace(
                 previous,
@@ -203,11 +246,67 @@ class CustomerPushSubscriptionIntegrationTests extends RedisListenerIsolatedInte
 
         assertThat(subscriptionCount(previous)).isZero();
         assertThat(subscriptionCount(current)).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject("SELECT status FROM customer_push_deliveries", String.class))
+                .isEqualTo("CANCELED");
         assertThat(count("customer_push_enrollments")).isEqualTo(1);
 
         subscriptionService.disable(current);
 
         assertThat(count("customer_push_subscriptions")).isZero();
+        assertThat(count("customer_push_enrollments")).isZero();
+    }
+
+    @Test
+    void rejectsReplacementBeforeRemovingThePreviousCapability() {
+        var order = createOrder();
+        var previous = newSubscription();
+        var current = newSubscription();
+        subscriptionService.reconcile(previous, List.of(order.trackingReference()));
+        subscriptionService.reconcile(current, List.of(order.trackingReference()));
+        var wrongCurrent = new CustomerPushSubscriptionInput(
+                current.endpoint(), current.p256dh(), base64Url(randomBytes(16)), null
+        );
+
+        assertThatThrownBy(() -> subscriptionService.replace(
+                previous, wrongCurrent, List.of(order.trackingReference())
+        )).isInstanceOf(InvalidCustomerPushSubscriptionException.class);
+        assertThat(subscriptionCount(previous)).isEqualTo(1);
+        assertThat(subscriptionCount(current)).isEqualTo(1);
+        assertThat(count("customer_push_enrollments")).isEqualTo(2);
+    }
+
+    @Test
+    void reconcilesOneCapabilityAcrossTenantsWithoutGrantingOtherOrderReads() {
+        var second = new IntegrationTestFixture(jdbcTemplate).createTenant();
+        var firstOrder = createOrder();
+        var secondOrder = orderService.createOrder(second.administrator(), second.firstLocationId(), null);
+        var unrelated = createOrder();
+        var input = newSubscription();
+        subscriptionService.reconcile(input, List.of(firstOrder.trackingReference(), secondOrder.trackingReference()));
+        assertThat(count("customer_push_enrollments")).isEqualTo(2);
+        orderService.updateStatus(tenant.administrator(),firstOrder.id(),OrderStatus.READY);
+        orderService.updateStatus(second.administrator(),secondOrder.id(),OrderStatus.READY);
+        fanoutService.fanOutAvailable();
+        assertThat(count("customer_push_deliveries")).isEqualTo(2);
+        var subscriptionId = jdbcTemplate.queryForObject(
+                "SELECT id FROM customer_push_subscriptions WHERE endpoint_hash = ?", UUID.class, sha256(input.endpoint()));
+        new org.springframework.transaction.support.TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            databaseAccessContext.pushCapability(List.of(subscriptionId), List.of(secondOrder.trackingReference()));
+            assertThat(runtimeJdbc.queryForList("SELECT id FROM orders", UUID.class)).containsExactly(secondOrder.id());
+            assertThat(runtimeJdbc.queryForObject("SELECT count(*) FROM order_history", Integer.class)).isZero();
+            assertThat(runtimeJdbc.queryForObject("SELECT count(*) FROM customer_push_deliveries", Integer.class)).isZero();
+        });
+
+        var wrongKey = newSubscription();
+        var mismatched = new CustomerPushSubscriptionInput(input.endpoint(), wrongKey.p256dh(), input.auth(), null);
+        assertThatThrownBy(() -> subscriptionService.disable(mismatched))
+                .isInstanceOf(InvalidCustomerPushSubscriptionException.class);
+        assertThat(count("customer_push_enrollments")).isEqualTo(2);
+
+        subscriptionService.reconcile(input, List.of(secondOrder.trackingReference()));
+        assertThat(jdbcTemplate.queryForList("SELECT order_id FROM customer_push_enrollments", UUID.class))
+                .containsExactly(secondOrder.id()).doesNotContain(unrelated.id());
+        subscriptionService.disable(input);
         assertThat(count("customer_push_enrollments")).isZero();
     }
 
@@ -257,6 +356,61 @@ class CustomerPushSubscriptionIntegrationTests extends RedisListenerIsolatedInte
                 "SELECT status FROM customer_push_deliveries",
                 String.class
         )).isEqualTo(CustomerPushDeliveryStatus.CANCELED.name());
+    }
+
+    @Test
+    void concurrentWorkersClaimOnceAndExpiredClaimsRejectTheOldCompletionToken() throws Exception {
+        var order = createOrder();
+        var input = newSubscription();
+        subscriptionService.reconcile(input, List.of(order.trackingReference()));
+        orderService.updateStatus(tenant.administrator(), order.id(), OrderStatus.READY);
+        while (fanoutService.fanOutAvailable() > 0) {
+            // Drain creation and READY markers.
+        }
+        var start = new java.util.concurrent.CountDownLatch(1);
+        try (var workers = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            var first = workers.submit(() -> { start.await(); return claimService.claimAvailable(); });
+            var second = workers.submit(() -> { start.await(); return claimService.claimAvailable(); });
+            start.countDown();
+            var claimed = new ArrayList<>(first.get());
+            claimed.addAll(second.get());
+            assertThat(claimed).hasSize(1);
+            var old = claimed.getFirst();
+            clock.advance(Duration.ofSeconds(31));
+            var renewed = claimService.claimAvailable().getFirst();
+            assertThat(renewed.id()).isEqualTo(old.id());
+            assertThat(renewed.claimToken()).isNotEqualTo(old.claimToken());
+            var accepted = new pl.karolbystrek.kairos.api.notification.application.model.WebPushResult(201, null, null, null);
+            assertThat(completionService.complete(old.id(), old.claimToken(), old.subscriptionId(),
+                    clock.instant(), accepted)).isFalse();
+            assertThat(completionService.complete(renewed.id(), renewed.claimToken(), renewed.subscriptionId(),
+                    clock.instant(), accepted)).isTrue();
+            assertThat(jdbcTemplate.queryForObject("SELECT status FROM customer_push_deliveries WHERE id = ?",
+                    String.class, old.id())).isEqualTo("ACCEPTED");
+        }
+    }
+
+    @Test
+    void cleanupRetiresOnlyExpiredSubscriptionsAndOldTerminalDeliveries() {
+        var order = createOrder();
+        var expiring = newSubscription();
+        var active = newSubscription();
+        subscriptionService.reconcile(new CustomerPushSubscriptionInput(expiring.endpoint(), expiring.p256dh(),
+                expiring.auth(), clock.instant().plusSeconds(5)), List.of(order.trackingReference()));
+        subscriptionService.reconcile(active, List.of(order.trackingReference()));
+        orderService.updateStatus(tenant.administrator(), order.id(), OrderStatus.READY);
+        while (fanoutService.fanOutAvailable() > 0) {
+            // Materialize both subscriptions' deliveries.
+        }
+        clock.advance(Duration.ofSeconds(6));
+        assertThat(cleanupService.clean()).isEqualTo(1);
+        assertThat(subscriptionCount(active)).isEqualTo(1);
+        assertThat(count("customer_push_enrollments")).isEqualTo(1);
+        jdbcTemplate.update("UPDATE customer_push_deliveries SET completed_at = ? WHERE status = 'CANCELED'",
+                java.sql.Timestamp.from(clock.instant().minus(Duration.ofDays(365))));
+        assertThat(cleanupService.clean()).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForList("SELECT status FROM customer_push_deliveries", String.class))
+                .containsExactly("PENDING");
     }
 
     private static StringRedisTemplate stringRedisTemplate() {

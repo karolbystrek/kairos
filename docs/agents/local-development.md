@@ -26,7 +26,9 @@
   run `docker compose down`, delete volumes, reset PostgreSQL, or prune Docker
   state without explicit authorization.
 - If a changed Flyway migration conflicts with a persistent database checksum,
-  report it and ask before resetting data.
+  report it and ask before resetting data; never run Flyway repair automatically.
+  The initial-schema policy uses fresh databases; see
+  [database initialization](../deployment/DATABASE.md).
 
 ## Setup
 
@@ -43,4 +45,7 @@ from the repository root). The JUnit launcher starts one disposable PostgreSQL 1
 container per session and removes it afterward. Missing Docker fails verification;
 there is no H2 fallback or silently skipped database suite. Tests never reuse
 Compose containers or user-owned volumes. Fixture setup can use
-`PostgresTestDatabase.ownerDatabase()`; this baseline does not enforce RLS yet.
+`PostgresTestDatabase.ownerDatabase()` for committed setup, independent assertions
+and cleanup. Application calls use the actual restricted runtime role and their
+own scoped transactions; do not wrap multiple actors or owner fixtures in a
+test-wide transaction. Missing context fails closed.

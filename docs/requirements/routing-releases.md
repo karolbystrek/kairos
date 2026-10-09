@@ -74,7 +74,8 @@ That artifact contains `release.json` with a full 40-character lowercase Git
 using `ghcr.io/karolbystrek/kairos/<service>@sha256:<64 lowercase hex>`.
 `release.tar.gz` contains the same manifest plus the exact checkout's shared and
 hosted Compose files, both NGINX configuration files, and the ZITADEL bootstrap
-script and the deployment shell command/Python helper. An explicit file allowlist
+script, PostgreSQL entrypoint role initialization script,
+exact V1 SQL, and the deployment shell command/Python helper. An explicit file allowlist
 excludes environment files, certificates and private keys. A main-only
 production job waits for successful publication and targets the
 `production` GitHub Environment. It downloads this run's artifact, validates
@@ -140,9 +141,13 @@ directories. A nonblocking host-wide `flock` at `/srv/kairos/deploy.lock` reject
 concurrent deployments; Python's stdlib `fcntl.flock` provides the lock without
 an additional host command dependency.
 
-Deployment pulls the complete stack, waits for PostgreSQL/Redis health, then
-ZITADEL health, and completes a recreated one-shot bootstrap before starting the
-API. The bootstrap preserves existing provider credentials. Only after API health
+Deployment pulls the complete stack, waits for PostgreSQL/Redis health, completes
+then waits for ZITADEL and completes its recreated provider bootstrap before
+starting the API. Fresh PostgreSQL initializes the restricted database roles
+through its standard entrypoint; Spring Flyway applies V1 automatically. The
+provider bootstrap preserves existing credentials. Existing database volumes do
+not rerun initialization; see [database initialization](../deployment/DATABASE.md).
+Ordinary deployment never resets volumes or repairs Flyway history. Only after API health
 passes does it replace the frontends and recreate NGINX so configuration bind
 mounts follow the deployed revision. Each readiness stage has a 300-second bound;
 bootstrap execution has a 360-second bound and image pulls a 900-second bound.

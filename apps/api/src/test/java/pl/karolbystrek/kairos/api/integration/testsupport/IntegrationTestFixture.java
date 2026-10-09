@@ -26,14 +26,13 @@ public final class IntegrationTestFixture {
         jdbcTemplate.update(
             """
                 INSERT INTO locations (
-                    id, tenant_id, name, normalized_name, live_normalized_name,
+                    id, tenant_id, name, normalized_name,
                     created_at, updated_at, last_enabled_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?), (?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?), (?, ?, ?, ?, ?, ?, ?)
                 """,
                 firstLocationId,
                 tenantId,
                 "First location",
-                "first location",
                 "first location",
                 Timestamp.from(now),
                 Timestamp.from(now),
@@ -41,7 +40,6 @@ public final class IntegrationTestFixture {
                 secondLocationId,
                 tenantId,
                 "Second location",
-                "second location",
                 "second location",
                 Timestamp.from(now),
                 Timestamp.from(now),

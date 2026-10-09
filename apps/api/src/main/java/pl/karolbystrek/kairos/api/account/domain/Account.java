@@ -53,16 +53,20 @@ public class Account {
     private Instant archivedAt;
 
     public static Account provisionMember(UUID tenantId, String email, String providerSubject, Instant now) {
-        return provision(tenantId, email, providerSubject, TenantRole.MEMBER, now);
+        return provision(UUID.randomUUID(), tenantId, email, providerSubject, TenantRole.MEMBER, now);
+    }
+
+    public static Account provisionMember(UUID accountId, UUID tenantId, String email, String providerSubject, Instant now) {
+        return provision(accountId, tenantId, email, providerSubject, TenantRole.MEMBER, now);
     }
 
     public static Account provisionAdministrator(UUID tenantId, String email, String providerSubject, Instant now) {
-        return provision(tenantId, email, providerSubject, TenantRole.ADMIN, now);
+        return provision(UUID.randomUUID(), tenantId, email, providerSubject, TenantRole.ADMIN, now);
     }
 
-    private static Account provision(UUID tenantId, String email, String providerSubject, TenantRole role, Instant now) {
+    private static Account provision(UUID accountId, UUID tenantId, String email, String providerSubject, TenantRole role, Instant now) {
         var account = new Account();
-        account.id = UUID.randomUUID();
+        account.id = accountId;
         account.tenantId = tenantId;
         account.email = email;
         account.providerSubject = providerSubject;

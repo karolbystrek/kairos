@@ -9,6 +9,7 @@ public abstract class RedisListenerIsolatedIntegrationTest {
 
     @org.junit.jupiter.api.BeforeEach
     void rejectUnconfiguredProviderCalls() {
+        PostgresTestDatabase.ownerDatabase().execute("TRUNCATE tenants,customer_push_subscriptions,spring_session RESTART IDENTITY CASCADE");
         org.mockito.Mockito.when(identityProvider.signIn(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString()))
             .thenThrow(new pl.karolbystrek.kairos.api.authentication.application.exception.InvalidLoginException());
     }

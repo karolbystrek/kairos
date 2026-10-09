@@ -75,3 +75,36 @@ account; local development data is recreated manually when applying that
 initial schema change.
 
 Order labels are trimmed, single-line text with a maximum of 32 characters. Automatic labeling is requested by omitting the custom label and uses the order's one-based creation ordinal among all orders at its location during the current UTC date. A provided blank label is invalid. Labels preserve casing, may contain ordinary Unicode text, and are not unique; staff remain responsible for avoiding ambiguous duplicates. Labels cannot be edited after order creation.
+
+Ownership columns and related order/location/tenant, event/order and webhook
+recipient/signing-version relationships are constrained consistently. Location
+live-name uniqueness uses a partial index on `(tenant_id, normalized_name)` for
+non-archived rows; no duplicate live-name column is stored. Normalized location
+names allow Unicode normalization expansion. Order-history initiator constraints
+reject partially missing identities while retaining intentionally identity-free
+records. Push deliveries omit unused endpoint fingerprints and service origins;
+retained deliveries derive ownership through event/order even when their
+subscription reference becomes null.
+
+Owner and runtime roles are separate and non-bypass; runtime cannot own objects,
+create schemas, truncate tables or inherit the owner role. Session tables receive
+explicit infrastructure privileges. Narrow SECURITY DEFINER helpers use a fixed
+safe search path, qualified relations, revoked PUBLIC execution and named runtime
+grants. PostgreSQL RLS applies command-specific read/write policies to direct and
+derived ownership without adding duplicate tenant columns everywhere. Application
+startup verifies role flags, ownership, expected policy/helper revision and grants.
+Migration credentials remain in the startup process, so this protects ordinary
+runtime database queries rather than a fully compromised API process.
+
+Business workflows and entity reads/writes remain in Java and Hibernate.
+PostgreSQL-specific context, minimal credential projections, worker discovery and
+capability aggregate/cancellation operations stay in persistence infrastructure.
+Registration and invitation redemption use exact new-identity/bearer scopes;
+they do not execute privileged database business workflows.
+
+Development edits the consolidated V1. The owner will recreate the disposable VPS
+database for this revision; no retained-data upgrade or automatic checksum repair
+is supplied. Fresh PostgreSQL entrypoint initialization provisions restricted
+roles before Spring Flyway applies V1. See
+[database roles and initialization](../deployment/DATABASE.md). Volume resets are
+separately authorized operator actions.

@@ -1,29 +1,29 @@
 package pl.karolbystrek.kairos.api.integration.webhook.application;
 
 import com.sun.net.httpserver.HttpServer;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.test.context.transaction.TestTransaction;
 import pl.karolbystrek.kairos.api.integration.application.ExternalIntegrationManagementService;
 import pl.karolbystrek.kairos.api.integration.testsupport.IntegrationTestFixture;
-import pl.karolbystrek.kairos.api.integration.webhook.domain.WebhookDeliveryStatus;
-import pl.karolbystrek.kairos.api.order.domain.OrderEventType;
 import pl.karolbystrek.kairos.api.integration.webhook.domain.WebhookSubscriptionStatus;
-import pl.karolbystrek.kairos.api.integration.webhook.infrastructure.persistence.WebhookDeliveryRepository;
+import pl.karolbystrek.kairos.api.integration.webhook.infrastructure.security.WebhookSignatureService;
 import pl.karolbystrek.kairos.api.order.application.OrderService;
+import pl.karolbystrek.kairos.api.order.domain.OrderEventType;
+import pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase;
 import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
 
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
-@Transactional
 class WebhookDeliveryProcessorIntegrationTests
         extends RedisListenerIsolatedIntegrationTest {
 
@@ -43,21 +43,24 @@ class WebhookDeliveryProcessorIntegrationTests
     private WebhookDeliveryProcessor deliveryProcessor;
 
     @Autowired
-    private WebhookDeliveryRepository deliveryRepository;
-
-    @Autowired
     private OrderService orderService;
 
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
+    private final JdbcTemplate jdbcTemplate = PostgresTestDatabase.ownerDatabase();
 
-    @Test
-    void actualNonSuccessResponseBecomesOneTerminalDeadLetter() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void capturedDeliverySurvivesArchivalAndPreservesSigningPreparationFailure(boolean corruptSigningMaterial) throws Exception {
         var server = HttpServer.create(
                 new InetSocketAddress(InetAddress.getLoopbackAddress(), 0),
                 0
         );
+        var requests = new AtomicInteger();
+        var receivedSignature = new AtomicReference<String>();
+        var receivedPayload = new AtomicReference<String>();
         server.createContext("/failure", exchange -> {
+            requests.incrementAndGet();
+            receivedSignature.set(exchange.getRequestHeaders().getFirst("Kairos-Signature"));
+            receivedPayload.set(new String(exchange.getRequestBody().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8));
             var response = "recipient failed".getBytes(java.nio.charset.StandardCharsets.UTF_8);
             exchange.sendResponseHeaders(503, response.length);
             try (var body = exchange.getResponseBody()) {
@@ -66,7 +69,6 @@ class WebhookDeliveryProcessorIntegrationTests
         });
         server.start();
         var tenant = new IntegrationTestFixture(jdbcTemplate).createTenant();
-        var committed = false;
         try {
             var integration = integrationService.create(
                     tenant.administrator(),
@@ -91,23 +93,37 @@ class WebhookDeliveryProcessorIntegrationTests
                     null
             );
             assertThat(fanoutService.fanOutAvailable()).isEqualTo(1);
+            jdbcTemplate.update("UPDATE external_integrations SET status = 'ARCHIVED', archived_at = now() WHERE id = ?", integration.id());
+            jdbcTemplate.update("UPDATE locations SET status = 'ARCHIVED', archived_at = now() WHERE id = ?", tenant.firstLocationId());
+            jdbcTemplate.update("UPDATE webhook_subscriptions SET status = 'ARCHIVED', archived_at = now() WHERE id = ?", issued.subscription().id());
+            jdbcTemplate.update("UPDATE webhook_signing_secret_versions SET retired_at = now() WHERE subscription_id = ?", issued.subscription().id());
+            var encryptedSecret = jdbcTemplate.queryForObject("SELECT encrypted_secret FROM webhook_signing_secret_versions WHERE subscription_id = ?", byte[].class, issued.subscription().id());
+            if (corruptSigningMaterial) {
+                jdbcTemplate.update("UPDATE webhook_signing_secret_versions SET encrypted_secret = ? WHERE subscription_id = ?", new byte[]{1}, issued.subscription().id());
+            }
             var claimed = claimService.claimAvailable().getFirst();
-
-            TestTransaction.flagForCommit();
-            TestTransaction.end();
-            committed = true;
+            if (corruptSigningMaterial) {
+                jdbcTemplate.update("UPDATE webhook_signing_secret_versions SET encrypted_secret = ? WHERE subscription_id = ?", encryptedSecret, issued.subscription().id());
+            }
 
             deliveryProcessor.process(claimed);
 
-            // Read through a fresh transaction so the result must be durable.
-            TestTransaction.start();
-
-            var delivery = deliveryRepository.findById(claimed.id()).orElseThrow();
-            assertThat(delivery.getStatus())
-                    .isEqualTo(WebhookDeliveryStatus.DEAD_LETTERED);
-            assertThat(delivery.getResponseStatus()).isEqualTo(503);
-            assertThat(delivery.getErrorType()).isEqualTo("NON_2XX_RESPONSE");
-            assertThat(delivery.getResponseBody()).isEqualTo("recipient failed");
+            assertThat(jdbcTemplate.queryForObject("SELECT status FROM webhook_deliveries WHERE id = ?", String.class, claimed.id())).isEqualTo("DEAD_LETTERED");
+            if (corruptSigningMaterial) {
+                assertThat(requests.get()).isZero();
+                assertThat(jdbcTemplate.queryForObject("SELECT error_type FROM webhook_deliveries WHERE id = ?", String.class, claimed.id())).isEqualTo("SIGNING_ERROR");
+            } else {
+                assertThat(requests.get()).isEqualTo(1);
+                assertThat(receivedPayload.get()).isEqualTo(claimed.payload());
+                var timestamp = Long.parseLong(receivedSignature.get().split(",")[0].substring(2));
+                var expectedSignature = new WebhookSignatureService().createHeader(
+                        java.time.Instant.ofEpochSecond(timestamp), claimed.payload(),
+                        java.util.List.of(issued.signingSecret().getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+                assertThat(receivedSignature.get()).isEqualTo(expectedSignature);
+                assertThat(jdbcTemplate.queryForObject("SELECT response_status FROM webhook_deliveries WHERE id = ?", Integer.class, claimed.id())).isEqualTo(503);
+                assertThat(jdbcTemplate.queryForObject("SELECT error_type FROM webhook_deliveries WHERE id = ?", String.class, claimed.id())).isEqualTo("NON_2XX_RESPONSE");
+                assertThat(jdbcTemplate.queryForObject("SELECT response_body FROM webhook_deliveries WHERE id = ?", String.class, claimed.id())).isEqualTo("recipient failed");
+            }
             assertThat(claimService.claimAvailable()).isEmpty();
             assertThat(jdbcTemplate.queryForObject(
                     "SELECT status FROM orders WHERE id = ?",
@@ -116,12 +132,7 @@ class WebhookDeliveryProcessorIntegrationTests
             )).isEqualTo("IN_PREPARATION");
         } finally {
             server.stop(0);
-            if (committed) {
-                if (!TestTransaction.isActive()) TestTransaction.start();
-                removeCommittedFixture(tenant.tenantId());
-                TestTransaction.flagForCommit();
-                TestTransaction.end();
-            }
+            removeCommittedFixture(tenant.tenantId());
         }
     }
 

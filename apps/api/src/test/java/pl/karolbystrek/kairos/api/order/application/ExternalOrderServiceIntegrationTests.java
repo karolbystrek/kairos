@@ -6,7 +6,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.transaction.annotation.Transactional;
 import pl.karolbystrek.kairos.api.integration.application.ApiKeyAuthenticationService;
 import pl.karolbystrek.kairos.api.integration.application.ApiKeyManagementService;
 import pl.karolbystrek.kairos.api.integration.application.ExternalIntegrationManagementService;
@@ -32,7 +31,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
-@Transactional
 @Import(MutableTestClockConfiguration.class)
 class ExternalOrderServiceIntegrationTests extends RedisListenerIsolatedIntegrationTest {
 
@@ -48,8 +46,7 @@ class ExternalOrderServiceIntegrationTests extends RedisListenerIsolatedIntegrat
     @Autowired
     private ApiKeyAuthenticationService authenticationService;
 
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
+    private final JdbcTemplate jdbcTemplate = pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase.ownerDatabase();
 
     @Autowired
     private MutableTestClock clock;
@@ -307,6 +304,31 @@ class ExternalOrderServiceIntegrationTests extends RedisListenerIsolatedIntegrat
                 null,
                 null
         )).isInstanceOf(IntegrationAccessDeniedException.class);
+    }
+
+    @Test
+    void writeOnlyPersistedScopeAllowsCommandsButDoesNotAllowReadEndpoints() {
+        jdbcTemplate.update("DELETE FROM api_key_scopes WHERE api_key_id = ? AND scope = 'ORDERS_READ'", principal.apiKeyId());
+        var writeOnly = authenticationService.authenticate(issuedKey.secret());
+        var created = orderService.create(writeOnly, tenant.firstLocationId(), null, "write-only");
+        assertThat(created.order().status()).isEqualTo(OrderStatus.IN_PREPARATION);
+        assertThat(orderService.create(writeOnly, tenant.firstLocationId(), null, "write-only").replayed()).isTrue();
+        assertThat(orderService.updateStatus(writeOnly, created.order().id(), OrderStatus.READY).status()).isEqualTo(OrderStatus.READY);
+        assertThatThrownBy(() -> orderService.find(writeOnly, created.order().id()))
+            .isInstanceOf(IntegrationAccessDeniedException.class);
+        assertThatThrownBy(() -> orderService.list(writeOnly, null, null, null, null))
+            .isInstanceOf(IntegrationAccessDeniedException.class);
+    }
+
+    @Test
+    void rejectsPrincipalAfterItsPersistedLocationGrantChanges() {
+        var created = orderService.create(principal, tenant.firstLocationId(), null, "stale-grant").order();
+        jdbcTemplate.update("DELETE FROM api_key_location_access WHERE api_key_id = ? AND location_id = ?",
+            principal.apiKeyId(), tenant.firstLocationId());
+        assertThatThrownBy(() -> orderService.find(principal, created.id()))
+            .isInstanceOf(IntegrationAccessDeniedException.class);
+        assertThat(jdbcTemplate.queryForObject("SELECT status FROM orders WHERE id = ?",
+            String.class, created.id())).isEqualTo("IN_PREPARATION");
     }
 
     private long countRows(String table, java.util.UUID orderId) {

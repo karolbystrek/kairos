@@ -6,11 +6,12 @@ import org.springframework.transaction.annotation.Transactional;
 import pl.karolbystrek.kairos.api.account.application.exception.StaffAccessDeniedException;
 import pl.karolbystrek.kairos.api.account.application.model.StaffAccessContext;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
+import pl.karolbystrek.kairos.api.account.application.port.StaffLocationDirectory;
 import pl.karolbystrek.kairos.api.account.domain.AccountStatus;
 import pl.karolbystrek.kairos.api.account.domain.TenantRole;
-import pl.karolbystrek.kairos.api.account.application.port.StaffLocationDirectory;
 import pl.karolbystrek.kairos.api.account.infrastructure.persistence.AccountRepository;
 import pl.karolbystrek.kairos.api.account.infrastructure.persistence.LocationAssignmentRepository;
+import pl.karolbystrek.kairos.api.persistence.infrastructure.DatabaseAccessContext;
 
 import java.util.Objects;
 
@@ -18,6 +19,7 @@ import java.util.Objects;
 @RequiredArgsConstructor
 public class StaffAccessService {
 
+    private final DatabaseAccessContext databaseAccess;
     private final AccountRepository accountRepository;
     private final LocationAssignmentRepository assignmentRepository;
     private final StaffLocationDirectory locationDirectory;
@@ -37,6 +39,8 @@ public class StaffAccessService {
             throw new StaffAccessDeniedException("Staff authentication is required");
         }
 
+        databaseAccess.staff(principal);
+        if (lockForUpdate) databaseAccess.lockStaffLocation();
         var account = (lockForUpdate
             ? accountRepository.findForUpdateById(principal.accountId())
             : accountRepository.findById(principal.accountId()))

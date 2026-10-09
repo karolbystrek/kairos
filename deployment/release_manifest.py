@@ -12,6 +12,7 @@ RUNTIME_FILES = (
     "nginx/default.conf.template",
     "nginx/cloudflare-real-ip.conf",
     "deployment/zitadel/bootstrap.py",
+    "deployment/postgres/bootstrap.sh",
     "deployment/deploy.sh",
     "deployment/deploy.py",
 )

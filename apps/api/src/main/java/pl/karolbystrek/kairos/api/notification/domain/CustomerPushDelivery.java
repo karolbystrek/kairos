@@ -40,12 +40,6 @@ public class CustomerPushDelivery {
     @Column(name = "order_id", nullable = false)
     private UUID orderId;
 
-    @Column(name = "endpoint_fingerprint", nullable = false, length = 64)
-    private String endpointFingerprint;
-
-    @Column(name = "push_service_origin", nullable = false, length = 255)
-    private String pushServiceOrigin;
-
     @Column(columnDefinition = "TEXT")
     private String payload;
 
@@ -90,8 +84,6 @@ public class CustomerPushDelivery {
             @NonNull UUID outboxEventId,
             @NonNull UUID subscriptionId,
             @NonNull UUID orderId,
-            @NonNull String endpointFingerprint,
-            @NonNull String pushServiceOrigin,
             @NonNull String payload,
             @NonNull Instant deadlineAt,
             @NonNull Instant now
@@ -101,8 +93,6 @@ public class CustomerPushDelivery {
         delivery.outboxEventId = outboxEventId;
         delivery.subscriptionId = subscriptionId;
         delivery.orderId = orderId;
-        delivery.endpointFingerprint = endpointFingerprint;
-        delivery.pushServiceOrigin = pushServiceOrigin;
         delivery.payload = payload;
         delivery.status = CustomerPushDeliveryStatus.PENDING;
         delivery.nextAttemptAt = now;

@@ -15,6 +15,7 @@ SERVICES = ("customer-app", "panel-app", "api")
 RUNTIME_FILES = (
     "compose.yaml", "compose.deployment.yaml", "nginx/default.conf.template",
     "nginx/cloudflare-real-ip.conf", "deployment/zitadel/bootstrap.py",
+    "deployment/postgres/bootstrap.sh",
 )
 
 

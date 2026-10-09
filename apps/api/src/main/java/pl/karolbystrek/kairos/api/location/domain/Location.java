@@ -31,11 +31,9 @@ public class Location {
     @Column(nullable = false, length = 120)
     private String name;
 
-    @Column(name = "normalized_name", nullable = false, length = 120)
+    @Column(name = "normalized_name", nullable = false, length = 240)
     private String normalizedName;
 
-    @Column(name = "live_normalized_name", unique = false, length = 120)
-    private String liveNormalizedName;
 
     @Column(name = "time_zone", nullable = false, length = 64)
     private String timeZone;
@@ -66,7 +64,6 @@ public class Location {
         location.tenantId = tenantId;
         location.name = name.value();
         location.normalizedName = name.normalizedValue();
-        location.liveNormalizedName = name.normalizedValue();
         location.timeZone = DEFAULT_TIME_ZONE;
         location.status = LocationStatus.ENABLED;
         location.createdAt = now;
@@ -82,7 +79,6 @@ public class Location {
         }
         this.name = name.value();
         normalizedName = name.normalizedValue();
-        liveNormalizedName = name.normalizedValue();
         updatedAt = now;
     }
 
@@ -113,7 +109,6 @@ public class Location {
             throw new IllegalStateException("Only a disabled location can be archived");
         }
         status = LocationStatus.ARCHIVED;
-        liveNormalizedName = null;
         archivedAt = now;
         updatedAt = now;
     }

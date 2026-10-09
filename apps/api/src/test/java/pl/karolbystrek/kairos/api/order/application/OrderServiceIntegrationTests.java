@@ -9,12 +9,10 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.transaction.annotation.Transactional;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
 import pl.karolbystrek.kairos.api.account.domain.TenantRole;
 import pl.karolbystrek.kairos.api.order.domain.InvalidOrderTransitionException;
 import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
-import pl.karolbystrek.kairos.api.order.infrastructure.persistence.OrderHistoryRepository;
 import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
 
 import java.sql.Timestamp;
@@ -28,18 +26,13 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @SpringBootTest
-@Transactional
 @Import(OrderServiceIntegrationTests.ClockConfiguration.class)
 class OrderServiceIntegrationTests extends RedisListenerIsolatedIntegrationTest {
 
     @Autowired
     private OrderService orderService;
 
-    @Autowired
-    private OrderHistoryRepository historyRepository;
-
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
+    private final JdbcTemplate jdbcTemplate = pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase.ownerDatabase();
 
     @Autowired
     private MutableClock clock;
@@ -55,11 +48,10 @@ class OrderServiceIntegrationTests extends RedisListenerIsolatedIntegrationTest 
         locationId = UUID.randomUUID();
         jdbcTemplate.update("INSERT INTO tenants (id) VALUES (?)", tenantId);
         jdbcTemplate.update(
-            "INSERT INTO locations (id, tenant_id, name, normalized_name, live_normalized_name) VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO locations (id, tenant_id, name, normalized_name) VALUES (?, ?, ?, ?)",
             locationId,
             tenantId,
             "Test location",
-            "test location",
             "test location"
         );
         var now = Instant.now();
@@ -93,7 +85,7 @@ class OrderServiceIntegrationTests extends RedisListenerIsolatedIntegrationTest 
         assertThat(completed.status()).isEqualTo(OrderStatus.COMPLETED);
         assertThat(tracked.label()).isEqualTo("1");
         assertThat(tracked.status()).isEqualTo(OrderStatus.COMPLETED);
-        assertThat(historyRepository.count()).isEqualTo(3);
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM order_history", Long.class)).isEqualTo(3);
         assertThat(jdbcTemplate.queryForList(
             "SELECT initiator_type FROM order_history WHERE order_id = ? ORDER BY id",
             String.class,
@@ -138,11 +130,10 @@ class OrderServiceIntegrationTests extends RedisListenerIsolatedIntegrationTest 
         var secondLocationId = UUID.randomUUID();
         var tenantId = principal.tenantId();
         jdbcTemplate.update(
-                "INSERT INTO locations (id, tenant_id, name, normalized_name, live_normalized_name) VALUES (?, ?, ?, ?, ?)",
+                "INSERT INTO locations (id, tenant_id, name, normalized_name) VALUES (?, ?, ?, ?)",
                 secondLocationId,
                 tenantId,
                 "Second location",
-                "second location",
                 "second location"
         );
 

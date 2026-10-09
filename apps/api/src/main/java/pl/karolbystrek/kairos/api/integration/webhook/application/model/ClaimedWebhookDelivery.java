@@ -11,10 +11,15 @@ public record ClaimedWebhookDelivery(
         @NonNull UUID subscriptionId,
         @NonNull String destinationUrl,
         @NonNull String payload,
-        @NonNull List<UUID> signingSecretVersionIds
+        @NonNull List<byte[]> signingSecrets
 ) {
 
+    @Override
+    public String toString() {
+        return "ClaimedWebhookDelivery[id=" + id + ", claimToken=" + claimToken + "]";
+    }
+
     public ClaimedWebhookDelivery {
-        signingSecretVersionIds = List.copyOf(signingSecretVersionIds);
+        signingSecrets = signingSecrets.stream().map(byte[]::clone).toList();
     }
 }

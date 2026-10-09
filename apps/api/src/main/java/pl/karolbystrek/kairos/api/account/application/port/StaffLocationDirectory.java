@@ -8,4 +8,6 @@ import java.util.UUID;
 public interface StaffLocationDirectory {
 
     Optional<StaffLocation> findById(UUID locationId);
+
+    Optional<StaffLocation> findForShareById(UUID locationId);
 }

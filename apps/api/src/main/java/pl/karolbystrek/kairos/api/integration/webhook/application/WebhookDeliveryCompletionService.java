@@ -5,6 +5,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pl.karolbystrek.kairos.api.integration.webhook.infrastructure.http.WebhookHttpResult;
 import pl.karolbystrek.kairos.api.integration.webhook.infrastructure.persistence.WebhookDeliveryRepository;
+import pl.karolbystrek.kairos.api.persistence.infrastructure.DatabaseAccessContext;
+import pl.karolbystrek.kairos.api.persistence.infrastructure.WorkerOperation;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -14,6 +16,7 @@ import java.util.UUID;
 public class WebhookDeliveryCompletionService {
 
     private final WebhookDeliveryRepository deliveryRepository;
+    private final DatabaseAccessContext databaseAccess;
 
     @Transactional
     public boolean complete(
@@ -23,6 +26,7 @@ public class WebhookDeliveryCompletionService {
             Instant completedAt,
             WebhookHttpResult result
     ) {
+        if (!databaseAccess.worker(WorkerOperation.WEBHOOK_COMPLETE, deliveryId, claimToken)) return false;
         var delivery = deliveryRepository.findForUpdateByIdAndClaimToken(deliveryId, claimToken);
         if (delivery.isEmpty()) {
             return false;

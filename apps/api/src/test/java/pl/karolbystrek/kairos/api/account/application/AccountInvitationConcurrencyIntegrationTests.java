@@ -25,7 +25,9 @@ class AccountInvitationConcurrencyIntegrationTests extends RedisListenerIsolated
     private AccountInvitationService invitationService;
 
     @Autowired
-    private JdbcTemplate jdbcTemplate;
+    private pl.karolbystrek.kairos.api.location.application.LocationService locationService;
+
+    private final JdbcTemplate jdbcTemplate = pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase.ownerDatabase();
 
     @Test
     void concurrentRedemptionCreatesExactlyOneAccountAndConsumesInvitationOnce() throws Exception {
@@ -35,11 +37,10 @@ class AccountInvitationConcurrencyIntegrationTests extends RedisListenerIsolated
         var now = Instant.now();
         jdbcTemplate.update("INSERT INTO tenants (id) VALUES (?)", tenantId);
         jdbcTemplate.update(
-            "INSERT INTO locations (id, tenant_id, name, normalized_name, live_normalized_name) VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO locations (id, tenant_id, name, normalized_name) VALUES (?, ?, ?, ?)",
             locationId,
             tenantId,
             "Concurrent location",
-            "concurrent location",
             "concurrent location"
         );
         jdbcTemplate.update(
@@ -90,12 +91,49 @@ class AccountInvitationConcurrencyIntegrationTests extends RedisListenerIsolated
         )).isEqualTo("REDEEMED");
     }
 
+    @Test
+    void concurrentLocationDisableAndRedemptionFinishWithNoEnabledNewMember() throws Exception {
+        var tenant = new pl.karolbystrek.kairos.api.integration.testsupport.IntegrationTestFixture(jdbcTemplate).createTenant();
+        var created = invitationService.create(tenant.administrator(), tenant.firstLocationId(), AssignmentRole.OPERATOR);
+        var email = "location-race-" + UUID.randomUUID() + "@example.com";
+        var start = new CountDownLatch(1);
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            var redemption = executor.submit(() -> {
+                start.await();
+                try {
+                    invitationService.redeem(hash(created.token()), email, email);
+                } catch (AccountInvitationUnavailableException unavailable) {
+                    assertThat(unavailable.reason()).isEqualTo(AccountInvitationUnavailableException.Reason.REVOKED);
+                }
+                return null;
+            });
+            var disable = executor.submit(() -> {
+                start.await();
+                locationService.updateStatus(tenant.administrator(), tenant.firstLocationId(),
+                    pl.karolbystrek.kairos.api.location.domain.LocationStatus.DISABLED);
+                return null;
+            });
+            start.countDown();
+            redemption.get(15, java.util.concurrent.TimeUnit.SECONDS);
+            disable.get(15, java.util.concurrent.TimeUnit.SECONDS);
+        }
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM accounts WHERE email = ? AND status = 'ENABLED'",
+            Integer.class, email)).isZero();
+        assertThat(jdbcTemplate.queryForObject("SELECT state FROM account_invitations WHERE id = ?",
+            String.class, created.invitation().id())).isIn("REDEEMED", "REVOKED");
+    }
+
+    private static String hash(String token) throws java.security.NoSuchAlgorithmException {
+        return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+            .digest(token.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+    }
+
     private boolean redeemAfterStart(CountDownLatch start, String token, String emailPrefix)
         throws Exception {
         start.await();
         try {
             invitationService.redeem(
-                java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(token.getBytes(java.nio.charset.StandardCharsets.UTF_8))),
+                hash(token),
                 emailPrefix + "@example.com",
                 emailPrefix
             );

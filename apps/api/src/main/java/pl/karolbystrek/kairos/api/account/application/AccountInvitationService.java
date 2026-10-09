@@ -3,56 +3,60 @@ package pl.karolbystrek.kairos.api.account.application;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.annotation.Propagation;
-import pl.karolbystrek.kairos.api.account.application.exception.AccountNotFoundException;
+import org.springframework.transaction.annotation.Transactional;
 import pl.karolbystrek.kairos.api.account.application.exception.AccountInvitationNotFoundException;
 import pl.karolbystrek.kairos.api.account.application.exception.AccountInvitationUnavailableException;
+import pl.karolbystrek.kairos.api.account.application.exception.AccountNotFoundException;
 import pl.karolbystrek.kairos.api.account.application.exception.InvalidAccountRequestException;
-import pl.karolbystrek.kairos.api.account.application.exception.SignedInRedemptionException;
 import pl.karolbystrek.kairos.api.account.application.exception.StaffAccessDeniedException;
 import pl.karolbystrek.kairos.api.account.application.model.AccountInvitationPreview;
 import pl.karolbystrek.kairos.api.account.application.model.AccountInvitationView;
 import pl.karolbystrek.kairos.api.account.application.model.CreatedAccountInvitation;
 import pl.karolbystrek.kairos.api.account.application.model.StaffAccessContext;
 import pl.karolbystrek.kairos.api.account.application.model.StaffLocation;
-import pl.karolbystrek.kairos.api.account.application.model.PanelPrincipal;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
 import pl.karolbystrek.kairos.api.account.application.port.StaffLocationDirectory;
-import pl.karolbystrek.kairos.api.account.domain.assignment.AssignmentRole;
+import pl.karolbystrek.kairos.api.account.domain.TenantRole;
+import pl.karolbystrek.kairos.api.account.domain.Account;
 import pl.karolbystrek.kairos.api.account.domain.assignment.LocationAssignment;
+import pl.karolbystrek.kairos.api.account.infrastructure.persistence.LocationAssignmentRepository;
+import pl.karolbystrek.kairos.api.persistence.infrastructure.DatabaseAccessContext;
+import pl.karolbystrek.kairos.api.account.domain.assignment.AssignmentRole;
 import pl.karolbystrek.kairos.api.account.domain.invitation.AccountInvitation;
-import pl.karolbystrek.kairos.api.account.domain.invitation.AccountInvitationState;
 import pl.karolbystrek.kairos.api.account.domain.invitation.AccountInvitationRevocationReason;
+import pl.karolbystrek.kairos.api.account.domain.invitation.AccountInvitationState;
 import pl.karolbystrek.kairos.api.account.infrastructure.persistence.AccountInvitationRepository;
 import pl.karolbystrek.kairos.api.account.infrastructure.persistence.AccountRepository;
-import pl.karolbystrek.kairos.api.account.infrastructure.persistence.LocationAssignmentRepository;
 import pl.karolbystrek.kairos.api.authentication.application.OneTimeBearerTokenService;
 
 import java.time.Clock;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class AccountInvitationService {
 
+    private final DatabaseAccessContext databaseAccess;
+    private final AccountCreationService accountCreationService;
+    private final LocationAssignmentRepository assignmentRepository;
     private final AccountInvitationRepository invitationRepository;
     private final AccountRepository accountRepository;
-    private final LocationAssignmentRepository assignmentRepository;
     private final StaffLocationDirectory locationDirectory;
     private final StaffAccessService staffAccessService;
-    private final AccountCreationService accountCreationService;
     private final OneTimeBearerTokenService tokenService;
     private final Clock clock;
 
     @Transactional
     public CreatedAccountInvitation create(
         StaffPrincipal actor,
-        java.util.UUID locationId,
+        UUID locationId,
         AssignmentRole role
     ) {
         var access = staffAccessService.resolveForUpdate(actor);
+        if (!access.isTenantAdmin()) access.requireLocationAccess(access.tenantId(), locationId);
         var location = locationDirectory.findById(locationId)
             .orElseThrow(() -> new AccountNotFoundException("Location was not found"));
         access.requireLocationAccess(location.tenantId(), location.id());
@@ -116,7 +120,7 @@ public class AccountInvitationService {
     }
 
     @Transactional
-    public void revoke(StaffPrincipal actor, java.util.UUID invitationId) {
+    public void revoke(StaffPrincipal actor, UUID invitationId) {
         var access = staffAccessService.resolveForUpdate(actor);
         requireInvitationCapability(access);
         var invitation = invitationRepository.findForUpdateById(invitationId)
@@ -132,7 +136,7 @@ public class AccountInvitationService {
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
-    public void revokePendingByIssuer(java.util.UUID issuerAccountId) {
+    public void revokePendingByIssuer(UUID issuerAccountId) {
         revokePendingByIssuer(
             issuerAccountId,
             AccountInvitationRevocationReason.ISSUER_DISABLED
@@ -141,7 +145,7 @@ public class AccountInvitationService {
 
     @Transactional(propagation = Propagation.MANDATORY)
     public void revokePendingByIssuer(
-        java.util.UUID issuerAccountId,
+        UUID issuerAccountId,
         AccountInvitationRevocationReason reason
     ) {
         var now = clock.instant();
@@ -156,7 +160,7 @@ public class AccountInvitationService {
 
     @Transactional(propagation = Propagation.MANDATORY)
     public void revokePendingByLocation(
-        java.util.UUID locationId,
+        UUID locationId,
         AccountInvitationRevocationReason reason
     ) {
         var now = clock.instant();
@@ -171,56 +175,55 @@ public class AccountInvitationService {
 
     @Transactional(readOnly = true)
     public AccountInvitationPreview preview(String presentedToken) {
-        var invitation = invitationRepository.findByTokenHash(tokenService.hash(presentedToken))
+        var hash = tokenService.hash(presentedToken);
+        databaseAccess.invitation(hash, null);
+        var invitation = invitationRepository.findByTokenHash(hash)
             .orElseThrow(AccountInvitationNotFoundException::new);
-        var now = clock.instant();
-        requireAvailable(invitation, now);
+        requireAvailable(invitation, clock.instant());
         requireIssuerAuthority(invitation);
         var location = requireLocation(invitation);
         requireEnabledLocation(location);
-        return new AccountInvitationPreview(
-            location.name(),
-            invitation.getAssignmentRole(),
-            invitation.getExpiresAt()
-        );
+        return new AccountInvitationPreview(location.name(), invitation.getAssignmentRole(), invitation.getExpiresAt());
     }
 
     @Transactional
-    public StaffPrincipal redeem(
-        String tokenHash,
-        String email,
-        String subject
-    ) {
-        var invitation = invitationRepository.findForUpdateByTokenHash(
-                tokenHash
-            )
+    public StaffPrincipal redeem(String tokenHash, String email, String subject) {
+        var accountId = UUID.randomUUID();
+        databaseAccess.invitation(tokenHash, accountId);
+        var locationId = invitationRepository.findLocationIdByTokenHash(tokenHash)
+            .orElseThrow(AccountInvitationNotFoundException::new);
+        // Location-before-invitation keeps redemption in the same lock order as lifecycle cascades.
+        var location = locationDirectory.findForShareById(locationId)
+            .orElseThrow(() -> unavailable(AccountInvitationUnavailableException.Reason.REVOKED));
+        var invitation = invitationRepository.findForUpdateByTokenHash(tokenHash)
             .orElseThrow(AccountInvitationNotFoundException::new);
         var now = clock.instant();
         requireAvailable(invitation, now);
         requireIssuerAuthority(invitation);
-        requireEnabledLocation(requireLocation(invitation));
-
-        var account = accountCreationService.createMember(
-            invitation.getTenantId(),
-            email,
-            subject
-        );
-        var assignment = LocationAssignment.assign(
-            account.getId(),
-            invitation.getLocationId(),
-            invitation.getTenantId(),
-            invitation.getAssignmentRole(),
-            now
-        );
-        assignmentRepository.saveAndFlush(assignment);
+        requireEnabledLocation(location);
+        var account = accountCreationService.create(Account.provisionMember(
+            accountId, invitation.getTenantId(), email, subject, now));
+        assignmentRepository.saveAndFlush(LocationAssignment.assign(account.getId(), invitation.getLocationId(),
+            invitation.getTenantId(), invitation.getAssignmentRole(), now));
         invitation.redeem(account.getId(), now);
         invitationRepository.flush();
-        log.info(
-            "Account invitation {} redeemed into account {}",
-            invitation.getId(),
-            account.getId()
-        );
+        log.info("Account invitation {} redeemed into account {}", invitation.getId(), account.getId());
         return new StaffPrincipal(account.getId(), account.getTenantId(), account.getTenantRole());
+    }
+
+    private void requireIssuerAuthority(AccountInvitation invitation) {
+        var issuer = accountRepository.findById(invitation.getIssuedByAccountId())
+            .orElseThrow(() -> unavailable(AccountInvitationUnavailableException.Reason.REVOKED));
+        if (!issuer.isEnabled() || !issuer.getTenantId().equals(invitation.getTenantId())) {
+            throw unavailable(AccountInvitationUnavailableException.Reason.REVOKED);
+        }
+        if (issuer.getTenantRole() == TenantRole.ADMIN) return;
+        var assignment = assignmentRepository.findByIdAccountId(issuer.getId())
+            .orElseThrow(() -> unavailable(AccountInvitationUnavailableException.Reason.REVOKED));
+        if (!assignment.getLocationId().equals(invitation.getLocationId())
+            || assignment.getRole() != AssignmentRole.MANAGER || invitation.getAssignmentRole() != AssignmentRole.OPERATOR) {
+            throw unavailable(AccountInvitationUnavailableException.Reason.REVOKED);
+        }
     }
 
     private static void requireManagementPermission(
@@ -242,23 +245,6 @@ public class AccountInvitationService {
     private static void requireInvitationCapability(StaffAccessContext access) {
         if (!access.isTenantAdmin() && access.assignmentRole() != AssignmentRole.MANAGER) {
             throw new StaffAccessDeniedException("The account cannot manage invitations");
-        }
-    }
-
-    private void requireIssuerAuthority(AccountInvitation invitation) {
-        var issuer = accountRepository.findById(invitation.getIssuedByAccountId())
-            .orElseThrow(() -> unavailable(AccountInvitationUnavailableException.Reason.REVOKED));
-        try {
-            var access = staffAccessService.resolve(new StaffPrincipal(
-                issuer.getId(),
-                issuer.getTenantId(),
-                issuer.getTenantRole()
-            ));
-            access.requireLocationAccess(invitation.getTenantId(), invitation.getLocationId());
-            requireManagementPermission(access, invitation.getAssignmentRole());
-        }
-        catch (StaffAccessDeniedException exception) {
-            throw unavailable(AccountInvitationUnavailableException.Reason.REVOKED);
         }
     }
 

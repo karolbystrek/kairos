@@ -28,6 +28,7 @@ applied migrations become immutable and later changes use forward migrations.
 
 | Maintenance | Procedure and verification |
 | --- | --- |
+| Development V1 changes | Follow [database initialization](DATABASE.md). The disposable VPS database is recreated by the operator for this revision; deployment never resets volumes or repairs Flyway history. |
 | OS/Docker/infrastructure patches | Schedule an outage with the operator; review upstream changes, validate changed Compose/NGINX configuration and deploy a reviewed revision. Infrastructure tags can change independently of source; test upgrades deliberately and record pulled versions. Verify health and reboot recovery. |
 | SSH/GHCR credentials | Install and verify replacement credentials through a trusted path before revoking old ones. Update the Environment SSH key/known_hosts after independently verifying any changed host key. Renew host registry credentials before expiry and verify all three pulls without exposing tokens. |
 | Provider PATs/admin credentials | Follow [authentication operations](../authentication-setup.md#operations-and-limits). Inventory existing token expirations; bootstrap preserves them. New API PATs use `9999-12-31T23:59:59Z` with the existing service roles; replace the API volume file atomically, restart API, verify auth and revoke the old PAT. The bootstrap administrator PAT is separate and never mounted into the API; rotate it through trusted provider administration. |

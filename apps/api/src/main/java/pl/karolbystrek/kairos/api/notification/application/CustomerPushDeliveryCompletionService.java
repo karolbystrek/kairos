@@ -3,6 +3,8 @@ package pl.karolbystrek.kairos.api.notification.application;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import pl.karolbystrek.kairos.api.persistence.infrastructure.DatabaseAccessContext;
+import pl.karolbystrek.kairos.api.persistence.infrastructure.WorkerOperation;
 import pl.karolbystrek.kairos.api.notification.application.model.WebPushResult;
 import pl.karolbystrek.kairos.api.notification.infrastructure.config.CustomerNotificationProperties;
 import pl.karolbystrek.kairos.api.notification.infrastructure.persistence.CustomerPushDeliveryRepository;
@@ -16,6 +18,7 @@ import java.util.concurrent.ThreadLocalRandom;
 public class CustomerPushDeliveryCompletionService {
 
     private final CustomerPushDeliveryRepository deliveryRepository;
+    private final DatabaseAccessContext databaseAccessContext;
     private final CustomerPushSubscriptionRetirementService retirementService;
     private final CustomerNotificationProperties properties;
 
@@ -27,6 +30,9 @@ public class CustomerPushDeliveryCompletionService {
             Instant completedAt,
             WebPushResult result
     ) {
+        if (!databaseAccessContext.worker(WorkerOperation.PUSH_COMPLETE, deliveryId, claimToken)) {
+            return false;
+        }
         var delivery = deliveryRepository.findForUpdateByIdAndClaimToken(
                 deliveryId,
                 claimToken
@@ -50,7 +56,7 @@ public class CustomerPushDeliveryCompletionService {
                     "SUBSCRIPTION_INVALID",
                     safeDiagnostic(result.diagnostic())
             );
-            retirementService.retire(subscriptionId, completedAt);
+            retirementService.retire(delivery.getSubscriptionId(), completedAt);
             return true;
         }
         if (result.isTransient()

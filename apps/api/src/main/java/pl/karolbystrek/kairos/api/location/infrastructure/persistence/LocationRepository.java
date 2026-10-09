@@ -32,6 +32,9 @@ public interface LocationRepository extends JpaRepository<Location, UUID> {
         UUID excludedId
     );
 
+    @Lock(LockModeType.PESSIMISTIC_READ)
+    Optional<Location> findForShareById(UUID locationId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<Location> findForUpdateById(UUID locationId);
 }
