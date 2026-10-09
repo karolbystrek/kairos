@@ -16,7 +16,6 @@ import {
   fromBase64Url,
   getNotificationConfiguration,
   reconcilePushSubscription,
-  removePushEnrollments,
   replacePushSubscription,
   serializePushSubscription,
 } from "@/src/api/customer-notifications";
@@ -26,7 +25,6 @@ import {
   pruneTerminalTrackedOrders,
   readNotificationMetadata,
   readNotificationTrackingReferences,
-  removeTrackedOrder,
   type SerializedPushSubscription,
   updateNotificationMetadata,
 } from "@/src/pwa/storage";
@@ -47,7 +45,6 @@ type CustomerNotificationContextValue = {
   enrollOrder: (trackingReference: string) => Promise<void>;
   message: string | null;
   state: NotificationState;
-  stopTrackingOrder: (trackingReference: string) => Promise<boolean>;
 };
 
 const CustomerNotificationContext =
@@ -280,53 +277,6 @@ export function CustomerPwaProvider({
     [state, synchronize],
   );
 
-  const stopTrackingOrder = useCallback(
-    async (trackingReference: string): Promise<boolean> => {
-      const metadata = await readNotificationMetadata();
-      const isEnrolled = (metadata.enrolledTrackingReferences ?? []).includes(
-        trackingReference,
-      );
-
-      if (metadata.notificationsEnabled === true && isEnrolled) {
-        if (!navigator.onLine) {
-          setMessage(
-            "Connect to the internet before stopping notification-enabled tracking.",
-          );
-
-          return false;
-        }
-        try {
-          const registration = await navigator.serviceWorker.ready;
-          const subscription = await registration.pushManager.getSubscription();
-
-          if (!subscription) {
-            throw new Error("The browser Push subscription is unavailable.");
-          }
-          await removePushEnrollments(serializePushSubscription(subscription), [
-            trackingReference,
-          ]);
-        } catch (error) {
-          setMessage(notificationErrorMessage(error));
-
-          return false;
-        }
-      }
-      const removedLocally = await removeTrackedOrder(
-        trackingReference,
-        "suppressed",
-      );
-
-      if (!removedLocally) {
-        return false;
-      }
-      await updateApplicationBadge();
-      setMessage(null);
-
-      return true;
-    },
-    [],
-  );
-
   const value = useMemo<CustomerNotificationContextValue>(
     () => ({
       disable,
@@ -335,17 +285,8 @@ export function CustomerPwaProvider({
       enrollOrder,
       message,
       state,
-      stopTrackingOrder,
     }),
-    [
-      disable,
-      dismissMessage,
-      enable,
-      enrollOrder,
-      message,
-      state,
-      stopTrackingOrder,
-    ],
+    [disable, dismissMessage, enable, enrollOrder, message, state],
   );
 
   return (

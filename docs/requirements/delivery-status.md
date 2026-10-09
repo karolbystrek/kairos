@@ -22,9 +22,10 @@ The current walking vertical slice is implemented for local development:
 * on-screen customer QR codes and anonymous tracking through REST;
 * customer-only SSE invalidation through Redis Pub/Sub with REST
   reconciliation;
-* customer PWA manifest, order-aware first-launch, last-destination restoration,
-  active-only IndexedDB snapshots, in-app QR scanning, per-order tracking
-  removal, generated Serwist service worker, explicit offline fallback,
+* customer PWA manifest, order-aware first-launch, unclosed-order restoration,
+  scan-first default page, explicit terminal-order closing, active-only
+  IndexedDB snapshots, in-app QR scanning, generated Serwist service worker,
+  explicit offline fallback,
   app-level notification consent and controls, application badges, and monotonic
   privacy-preserving push handling, with the final regular, maskable,
   Apple-touch, and favicon assets supplied and device acceptance still

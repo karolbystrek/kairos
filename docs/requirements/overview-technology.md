@@ -166,9 +166,8 @@ localized text without depending on short English labels.
 
 Neither frontend uses a persistent global top bar. Customer pages
 place only the utilities relevant to that page in a quiet trailing control
-group; the tracking view aligns Home, Notifications, and Appearance on one
-level. On tablet and desktop, staff workspace navigation is a flat, rounded
-segmented control centered independently of the trailing Appearance and Account
+group; the tracking view aligns Notifications and Appearance on one level. On
+tablet and desktop, staff workspace navigation is a flat, rounded segmented control centered independently of the trailing Appearance and Account
 utilities on the same level. It uses only a solid secondary background and
 selected segment, without glass effects, decorative borders, or shadows.
 
@@ -186,10 +185,7 @@ Routine interactive surfaces in both frontends use one shared short motion
 system: a restrained scale lift on precise-pointer hover, immediate compression
 while pressed, and a subtle spring-like return on release. Stateful spatial
 transitions that communicate a changed location or support direct manipulation
-remain purposeful exceptions. Customer order rows use the same medium corner
-scale and interaction treatment as staff cards while preserving the customer
-swipe-to-remove gesture. Pointer capture begins only after horizontal swipe
-intent is established so an ordinary tap remains native link navigation.
+remain purposeful exceptions.
 Reduced-motion preferences retain non-spatial state feedback while suppressing
 the interaction scaling.
 

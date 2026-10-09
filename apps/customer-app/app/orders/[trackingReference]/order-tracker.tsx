@@ -1,6 +1,7 @@
 "use client";
 
-import { Alert, Spinner } from "@heroui/react";
+import { Alert, Button, Spinner } from "@heroui/react";
+import { X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
@@ -33,7 +34,10 @@ function shouldRetryOnError(error: Error): boolean {
 }
 
 function getTrackingErrorMessage(error: unknown): string {
-  if (error instanceof ApiError && error.status === 404) {
+  if (
+    error instanceof ApiError &&
+    (error.status === 400 || error.status === 404)
+  ) {
     return "This order could not be found.";
   }
 
@@ -115,7 +119,7 @@ export function OrderTracker({
   );
   const [offlineLookupComplete, setOfflineLookupComplete] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
-  const leavingForHome = useRef(false);
+  const destinationSaved = useRef<Promise<void>>(Promise.resolve());
   const previousTransition = useRef<string | null>(null);
   const {
     data: order,
@@ -136,14 +140,22 @@ export function OrderTracker({
     },
   );
   const isOrderActive = isActive(order);
+  const isOrderUnavailable =
+    error instanceof ApiError && (error.status === 400 || error.status === 404);
   const displayedOrder = order ?? offlineOrder;
   const isOfflineSnapshot = !order && offlineOrder !== null;
-  const goHome = () => {
-    leavingForHome.current = true;
-    void rememberLastStableDestination({ kind: "home" }).then(() => {
-      router.push("/");
-    });
+  const closeOrder = async () => {
+    await destinationSaved.current;
+    await rememberLastStableDestination({ kind: "home" });
+    router.replace("/");
   };
+
+  useEffect(() => {
+    destinationSaved.current = rememberLastStableDestination({
+      kind: "order",
+      trackingReference,
+    });
+  }, [trackingReference]);
 
   useEffect(() => {
     const synchronizeConnectivity = () => {
@@ -185,13 +197,6 @@ export function OrderTracker({
       updatedAt: order.updatedAt,
     }).then(async () => {
       await updateApplicationBadge();
-      if (!leavingForHome.current) {
-        await rememberLastStableDestination(
-          isActiveOrderStatus(order.status)
-            ? { kind: "order", trackingReference }
-            : { kind: "home" },
-        );
-      }
       if (isActiveOrderStatus(order.status)) {
         await enrollOrder(trackingReference);
       }
@@ -204,7 +209,11 @@ export function OrderTracker({
     }
     let active = true;
 
-    void readTrackedOrder(trackingReference).then((snapshot) => {
+    void (
+      isOrderUnavailable
+        ? Promise.resolve(null)
+        : readTrackedOrder(trackingReference)
+    ).then((snapshot) => {
       if (active) {
         setOfflineOrder(snapshot);
         setOfflineLookupComplete(true);
@@ -217,7 +226,7 @@ export function OrderTracker({
     return () => {
       active = false;
     };
-  }, [error, order, trackingReference]);
+  }, [error, isOrderUnavailable, order, trackingReference]);
 
   useOrderEventStream({
     enabled: isOrderActive,
@@ -229,7 +238,7 @@ export function OrderTracker({
   if ((isLoading || (error && !offlineLookupComplete)) && !displayedOrder) {
     return (
       <section className="flex min-h-[calc(100svh-3rem)] flex-col">
-        <CustomerToolbar onHome={goHome} />
+        <CustomerToolbar />
         <div className="flex flex-1 items-center justify-center">
           <Spinner aria-label="Loading order" />
         </div>
@@ -240,7 +249,7 @@ export function OrderTracker({
   if (!displayedOrder) {
     return (
       <section className="flex min-h-[calc(100svh-3rem)] flex-col">
-        <CustomerToolbar onHome={goHome} />
+        <CustomerToolbar />
         <div className="flex flex-1 items-center justify-center">
           <Alert className="w-full" status="danger">
             <Alert.Indicator />
@@ -251,6 +260,15 @@ export function OrderTracker({
                   ? "You're offline and no saved status is available for this order. Reconnect to check its status."
                   : getTrackingErrorMessage(error)}
               </Alert.Description>
+              {isOrderUnavailable && (
+                <Button
+                  className="mt-4"
+                  variant="secondary"
+                  onPress={() => void closeOrder()}
+                >
+                  Back to scanner
+                </Button>
+              )}
             </Alert.Content>
           </Alert>
         </div>
@@ -260,7 +278,7 @@ export function OrderTracker({
 
   return (
     <section className="flex min-h-[calc(100svh-3rem)] flex-col">
-      <CustomerToolbar onHome={goHome} />
+      <CustomerToolbar />
       {(error || isOfflineSnapshot) && (
         <Alert className="mt-4" status="warning">
           <Alert.Indicator />
@@ -283,6 +301,16 @@ export function OrderTracker({
         <h1 className="status-title mt-4 max-w-[14ch]">
           {statusCopy[displayedOrder.status]}
         </h1>
+        {!isActiveOrderStatus(displayedOrder.status) && (
+          <Button
+            className="mt-8"
+            variant="secondary"
+            onPress={() => void closeOrder()}
+          >
+            <X aria-hidden="true" size={20} />
+            Close order
+          </Button>
+        )}
       </div>
     </section>
   );

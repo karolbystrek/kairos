@@ -160,7 +160,7 @@ export function OrderScanner() {
   const cancel = () => {
     hasHandledResult.current = true;
     stopCamera();
-    router.push("/");
+    router.replace("/");
   };
 
   const switchCamera = async () => {
@@ -201,7 +201,7 @@ export function OrderScanner() {
           </Alert.Content>
         </Alert>
         <Button variant="secondary" onPress={cancel}>
-          Back to Your orders
+          Back to scanner
         </Button>
       </section>
     );

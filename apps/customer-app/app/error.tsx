@@ -22,9 +22,7 @@ export default function Error({
         <Alert.Indicator />
         <Alert.Content>
           <Alert.Title>Kairos could not open this view</Alert.Title>
-          <Alert.Description>
-            Your saved orders are unchanged. Try loading the view again.
-          </Alert.Description>
+          <Alert.Description>Try loading the view again.</Alert.Description>
           <Button className="mt-4" size="sm" variant="danger" onPress={reset}>
             Try again
           </Button>
