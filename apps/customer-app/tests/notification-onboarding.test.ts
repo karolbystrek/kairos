@@ -11,41 +11,19 @@ import {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("notification onboarding", () => {
-  it("suppresses dismissed automatic onboarding but reopens it from the bell", () => {
-    const context = { state: "disabled" as const, permission: "default" as const, installationRequired: false, dismissed: true };
+  it("remembers automatic installation-guide dismissal but allows reopening from the bell", () => {
+    const context = { state: "installation-required" as const, installationRequired: true, dismissed: true };
     expect(shouldShowNotificationGuide({ ...context, automatic: true })).toBe(false);
     expect(shouldShowNotificationGuide({ ...context, automatic: false })).toBe(true);
   });
 
-  it("enables directly when permission is granted without required installation", () => {
-    expect(shouldShowNotificationGuide({ state: "disabled", permission: "granted", installationRequired: false, dismissed: false, automatic: false })).toBe(false);
-    expect(shouldShowNotificationGuide({ state: "disabled", permission: "default", installationRequired: false, dismissed: false, automatic: false })).toBe(true);
-  });
-
-  it("enables directly from an installed app even before permission is granted", () => {
-    expect(shouldShowNotificationGuide({ state: "disabled", permission: "default", installed: true, installationRequired: false, dismissed: true, automatic: false })).toBe(false);
-  });
-
-  it("uses restored permission immediately rather than stale blocked state", () => {
-    expect(shouldShowNotificationGuide({ state: "blocked", permission: "granted", installationRequired: false, dismissed: true, automatic: false })).toBe(false);
-    expect(shouldShowNotificationGuide({ state: "blocked", permission: "denied", installed: true, installationRequired: false, dismissed: true, automatic: false })).toBe(true);
-  });
-
-  it("lets an installed app request permission after blocked permission is reset to Ask", () => {
-    expect(shouldShowNotificationGuide({ state: "blocked", permission: "default", installed: true, installationRequired: false, dismissed: true, automatic: false })).toBe(false);
-    expect(shouldShowNotificationGuide({ state: "disabled", permission: "denied", installed: true, installationRequired: false, dismissed: true, automatic: false })).toBe(true);
-  });
-
-  it("explains required installation even when permission is granted", () => {
-    expect(shouldShowNotificationGuide({ state: "installation-required", permission: "granted", installationRequired: true, dismissed: false, automatic: false })).toBe(true);
-  });
-
-  it.each(["blocked", "unsupported"] as const)("explains %s rather than requesting permission", (state) => {
-    expect(shouldShowNotificationGuide({ state, permission: undefined, installationRequired: false, dismissed: false, automatic: false })).toBe(true);
+  it.each(["disabled", "blocked", "unsupported", "error", "enabled"] as const)("never opens a popup for %s when installation is unnecessary", (state) => {
+    expect(shouldShowNotificationGuide({ state, installationRequired: false, dismissed: false, automatic: true })).toBe(false);
+    expect(shouldShowNotificationGuide({ state, installationRequired: false, dismissed: false, automatic: false })).toBe(false);
   });
 
   it.each(["loading", "enabled"] as const)("does not interrupt %s notifications", (state) => {
-    expect(shouldShowNotificationGuide({ state, permission: "default", installationRequired: false, dismissed: false, automatic: true })).toBe(false);
+    expect(shouldShowNotificationGuide({ state, installationRequired: true, dismissed: false, automatic: true })).toBe(false);
   });
 
   it("remembers dismissal across reads without storing an order identifier", () => {

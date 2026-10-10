@@ -2,35 +2,11 @@
 
 import { Button, Modal, Tooltip } from "@heroui/react";
 import { X } from "lucide-react";
-import { useState } from "react";
 
-import { isAppleMobile } from "@/src/pwa/notification-onboarding";
 import { useCustomerNotifications } from "@/src/pwa/notification-provider";
 
 export function NotificationGuide() {
-  const {
-    canInstall,
-    dismissGuide,
-    enable,
-    guideOpen,
-    install,
-    installed,
-    message,
-    state,
-  } = useCustomerNotifications();
-  const [busy, setBusy] = useState(false);
-  const [actionError, setActionError] = useState<string | null>(null);
-
-  const installationRequired = state === "installation-required";
-  const unavailable = state === "blocked" || state === "unsupported";
-  const apple = typeof navigator !== "undefined" && isAppleMobile(navigator);
-  const description = installationRequired
-    ? "On iPhone or iPad, open Kairos in Safari, tap Share, then Add to Home Screen and Add. Open Kairos from the Home Screen and tap the bell to enable notifications. Requires iOS or iPadOS 16.4 or later."
-    : state === "blocked"
-      ? "Notifications are blocked. Allow them in your browser or device settings, then tap the bell again."
-      : state === "unsupported"
-        ? "Notifications are unavailable in this browser or configuration. You can still track your order here."
-        : "Get updates when your order is ready, completed, or canceled, even when Kairos is in the background. Allow notifications in the next browser prompt. You can turn them off with the bell at any time.";
+  const { dismissGuide, guideOpen } = useCustomerNotifications();
 
   return (
     <Modal
@@ -51,70 +27,26 @@ export function NotificationGuide() {
               <Tooltip.Content>Dismiss</Tooltip.Content>
             </Tooltip>
             <Modal.Header className="pr-8">
-              <Modal.Heading>Order notifications</Modal.Heading>
+              <Modal.Heading>Add Kairos to your Home Screen</Modal.Heading>
             </Modal.Header>
             <Modal.Body className="space-y-4">
-              <p>{description}</p>
-              {!installed && !apple && !unavailable && (
-                <p className="text-muted">
-                  Installation is optional.{" "}
-                  {canInstall
-                    ? "Install Kairos for quick access from your Home Screen or desktop."
-                    : "To install, use your browser’s Install app or Add to Home Screen menu when available. In Safari on Mac, choose File → Add to Dock."}
-                </p>
-              )}
-              <p className="text-muted text-sm">
-                Tracking works without notifications. Dismissing this guide is
-                remembered on this device; tap the bell to open it again.
+              <p>
+                To receive order notifications on iPhone or iPad, open Kairos in
+                Safari, tap Share, then Add to Home Screen and Add.
               </p>
-              {(message || actionError) && (
-                <p role="status">{actionError ?? message}</p>
-              )}
+              <p>
+                Open Kairos from the Home Screen and tap the bell to enable
+                notifications. Requires iOS or iPadOS 16.4 or later.
+              </p>
+              <p className="text-muted text-sm">
+                Tracking works without installation. Dismissal is remembered on
+                this device; tap the bell to see these instructions again.
+              </p>
             </Modal.Body>
-            <Modal.Footer className="flex-wrap">
+            <Modal.Footer>
               <Button variant="secondary" onPress={dismissGuide}>
-                Not now
+                Got it
               </Button>
-              {canInstall && !installed && !apple && !unavailable && (
-                <Button
-                  isDisabled={busy}
-                  variant="secondary"
-                  onPress={() => {
-                    setBusy(true);
-                    setActionError(null);
-                    void install()
-                      .catch(() => {
-                        setActionError(
-                          "Use your browser’s Install app menu to install Kairos.",
-                        );
-                      })
-                      .finally(() => {
-                        setBusy(false);
-                      });
-                  }}
-                >
-                  Install Kairos
-                </Button>
-              )}
-              {!installationRequired && !unavailable && (
-                <Button
-                  isDisabled={busy || state === "loading"}
-                  variant="primary"
-                  onPress={() => {
-                    setBusy(true);
-                    setActionError(null);
-                    void enable()
-                      .catch(() => {
-                        setActionError(
-                          "Notifications could not be enabled. Try again or continue tracking here.",
-                        );
-                      })
-                      .finally(() => setBusy(false));
-                  }}
-                >
-                  Enable notifications
-                </Button>
-              )}
             </Modal.Footer>
           </Modal.Dialog>
         </Modal.Container>

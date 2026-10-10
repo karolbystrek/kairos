@@ -26,28 +26,20 @@ export function requiresNotificationInstallation(): boolean {
 
 export function shouldShowNotificationGuide({
   state,
-  permission,
   installationRequired,
   dismissed,
   automatic,
-  installed = false,
 }: {
   state: NotificationState;
-  permission: NotificationPermission | undefined;
   installationRequired: boolean;
   dismissed: boolean;
   automatic: boolean;
-  installed?: boolean;
 }): boolean {
-  if (state === "loading" || state === "enabled" || (automatic && dismissed))
-    return false;
-
   return (
-    installationRequired ||
-    state === "unsupported" ||
-    permission === "denied" ||
-    (state === "blocked" && permission === undefined) ||
-    (permission !== "granted" && (automatic || !installed))
+    installationRequired &&
+    state !== "loading" &&
+    state !== "enabled" &&
+    !(automatic && dismissed)
   );
 }
 

@@ -136,6 +136,6 @@ tracking-reference expiration, session-management UI, additional
 administrators, CAPTCHA, MFA,
 passkeys, webhook DLQ
 inspection and alerts, automatic webhook retry or redelivery, strict delivery
-ordering, native mobile variants. Any of
+ordering, application-owned install prompts, and native mobile variants. Any of
 these requires an explicitly approved increment and synchronized changes to
 the [canonical requirements](../REQUIREMENTS.md).

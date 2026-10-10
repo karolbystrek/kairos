@@ -1,7 +1,7 @@
 "use client";
 
 import { Alert, Button, Tooltip } from "@heroui/react";
-import { Bell, BellOff, X } from "lucide-react";
+import { ArrowUp, Bell, BellOff, X } from "lucide-react";
 
 import { NotificationGuide } from "@/src/pwa/notification-guide";
 import {
@@ -31,33 +31,69 @@ function notificationActionLabel(state: NotificationState): string {
 }
 
 export function NotificationControl() {
-  const { disable, dismissMessage, requestEnable, message, state } =
-    useCustomerNotifications();
+  const {
+    disable,
+    dismissGuide,
+    dismissMessage,
+    hintOpen,
+    requestEnable,
+    message,
+    state,
+  } = useCustomerNotifications();
   const isEnabled = state === "enabled";
   const isUnavailable = state === "loading";
   const actionLabel = notificationActionLabel(state);
 
   return (
     <>
-      <Tooltip delay={500}>
-        <Tooltip.Trigger>
-          <Button
-            isIconOnly
-            aria-label={actionLabel}
-            aria-pressed={isEnabled}
-            className="rounded-md"
-            isDisabled={isUnavailable}
-            variant={isEnabled ? "primary" : "tertiary"}
-            onPress={() => {
-              if (isEnabled) void disable();
-              else requestEnable();
-            }}
+      <div className="relative">
+        <Tooltip delay={500}>
+          <Tooltip.Trigger>
+            <Button
+              isIconOnly
+              aria-label={actionLabel}
+              aria-pressed={isEnabled}
+              className="rounded-md"
+              isDisabled={isUnavailable}
+              variant={isEnabled ? "primary" : "tertiary"}
+              onPress={() => {
+                if (isEnabled) void disable();
+                else requestEnable();
+              }}
+            >
+              <NotificationIcon enabled={isEnabled} />
+            </Button>
+          </Tooltip.Trigger>
+          <Tooltip.Content>{actionLabel}</Tooltip.Content>
+        </Tooltip>
+        {hintOpen && (
+          <div
+            className="absolute right-0 top-full z-40 mt-2 w-64 max-w-[calc(100vw-2.5rem)] rounded-xl bg-surface p-4 shadow-lg"
+            role="status"
           >
-            <NotificationIcon enabled={isEnabled} />
-          </Button>
-        </Tooltip.Trigger>
-        <Tooltip.Content>{actionLabel}</Tooltip.Content>
-      </Tooltip>
+            <ArrowUp aria-hidden="true" className="ml-auto mb-2" size={18} />
+            <div className="flex items-start gap-2">
+              <p className="text-sm">
+                Tap the bell to get order notifications.
+              </p>
+              <Tooltip delay={500}>
+                <Tooltip.Trigger>
+                  <Button
+                    isIconOnly
+                    aria-label="Dismiss notification hint"
+                    size="sm"
+                    variant="tertiary"
+                    onPress={dismissGuide}
+                  >
+                    <X aria-hidden="true" size={16} />
+                  </Button>
+                </Tooltip.Trigger>
+                <Tooltip.Content>Dismiss</Tooltip.Content>
+              </Tooltip>
+            </div>
+          </div>
+        )}
+      </div>
       <NotificationGuide />
       {message && (
         <div className="notification-region fixed inset-x-0 z-50 px-5 sm:px-6">

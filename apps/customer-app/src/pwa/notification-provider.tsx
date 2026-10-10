@@ -20,7 +20,6 @@ import {
   serializePushSubscription,
 } from "@/src/api/customer-notifications";
 import {
-  isStandalone,
   readGuideDismissal,
   rememberGuideDismissal,
   requiresNotificationInstallation,
@@ -45,14 +44,7 @@ export type NotificationState =
   | "loading"
   | "unsupported";
 
-type InstallPrompt = Event & {
-  prompt: () => Promise<{ outcome: "accepted" | "dismissed" }>;
-};
-
 type CustomerNotificationContextValue = {
-  canInstall: boolean;
-  installed: boolean;
-  install: () => Promise<void>;
   disable: () => Promise<void>;
   dismissMessage: () => void;
   enable: () => Promise<void>;
@@ -60,6 +52,7 @@ type CustomerNotificationContextValue = {
   message: string | null;
   state: NotificationState;
   guideOpen: boolean;
+  hintOpen: boolean;
   dismissGuide: () => void;
   requestEnable: () => void;
   showGuideForOrder: () => void;
@@ -76,11 +69,8 @@ export function CustomerPwaProvider({
   const [state, setState] = useState<NotificationState>("loading");
   const [message, setMessage] = useState<string | null>(null);
   const [guideOpen, setGuideOpen] = useState(false);
+  const [hintOpen, setHintOpen] = useState(false);
   const guideDismissed = useRef(false);
-  const [installationAccepted, setInstallationAccepted] = useState(false);
-  const [installPrompt, setInstallPrompt] = useState<InstallPrompt | null>(
-    null,
-  );
   const firstOrderSeen = useRef(false);
   const synchronizing = useRef<Promise<void> | null>(null);
   const dismissMessage = useCallback(() => setMessage(null), []);
@@ -151,6 +141,7 @@ export function CustomerPwaProvider({
       setState("enabled");
       setMessage(null);
       setGuideOpen(false);
+      setHintOpen(false);
     } catch (error) {
       setState("error");
       setMessage(notificationErrorMessage(error));
@@ -189,25 +180,11 @@ export function CustomerPwaProvider({
       }
     };
 
-    const handleInstalled = () => {
-      setInstallationAccepted(true);
-      setInstallPrompt(null);
-    };
-
-    const handleInstallPrompt = (event: Event) => {
-      event.preventDefault();
-      setInstallPrompt(event as InstallPrompt);
-    };
-
-    window.addEventListener("beforeinstallprompt", handleInstallPrompt);
-    window.addEventListener("appinstalled", handleInstalled);
     window.addEventListener("online", handleOnline);
 
     return () => {
       active = false;
       window.removeEventListener("online", handleOnline);
-      window.removeEventListener("appinstalled", handleInstalled);
-      window.removeEventListener("beforeinstallprompt", handleInstallPrompt);
     };
   }, [synchronize]);
 
@@ -220,6 +197,9 @@ export function CustomerPwaProvider({
     }
     if (!supportsWebPush() || process.env.NODE_ENV !== "production") {
       setState("unsupported");
+      setMessage(
+        "Notifications are unavailable in this browser or configuration. Tracking still works normally.",
+      );
 
       return;
     }
@@ -320,59 +300,45 @@ export function CustomerPwaProvider({
     guideDismissed.current = true;
     rememberGuideDismissal();
     setGuideOpen(false);
+    setHintOpen(false);
   }, []);
 
   const shouldShowGuide = useCallback(
     (automatic: boolean) =>
       shouldShowNotificationGuide({
         state,
-        permission:
-          typeof Notification === "undefined"
-            ? undefined
-            : Notification.permission,
         installationRequired: requiresNotificationInstallation(),
-        installed: installationAccepted || isStandalone(),
         dismissed: guideDismissed.current || readGuideDismissal(),
         automatic,
       }),
-    [state, installationAccepted],
+    [state],
   );
 
   const showGuideForOrder = useCallback(() => {
     if (state === "loading" || firstOrderSeen.current) return;
     firstOrderSeen.current = true;
     if (shouldShowGuide(true)) setGuideOpen(true);
+    else if (
+      !guideDismissed.current &&
+      !readGuideDismissal() &&
+      (state === "disabled" || state === "error") &&
+      typeof Notification !== "undefined" &&
+      Notification.permission === "default"
+    )
+      setHintOpen(true);
   }, [state, shouldShowGuide]);
 
   const requestEnable = useCallback(() => {
-    if (
-      state === "blocked" &&
-      typeof Notification !== "undefined" &&
-      Notification.permission !== "denied"
-    ) {
-      setState("disabled");
-    }
     if (shouldShowGuide(false)) {
       setGuideOpen(true);
     } else {
+      dismissGuide();
       void enable();
     }
-  }, [enable, shouldShowGuide, state]);
-
-  const install = useCallback(async () => {
-    const prompt = installPrompt;
-
-    setInstallPrompt(null);
-    await prompt?.prompt();
-  }, [installPrompt]);
+  }, [dismissGuide, enable, shouldShowGuide]);
 
   const value = useMemo<CustomerNotificationContextValue>(
     () => ({
-      canInstall: installPrompt !== null,
-      installed:
-        installationAccepted ||
-        (typeof window !== "undefined" && isStandalone()),
-      install,
       disable,
       dismissMessage,
       enable,
@@ -380,14 +346,12 @@ export function CustomerPwaProvider({
       message,
       state,
       guideOpen,
+      hintOpen,
       dismissGuide,
       requestEnable,
       showGuideForOrder,
     }),
     [
-      installPrompt,
-      installationAccepted,
-      install,
       disable,
       dismissMessage,
       enable,
@@ -395,6 +359,7 @@ export function CustomerPwaProvider({
       message,
       state,
       guideOpen,
+      hintOpen,
       dismissGuide,
       requestEnable,
       showGuideForOrder,
