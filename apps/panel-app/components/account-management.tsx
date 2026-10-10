@@ -3,6 +3,7 @@
 import type { FormEvent } from "react";
 import type { TenantAccount } from "@/src/api/authentication";
 
+import { RefreshCw } from "lucide-react";
 import {
   Alert,
   Button,
@@ -14,7 +15,6 @@ import {
   Tooltip,
 } from "@heroui/react";
 import {
-  ArrowRight as ArrowRightIcon,
   Ban as DisableIcon,
   Check as CheckIcon,
   Plus as PlusIcon,
@@ -24,6 +24,7 @@ import { useEffect, useState } from "react";
 import useSWR from "swr";
 import useSWRMutation from "swr/mutation";
 
+import { HoldToConfirmButton } from "@/components/hold-to-confirm-button";
 import { PanelPopup } from "@/components/panel-popup";
 import { FormSelect, FormTextField } from "@/components/form-controls";
 import { OneTimeSecret } from "@/components/integrations/one-time-secret";
@@ -140,15 +141,10 @@ function formatDateTime(value: string): string {
 export function AccountManagement({ account }: { account: TenantAccount }) {
   const isAdministrator = account.tenantRole === "ADMIN";
   const [selectedAccountId, setSelectedAccountId] = useState<string>();
-  const [accountToDisable, setAccountToDisable] = useState<ManagedAccount>();
-  const [accountToDelete, setAccountToDelete] = useState<ManagedAccount>();
-  const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedInvitationId, setSelectedInvitationId] = useState<string>();
   const [email, setEmail] = useState("");
   const [emailError, setEmailError] = useState<string>();
-  const [invitationToRevoke, setInvitationToRevoke] =
-    useState<AccountInvitation>();
   const [createdInvitation, setCreatedInvitation] =
     useState<CreatedAccountInvitation>();
   const [selectedLocationId, setSelectedLocationId] = useState<string>();
@@ -275,8 +271,10 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
     void mutateInvitations(undefined, { throwOnError: false });
   }
 
-  async function revokeInvitation(): Promise<void> {
-    if (!invitationToRevoke || isRevoking) return;
+  async function revokeInvitation(
+    invitationToRevoke: AccountInvitation,
+  ): Promise<void> {
+    if (isRevoking) return;
     resetRevocation();
     const revoked = await triggerRevocation(invitationToRevoke.id);
 
@@ -288,7 +286,6 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
         ),
       { revalidate: false },
     );
-    setInvitationToRevoke(undefined);
     setSelectedInvitationId(undefined);
     void mutateInvitations(undefined, { throwOnError: false });
   }
@@ -296,7 +293,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
   async function changeStatus(
     managedAccount: ManagedAccount,
   ): Promise<boolean> {
-    if (isChangingStatus) return false;
+    if (isChangingStatus || isDeleting) return false;
 
     resetStatus();
     const updated = await triggerStatus({
@@ -319,8 +316,10 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
     return true;
   }
 
-  async function removeAccount(): Promise<boolean> {
-    if (!accountToDelete || isDeleting) return false;
+  async function removeAccount(
+    accountToDelete: ManagedAccount,
+  ): Promise<boolean> {
+    if (isDeleting || isChangingStatus) return false;
 
     resetDeletion();
     const deleted = await triggerDeletion(accountToDelete.id);
@@ -334,8 +333,6 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
       { revalidate: false },
     );
     setSelectedAccountId(undefined);
-    setAccountToDelete(undefined);
-    setDeleteConfirmation("");
     void mutateAccounts(undefined, { throwOnError: false });
     void mutateInvitations(undefined, { throwOnError: false });
 
@@ -360,11 +357,10 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-4">
-          <h1 className="page-title">Konta</h1>
+          <h1 className="sr-only">Konta</h1>
           <Tooltip delay={500}>
             <Tooltip.Trigger>
               <Button
-                isIconOnly
                 aria-label="Nowe konto"
                 className="rounded-md"
                 isDisabled={enabledLocations.length === 0}
@@ -372,6 +368,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
                 onPress={openCreate}
               >
                 <PlusIcon size={20} />
+                Nowe konto
               </Button>
             </Tooltip.Trigger>
             <Tooltip.Content>
@@ -404,12 +401,13 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
               {getErrorMessage(invitationsError)}
             </Alert.Description>
             <Button
+              aria-label="Spróbuj ponownie wczytać zaproszenia"
               className="mt-3"
               size="sm"
               variant="danger"
               onPress={() => void mutateInvitations()}
             >
-              Spróbuj ponownie
+              <RefreshCw aria-hidden="true" size={18} /> Spróbuj ponownie
             </Button>
           </Alert.Content>
         </Alert>
@@ -468,10 +466,10 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
                 }
                 status={managedAccount.status}
                 title={managedAccount.email}
-                trailing={<ArrowRightIcon size={17} />}
                 onPress={() => {
                   setSelectedInvitationId(undefined);
                   resetStatus();
+                  resetDeletion();
                   setSelectedAccountId(managedAccount.id);
                 }}
               />
@@ -488,9 +486,9 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
                 }
                 status="PENDING"
                 title={invitation.email}
-                trailing={<ArrowRightIcon size={17} />}
                 onPress={() => {
                   setSelectedAccountId(undefined);
+                  resetRevocation();
                   setSelectedInvitationId(invitation.id);
                 }}
               />
@@ -499,6 +497,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
 
           {selectedAccount && (
             <PanelPopup
+              key={selectedAccount.id}
               isOpen
               aria-label={`Konto ${selectedAccount.email}`}
               onOpenChange={(open) => {
@@ -511,59 +510,31 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
                   title={selectedAccount.email}
                   trailingActions={
                     <>
-                      <Tooltip delay={500}>
-                        <Tooltip.Trigger>
-                          <Button
-                            isIconOnly
-                            aria-label={`${selectedAccount.status === "ENABLED" ? "Wyłącz" : "Włącz"} konto ${selectedAccount.email}`}
-                            className="shrink-0 rounded-md"
-                            isPending={isChangingStatus}
-                            variant={
-                              selectedAccount.status === "ENABLED"
-                                ? "danger"
-                                : "secondary"
-                            }
-                            onPress={() => {
-                              if (isChangingStatus) return;
-                              if (selectedAccount.status === "ENABLED") {
-                                setAccountToDisable(selectedAccount);
-                              } else {
-                                void changeStatus(selectedAccount);
-                              }
-                            }}
-                          >
-                            {selectedAccount.status === "ENABLED" ? (
-                              <DisableIcon size={20} />
-                            ) : (
-                              <CheckIcon size={20} />
-                            )}
-                          </Button>
-                        </Tooltip.Trigger>
-                        <Tooltip.Content>
-                          {selectedAccount.status === "ENABLED"
-                            ? "Wyłącz"
-                            : "Włącz"}
-                        </Tooltip.Content>
-                      </Tooltip>
-                      <Tooltip delay={500}>
-                        <Tooltip.Trigger>
-                          <Button
-                            isIconOnly
-                            aria-label={`Usuń konto ${selectedAccount.email}`}
-                            className="shrink-0 rounded-md"
-                            variant="danger"
-                            onPress={() => {
-                              if (isDeleting) return;
-                              resetDeletion();
-                              setDeleteConfirmation("");
-                              setAccountToDelete(selectedAccount);
-                            }}
-                          >
-                            <DeleteIcon size={20} />
-                          </Button>
-                        </Tooltip.Trigger>
-                        <Tooltip.Content>Usuń</Tooltip.Content>
-                      </Tooltip>
+                      {selectedAccount.status === "ENABLED" ? (
+                        <HoldToConfirmButton
+                          isDisabled={isChangingStatus || isDeleting}
+                          isPending={isChangingStatus}
+                          onConfirm={() => changeStatus(selectedAccount)}
+                        >
+                          <DisableIcon size={18} /> Przytrzymaj, aby wyłączyć
+                        </HoldToConfirmButton>
+                      ) : (
+                        <Button
+                          isDisabled={isDeleting}
+                          isPending={isChangingStatus}
+                          variant="secondary"
+                          onPress={() => void changeStatus(selectedAccount)}
+                        >
+                          <CheckIcon size={18} /> Włącz
+                        </Button>
+                      )}
+                      <HoldToConfirmButton
+                        isDisabled={isDeleting || isChangingStatus}
+                        isPending={isDeleting}
+                        onConfirm={() => removeAccount(selectedAccount)}
+                      >
+                        <DeleteIcon size={18} /> Przytrzymaj, aby usunąć
+                      </HoldToConfirmButton>
                     </>
                   }
                 />
@@ -574,6 +545,20 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
                     ? "Włączone"
                     : "Wyłączone"}
                 </p>
+                <p className="mt-3 text-sm text-muted">
+                  Wyłączenie wyloguje konto i unieważni zaproszenia. Usunięcie
+                  trwale odbierze dostęp.
+                </p>
+                {deletionError && (
+                  <Alert status="danger">
+                    <Alert.Content>
+                      <Alert.Title>Nie udało się usunąć konta</Alert.Title>
+                      <Alert.Description>
+                        {getErrorMessage(deletionError)}
+                      </Alert.Description>
+                    </Alert.Content>
+                  </Alert>
+                )}
                 {statusError && (
                   <Alert status="danger">
                     <Alert.Content>
@@ -735,7 +720,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
               )}
             </PanelPopup.Body>
             <PanelPopup.Footer className="max-w-full flex-wrap">
-              <Button slot="close" variant="tertiary">
+              <Button aria-label="Anuluj" slot="close" variant="tertiary">
                 Anuluj
               </Button>
               <Button isPending={isCreating} type="submit">
@@ -749,6 +734,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
 
       {selectedInvitation && (
         <PanelPopup
+          key={selectedInvitation.id}
           isOpen
           aria-label={`Zaproszenie dla ${selectedInvitation.email}`}
           onOpenChange={(open) => {
@@ -760,20 +746,31 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
               eyebrow="Zaproszenie"
               title={selectedInvitation.email}
               trailingActions={
-                <Button
-                  isIconOnly
-                  aria-label={`Unieważnij zaproszenie dla ${selectedInvitation.email}`}
-                  variant="danger"
-                  onPress={() => {
-                    if (isRevoking) return;
-                    resetRevocation();
-                    setInvitationToRevoke(selectedInvitation);
-                  }}
+                <HoldToConfirmButton
+                  isDisabled={isRevoking}
+                  isPending={isRevoking}
+                  onConfirm={() => revokeInvitation(selectedInvitation)}
                 >
-                  <DisableIcon size={20} />
-                </Button>
+                  <DisableIcon size={18} /> Przytrzymaj, aby unieważnić
+                </HoldToConfirmButton>
               }
             />
+            <p className="mt-3 text-sm text-muted">
+              Zaproszenie dla {selectedInvitation.email} do lokalu{" "}
+              {selectedInvitation.locationName} natychmiast przestanie działać.
+            </p>
+            {revocationError && (
+              <Alert status="danger">
+                <Alert.Content>
+                  <Alert.Title>
+                    Nie udało się unieważnić zaproszenia
+                  </Alert.Title>
+                  <Alert.Description>
+                    {getErrorMessage(revocationError)}
+                  </Alert.Description>
+                </Alert.Content>
+              </Alert>
+            )}
             <dl className="mt-6 grid gap-5 border-t border-separator pt-6 sm:grid-cols-2">
               <div>
                 <dt className="text-sm text-muted">Status</dt>
@@ -815,163 +812,6 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
           </PanelPopup.Body>
         </PanelPopup>
       )}
-
-      <PanelPopup
-        className="sm:max-w-[440px]"
-        isOpen={Boolean(invitationToRevoke)}
-        role="alertdialog"
-        onOpenChange={(open) => {
-          if (!open) setInvitationToRevoke(undefined);
-        }}
-      >
-        <PanelPopup.Header>
-          <PanelPopup.Icon status="danger" />
-          <PanelPopup.Heading>Unieważnić zaproszenie?</PanelPopup.Heading>
-        </PanelPopup.Header>
-        <PanelPopup.Body className="flex flex-col gap-4">
-          <p>
-            Zaproszenie dla {invitationToRevoke?.email} do lokalu{" "}
-            {invitationToRevoke?.locationName}
-            (rola:{" "}
-            {invitationToRevoke?.role === "MANAGER" ? "Kierownik" : "Pracownik"}
-            ) natychmiast przestanie działać.
-          </p>
-          {revocationError && (
-            <Alert status="danger">
-              <Alert.Indicator />
-              <Alert.Content>
-                <Alert.Title>Nie udało się unieważnić zaproszenia</Alert.Title>
-                <Alert.Description>
-                  {getErrorMessage(revocationError)}
-                </Alert.Description>
-              </Alert.Content>
-            </Alert>
-          )}
-        </PanelPopup.Body>
-        <PanelPopup.Footer>
-          <Button slot="close" variant="tertiary">
-            Anuluj
-          </Button>
-          <Button
-            isPending={isRevoking}
-            variant="danger"
-            onPress={() => void revokeInvitation()}
-          >
-            Unieważnij
-          </Button>
-        </PanelPopup.Footer>
-      </PanelPopup>
-
-      <PanelPopup
-        className="sm:max-w-[420px]"
-        isOpen={Boolean(accountToDisable)}
-        role="alertdialog"
-        onOpenChange={(open) => {
-          if (!open) setAccountToDisable(undefined);
-        }}
-      >
-        <PanelPopup.Header>
-          <PanelPopup.Icon status="warning" />
-          <PanelPopup.Heading>
-            Wyłączyć konto {accountToDisable?.email}?
-          </PanelPopup.Heading>
-        </PanelPopup.Header>
-        <PanelPopup.Body className="flex flex-col gap-4">
-          <p>
-            Konto zostanie wylogowane, a jego oczekujące zaproszenia
-            unieważnione. Dostęp do panelu zostanie zablokowany do ponownego
-            włączenia konta.
-          </p>
-          {statusError && (
-            <Alert status="danger">
-              <Alert.Content>
-                <Alert.Title>Nie udało się wyłączyć konta</Alert.Title>
-                <Alert.Description>
-                  {getErrorMessage(statusError)}
-                </Alert.Description>
-              </Alert.Content>
-            </Alert>
-          )}
-        </PanelPopup.Body>
-        <PanelPopup.Footer>
-          <Button slot="close" variant="tertiary">
-            Anuluj
-          </Button>
-          <Button
-            isPending={isChangingStatus}
-            variant="danger"
-            onPress={() => {
-              if (!accountToDisable) return;
-              void changeStatus(accountToDisable).then((changed) => {
-                if (changed) setAccountToDisable(undefined);
-              });
-            }}
-          >
-            Wyłącz
-          </Button>
-        </PanelPopup.Footer>
-      </PanelPopup>
-
-      <PanelPopup
-        className="sm:max-w-[460px]"
-        isOpen={Boolean(accountToDelete)}
-        role="alertdialog"
-        onOpenChange={(open) => {
-          if (!open) {
-            setAccountToDelete(undefined);
-            setDeleteConfirmation("");
-            if (!isDeleting) resetDeletion();
-          }
-        }}
-      >
-        <PanelPopup.Header>
-          <PanelPopup.Icon status="danger" />
-          <PanelPopup.Heading>
-            Usunąć konto {accountToDelete?.email}?
-          </PanelPopup.Heading>
-        </PanelPopup.Header>
-        <PanelPopup.Body className="flex flex-col gap-4">
-          <p>
-            Konto zostanie wylogowane, zniknie z listy kont i straci oczekujące
-            zaproszenia oraz dostęp do panelu. Aby potwierdzić, wpisz dokładny
-            adres e-mail konta.
-          </p>
-          <FormTextField
-            fullWidth
-            isRequired
-            inputProps={{ autoComplete: "off" }}
-            isDisabled={isDeleting}
-            label={`Wpisz ${accountToDelete?.email} w celu potwierdzenia`}
-            name="delete-account-confirmation"
-            value={deleteConfirmation}
-            onChange={setDeleteConfirmation}
-          />
-          {deletionError && (
-            <Alert status="danger">
-              <Alert.Indicator />
-              <Alert.Content>
-                <Alert.Title>Nie udało się usunąć konta</Alert.Title>
-                <Alert.Description>
-                  {getErrorMessage(deletionError)}
-                </Alert.Description>
-              </Alert.Content>
-            </Alert>
-          )}
-        </PanelPopup.Body>
-        <PanelPopup.Footer>
-          <Button slot="close" variant="tertiary">
-            Anuluj
-          </Button>
-          <Button
-            isDisabled={deleteConfirmation !== accountToDelete?.email}
-            isPending={isDeleting}
-            variant="danger"
-            onPress={() => void removeAccount()}
-          >
-            Usuń
-          </Button>
-        </PanelPopup.Footer>
-      </PanelPopup>
     </div>
   );
 }

@@ -485,18 +485,18 @@ export function OrderManagement({
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center gap-4">
-        <h1 className="page-title">Zamówienia</h1>
+        <h1 className="sr-only">Zamówienia</h1>
         {enabledLocations.length > 0 && (
           <Tooltip delay={500}>
             <Tooltip.Trigger>
               <Button
-                isIconOnly
                 aria-label="Nowe zamówienie"
                 className="rounded-md"
                 size="lg"
                 onPress={openCreate}
               >
                 <PlusIcon size={20} />
+                Nowe zamówienie
               </Button>
             </Tooltip.Trigger>
             <Tooltip.Content>Nowe zamówienie</Tooltip.Content>
@@ -653,7 +653,7 @@ export function OrderManagement({
             )}
           </PanelPopup.Body>
           <PanelPopup.Footer>
-            <Button slot="close" variant="tertiary">
+            <Button aria-label="Anuluj" slot="close" variant="tertiary">
               Anuluj
             </Button>
             <Button isPending={isCreatingOrder} type="submit">
@@ -702,16 +702,13 @@ export function OrderManagement({
         }}
       >
         <PanelPopup.Header>
-          <PanelPopup.Icon status="danger" />
+          <PanelPopup.Icon status="warning" />
           <PanelPopup.Heading>
             Anuluj zamówienie {cancelOrder?.label}?
           </PanelPopup.Heading>
         </PanelPopup.Header>
         <PanelPopup.Body>
-          <p>
-            Klient zobaczy, że zamówienie zostało anulowane. Tej operacji nie
-            można cofnąć.
-          </p>
+          <p>Tej operacji nie można cofnąć.</p>
           {updateOrderError && (
             <Alert className="mt-4" status="danger">
               <Alert.Indicator />
@@ -725,7 +722,11 @@ export function OrderManagement({
           )}
         </PanelPopup.Body>
         <PanelPopup.Footer>
-          <Button slot="close" variant="tertiary">
+          <Button
+            aria-label="Zachowaj zamówienie"
+            slot="close"
+            variant="tertiary"
+          >
             Zachowaj zamówienie
           </Button>
           <Button
@@ -738,7 +739,7 @@ export function OrderManagement({
               });
             }}
           >
-            Anuluj zamówienie
+            <CloseIcon aria-hidden="true" size={18} /> Anuluj zamówienie
           </Button>
         </PanelPopup.Footer>
       </PanelPopup>

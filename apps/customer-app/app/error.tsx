@@ -1,6 +1,7 @@
 "use client";
 
 import { Alert, Button } from "@heroui/react";
+import { RefreshCw } from "lucide-react";
 import { useEffect } from "react";
 
 export default function Error({
@@ -22,9 +23,8 @@ export default function Error({
         <Alert.Indicator />
         <Alert.Content>
           <Alert.Title>Nie udało się otworzyć tego widoku</Alert.Title>
-          <Alert.Description>Spróbuj ponownie wczytać widok.</Alert.Description>
           <Button className="mt-4" size="sm" variant="danger" onPress={reset}>
-            Spróbuj ponownie
+            <RefreshCw aria-hidden="true" size={18} /> Spróbuj ponownie
           </Button>
         </Alert.Content>
       </Alert>

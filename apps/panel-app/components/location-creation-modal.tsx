@@ -141,7 +141,7 @@ export function LocationCreationModal({
         </PanelPopup.Body>
         <PanelPopup.Footer>
           {!isRequired && (
-            <Button slot="close" variant="tertiary">
+            <Button aria-label="Anuluj" slot="close" variant="tertiary">
               Anuluj
             </Button>
           )}

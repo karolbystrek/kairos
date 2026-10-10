@@ -12,9 +12,11 @@ import {
   Spinner,
   TextField,
 } from "@heroui/react";
+import { Ban, History, KeyRound, Plus, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
 
+import { HoldToConfirmButton } from "@/components/hold-to-confirm-button";
 import { PanelPopup } from "@/components/panel-popup";
 import { FormTextField } from "@/components/form-controls";
 import {
@@ -240,8 +242,7 @@ export function ApiKeyManagement({
         <div>
           <h3 className="text-xl font-semibold">Utwórz klucz API</h3>
           <p className="text-sm text-muted">
-            Uprawnień nie można później zmienić. Jeśli potrzebujesz innych,
-            utwórz nowy klucz.
+            Uprawnień nie można później zmienić.
           </p>
         </div>
 
@@ -325,6 +326,7 @@ export function ApiKeyManagement({
             isPending={pendingAction === "issue"}
             type="submit"
           >
+            <Plus size={18} />
             {pendingAction === "issue" ? "Tworzenie…" : "Utwórz"}
           </Button>
         </form>
@@ -397,70 +399,78 @@ export function ApiKeyManagement({
                     variant="secondary"
                     onPress={() => setSelectedApiKeyId(apiKey.id)}
                   >
+                    <History size={18} />
                     Wersje
                   </Button>
                   <Button
-                    isDisabled={Boolean(apiKey.revokedAt)}
+                    isDisabled={
+                      Boolean(pendingAction) || Boolean(apiKey.revokedAt)
+                    }
                     isPending={pendingAction === `rotate-${apiKey.id}`}
                     variant="secondary"
                     onPress={() => rotate(apiKey)}
                   >
+                    <RefreshCw size={18} />
                     Zmień sekret
                   </Button>
                   <Button
-                    isDisabled={Boolean(apiKey.revokedAt)}
+                    isDisabled={
+                      Boolean(pendingAction) || Boolean(apiKey.revokedAt)
+                    }
                     isPending={pendingAction === `revoke-${apiKey.id}`}
                     variant="danger"
                     onPress={() => {
                       if (!pendingAction) setApiKeyToRevoke(apiKey);
                     }}
                   >
+                    <KeyRound size={18} />
                     Unieważnij
                   </Button>
                 </div>
+                {apiKeyToRevoke && apiKeyToRevoke.id === apiKey.id && (
+                  <section
+                    aria-label={`Unieważnienie klucza ${apiKeyToRevoke.name}`}
+                    className="flex flex-col gap-3"
+                  >
+                    <p className="text-sm text-muted">
+                      Wszystkie wersje sekretu klucza {apiKeyToRevoke.name}{" "}
+                      natychmiast przestaną działać. Tej operacji nie można
+                      cofnąć.
+                    </p>
+                    <div className="confirmation-actions">
+                      <HoldToConfirmButton
+                        key={apiKeyToRevoke.id}
+                        isDisabled={
+                          Boolean(pendingAction) ||
+                          Boolean(apiKeyToRevoke.revokedAt)
+                        }
+                        isPending={
+                          pendingAction === `revoke-${apiKeyToRevoke.id}`
+                        }
+                        onConfirm={async () => {
+                          if (await revoke(apiKeyToRevoke))
+                            setApiKeyToRevoke(undefined);
+                        }}
+                      >
+                        <Ban size={18} />
+                        Przytrzymaj, aby unieważnić klucz
+                      </HoldToConfirmButton>
+                      <Button
+                        aria-label="Anuluj unieważnienie klucza"
+                        isDisabled={Boolean(pendingAction)}
+                        variant="tertiary"
+                        onPress={() => setApiKeyToRevoke(undefined)}
+                      >
+                        Anuluj
+                      </Button>
+                    </div>
+                  </section>
+                )}
               </article>
             ))}
           </div>
         )}
       </section>
-
-      <PanelPopup
-        className="sm:max-w-[420px]"
-        isOpen={Boolean(apiKeyToRevoke)}
-        role="alertdialog"
-        onOpenChange={(open) => {
-          if (!open) setApiKeyToRevoke(undefined);
-        }}
-      >
-        <PanelPopup.Header>
-          <PanelPopup.Icon status="danger" />
-          <PanelPopup.Heading>
-            Unieważnić klucz {apiKeyToRevoke?.name}?
-          </PanelPopup.Heading>
-        </PanelPopup.Header>
-        <PanelPopup.Body>
-          Wszystkie wersje sekretu tego klucza natychmiast przestaną działać.
-          Tej operacji nie można cofnąć.
-        </PanelPopup.Body>
-        <PanelPopup.Footer>
-          <Button slot="close" variant="tertiary">
-            Anuluj
-          </Button>
-          <Button
-            isPending={pendingAction === `revoke-${apiKeyToRevoke?.id ?? ""}`}
-            variant="danger"
-            onPress={() => {
-              if (!apiKeyToRevoke) return;
-
-              void revoke(apiKeyToRevoke).then((revoked) => {
-                if (revoked) setApiKeyToRevoke(undefined);
-              });
-            }}
-          >
-            Unieważnij
-          </Button>
-        </PanelPopup.Footer>
-      </PanelPopup>
 
       <PanelPopup
         isOpen={Boolean(selectedApiKey)}
@@ -475,10 +485,6 @@ export function ApiKeyManagement({
           </PanelPopup.Heading>
         </PanelPopup.Header>
         <PanelPopup.Body className="flex flex-col gap-4">
-          <p className="text-sm text-muted">
-            Po zmianie poprzedni sekret pozostaje ważny do terminu podanego
-            poniżej.
-          </p>
           {versionsError ? (
             <Alert status="danger">
               <Alert.Indicator />

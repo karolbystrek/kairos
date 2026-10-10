@@ -26,10 +26,10 @@
 	--accent-soft: #e8f3ff;
 	--accent-soft-foreground: #0058ad;
 	--success: #0a84ff;
-	--warning: #0a84ff;
-	--warning-foreground: #ffffff;
-	--warning-soft: #e8f3ff;
-	--warning-soft-foreground: #0058ad;
+	--warning: #eab308;
+	--warning-foreground: #1c1c1e;
+	--warning-soft: #fff8d6;
+	--warning-soft-foreground: #8a6500;
 	--danger: #ff453a;
 	--danger-foreground: #ffffff;
 	--danger-soft: #fff0f1;
@@ -76,7 +76,7 @@
 	--type-brand: clamp(2.5rem, 7vw, 3rem);
 
 	--content-customer: 40rem;
-	--focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent);
+	--focus-ring: 0 0 0 2px color-mix(in srgb, var(--foreground) 22%, transparent);
 	--popup-backdrop: color-mix(in srgb, var(--foreground) 20%, transparent);
 	--popup-backdrop-blur: 8px;
 	--shadow-floating: 0 18px 48px rgb(0 0 0 / 14%);
@@ -106,10 +106,10 @@
 	--accent-soft: #082c50;
 	--accent-soft-foreground: #64b5ff;
 	--success: #0071e3;
-	--warning: #0071e3;
-	--warning-foreground: #ffffff;
-	--warning-soft: #082c50;
-	--warning-soft-foreground: #64b5ff;
+	--warning: #ffd60a;
+	--warning-foreground: #1c1c1e;
+	--warning-soft: #332b08;
+	--warning-soft-foreground: #ffd60a;
 	--danger: #d70015;
 	--danger-foreground: #ffffff;
 	--danger-soft: #3a1110;
@@ -590,7 +590,6 @@ body {
 }
 
 .empty-scan-action:focus-visible {
-	background: var(--surface-secondary);
 	box-shadow: var(--focus-ring);
 }
 
@@ -598,11 +597,6 @@ body {
 	background: var(--surface-tertiary);
 }
 
-@media (hover: hover) {
-	.empty-scan-action:hover {
-		background: var(--surface-secondary);
-	}
-}
 
 @media (prefers-reduced-motion: reduce) {
 	html {
@@ -652,4 +646,92 @@ body {
 		--separator: #6e6e73;
 		--text-secondary: #d1d1d6;
 	}
+}
+
+/* Hover keeps each control's resting colours; press feedback remains physical. */
+:root, .light, .dark {
+  --default-hover: var(--default);
+  --accent-hover: var(--accent);
+  --danger-hover: var(--danger);
+  --danger-soft-hover: var(--danger-soft);
+  --field-hover: var(--field-background);
+  --field-border-hover: var(--field-border);
+  --field-focus: var(--field-background);
+  --field-border-focus: var(--field-border);
+  --focus: color-mix(in srgb, var(--foreground) 22%, transparent);
+}
+
+.button {
+  --button-bg-hover: var(--button-bg);
+}
+
+:is(.input, .textarea) {
+  --input-bg-hover: var(--input-bg);
+  --textarea-bg-hover: var(--textarea-bg);
+}
+
+.select__trigger {
+  --select-trigger-bg-hover: var(--select-trigger-bg);
+}
+
+:is(.close-button, .dropdown__trigger, .menu-item, .list-box-item):is(:hover, [data-hovered="true"]):not(:active, [data-pressed="true"]) {
+  background-color: transparent;
+}
+
+.close-button--default:is(:hover, [data-hovered="true"]):not(:active, [data-pressed="true"]) {
+  background-color: var(--default);
+}
+
+.icon-menu-trigger:is(:hover, [data-hovered="true"]):not(:active, [data-pressed="true"]) {
+  background-color: var(--surface-secondary);
+}
+
+:is(.tabs__tab, .tabs__list-container__scroll-prev, .tabs__list-container__scroll-next, .link):is(:hover, [data-hovered="true"]):not(:disabled, [aria-disabled="true"], [data-disabled="true"]) {
+  opacity: 1;
+}
+
+/* HeroUI text fields otherwise add a ring for pointer focus as well. */
+:is(.input, .textarea):is(:focus, [data-focused="true"]):not([data-focus-visible="true"]) {
+  --tw-ring-shadow: 0 0 #0000;
+}
+
+:is(button, a[href], [role="button"], [role="tab"], .input, .textarea, .select__trigger, .radio__content):is(:focus-visible, [data-focus-visible="true"]) {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  --tw-ring-shadow: 0 0 #0000;
+}
+
+:is(.input, .textarea):focus-visible:not([data-focus-visible="true"]) {
+  outline: none;
+}
+
+:is(.modal__footer, .alert-dialog__footer, .drawer__footer) {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+}
+
+:is(.modal__footer, .alert-dialog__footer, .drawer__footer) > .button {
+  width: 100%;
+  height: auto;
+  min-height: var(--control-regular);
+  white-space: normal;
+}
+
+.switch {
+  --switch-control-bg-hover: var(--switch-control-bg);
+  --switch-control-bg-checked-hover: var(--switch-control-bg-checked);
+}
+
+:is(button, a[href], [role="button"], [role="tab"], [role="menuitem"], [role="option"]):focus:not(:focus-visible, [data-focus-visible="true"]) {
+  outline: none;
+  --tw-ring-shadow: 0 0 #0000;
+}
+
+.link:is(:hover, [data-hovered="true"]):not(:active, [data-pressed="true"]) {
+  text-decoration-line: none;
+}
+
+.link:is(:hover, [data-hovered="true"]):not(:active, [data-pressed="true"], :focus-visible, [data-focus-visible="true"]) .link__icon {
+  opacity: 0.6;
 }

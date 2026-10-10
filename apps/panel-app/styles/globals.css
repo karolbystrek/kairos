@@ -27,10 +27,10 @@
 	--accent-soft-foreground: #0058ad;
 	--success: #0a84ff;
 	--invitation-status: #b97900;
-	--warning: #0a84ff;
-	--warning-foreground: #ffffff;
-	--warning-soft: #e8f3ff;
-	--warning-soft-foreground: #0058ad;
+	--warning: #eab308;
+	--warning-foreground: #1c1c1e;
+	--warning-soft: #fff8d6;
+	--warning-soft-foreground: #8a6500;
 	--danger: #ff453a;
 	--danger-foreground: #ffffff;
 	--danger-soft: #fff0f1;
@@ -78,7 +78,7 @@
 	--type-brand: clamp(2.5rem, 7vw, 3rem);
 
 	--content-panel: 90rem;
-	--focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent);
+	--focus-ring: 0 0 0 2px color-mix(in srgb, var(--foreground) 22%, transparent);
 	--popup-backdrop: color-mix(in srgb, var(--foreground) 20%, transparent);
 	--popup-backdrop-blur: 8px;
 	--shadow-floating: 0 18px 48px rgb(0 0 0 / 14%);
@@ -109,10 +109,10 @@
 	--accent-soft-foreground: #64b5ff;
 	--success: #0071e3;
 	--invitation-status: #ffd60a;
-	--warning: #0071e3;
-	--warning-foreground: #ffffff;
-	--warning-soft: #082c50;
-	--warning-soft-foreground: #64b5ff;
+	--warning: #ffd60a;
+	--warning-foreground: #1c1c1e;
+	--warning-soft: #332b08;
+	--warning-soft-foreground: #ffd60a;
 	--danger: #d70015;
 	--danger-foreground: #ffffff;
 	--danger-soft: #3a1110;
@@ -629,14 +629,6 @@ body {
 	background: var(--selection);
 }
 
-.panel-card:focus-within {
-	background: var(--surface-secondary);
-}
-
-.panel-card[data-selected="true"]:focus-within {
-	background: var(--selection-hover);
-}
-
 .panel-card:has(> .button:active) {
 	background: var(--surface-tertiary);
 }
@@ -646,14 +638,6 @@ body {
 }
 
 @media (hover: hover) and (pointer: fine) {
-	.panel-card:hover {
-		background: var(--surface-secondary);
-	}
-
-	.panel-card[data-selected="true"]:hover {
-		background: var(--selection-hover);
-	}
-
 	.panel-card:has(> .button:hover) {
 		scale: var(--interaction-hover-scale);
 	}
@@ -786,4 +770,165 @@ body {
 .entity-card-grid .panel-card[data-status="PENDING"] {
   background: color-mix(in srgb, var(--invitation-status) 12%, var(--surface));
   border-color: color-mix(in srgb, var(--invitation-status) 35%, var(--separator));
+}
+
+/* Hover keeps each control's resting colours; press feedback remains physical. */
+:root, .light, .dark {
+  --default-hover: var(--default);
+  --accent-hover: var(--accent);
+  --danger-hover: var(--danger);
+  --danger-soft-hover: var(--danger-soft);
+  --field-hover: var(--field-background);
+  --field-border-hover: var(--field-border);
+  --field-focus: var(--field-background);
+  --field-border-focus: var(--field-border);
+  --focus: color-mix(in srgb, var(--foreground) 22%, transparent);
+}
+
+.button {
+  --button-bg-hover: var(--button-bg);
+}
+
+:is(.input, .textarea) {
+  --input-bg-hover: var(--input-bg);
+  --textarea-bg-hover: var(--textarea-bg);
+}
+
+.select__trigger {
+  --select-trigger-bg-hover: var(--select-trigger-bg);
+}
+
+:is(.close-button, .dropdown__trigger, .menu-item, .list-box-item):is(:hover, [data-hovered="true"]):not(:active, [data-pressed="true"]) {
+  background-color: transparent;
+}
+
+.close-button--default:is(:hover, [data-hovered="true"]):not(:active, [data-pressed="true"]) {
+  background-color: var(--default);
+}
+
+.icon-menu-trigger:is(:hover, [data-hovered="true"]):not(:active, [data-pressed="true"]) {
+  background-color: var(--surface-secondary);
+}
+
+:is(.tabs__tab, .tabs__list-container__scroll-prev, .tabs__list-container__scroll-next, .link):is(:hover, [data-hovered="true"]):not(:disabled, [aria-disabled="true"], [data-disabled="true"]) {
+  opacity: 1;
+}
+
+/* HeroUI text fields otherwise add a ring for pointer focus as well. */
+:is(.input, .textarea):is(:focus, [data-focused="true"]):not([data-focus-visible="true"]) {
+  --tw-ring-shadow: 0 0 #0000;
+}
+
+:is(button, a[href], [role="button"], [role="tab"], .input, .textarea, .select__trigger, .radio__content):is(:focus-visible, [data-focus-visible="true"]) {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  --tw-ring-shadow: 0 0 #0000;
+}
+
+:is(.input, .textarea):focus-visible:not([data-focus-visible="true"]) {
+  outline: none;
+}
+
+:is(.modal__footer, .alert-dialog__footer, .drawer__footer) {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+}
+
+:is(.modal__footer, .alert-dialog__footer, .drawer__footer) > .button {
+  width: 100%;
+  height: auto;
+  min-height: var(--control-regular);
+  white-space: normal;
+}
+
+.confirmation-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.confirmation-actions > .button {
+  width: 100%;
+  min-height: var(--control-regular);
+  height: auto;
+  white-space: normal;
+}
+
+.hold-to-confirm {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+}
+
+.hold-to-confirm__fill {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--foreground) 18%, transparent);
+  clip-path: inset(0 100% 0 0);
+  transition: clip-path 180ms var(--interaction-easing);
+}
+
+.hold-to-confirm[data-holding="true"] .hold-to-confirm__fill {
+  clip-path: inset(0 0 0 0);
+  transition: clip-path 1600ms linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hold-to-confirm__fill {
+    clip-path: none;
+    opacity: 0;
+    transition: none;
+  }
+
+  .hold-to-confirm[data-holding="true"] .hold-to-confirm__fill {
+    opacity: 1;
+    transition: none;
+  }
+}
+
+/* Card overlay buttons stay transparent in every pointer state. */
+.panel-card > .button {
+  --button-bg: transparent;
+  --button-bg-hover: transparent;
+  --button-bg-pressed: transparent;
+}
+
+.switch {
+  --switch-control-bg-hover: var(--switch-control-bg);
+  --switch-control-bg-checked-hover: var(--switch-control-bg-checked);
+}
+
+:is(button, a[href], [role="button"], [role="tab"], [role="menuitem"], [role="option"]):focus:not(:focus-visible, [data-focus-visible="true"]) {
+  outline: none;
+  --tw-ring-shadow: 0 0 #0000;
+}
+
+.link:is(:hover, [data-hovered="true"]):not(:active, [data-pressed="true"]) {
+  text-decoration-line: none;
+}
+
+.link:is(:hover, [data-hovered="true"]):not(:active, [data-pressed="true"], :focus-visible, [data-focus-visible="true"]) .link__icon {
+  opacity: 0.6;
+}
+
+.panel-popup > .modal__header:has(> .alert-dialog__icon) {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.panel-popup .modal__header > .alert-dialog__icon {
+  width: var(--control-small);
+  height: var(--control-small);
+  border-radius: var(--radius-medium);
+}
+
+.entity-name-edit {
+	background: transparent;
+	border: 0;
+	box-shadow: none;
 }
