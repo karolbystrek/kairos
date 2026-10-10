@@ -16,8 +16,16 @@ Use `gh` for all GitHub operations.
 
 ## Required workflow
 
+For every task, invoke the `/grilling` skill before starting the task discussion
+with the user. Use it to guide the discussion toward shared understanding.
+
 Establish shared understanding with the user of the problem, scope, constraints,
-and acceptance criteria before proposing an implementation plan. Scale planning
+and acceptance criteria before proposing an implementation plan. For every task,
+discuss the implementation plan and implementation details with the user until
+both reach shared understanding, before starting implementation. For each area
+of the task, propose a short list of possible solutions, always identify one
+recommended solution, and explain why it is recommended. Resolve questions and
+trade-offs with the user rather than silently choosing an approach. Scale planning
 and review to the task's complexity and risk. Track substantial work in GitHub
 issues; small documentation edits and mechanical cleanups do not require an
 issue. Issues describe context, goals and acceptance criteria, not implementation

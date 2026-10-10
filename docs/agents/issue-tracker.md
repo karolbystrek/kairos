@@ -14,9 +14,14 @@ Use descriptive issue titles without an agent prefix.
 
 ## Issue and implementation cycle
 
-1. Read the relevant guidance and source, then establish shared understanding
+1. Invoke the `/grilling` skill before starting the task discussion with the
+   user. Read the relevant guidance and source, then establish shared understanding
    with the user of the problem, scope, constraints and acceptance criteria
-   before proposing an implementation plan. Resolve material ambiguity first;
+   before proposing an implementation plan. Discuss the plan and implementation
+   details with the user until both reach shared understanding, before starting
+   implementation. For each area of the task, propose a short list of possible
+   solutions, identify one recommended solution with justification, and resolve
+   questions and trade-offs with the user. Resolve material ambiguity first;
    keep simple tasks brief and expand planning only for complexity or risk.
 2. Create an issue for substantial work that benefits from durable tracking.
    Small documentation edits and mechanical cleanups do not require an issue;
