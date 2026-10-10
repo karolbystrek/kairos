@@ -238,6 +238,124 @@ body {
 	box-shadow: none;
 }
 
+/* Reuse the easing token with a stronger curve for notification onboarding. */
+.notification-invitation,
+.notification-guide-backdrop,
+.notification-guide-container {
+	--ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* Keep the bell anchored while its first-order invitation appears beside it. */
+.notification-invitation {
+	position: relative;
+}
+
+.notification-toggle.button {
+	width: max-content;
+	min-width: var(--control-regular);
+	padding-inline: 0.625rem;
+	gap: var(--space-2);
+}
+
+.notification-invitation-label,
+.notification-invitation-dismiss.button {
+	display: none;
+	opacity: 0;
+	transform: translateX(0.25rem);
+	transition:
+		opacity 180ms var(--ease-out),
+		transform 180ms var(--ease-out),
+		display 180ms allow-discrete;
+}
+
+.notification-invitation-dismiss.button {
+	position: absolute;
+	right: calc(100% + var(--space-1));
+	top: 0;
+}
+
+.notification-invitation[data-inviting="true"] .notification-invitation-label {
+	display: inline;
+}
+
+.notification-invitation[data-inviting="true"] .notification-invitation-dismiss {
+	display: inline-flex;
+}
+
+.notification-invitation[data-inviting="true"] :is(.notification-invitation-label, .notification-invitation-dismiss) {
+	opacity: 1;
+	transform: translateX(0);
+}
+
+@starting-style {
+	.notification-invitation[data-inviting="true"] :is(.notification-invitation-label, .notification-invitation-dismiss) {
+		opacity: 0;
+		transform: translateX(0.25rem);
+	}
+}
+
+.notification-installation-steps {
+	display: grid;
+	gap: var(--space-6);
+	margin-top: var(--space-6);
+	padding: 0;
+	list-style: none;
+}
+
+.notification-installation-steps li {
+	display: flex;
+	align-items: center;
+	gap: var(--space-4);
+}
+
+.notification-installation-icon {
+	display: grid;
+	place-items: center;
+	flex: none;
+	width: 3rem;
+	height: 3rem;
+	border-radius: var(--radius-medium);
+	background: var(--accent-soft);
+	color: var(--accent-soft-foreground);
+}
+
+.notification-guide-backdrop[data-entering="true"],
+.notification-guide-backdrop[data-exiting="true"] {
+	animation-timing-function: var(--ease-out);
+}
+
+.notification-guide-container[data-entering="true"] {
+	animation: notification-guide-in 250ms var(--ease-out);
+}
+
+.notification-guide-container[data-exiting="true"] {
+	animation: notification-guide-out 150ms var(--ease-out);
+}
+
+@keyframes notification-guide-in {
+	from { opacity: 0; transform: scale(0.96); }
+	to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes notification-guide-out {
+	from { opacity: 1; transform: scale(1); }
+	to { opacity: 0; transform: scale(0.96); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.notification-invitation-label,
+	.notification-invitation-dismiss.button {
+		transform: none !important;
+	}
+
+	.notification-guide-container[data-entering="true"],
+	.notification-guide-container[data-exiting="true"],
+	.notification-guide-backdrop[data-entering="true"],
+	.notification-guide-backdrop[data-exiting="true"] {
+		animation: none;
+	}
+}
+
 .notification-dismiss {
 	flex: none;
 }

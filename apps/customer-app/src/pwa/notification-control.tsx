@@ -1,7 +1,7 @@
 "use client";
 
 import { Alert, Button, Tooltip } from "@heroui/react";
-import { ArrowUp, Bell, BellOff, X } from "lucide-react";
+import { Bell, BellOff, X } from "lucide-react";
 
 import { NotificationGuide } from "@/src/pwa/notification-guide";
 import {
@@ -46,53 +46,47 @@ export function NotificationControl() {
 
   return (
     <>
-      <div className="relative">
+      <div className="notification-invitation" data-inviting={hintOpen}>
         <Tooltip delay={500}>
           <Tooltip.Trigger>
             <Button
               isIconOnly
-              aria-label={actionLabel}
+              aria-hidden={!hintOpen}
+              aria-label="Dismiss notification invitation"
+              className="notification-invitation-dismiss"
+              isDisabled={!hintOpen}
+              variant="tertiary"
+              onPress={dismissGuide}
+            >
+              <X aria-hidden="true" size={18} />
+            </Button>
+          </Tooltip.Trigger>
+          <Tooltip.Content>Not now</Tooltip.Content>
+        </Tooltip>
+        <Tooltip delay={500}>
+          <Tooltip.Trigger>
+            <Button
+              aria-label={hintOpen ? "Notify me" : actionLabel}
               aria-pressed={isEnabled}
-              className="rounded-md"
+              className="notification-toggle"
               isDisabled={isUnavailable}
-              variant={isEnabled ? "primary" : "tertiary"}
+              variant={hintOpen || isEnabled ? "primary" : "tertiary"}
               onPress={() => {
                 if (isEnabled) void disable();
                 else requestEnable();
               }}
             >
+              <span
+                aria-hidden="true"
+                className="notification-invitation-label"
+              >
+                Notify me
+              </span>
               <NotificationIcon enabled={isEnabled} />
             </Button>
           </Tooltip.Trigger>
           <Tooltip.Content>{actionLabel}</Tooltip.Content>
         </Tooltip>
-        {hintOpen && (
-          <div
-            className="absolute right-0 top-full z-40 mt-2 w-64 max-w-[calc(100vw-2.5rem)] rounded-xl bg-surface p-4 shadow-lg"
-            role="status"
-          >
-            <ArrowUp aria-hidden="true" className="ml-auto mb-2" size={18} />
-            <div className="flex items-start gap-2">
-              <p className="text-sm">
-                Tap the bell to get order notifications.
-              </p>
-              <Tooltip delay={500}>
-                <Tooltip.Trigger>
-                  <Button
-                    isIconOnly
-                    aria-label="Dismiss notification hint"
-                    size="sm"
-                    variant="tertiary"
-                    onPress={dismissGuide}
-                  >
-                    <X aria-hidden="true" size={16} />
-                  </Button>
-                </Tooltip.Trigger>
-                <Tooltip.Content>Dismiss</Tooltip.Content>
-              </Tooltip>
-            </div>
-          </div>
-        )}
       </div>
       <NotificationGuide />
       {message && (

@@ -138,12 +138,12 @@ current browser push subscription. New active orders are enrolled silently, and
 terminal orders are removed after their final notification delivery has been
 materialized. The API limits a subscription to ten contexts per order.
 
-The first successfully loaded order shows a dismissible hint pointing to the
-notification bell when browser permission can be requested directly. The order
-screen remains visible and tapping the bell requests permission immediately.
+The first successfully loaded order temporarily expands the notification bell
+into a dismissible “Notify me” button when browser permission can be requested
+directly. The order screen remains visible and tapping the bell requests permission immediately.
 Only Apple mobile contexts requiring Home Screen installation show a popup,
-with Safari installation steps and instructions to enable notifications from the
-installed app. This includes desktop-mode iPads. Dismissal of either guidance
+with three icon-led steps: Share in Safari, Add to Home Screen, and open Kairos
+then tap the bell. This includes desktop-mode iPads. Dismissal of either guidance
 is remembered locally, with an in-memory fallback when storage is inaccessible.
 The bell reopens installation instructions regardless of prior dismissal; all
 other contexts enable directly or show inline blocked/unsupported guidance.

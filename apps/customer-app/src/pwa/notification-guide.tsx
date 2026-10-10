@@ -1,7 +1,7 @@
 "use client";
 
 import { Button, Modal, Tooltip } from "@heroui/react";
-import { X } from "lucide-react";
+import { Bell, Share, SquarePlus, X } from "lucide-react";
 
 import { useCustomerNotifications } from "@/src/pwa/notification-provider";
 
@@ -15,8 +15,12 @@ export function NotificationGuide() {
         if (!open) dismissGuide();
       }}
     >
-      <Modal.Backdrop isDismissable>
-        <Modal.Container placement="center" size="sm">
+      <Modal.Backdrop isDismissable className="notification-guide-backdrop">
+        <Modal.Container
+          className="notification-guide-container"
+          placement="center"
+          size="sm"
+        >
           <Modal.Dialog>
             <Tooltip delay={500}>
               <Tooltip.Trigger>
@@ -27,25 +31,43 @@ export function NotificationGuide() {
               <Tooltip.Content>Dismiss</Tooltip.Content>
             </Tooltip>
             <Modal.Header className="pr-8">
-              <Modal.Heading>Add Kairos to your Home Screen</Modal.Heading>
+              <Modal.Heading>Get order notifications</Modal.Heading>
             </Modal.Header>
-            <Modal.Body className="space-y-4">
-              <p>
-                To receive order notifications on iPhone or iPad, open Kairos in
-                Safari, tap Share, then Add to Home Screen and Add.
-              </p>
-              <p>
-                Open Kairos from the Home Screen and tap the bell to enable
-                notifications. Requires iOS or iPadOS 16.4 or later.
-              </p>
-              <p className="text-muted text-sm">
-                Tracking works without installation. Dismissal is remembered on
-                this device; tap the bell to see these instructions again.
-              </p>
+            <Modal.Body>
+              <p className="text-muted">On iPhone or iPad, add Kairos first.</p>
+              <ol className="notification-installation-steps">
+                <li>
+                  <span className="notification-installation-icon">
+                    <Share aria-hidden="true" size={24} />
+                  </span>
+                  <div>
+                    <span className="text-muted text-sm">1</span>
+                    <p>Tap Share in Safari</p>
+                  </div>
+                </li>
+                <li>
+                  <span className="notification-installation-icon">
+                    <SquarePlus aria-hidden="true" size={24} />
+                  </span>
+                  <div>
+                    <span className="text-muted text-sm">2</span>
+                    <p>Add to Home Screen</p>
+                  </div>
+                </li>
+                <li>
+                  <span className="notification-installation-icon">
+                    <Bell aria-hidden="true" size={24} />
+                  </span>
+                  <div>
+                    <span className="text-muted text-sm">3</span>
+                    <p>Open Kairos → tap the bell</p>
+                  </div>
+                </li>
+              </ol>
             </Modal.Body>
             <Modal.Footer>
               <Button variant="secondary" onPress={dismissGuide}>
-                Got it
+                Not now
               </Button>
             </Modal.Footer>
           </Modal.Dialog>
