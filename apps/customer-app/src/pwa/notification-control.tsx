@@ -3,6 +3,7 @@
 import { Alert, Button, Tooltip } from "@heroui/react";
 import { Bell, BellOff, X } from "lucide-react";
 
+import { NotificationGuide } from "@/src/pwa/notification-guide";
 import {
   type NotificationState,
   useCustomerNotifications,
@@ -30,10 +31,10 @@ function notificationActionLabel(state: NotificationState): string {
 }
 
 export function NotificationControl() {
-  const { disable, dismissMessage, enable, message, state } =
+  const { disable, dismissMessage, requestEnable, message, state } =
     useCustomerNotifications();
   const isEnabled = state === "enabled";
-  const isUnavailable = state === "loading" || state === "unsupported";
+  const isUnavailable = state === "loading";
   const actionLabel = notificationActionLabel(state);
 
   return (
@@ -45,10 +46,11 @@ export function NotificationControl() {
             aria-label={actionLabel}
             aria-pressed={isEnabled}
             className="rounded-md"
-            isDisabled={isUnavailable || state === "blocked"}
+            isDisabled={isUnavailable}
             variant={isEnabled ? "primary" : "tertiary"}
             onPress={() => {
-              void (isEnabled ? disable() : enable());
+              if (isEnabled) void disable();
+              else requestEnable();
             }}
           >
             <NotificationIcon enabled={isEnabled} />
@@ -56,6 +58,7 @@ export function NotificationControl() {
         </Tooltip.Trigger>
         <Tooltip.Content>{actionLabel}</Tooltip.Content>
       </Tooltip>
+      <NotificationGuide />
       {message && (
         <div className="notification-region fixed inset-x-0 z-50 px-5 sm:px-6">
           <div className="mx-auto max-w-[var(--content-customer)]">

@@ -19,6 +19,13 @@ import {
   replacePushSubscription,
   serializePushSubscription,
 } from "@/src/api/customer-notifications";
+import {
+  isStandalone,
+  readGuideDismissal,
+  rememberGuideDismissal,
+  requiresNotificationInstallation,
+  shouldShowNotificationGuide,
+} from "@/src/pwa/notification-onboarding";
 import { migrateLegacyRecentlyTrackedOrders } from "@/src/pwa/recently-tracked-orders";
 import { updateApplicationBadge } from "@/src/pwa/badge";
 import {
@@ -38,13 +45,24 @@ export type NotificationState =
   | "loading"
   | "unsupported";
 
+type InstallPrompt = Event & {
+  prompt: () => Promise<{ outcome: "accepted" | "dismissed" }>;
+};
+
 type CustomerNotificationContextValue = {
+  canInstall: boolean;
+  installed: boolean;
+  install: () => Promise<void>;
   disable: () => Promise<void>;
   dismissMessage: () => void;
   enable: () => Promise<void>;
   enrollOrder: (trackingReference: string) => Promise<void>;
   message: string | null;
   state: NotificationState;
+  guideOpen: boolean;
+  dismissGuide: () => void;
+  requestEnable: () => void;
+  showGuideForOrder: () => void;
 };
 
 const CustomerNotificationContext =
@@ -57,10 +75,23 @@ export function CustomerPwaProvider({
 }) {
   const [state, setState] = useState<NotificationState>("loading");
   const [message, setMessage] = useState<string | null>(null);
+  const [guideOpen, setGuideOpen] = useState(false);
+  const guideDismissed = useRef(false);
+  const [installationAccepted, setInstallationAccepted] = useState(false);
+  const [installPrompt, setInstallPrompt] = useState<InstallPrompt | null>(
+    null,
+  );
+  const firstOrderSeen = useRef(false);
   const synchronizing = useRef<Promise<void> | null>(null);
   const dismissMessage = useCallback(() => setMessage(null), []);
 
   const synchronize = useCallback(async () => {
+    if (requiresNotificationInstallation()) {
+      setState("installation-required");
+      setMessage(null);
+
+      return;
+    }
     if (!supportsWebPush()) {
       setState("unsupported");
       setMessage(null);
@@ -98,12 +129,8 @@ export function CustomerPwaProvider({
       return;
     }
     if (Notification.permission !== "granted") {
-      setState(isIosOutsideStandalone() ? "installation-required" : "disabled");
-      setMessage(
-        isIosOutsideStandalone()
-          ? "Add Kairos to your Home Screen, open it there, then enable notifications."
-          : null,
-      );
+      setState("disabled");
+      setMessage(null);
 
       return;
     }
@@ -123,6 +150,7 @@ export function CustomerPwaProvider({
       await operation;
       setState("enabled");
       setMessage(null);
+      setGuideOpen(false);
     } catch (error) {
       setState("error");
       setMessage(notificationErrorMessage(error));
@@ -161,26 +189,37 @@ export function CustomerPwaProvider({
       }
     };
 
+    const handleInstalled = () => {
+      setInstallationAccepted(true);
+      setInstallPrompt(null);
+    };
+
+    const handleInstallPrompt = (event: Event) => {
+      event.preventDefault();
+      setInstallPrompt(event as InstallPrompt);
+    };
+
+    window.addEventListener("beforeinstallprompt", handleInstallPrompt);
+    window.addEventListener("appinstalled", handleInstalled);
     window.addEventListener("online", handleOnline);
 
     return () => {
       active = false;
       window.removeEventListener("online", handleOnline);
+      window.removeEventListener("appinstalled", handleInstalled);
+      window.removeEventListener("beforeinstallprompt", handleInstallPrompt);
     };
   }, [synchronize]);
 
   const enable = useCallback(async () => {
     setMessage(null);
-    if (!supportsWebPush()) {
-      setState("unsupported");
+    if (requiresNotificationInstallation()) {
+      setState("installation-required");
 
       return;
     }
-    if (isIosOutsideStandalone()) {
-      setState("installation-required");
-      setMessage(
-        "On iPhone or iPad, use Share → Add to Home Screen, then open Kairos from the Home Screen.",
-      );
+    if (!supportsWebPush() || process.env.NODE_ENV !== "production") {
+      setState("unsupported");
 
       return;
     }
@@ -200,22 +239,22 @@ export function CustomerPwaProvider({
 
       return;
     }
-    const permission =
-      Notification.permission === "granted"
-        ? "granted"
-        : await Notification.requestPermission();
-
-    if (permission !== "granted") {
-      setState(permission === "denied" ? "blocked" : "disabled");
-      setMessage(
-        permission === "denied"
-          ? "Notifications are blocked. Restore them in your browser or device settings."
-          : "Notification permission was not granted.",
-      );
-
-      return;
-    }
     try {
+      const permission =
+        Notification.permission === "granted"
+          ? "granted"
+          : await Notification.requestPermission();
+
+      if (permission !== "granted") {
+        setState(permission === "denied" ? "blocked" : "disabled");
+        setMessage(
+          permission === "denied"
+            ? "Notifications are blocked. Restore them in your browser or device settings."
+            : "Notification permission was not granted.",
+        );
+
+        return;
+      }
       await updateNotificationMetadata({ notificationsEnabled: true });
       await synchronize();
     } catch {
@@ -277,16 +316,89 @@ export function CustomerPwaProvider({
     [state, synchronize],
   );
 
+  const dismissGuide = useCallback(() => {
+    guideDismissed.current = true;
+    rememberGuideDismissal();
+    setGuideOpen(false);
+  }, []);
+
+  const shouldShowGuide = useCallback(
+    (automatic: boolean) =>
+      shouldShowNotificationGuide({
+        state,
+        permission:
+          typeof Notification === "undefined"
+            ? undefined
+            : Notification.permission,
+        installationRequired: requiresNotificationInstallation(),
+        installed: installationAccepted || isStandalone(),
+        dismissed: guideDismissed.current || readGuideDismissal(),
+        automatic,
+      }),
+    [state, installationAccepted],
+  );
+
+  const showGuideForOrder = useCallback(() => {
+    if (state === "loading" || firstOrderSeen.current) return;
+    firstOrderSeen.current = true;
+    if (shouldShowGuide(true)) setGuideOpen(true);
+  }, [state, shouldShowGuide]);
+
+  const requestEnable = useCallback(() => {
+    if (
+      state === "blocked" &&
+      typeof Notification !== "undefined" &&
+      Notification.permission !== "denied"
+    ) {
+      setState("disabled");
+    }
+    if (shouldShowGuide(false)) {
+      setGuideOpen(true);
+    } else {
+      void enable();
+    }
+  }, [enable, shouldShowGuide, state]);
+
+  const install = useCallback(async () => {
+    const prompt = installPrompt;
+
+    setInstallPrompt(null);
+    await prompt?.prompt();
+  }, [installPrompt]);
+
   const value = useMemo<CustomerNotificationContextValue>(
     () => ({
+      canInstall: installPrompt !== null,
+      installed:
+        installationAccepted ||
+        (typeof window !== "undefined" && isStandalone()),
+      install,
       disable,
       dismissMessage,
       enable,
       enrollOrder,
       message,
       state,
+      guideOpen,
+      dismissGuide,
+      requestEnable,
+      showGuideForOrder,
     }),
-    [disable, dismissMessage, enable, enrollOrder, message, state],
+    [
+      installPrompt,
+      installationAccepted,
+      install,
+      disable,
+      dismissMessage,
+      enable,
+      enrollOrder,
+      message,
+      state,
+      guideOpen,
+      dismissGuide,
+      requestEnable,
+      showGuideForOrder,
+    ],
   );
 
   return (
@@ -371,21 +483,6 @@ function supportsWebPush(): boolean {
     "PushManager" in window &&
     "Notification" in window
   );
-}
-
-function isIosOutsideStandalone(): boolean {
-  if (typeof window === "undefined") {
-    return false;
-  }
-  const navigatorWithStandalone = navigator as Navigator & {
-    standalone?: boolean;
-  };
-  const ios = /iPad|iPhone|iPod/.test(navigator.userAgent);
-  const standalone =
-    window.matchMedia("(display-mode: standalone)").matches ||
-    navigatorWithStandalone.standalone === true;
-
-  return ios && !standalone;
 }
 
 function keysEqual(current: ArrayBuffer | null, expected: Uint8Array): boolean {

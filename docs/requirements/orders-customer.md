@@ -138,6 +138,19 @@ current browser push subscription. New active orders are enrolled silently, and
 terminal orders are removed after their final notification delivery has been
 materialized. The API limits a subscription to ten contexts per order.
 
+The first successfully loaded order automatically opens a concise, dismissible
+notification guide while notifications still need setup. Dismissal is remembered
+in a versioned device-local preference; inaccessible storage falls back to the
+current session. The guide explains local remembrance and keeps tracking optional.
+The bell reopens the same guide when permission or required installation is
+missing, regardless of prior dismissal. In an installed app, or with permission
+already granted and no required installation, the bell enables directly.
+Blocked and unsupported configurations receive guidance without a permission
+request. iOS/iPadOS, including desktop-mode iPads, receive Home Screen steps
+before Push API feature detection. Eligible browsers expose an explicit native
+Install action; other browsers receive menu instructions. Optional installation
+is never a prerequisite for supported browser notifications.
+
 The application exposes one persistent notification control in the top-right
 corner of every customer view. Its icon distinguishes enabled notifications
 from all off or unavailable states: a normal bell offers notification enabling,
