@@ -34,50 +34,43 @@ export function NotificationGuide() {
             <Modal.Header className="pr-8">
               <Modal.Heading>
                 {installationRequired
-                  ? "Get order notifications"
+                  ? "Add Kairos to Home Screen"
                   : "Know when it’s ready"}
               </Modal.Heading>
             </Modal.Header>
-            <Modal.Body>
-              {installationRequired ? (
-                <>
-                  <p className="text-muted">
-                    On iPhone or iPad, add Kairos first.
-                  </p>
-                  <ol className="notification-installation-steps">
-                    <li>
-                      <span className="notification-installation-icon">
-                        <Share aria-hidden="true" size={24} />
-                      </span>
-                      <div>
-                        <span className="text-muted text-sm">1</span>
-                        <p>Tap Share in Safari</p>
-                      </div>
-                    </li>
-                    <li>
-                      <span className="notification-installation-icon">
-                        <SquarePlus aria-hidden="true" size={24} />
-                      </span>
-                      <div>
-                        <span className="text-muted text-sm">2</span>
-                        <p>Add to Home Screen</p>
-                      </div>
-                    </li>
-                    <li>
-                      <span className="notification-installation-icon">
-                        <Bell aria-hidden="true" size={24} />
-                      </span>
-                      <div>
-                        <span className="text-muted text-sm">3</span>
-                        <p>Open Kairos → tap the bell</p>
-                      </div>
-                    </li>
-                  </ol>
-                </>
-              ) : (
-                <p>Get a notification when your order is ready.</p>
-              )}
-            </Modal.Body>
+            {installationRequired && (
+              <Modal.Body>
+                <ol className="notification-installation-steps">
+                  <li>
+                    <span className="notification-installation-icon">
+                      <Share aria-hidden="true" size={24} />
+                    </span>
+                    <div>
+                      <span className="text-muted text-sm">1</span>
+                      <p>Tap Share in Safari</p>
+                    </div>
+                  </li>
+                  <li>
+                    <span className="notification-installation-icon">
+                      <SquarePlus aria-hidden="true" size={24} />
+                    </span>
+                    <div>
+                      <span className="text-muted text-sm">2</span>
+                      <p>Add to Home Screen</p>
+                    </div>
+                  </li>
+                  <li>
+                    <span className="notification-installation-icon">
+                      <Bell aria-hidden="true" size={24} />
+                    </span>
+                    <div>
+                      <span className="text-muted text-sm">3</span>
+                      <p>Open Kairos → tap the bell</p>
+                    </div>
+                  </li>
+                </ol>
+              </Modal.Body>
+            )}
             <Modal.Footer>
               <Button variant="secondary" onPress={dismissGuide}>
                 Not now

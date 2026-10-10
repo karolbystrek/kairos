@@ -80,6 +80,10 @@ tokens rather than the standalone authentication-page layout.
 
 #### Appearance and popup behavior
 
+Keep popups quick to read: use a clear title and direct actions, and omit
+secondary text that repeats the title. Include instructions only when needed
+to complete the action, using short steps rather than explanatory paragraphs.
+
 The shared visual character is direct, neutral, and hospitality-oriented
 without restaurant-themed decoration. Light appearance uses a true white page,
 light-gray secondary regions, and one restrained light-blue selection/accent;

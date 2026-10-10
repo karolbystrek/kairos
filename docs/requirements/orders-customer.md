@@ -139,7 +139,8 @@ terminal orders are removed after their final notification delivery has been
 materialized. The API limits a subscription to ten contexts per order.
 
 Three seconds after the first order loads successfully, the application shows a
-compact, dismissible notification popup when permission can be requested, or
+compact, dismissible notification popup with only a title and actions when
+permission can be requested, or
 an illustrated installation guide on Apple mobile devices requiring Home Screen
 installation. Navigation away cancels the delay. Enabled, granted, blocked, and
 unsupported browser states skip the automatic permission invitation. Dismissal
