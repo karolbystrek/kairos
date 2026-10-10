@@ -5,7 +5,6 @@ import type { TenantAccount } from "@/src/api/authentication";
 
 import {
   Alert,
-  Badge,
   Button,
   ListBox,
   Radio,
@@ -20,7 +19,6 @@ import {
   Check as CheckIcon,
   Plus as PlusIcon,
   Trash2 as DeleteIcon,
-  UserRoundPlus as InvitationIcon,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import useSWR from "swr";
@@ -46,6 +44,7 @@ import {
   type AssignmentRole,
   type ManagedAccount,
 } from "@/src/api/accounts";
+import { requiredEmailInputSchema } from "@/src/api/account-input";
 import { ApiError } from "@/src/api/api-fetch";
 import {
   staffAccountsKey,
@@ -145,7 +144,9 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
   const [accountToDelete, setAccountToDelete] = useState<ManagedAccount>();
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [isInvitationsOpen, setIsInvitationsOpen] = useState(false);
+  const [selectedInvitationId, setSelectedInvitationId] = useState<string>();
+  const [email, setEmail] = useState("");
+  const [emailError, setEmailError] = useState<string>();
   const [invitationToRevoke, setInvitationToRevoke] =
     useState<AccountInvitation>();
   const [createdInvitation, setCreatedInvitation] =
@@ -233,22 +234,34 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
       : enabledLocations[0]?.id
     : assignedLocationId;
   const selectedRole = isAdministrator ? role : "OPERATOR";
-  const selectedAccount =
-    accounts.find((candidate) => candidate.id === selectedAccountId) ??
-    accounts[0];
+  const selectedAccount = accounts.find(
+    (candidate) => candidate.id === selectedAccountId,
+  );
   const locationNames = new Map(
     locations.map((location) => [location.id, location.name]),
   );
   const pendingInvitations = invitations.filter(
     (invitation) => new Date(invitation.expiresAt).getTime() > now,
   );
-  const collectionError = locationsError ?? accountsError ?? statusError;
+  const selectedInvitation = pendingInvitations.find(
+    (invitation) => invitation.id === selectedInvitationId,
+  );
+  const collectionError = locationsError ?? accountsError;
 
   async function submitInvitation(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!locationId || isCreating) return;
+    const parsedEmail = requiredEmailInputSchema.safeParse(email);
+
+    if (!parsedEmail.success) {
+      setEmailError(parsedEmail.error.issues[0]?.message);
+
+      return;
+    }
+    setEmailError(undefined);
     resetCreation();
     const created = await triggerCreation({
+      email: parsedEmail.data,
       locationId,
       role: selectedRole,
     });
@@ -276,6 +289,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
       { revalidate: false },
     );
     setInvitationToRevoke(undefined);
+    setSelectedInvitationId(undefined);
     void mutateInvitations(undefined, { throwOnError: false });
   }
 
@@ -337,6 +351,8 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
     resetCreation();
     setSelectedLocationId(locationId ?? enabledLocations[0]?.id);
     setRole("OPERATOR");
+    setEmail("");
+    setEmailError(undefined);
     setIsCreateOpen(true);
   }
 
@@ -365,32 +381,6 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
             </Tooltip.Content>
           </Tooltip>
         </div>
-        <Tooltip delay={500}>
-          <Tooltip.Trigger>
-            <Badge.Anchor>
-              <Button
-                isIconOnly
-                aria-label={
-                  pendingInvitations.length > 0
-                    ? `Zaproszenia — oczekujące: ${pendingInvitations.length.toLocaleString("pl-PL")}`
-                    : "Zaproszenia"
-                }
-                className="rounded-md"
-                size="lg"
-                variant="secondary"
-                onPress={() => setIsInvitationsOpen(true)}
-              >
-                <InvitationIcon size={20} />
-              </Button>
-              {pendingInvitations.length > 0 && (
-                <Badge color="accent" size="sm">
-                  {pendingInvitations.length.toLocaleString("pl-PL")}
-                </Badge>
-              )}
-            </Badge.Anchor>
-          </Tooltip.Trigger>
-          <Tooltip.Content>Zaproszenia</Tooltip.Content>
-        </Tooltip>
       </div>
 
       {collectionError && (
@@ -405,17 +395,48 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
         </Alert>
       )}
 
+      {invitationsError && (
+        <Alert status="danger">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Title>Nie udało się wczytać zaproszeń</Alert.Title>
+            <Alert.Description>
+              {getErrorMessage(invitationsError)}
+            </Alert.Description>
+            <Button
+              className="mt-3"
+              size="sm"
+              variant="danger"
+              onPress={() => void mutateInvitations()}
+            >
+              Spróbuj ponownie
+            </Button>
+          </Alert.Content>
+        </Alert>
+      )}
+      {areInvitationsLoading && (
+        <div className="flex items-center gap-2 text-sm text-muted">
+          <Spinner aria-label="Wczytywanie zaproszeń" size="sm" />
+          <span>Wczytywanie zaproszeń…</span>
+        </div>
+      )}
+
       {!areLocationsLoading && enabledLocations.length === 0 && (
         <p className="text-sm text-muted">
           Włącz lokal w zakładce Lokale, aby zaprosić użytkownika.
         </p>
       )}
 
-      {areLocationsLoading || areAccountsLoading ? (
+      {areAccountsLoading &&
+      accounts.length === 0 &&
+      pendingInvitations.length === 0 ? (
         <div className="flex min-h-80 items-center justify-center">
           <Spinner aria-label="Wczytywanie kont" />
         </div>
-      ) : accounts.length === 0 ? (
+      ) : accounts.length === 0 &&
+        pendingInvitations.length === 0 &&
+        !areInvitationsLoading &&
+        !invitationsError ? (
         <div className="py-12">
           <h2 className="section-title">Brak kont pracowników</h2>
           <p className="mt-2 max-w-sm secondary-text">
@@ -425,139 +446,189 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
           </p>
         </div>
       ) : (
-        <div className="grid gap-6 md:grid-cols-[minmax(220px,0.65fr)_minmax(0,1.35fr)]">
-          <section className="border-t border-separator pt-2 md:border-r md:border-t-0 md:pr-6 md:pt-0">
+        <>
+          <section
+            aria-label="Konta i zaproszenia"
+            className="entity-card-grid"
+          >
             {accounts.map((managedAccount) => (
               <PanelCard
                 key={managedAccount.id}
-                accessibilityLabel={`Pokaż konto ${managedAccount.email}`}
+                accessibilityLabel={`Pokaż konto ${managedAccount.email}, ${managedAccount.status === "ENABLED" ? "włączone" : "wyłączone"}`}
                 isSelected={managedAccount.id === selectedAccount?.id}
                 metadata={
-                  <span
-                    className={
-                      managedAccount.status === "ENABLED"
-                        ? "text-accent"
-                        : "secondary-text"
-                    }
-                  >
-                    {managedAccount.status === "ENABLED"
-                      ? "Włączone"
-                      : "Wyłączone"}
-                  </span>
+                  <p className="mt-2 break-words text-sm text-muted">
+                    {managedAccount.role === "MANAGER"
+                      ? "Kierownik"
+                      : "Pracownik"}{" "}
+                    ·{" "}
+                    {locationNames.get(managedAccount.locationId) ??
+                      "Niedostępny"}
+                  </p>
                 }
+                status={managedAccount.status}
                 title={managedAccount.email}
                 trailing={<ArrowRightIcon size={17} />}
-                onPress={() => setSelectedAccountId(managedAccount.id)}
+                onPress={() => {
+                  setSelectedInvitationId(undefined);
+                  resetStatus();
+                  setSelectedAccountId(managedAccount.id);
+                }}
+              />
+            ))}
+            {pendingInvitations.map((invitation) => (
+              <PanelCard
+                key={invitation.id}
+                accessibilityLabel={`Pokaż zaproszenie dla ${invitation.email}, oczekujące`}
+                metadata={
+                  <p className="mt-2 break-words text-sm text-muted">
+                    {invitation.role === "MANAGER" ? "Kierownik" : "Pracownik"}{" "}
+                    · {invitation.locationName}
+                  </p>
+                }
+                status="PENDING"
+                title={invitation.email}
+                trailing={<ArrowRightIcon size={17} />}
+                onPress={() => {
+                  setSelectedAccountId(undefined);
+                  setSelectedInvitationId(invitation.id);
+                }}
               />
             ))}
           </section>
 
           {selectedAccount && (
-            <section className="min-w-0">
-              <PanelDetailHeader
-                eyebrow="Konto"
-                title={selectedAccount.email}
-                trailingActions={
-                  <>
-                    <Tooltip delay={500}>
-                      <Tooltip.Trigger>
-                        <Button
-                          isIconOnly
-                          aria-label={`${selectedAccount.status === "ENABLED" ? "Wyłącz" : "Włącz"} konto ${selectedAccount.email}`}
-                          className="shrink-0 rounded-md"
-                          isPending={isChangingStatus}
-                          variant={
-                            selectedAccount.status === "ENABLED"
-                              ? "danger"
-                              : "secondary"
-                          }
-                          onPress={() => {
-                            if (isChangingStatus) return;
-                            if (selectedAccount.status === "ENABLED") {
-                              setAccountToDisable(selectedAccount);
-                            } else {
-                              void changeStatus(selectedAccount);
+            <PanelPopup
+              isOpen
+              aria-label={`Konto ${selectedAccount.email}`}
+              onOpenChange={(open) => {
+                if (!open) setSelectedAccountId(undefined);
+              }}
+            >
+              <PanelPopup.Body className="pb-6 pt-12">
+                <PanelDetailHeader
+                  eyebrow="Konto"
+                  title={selectedAccount.email}
+                  trailingActions={
+                    <>
+                      <Tooltip delay={500}>
+                        <Tooltip.Trigger>
+                          <Button
+                            isIconOnly
+                            aria-label={`${selectedAccount.status === "ENABLED" ? "Wyłącz" : "Włącz"} konto ${selectedAccount.email}`}
+                            className="shrink-0 rounded-md"
+                            isPending={isChangingStatus}
+                            variant={
+                              selectedAccount.status === "ENABLED"
+                                ? "danger"
+                                : "secondary"
                             }
-                          }}
-                        >
-                          {selectedAccount.status === "ENABLED" ? (
-                            <DisableIcon size={20} />
-                          ) : (
-                            <CheckIcon size={20} />
-                          )}
-                        </Button>
-                      </Tooltip.Trigger>
-                      <Tooltip.Content>
-                        {selectedAccount.status === "ENABLED"
-                          ? "Wyłącz"
-                          : "Włącz"}
-                      </Tooltip.Content>
-                    </Tooltip>
-                    <Tooltip delay={500}>
-                      <Tooltip.Trigger>
-                        <Button
-                          isIconOnly
-                          aria-label={`Usuń konto ${selectedAccount.email}`}
-                          className="shrink-0 rounded-md"
-                          variant="danger"
-                          onPress={() => {
-                            if (isDeleting) return;
-                            resetDeletion();
-                            setDeleteConfirmation("");
-                            setAccountToDelete(selectedAccount);
-                          }}
-                        >
-                          <DeleteIcon size={20} />
-                        </Button>
-                      </Tooltip.Trigger>
-                      <Tooltip.Content>Usuń</Tooltip.Content>
-                    </Tooltip>
-                  </>
-                }
-              />
+                            onPress={() => {
+                              if (isChangingStatus) return;
+                              if (selectedAccount.status === "ENABLED") {
+                                setAccountToDisable(selectedAccount);
+                              } else {
+                                void changeStatus(selectedAccount);
+                              }
+                            }}
+                          >
+                            {selectedAccount.status === "ENABLED" ? (
+                              <DisableIcon size={20} />
+                            ) : (
+                              <CheckIcon size={20} />
+                            )}
+                          </Button>
+                        </Tooltip.Trigger>
+                        <Tooltip.Content>
+                          {selectedAccount.status === "ENABLED"
+                            ? "Wyłącz"
+                            : "Włącz"}
+                        </Tooltip.Content>
+                      </Tooltip>
+                      <Tooltip delay={500}>
+                        <Tooltip.Trigger>
+                          <Button
+                            isIconOnly
+                            aria-label={`Usuń konto ${selectedAccount.email}`}
+                            className="shrink-0 rounded-md"
+                            variant="danger"
+                            onPress={() => {
+                              if (isDeleting) return;
+                              resetDeletion();
+                              setDeleteConfirmation("");
+                              setAccountToDelete(selectedAccount);
+                            }}
+                          >
+                            <DeleteIcon size={20} />
+                          </Button>
+                        </Tooltip.Trigger>
+                        <Tooltip.Content>Usuń</Tooltip.Content>
+                      </Tooltip>
+                    </>
+                  }
+                />
 
-              <dl className="mt-8 grid gap-5 border-t border-separator pt-6 sm:grid-cols-2">
-                <div>
-                  <dt className="text-xs font-medium uppercase tracking-[0.12em] text-muted">
-                    Rola
-                  </dt>
-                  <dd className="mt-1 font-medium">
-                    {selectedAccount.role === "MANAGER"
-                      ? "Kierownik"
-                      : "Pracownik"}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-xs font-medium uppercase tracking-[0.12em] text-muted">
-                    Lokal
-                  </dt>
-                  <dd className="mt-1 font-medium">
-                    {locationNames.get(selectedAccount.locationId) ??
-                      "Niedostępny"}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-xs font-medium uppercase tracking-[0.12em] text-muted">
-                    E-mail
-                  </dt>
-                  <dd className="mt-1 break-words font-medium">
-                    {selectedAccount.email}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-xs font-medium uppercase tracking-[0.12em] text-muted">
-                    Utworzono
-                  </dt>
-                  <dd className="mt-1 font-medium">
-                    {new Date(selectedAccount.createdAt).toLocaleDateString(
-                      "pl-PL",
-                    )}
-                  </dd>
-                </div>
-              </dl>
-            </section>
+                <p className="mt-4 text-sm text-muted">
+                  Status:{" "}
+                  {selectedAccount.status === "ENABLED"
+                    ? "Włączone"
+                    : "Wyłączone"}
+                </p>
+                {statusError && (
+                  <Alert status="danger">
+                    <Alert.Content>
+                      <Alert.Title>
+                        Nie udało się zmienić statusu konta
+                      </Alert.Title>
+                      <Alert.Description>
+                        {getErrorMessage(statusError)}
+                      </Alert.Description>
+                    </Alert.Content>
+                  </Alert>
+                )}
+                <dl className="mt-8 grid gap-5 border-t border-separator pt-6 sm:grid-cols-2">
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-[0.12em] text-muted">
+                      Rola
+                    </dt>
+                    <dd className="mt-1 font-medium">
+                      {selectedAccount.role === "MANAGER"
+                        ? "Kierownik"
+                        : "Pracownik"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-[0.12em] text-muted">
+                      Lokal
+                    </dt>
+                    <dd className="mt-1 font-medium">
+                      {locationNames.get(selectedAccount.locationId) ??
+                        "Niedostępny"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-[0.12em] text-muted">
+                      E-mail
+                    </dt>
+                    <dd className="mt-1 break-words font-medium">
+                      {selectedAccount.email}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-[0.12em] text-muted">
+                      Utworzono
+                    </dt>
+                    <dd className="mt-1 font-medium">
+                      {new Date(selectedAccount.createdAt).toLocaleDateString(
+                        "pl-PL",
+                      )}
+                    </dd>
+                  </div>
+                </dl>
+              </PanelPopup.Body>
+            </PanelPopup>
           )}
-        </div>
+        </>
       )}
 
       <PanelPopup
@@ -576,7 +647,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
             <OneTimeSecret
               secret={{
                 title: "Udostępnij zaproszenie",
-                description: `${createdInvitation.role === "MANAGER" ? "Kierownik" : "Pracownik"} · ${createdInvitation.locationName}`,
+                description: `${createdInvitation.email} · ${createdInvitation.role === "MANAGER" ? "Kierownik" : "Pracownik"} · ${createdInvitation.locationName}`,
                 value: createdInvitation.invitationLink,
               }}
               onConfirmed={() => {
@@ -601,6 +672,21 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
                   </Alert.Content>
                 </Alert>
               )}
+              <FormTextField
+                fullWidth
+                isRequired
+                errorMessage={emailError}
+                inputProps={{ type: "email", autoComplete: "email" }}
+                isDisabled={isCreating}
+                label="E-mail zapraszanej osoby"
+                maxLength={200}
+                name="invitation-email"
+                value={email}
+                onChange={(value) => {
+                  setEmail(value);
+                  setEmailError(undefined);
+                }}
+              />
               {isAdministrator ? (
                 <LocationSelect
                   locations={enabledLocations}
@@ -661,91 +747,74 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
         )}
       </PanelPopup>
 
-      <PanelPopup
-        className="max-h-[min(90vh,760px)] sm:max-w-3xl"
-        isOpen={isInvitationsOpen}
-        size="lg"
-        onOpenChange={setIsInvitationsOpen}
-      >
-        <PanelPopup.Header>
-          <PanelPopup.Heading>Oczekujące zaproszenia</PanelPopup.Heading>
-        </PanelPopup.Header>
-        <PanelPopup.Body className="pb-6">
-          {areInvitationsLoading ? (
-            <div className="flex min-h-48 items-center justify-center">
-              <Spinner aria-label="Wczytywanie zaproszeń" />
-            </div>
-          ) : invitationsError ? (
-            <Alert status="danger">
-              <Alert.Indicator />
-              <Alert.Content>
-                <Alert.Title>Nie udało się wczytać zaproszeń</Alert.Title>
-                <Alert.Description>
-                  {getErrorMessage(invitationsError)}
-                </Alert.Description>
+      {selectedInvitation && (
+        <PanelPopup
+          isOpen
+          aria-label={`Zaproszenie dla ${selectedInvitation.email}`}
+          onOpenChange={(open) => {
+            if (!open) setSelectedInvitationId(undefined);
+          }}
+        >
+          <PanelPopup.Body className="pb-6 pt-12">
+            <PanelDetailHeader
+              eyebrow="Zaproszenie"
+              title={selectedInvitation.email}
+              trailingActions={
                 <Button
-                  className="mt-3"
-                  size="sm"
+                  isIconOnly
+                  aria-label={`Unieważnij zaproszenie dla ${selectedInvitation.email}`}
                   variant="danger"
-                  onPress={() => void mutateInvitations()}
+                  onPress={() => {
+                    if (isRevoking) return;
+                    resetRevocation();
+                    setInvitationToRevoke(selectedInvitation);
+                  }}
                 >
-                  Spróbuj ponownie
+                  <DisableIcon size={20} />
                 </Button>
-              </Alert.Content>
-            </Alert>
-          ) : pendingInvitations.length === 0 ? (
-            <p className="py-12 text-center secondary-text">
-              Brak oczekujących zaproszeń
-            </p>
-          ) : (
-            <ul className="divide-y divide-separator">
-              {pendingInvitations.map((invitation) => (
-                <li
-                  key={invitation.id}
-                  className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div className="min-w-0">
-                    <p className="font-semibold">
-                      {invitation.role === "MANAGER"
-                        ? "Kierownik"
-                        : "Pracownik"}
-                      <span className="font-normal text-muted">
-                        {" "}
-                        · {invitation.locationName}
-                      </span>
-                    </p>
-                    <p className="mt-1 text-sm text-muted">
-                      Autor: {invitation.issuedByEmail}, data:{" "}
-                      {formatDateTime(invitation.createdAt)}
-                    </p>
-                    <p className="mt-1 text-sm text-muted">
-                      Wygasa {formatDateTime(invitation.expiresAt)}
-                    </p>
-                  </div>
-                  <Tooltip delay={500}>
-                    <Tooltip.Trigger>
-                      <Button
-                        isIconOnly
-                        aria-label={`Unieważnij zaproszenie do lokalu ${invitation.locationName} (rola: ${invitation.role === "MANAGER" ? "Kierownik" : "Pracownik"})`}
-                        className="shrink-0 self-end rounded-md sm:self-auto"
-                        variant="danger"
-                        onPress={() => {
-                          if (isRevoking) return;
-                          resetRevocation();
-                          setInvitationToRevoke(invitation);
-                        }}
-                      >
-                        <DisableIcon size={20} />
-                      </Button>
-                    </Tooltip.Trigger>
-                    <Tooltip.Content>Unieważnij</Tooltip.Content>
-                  </Tooltip>
-                </li>
-              ))}
-            </ul>
-          )}
-        </PanelPopup.Body>
-      </PanelPopup>
+              }
+            />
+            <dl className="mt-6 grid gap-5 border-t border-separator pt-6 sm:grid-cols-2">
+              <div>
+                <dt className="text-sm text-muted">Status</dt>
+                <dd className="mt-1 font-medium">Oczekujące</dd>
+              </div>
+              <div>
+                <dt className="text-sm text-muted">Rola</dt>
+                <dd className="mt-1 font-medium">
+                  {selectedInvitation.role === "MANAGER"
+                    ? "Kierownik"
+                    : "Pracownik"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm text-muted">Lokal</dt>
+                <dd className="mt-1 break-words font-medium">
+                  {selectedInvitation.locationName}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm text-muted">Autor</dt>
+                <dd className="mt-1 break-words font-medium">
+                  {selectedInvitation.issuedByEmail}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm text-muted">Utworzono</dt>
+                <dd className="mt-1 font-medium">
+                  {formatDateTime(selectedInvitation.createdAt)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm text-muted">Wygasa</dt>
+                <dd className="mt-1 font-medium">
+                  {formatDateTime(selectedInvitation.expiresAt)}
+                </dd>
+              </div>
+            </dl>
+          </PanelPopup.Body>
+        </PanelPopup>
+      )}
 
       <PanelPopup
         className="sm:max-w-[440px]"
@@ -761,7 +830,8 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
         </PanelPopup.Header>
         <PanelPopup.Body className="flex flex-col gap-4">
           <p>
-            Zaproszenie do lokalu {invitationToRevoke?.locationName}
+            Zaproszenie dla {invitationToRevoke?.email} do lokalu{" "}
+            {invitationToRevoke?.locationName}
             (rola:{" "}
             {invitationToRevoke?.role === "MANAGER" ? "Kierownik" : "Pracownik"}
             ) natychmiast przestanie działać.
@@ -806,9 +876,22 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
             Wyłączyć konto {accountToDisable?.email}?
           </PanelPopup.Heading>
         </PanelPopup.Header>
-        <PanelPopup.Body>
-          Konto zostanie wylogowane, a jego oczekujące zaproszenia unieważnione.
-          Dostęp do panelu zostanie zablokowany do ponownego włączenia konta.
+        <PanelPopup.Body className="flex flex-col gap-4">
+          <p>
+            Konto zostanie wylogowane, a jego oczekujące zaproszenia
+            unieważnione. Dostęp do panelu zostanie zablokowany do ponownego
+            włączenia konta.
+          </p>
+          {statusError && (
+            <Alert status="danger">
+              <Alert.Content>
+                <Alert.Title>Nie udało się wyłączyć konta</Alert.Title>
+                <Alert.Description>
+                  {getErrorMessage(statusError)}
+                </Alert.Description>
+              </Alert.Content>
+            </Alert>
+          )}
         </PanelPopup.Body>
         <PanelPopup.Footer>
           <Button slot="close" variant="tertiary">

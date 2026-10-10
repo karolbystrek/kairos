@@ -121,8 +121,8 @@ class DatabaseIsolationIntegrationTests extends RedisListenerIsolatedIntegration
     void invitationScopeCannotBrowseOrChangeUnrelatedAccountsAndInvitations() {
         var fixture=new IntegrationTestFixture(PostgresTestDatabase.ownerDatabase());
         var own=fixture.createTenant(); var other=fixture.createTenant();
-        var invitation=invitations.create(own.administrator(),own.firstLocationId(),AssignmentRole.OPERATOR);
-        invitations.create(other.administrator(),other.firstLocationId(),AssignmentRole.OPERATOR);
+        var invitation=invitations.create(own.administrator(),own.firstLocationId(),AssignmentRole.OPERATOR,"pending@example.com");
+        invitations.create(other.administrator(),other.firstLocationId(),AssignmentRole.OPERATOR,"pending@example.com");
         var transaction=new TransactionTemplate(transactionManager);
         transaction.executeWithoutResult(status -> {
             context.invitation(tokens.hash(invitation.token()),UUID.randomUUID());

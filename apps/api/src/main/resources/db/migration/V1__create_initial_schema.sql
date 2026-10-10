@@ -253,6 +253,7 @@ CREATE INDEX accounts_tenant_id_idx ON accounts (tenant_id);
 
 CREATE TABLE account_invitations
 (
+    email                VARCHAR(200)             NOT NULL,
     id                   UUID PRIMARY KEY,
     tenant_id            UUID                     NOT NULL,
     location_id          UUID                     NOT NULL,

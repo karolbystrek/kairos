@@ -110,12 +110,14 @@
   account, requires exact-email confirmation, archives it atomically, invalidates
   earlier authentication and revokes pending invitations, retains its historical
   assignment and reserved identity, and removes it from ordinary account lists.
-* The Accounts collection contains only created accounts. A trailing icon-only
-  **Invitations** control with an accessible tooltip and a positive-count-only
-  HeroUI badge opens a responsive focused
-  modal containing manageable unredeemed Account Invitations and their actions
-  without adding a peer workspace destination. It has complete empty, loading,
-  failure, keyboard, focus-restoration, enlarged-text, and mobile states.
+* Accounts, Locations, and Integrations initially show responsive card collections
+  without automatic selection or persistent detail panels. Selecting a card
+  opens its details and management actions in the shared popup. Cards visually
+  communicate status only through colour, with accessible status labels and
+  explicit status in details; no search or filters are included.
+* Accounts includes pending invitations alongside created accounts. Both show
+  email, role, and location; Locations and Integrations show name. Invitation
+  details retain issuer, creation and expiry metadata and confirmed revocation.
 * Public sign-in exposes Create account. Email verification and recovery are
   deferred; immutable ZITADEL identity binding and current local authorization
   gate protected work. Password changes are available after login.
@@ -124,8 +126,8 @@
   for locations in its tenant. A location manager can issue only operator
   invitations for its own enabled location, and a location operator cannot issue
   invitations.
-* A valid account invitation fixes the tenant, location, and role, and its first
-  successful redemption atomically creates one enabled person-oriented member
+* A valid account invitation fixes the recipient email, tenant, location, and
+  role, and its first successful redemption atomically creates one enabled person-oriented member
   account and location assignment without further approval. It never creates or
   reserves an incomplete account before redemption.
 * An invitation expires seven days after issuance, stores only a SHA-256 hash
@@ -135,9 +137,12 @@
   allowed, but concurrent claims of one invitation create exactly one account.
   Expiration is derived during list, preview, and redemption from `expiresAt`;
   no worker or write-on-read materializes an `EXPIRED` lifecycle state.
-* Each pending row identifies the fixed role and location, creator, creation
-  time, and absolute expiration time. Its direct icon-only Revoke action
-  requires confirmation, and terminal invitations leave the modal while their
+* Each pending invitation fixes a required valid normalized recipient email.
+  Creation, list, and preview expose it; invited registration displays it
+  read-only beside clearly spaced location/role context. Mismatched redemption
+  email is rejected before provider provisioning and rechecked atomically.
+  Details identify the fixed role and location, creator, creation time, and expiry. Its direct icon-only Revoke action
+  requires confirmation, and terminal invitations leave the collection while their
   secret-free metadata is retained indefinitely for audit without a history UI
   in the current development scope.
 * Redemption requires the issuer to remain enabled and authorized. A signed-in
@@ -146,7 +151,7 @@
   Orders workspace.
 * Disabling an issuer atomically revokes its pending invitations with an
   internal reason, while redemption still rechecks current issuer authority.
-  The invitation modal uses account-scoped SWR revalidation rather than a live
+  The invitation collection uses account-scoped SWR revalidation rather than a live
   staff event stream.
 * Invitation links keep the bearer token in the panel URL fragment, submit it
   only in an API request body protected by CSRF, and never expose it through

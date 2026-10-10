@@ -7,7 +7,7 @@
 - [Accounts and invitations](#accounts-and-invitations-1)
 - [Expiration and bearer handling](#expiration-and-bearer-handling)
 - [Management and issuer eligibility](#management-and-issuer-eligibility)
-- [Invitation modal and synchronization](#invitation-modal-and-synchronization)
+- [Invitation cards and synchronization](#invitation-cards-and-synchronization)
 - [Account authority and archival](#account-authority-and-archival)
 - [Redemption and browser context](#redemption-and-browser-context)
 
@@ -15,13 +15,18 @@
 
 An **Account Invitation** is a separate, single-use bearer capability that
 authorizes creation of one person-oriented manager or operator account. It is
-not an incomplete account and reserves no recipient email. It records the
-owning tenant, fixed location and assignment role, and issuing account. Anyone
-who possesses its link can attempt to redeem it, and the person who completes
-the first successful redemption becomes the account owner. Redemption collects
-the person's email, password, and confirmation. After verified sign-in it atomically creates an
-enabled member account with an assignment to the enabled location while
-consuming the invitation. No further administrator approval is required.
+not an incomplete account. Creation requires a valid recipient email, normalized
+with the same rules as Account email, and records it alongside the owning tenant,
+fixed location and assignment role, and issuing account. The invitation fixes
+that email but does not reserve a globally unique Account identity before
+redemption. Anyone who possesses its link can attempt to redeem it for the fixed
+email; possession does not prove ownership of the mailbox. Email sending and
+email verification remain deferred. Redemption displays the email read-only and
+collects password and confirmation. The API rejects a different normalized email
+before provider provisioning and rechecks the binding during atomic redemption.
+After verified password sign-in it atomically creates an enabled member account
+with an assignment to the enabled location while consuming the invitation. No
+further administrator approval is required.
 
 ### Expiration and bearer handling
 
@@ -47,8 +52,8 @@ of time. The exact audit time remains the stored deadline.
 
 ### Management and issuer eligibility
 
-Pending invitations are omitted from the account collection and managed
-through the dedicated focused surface opened from Accounts. Tenant
+Pending invitations appear alongside created accounts in the Accounts collection
+and open their own details in the shared popup presentation. Tenant
 administrators may inspect or revoke every pending invitation in their tenant.
 Managers may do the same for operator invitations to their own enabled location
 regardless of which authorized manager issued them. Redemption
@@ -62,31 +67,30 @@ invitation, while concurrent redemption is
 serialized so exactly one successful submission can create an account. An
 existing account cannot redeem an invitation to gain another location or role.
 
-### Invitation modal and synchronization
+### Invitation cards and synchronization
 
-The pending-invitations modal stays shallow rather than opening a nested detail
-view. Each row shows role, location, creator, creation time, and absolute
-expiration time, with creation time distinguishing otherwise identical
-invitations. A trailing icon-only Revoke action uses the panel's established
-prohibited-state symbol, an accessible name, and a pointer tooltip. Revocation
-requires focused confirmation identifying the role and location because it
-makes an already shared link unusable. Redeemed, revoked, and expired
-invitations disappear from this modal after revalidation; redeemed accounts
-then appear in the normal Accounts collection. Terminal invitation metadata
-remains in PostgreSQL for audit but has no history interface in this increment.
+Account and pending-invitation cards show email, role, and location. A distinct
+pending colour separates invitations from enabled and disabled accounts, without
+visible status text on the card; assistive technology receives the status and
+the detail popup states it explicitly. Selecting an invitation opens its email,
+role, location, issuer, creation time, expiration time, and Revoke action.
+Revocation requires focused confirmation identifying the recipient and target
+because it makes an already shared link unusable. Redeemed, revoked, and expired
+invitations disappear from the collection after revalidation; redeemed accounts
+then appear as created accounts. Terminal metadata remains in PostgreSQL for
+audit but has no history interface in this increment.
 
-The modal retains its structure while loading, uses a labelled progress
-indicator, shows **No pending invitations** without duplicating the creation
-action, and keeps failures in context with a user-oriented message and Retry.
-Opening moves focus to its heading or first meaningful control, closing returns
-focus to the **Invitations** control, and every row action remains operable by touch,
-pointer, keyboard, and assistive technology. Mobile adaptation preserves the
-same information and actions without horizontal scrolling.
+Invitation loading and failures remain visible in Accounts even when no created
+accounts exist. Failures offer a user-oriented message and Retry without hiding
+successfully loaded entities. Selecting a card moves focus into its popup;
+closing returns focus to the invoking card when it remains available. Every
+action remains operable by touch, pointer, keyboard, and assistive technology.
+Mobile adaptation preserves information and actions without horizontal scrolling.
 
-The invitation count and modal use account-scoped SWR state. They revalidate
-after creation or revocation and on focus and reconnect, and determine pending
-eligibility against the server-provided timestamps. This increment adds no live
-staff event stream for invitation changes.
+The collection uses account-scoped SWR state. It revalidates after creation or
+revocation and on focus and reconnect, and determines pending eligibility
+against the server-provided timestamps. This increment adds no live staff event
+stream for invitation changes and no collection search or filters.
 
 ### Account authority and archival
 
@@ -117,9 +121,10 @@ peer manager, and another location's operator are never valid targets.
 
 ### Redemption and browser context
 
-The invitation registration form displays fixed location/role context and asks
-for email, password, and confirmation. Signed-in users must explicitly sign out
-first; the fragment is preserved while doing so. Successful registration creates the
+The invitation registration form displays the location prominently and the role
+as supporting text, with clear spacing before the form. It displays the fixed
+recipient email read-only and asks for password and confirmation. Signed-in users
+must explicitly sign out first; the fragment is preserved while doing so. Successful registration creates the
 Account and assignment in the same transaction as invitation consumption, then
 issues cookies and opens Orders. Known unusable links have identity-free
 terminal problems; unknown or malformed tokens do not disclose Account identity.

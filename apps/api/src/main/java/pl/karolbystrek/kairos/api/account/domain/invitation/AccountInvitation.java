@@ -30,6 +30,9 @@ public class AccountInvitation {
     @Column(name = "tenant_id", nullable = false)
     private UUID tenantId;
 
+    @Column(nullable = false, length = 200)
+    private String email;
+
     @Column(name = "location_id", nullable = false)
     private UUID locationId;
 
@@ -74,6 +77,7 @@ public class AccountInvitation {
         @NonNull UUID locationId,
         @NonNull UUID issuedByAccountId,
         @NonNull AssignmentRole assignmentRole,
+        @NonNull String email,
         @NonNull String tokenHash,
         @NonNull Instant now
     ) {
@@ -83,6 +87,7 @@ public class AccountInvitation {
         invitation.locationId = locationId;
         invitation.issuedByAccountId = issuedByAccountId;
         invitation.assignmentRole = assignmentRole;
+        invitation.email = email;
         invitation.tokenHash = tokenHash;
         invitation.state = AccountInvitationState.PENDING;
         invitation.expiresAt = now.plus(LIFETIME);

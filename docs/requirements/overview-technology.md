@@ -180,9 +180,10 @@ use one reusable Panel Card anatomy: a direct full-card target, primary identity
 supporting metadata, and an optional trailing accessory or action group. They
 share the medium corner scale, page surface at rest, one-pixel separators, and
 an 8-pixel inter-card rhythm with immediate hover, keyboard-focus, and pressed
-feedback. Selected collection
-cards add the restrained blue selection surface without a decorative leading
-edge. Cards keep identity and compact accessories inline across phone, tablet,
+feedback. Management collection cards use restrained colour surfaces for
+enabled, disabled, and pending status; explicit status appears in their detail
+popup. Order selection retains its blue selection surface without a decorative
+leading edge. Cards keep identity and compact accessories inline across phone, tablet,
 and desktop widths; essential text reflows instead of being removed.
 
 Routine interactive surfaces in both frontends use one shared short motion

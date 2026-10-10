@@ -271,6 +271,10 @@ function IntegrationDetails({
         }
       />
 
+      <p className="text-sm text-muted">
+        Status: {integration.status === "ENABLED" ? "Włączona" : "Wyłączona"}
+      </p>
+
       <Tabs>
         <Tabs.ListContainer>
           <Tabs.List aria-label={`${integration.name} — klucze i webhooki`}>
@@ -316,9 +320,21 @@ function IntegrationDetails({
             Wyłączyć integrację {integration.name}?
           </PanelPopup.Heading>
         </PanelPopup.Header>
-        <PanelPopup.Body>
-          Klucze API przestaną działać, a wysyłanie nowych webhooków zostanie
-          wstrzymane do ponownego włączenia integracji.
+        <PanelPopup.Body className="flex flex-col gap-4">
+          <p>
+            Klucze API przestaną działać, a wysyłanie nowych webhooków zostanie
+            wstrzymane do ponownego włączenia integracji.
+          </p>
+          {Boolean(actionError) && (
+            <Alert status="danger">
+              <Alert.Content>
+                <Alert.Title>Nie udało się wyłączyć integracji</Alert.Title>
+                <Alert.Description>
+                  {getIntegrationErrorMessage(actionError)}
+                </Alert.Description>
+              </Alert.Content>
+            </Alert>
+          )}
         </PanelPopup.Body>
         <PanelPopup.Footer>
           <Button slot="close" variant="tertiary">
@@ -368,6 +384,16 @@ function IntegrationDetails({
             value={deleteConfirmation}
             onChange={setDeleteConfirmation}
           />
+          {Boolean(actionError) && (
+            <Alert status="danger">
+              <Alert.Content>
+                <Alert.Title>Nie udało się usunąć integracji</Alert.Title>
+                <Alert.Description>
+                  {getIntegrationErrorMessage(actionError)}
+                </Alert.Description>
+              </Alert.Content>
+            </Alert>
+          )}
         </PanelPopup.Body>
         <PanelPopup.Footer>
           <Button slot="close" variant="tertiary">
@@ -417,10 +443,9 @@ export function IntegrationManagement({ accountId }: { accountId: string }) {
     shouldRetryOnError: shouldRetryIntegrationRequest,
   });
 
-  const selectedIntegration =
-    integrations.find(
-      (integration) => integration.id === selectedIntegrationId,
-    ) ?? integrations[0];
+  const selectedIntegration = integrations.find(
+    (integration) => integration.id === selectedIntegrationId,
+  );
   const enabledLocations = locations.filter(
     (location) => location.status === "ENABLED",
   );
@@ -537,25 +562,15 @@ export function IntegrationManagement({ accountId }: { accountId: string }) {
           </p>
         </div>
       ) : (
-        <div className="grid gap-6 md:grid-cols-[minmax(220px,0.65fr)_minmax(0,1.35fr)]">
-          <section className="border-t border-separator pt-2 md:border-r md:border-t-0 md:pr-6 md:pt-0">
+        <>
+          <section aria-label="Integracje" className="entity-card-grid">
             {integrations.map((integration) => (
               <PanelCard
                 key={integration.id}
-                accessibilityLabel={`Pokaż integrację ${integration.name}`}
+                accessibilityLabel={`Pokaż integrację ${integration.name}, ${integration.status === "ENABLED" ? "włączona" : "wyłączona"}`}
                 isSelected={integration.id === selectedIntegration?.id}
-                metadata={
-                  <span
-                    className={
-                      integration.status === "ENABLED"
-                        ? "text-accent"
-                        : "secondary-text"
-                    }
-                  >
-                    {integration.status === "ENABLED"
-                      ? "Włączona"
-                      : "Wyłączona"}
-                  </span>
+                status={
+                  integration.status === "ENABLED" ? "ENABLED" : "DISABLED"
                 }
                 title={integration.name}
                 trailing={<ArrowRightIcon size={17} />}
@@ -564,26 +579,35 @@ export function IntegrationManagement({ accountId }: { accountId: string }) {
             ))}
           </section>
 
-          <div className="min-w-0">
-            {enabledLocations.length === 0 && (
-              <p className="mb-5 text-sm text-muted">
-                Włącz lokal w zakładce Lokale, aby dodać klucze API lub
-                webhooki.
-              </p>
-            )}
-            {selectedIntegration && (
-              <IntegrationDetails
-                key={selectedIntegration.id}
-                accountId={accountId}
-                integration={selectedIntegration}
-                locations={locations}
-                onDeleted={removeIntegration}
-                onSecretIssued={setPendingSecret}
-                onUpdated={updateIntegration}
-              />
-            )}
-          </div>
-        </div>
+          {selectedIntegration && (
+            <PanelPopup
+              isOpen
+              aria-label={`Integracja ${selectedIntegration.name}`}
+              size="lg"
+              onOpenChange={(open) => {
+                if (!open) setSelectedIntegrationId(undefined);
+              }}
+            >
+              <PanelPopup.Body className="pb-6 pt-12">
+                {enabledLocations.length === 0 && (
+                  <p className="mb-5 text-sm text-muted">
+                    Włącz lokal w zakładce Lokale, aby dodać klucze API lub
+                    webhooki.
+                  </p>
+                )}
+                <IntegrationDetails
+                  key={selectedIntegration.id}
+                  accountId={accountId}
+                  integration={selectedIntegration}
+                  locations={locations}
+                  onDeleted={removeIntegration}
+                  onSecretIssued={setPendingSecret}
+                  onUpdated={updateIntegration}
+                />
+              </PanelPopup.Body>
+            </PanelPopup>
+          )}
+        </>
       )}
 
       <PanelPopup

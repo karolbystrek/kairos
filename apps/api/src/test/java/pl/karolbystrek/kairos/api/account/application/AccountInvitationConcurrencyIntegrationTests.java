@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import pl.karolbystrek.kairos.api.account.application.exception.AccountInvitationUnavailableException;
+import pl.karolbystrek.kairos.api.authentication.application.exception.RegistrationValidationException;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
 import pl.karolbystrek.kairos.api.account.domain.TenantRole;
 import pl.karolbystrek.kairos.api.account.domain.assignment.AssignmentRole;
@@ -27,6 +28,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
 class AccountInvitationConcurrencyIntegrationTests extends RedisListenerIsolatedIntegrationTest {
@@ -38,6 +40,22 @@ class AccountInvitationConcurrencyIntegrationTests extends RedisListenerIsolated
     private LocationService locationService;
 
     private final JdbcTemplate jdbcTemplate = PostgresTestDatabase.ownerDatabase();
+
+    @Test
+    void atomicRedemptionRejectsAnEmailOutsideTheInvitation() throws Exception {
+        var tenant = new IntegrationTestFixture(jdbcTemplate).createTenant();
+        var email = "invited-" + UUID.randomUUID() + "@example.com";
+        var created = invitationService.create(tenant.administrator(), tenant.firstLocationId(),
+            AssignmentRole.OPERATOR, email);
+        var differentEmail = "different-" + UUID.randomUUID() + "@example.com";
+
+        assertThatThrownBy(() -> invitationService.redeem(hash(created.token()), differentEmail, differentEmail))
+            .isInstanceOf(RegistrationValidationException.class);
+        assertThat(jdbcTemplate.queryForObject("SELECT state FROM account_invitations WHERE id = ?",
+            String.class, created.invitation().id())).isEqualTo("PENDING");
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM accounts WHERE email = ?",
+            Integer.class, differentEmail)).isZero();
+    }
 
     @Test
     void concurrentRedemptionCreatesExactlyOneAccountAndConsumesInvitationOnce() throws Exception {
@@ -64,24 +82,25 @@ class AccountInvitationConcurrencyIntegrationTests extends RedisListenerIsolated
             Timestamp.from(now),
             Timestamp.from(now)
         );
+        var emailPrefix = "concurrent-redeemer-" + UUID.randomUUID();
         var created = invitationService.create(
             new StaffPrincipal(administratorId, tenantId, TenantRole.ADMIN),
             locationId,
-            AssignmentRole.OPERATOR
+            AssignmentRole.OPERATOR,
+            emailPrefix + "@example.com"
         );
-        var emailPrefix = "concurrent-redeemer-" + UUID.randomUUID();
         var start = new CountDownLatch(1);
 
         try (var executor = Executors.newFixedThreadPool(2)) {
             var first = executor.submit(() -> redeemAfterStart(
                 start,
                 created.token(),
-                emailPrefix + "-first"
+                emailPrefix
             ));
             var second = executor.submit(() -> redeemAfterStart(
                 start,
                 created.token(),
-                emailPrefix + "-second"
+                emailPrefix
             ));
             start.countDown();
 
@@ -104,8 +123,8 @@ class AccountInvitationConcurrencyIntegrationTests extends RedisListenerIsolated
     @Test
     void concurrentLocationDisableAndRedemptionFinishWithNoEnabledNewMember() throws Exception {
         var tenant = new IntegrationTestFixture(jdbcTemplate).createTenant();
-        var created = invitationService.create(tenant.administrator(), tenant.firstLocationId(), AssignmentRole.OPERATOR);
         var email = "location-race-" + UUID.randomUUID() + "@example.com";
+        var created = invitationService.create(tenant.administrator(), tenant.firstLocationId(), AssignmentRole.OPERATOR, email);
         var start = new CountDownLatch(1);
         try (var executor = Executors.newFixedThreadPool(2)) {
             var redemption = executor.submit(() -> {

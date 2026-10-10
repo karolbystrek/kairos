@@ -126,8 +126,11 @@ The Account Invitation list, creation, and revocation operations are authenticat
 scoped by the caller's account-management authority. Preview and redemption are
 anonymous, accept the bearer token only in their validated request bodies,
 retain normal browser CSRF protection, and never log those bodies. Preview
-returns only the location name, fixed role, and safe invitation state needed by
-the registration page. Redemption removes the token fragment from browser
+returns the fixed recipient email, location name, role, and expiration needed by
+the registration page. Creation requires email, location, and role; list and
+creation responses include the recipient email. Redemption rejects an email
+that differs after normalization with an Email field error and `400`, before
+provider provisioning and again inside the local redemption transaction. Redemption removes the token fragment from browser
 history after success or a terminal response. Validation failures return `400`,
 an available invitation with conflicting email or provider identity returns `409`, a
 known expired, revoked, or redeemed invitation returns `410`, an unknown token

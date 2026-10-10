@@ -24,13 +24,15 @@ The database schema must include tables covering the following concepts. Names a
   timestamps, rolling inactivity expiry, Account principal index and server-only
   provider session attributes. No custom refresh-session table.
 * **Account Invitations:** separate authority to create one member account,
-  including stable identity, direct tenant ownership, fixed target location and
+  including stable identity, normalized recipient email, direct tenant ownership,
+  fixed target location and
   manager or operator role, issuing account, SHA-256 hash of a single-use
   32-byte random Base64url bearer credential, `PENDING`, `REDEEMED`, or
   `REVOKED` lifecycle state and internal revocation reason, seven-day absolute
   expiry, and timestamps. Expiration is derived from the deadline rather than
-  persisted as a fourth lifecycle state. An invitation contains no account
-  recipient email or password and is not itself an account. Multiple pending
+  persisted as a fourth lifecycle state. An invitation fixes its recipient email
+  but contains no password and is not itself an account or a reservation of a
+  globally unique Account email. Multiple pending
   invitations may share a target location and role. Terminal metadata is
   retained indefinitely in the current development scope without a
   recoverable bearer secret; a deliberate security-event retention policy

@@ -8,6 +8,7 @@ import java.util.UUID;
 
 public record AccountInvitationResponse(
     UUID id,
+    String email,
     UUID locationId,
     String locationName,
     AssignmentRole role,
@@ -18,6 +19,7 @@ public record AccountInvitationResponse(
     public static AccountInvitationResponse from(AccountInvitationView invitation) {
         return new AccountInvitationResponse(
             invitation.id(),
+            invitation.email(),
             invitation.locationId(),
             invitation.locationName(),
             invitation.role(),

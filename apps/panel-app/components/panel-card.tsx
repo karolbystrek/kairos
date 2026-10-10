@@ -8,6 +8,7 @@ export function PanelCard({
   metadata,
   onPress,
   title,
+  status,
   trailing,
 }: {
   accessibilityLabel?: string;
@@ -15,12 +16,14 @@ export function PanelCard({
   metadata?: ReactNode;
   onPress?: () => void;
   title: string;
+  status?: "ENABLED" | "DISABLED" | "PENDING";
   trailing?: ReactNode;
 }) {
   return (
     <article
       className="panel-card relative px-3 py-2"
       data-selected={isSelected || undefined}
+      data-status={status}
     >
       {onPress && accessibilityLabel && (
         <Button

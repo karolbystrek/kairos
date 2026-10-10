@@ -22,6 +22,7 @@ import { getCurrentAccount, logout } from "@/src/api/authentication";
 const registrationErrorMessages = new Map([
   ["Email is required.", "Podaj adres e-mail."],
   ["Enter a valid email address.", "Podaj poprawny adres e-mail."],
+  ["Email must match the invitation.", "Użyj adresu e-mail z zaproszenia."],
   [
     "Email must not exceed 200 characters.",
     "Adres e-mail może mieć maksymalnie 200 znaków.",
@@ -105,7 +106,11 @@ export function RegistrationForm({ invited = false }: { invited?: boolean }) {
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (pending) return;
-    const input = { email, password, passwordConfirmation: confirmation };
+    const input = {
+      email: invited ? (invitation?.email ?? "") : email,
+      password,
+      passwordConfirmation: confirmation,
+    };
 
     setFieldErrors({});
     setPending(true);
@@ -171,10 +176,17 @@ export function RegistrationForm({ invited = false }: { invited?: boolean }) {
       title={invited ? "Dołącz do zespołu" : "Utwórz konto"}
     >
       {invitation && (
-        <p>
-          {invitation.locationName} ·{" "}
-          {invitation.role === "MANAGER" ? "Kierownik" : "Pracownik"}
-        </p>
+        <div className="mb-6 min-w-0 space-y-1">
+          <p className="text-xs font-medium text-muted">
+            Zaproszenie do lokalu
+          </p>
+          <p className="break-words text-lg font-semibold tracking-tight">
+            {invitation.locationName}
+          </p>
+          <p className="text-sm text-muted">
+            {invitation.role === "MANAGER" ? "Kierownik" : "Pracownik"}
+          </p>
+        </div>
       )}
       {invited && (terminalMessage || token === "" || previewError) && (
         <Alert status="danger">
@@ -212,14 +224,15 @@ export function RegistrationForm({ invited = false }: { invited?: boolean }) {
             inputProps={{
               autoCapitalize: "none",
               autoComplete: "email",
-              autoFocus: true,
+              autoFocus: !invited,
             }}
             isDisabled={pending}
+            isReadOnly={invited}
             label="E-mail"
             maxLength={200}
             name="email"
             type="email"
-            value={email}
+            value={invited ? (invitation?.email ?? "") : email}
             onChange={(value) => {
               setEmail(value);
               setFieldErrors((current) => ({ ...current, email: "" }));
@@ -228,7 +241,7 @@ export function RegistrationForm({ invited = false }: { invited?: boolean }) {
           <FormTextField
             isRequired
             errorMessage={fieldErrors.password}
-            inputProps={{ autoComplete: "new-password" }}
+            inputProps={{ autoComplete: "new-password", autoFocus: invited }}
             isDisabled={pending}
             label="Hasło"
             maxLength={200}

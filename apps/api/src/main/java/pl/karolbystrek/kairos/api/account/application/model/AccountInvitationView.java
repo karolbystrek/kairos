@@ -8,6 +8,7 @@ import java.util.UUID;
 
 public record AccountInvitationView(
     @NonNull UUID id,
+    @NonNull String email,
     @NonNull UUID locationId,
     @NonNull String locationName,
     @NonNull AssignmentRole role,

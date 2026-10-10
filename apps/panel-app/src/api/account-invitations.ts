@@ -7,6 +7,7 @@ import { authenticationResultSchema } from "./authentication";
 
 const invitationSchema = z.object({
   id: z.uuid(),
+  email: z.email(),
   locationId: z.uuid(),
   locationName: z.string(),
   role: assignmentRoleSchema,
@@ -22,12 +23,14 @@ const createdInvitationSchema = invitationSchema.extend({
 const invitationsSchema = z.array(invitationSchema);
 
 const previewSchema = z.object({
+  email: z.email(),
   locationName: z.string(),
   role: assignmentRoleSchema,
   expiresAt: z.iso.datetime({ offset: true }),
 });
 
 const createInvitationInputSchema = z.object({
+  email: requiredEmailInputSchema,
   locationId: z.uuid(),
   role: assignmentRoleSchema,
 });
