@@ -89,7 +89,7 @@ export function RegistrationForm({ invited = false }: { invited?: boolean }) {
       setPassword("");
       setConfirmation("");
       if (invited) clearInvitationFragment();
-      window.location.assign("/");
+      window.location.assign("/dashboard");
     } catch (error) {
       const terminal = invited ? handleInvitationProblem(error) : undefined;
 
@@ -125,7 +125,7 @@ export function RegistrationForm({ invited = false }: { invited?: boolean }) {
     <AuthFormLayout
       footer={
         <>
-          Already have an account? <Link href="/">Sign in.</Link>
+          Already have an account? <Link href="/login">Sign in.</Link>
         </>
       }
       title={invited ? "Join your team" : "Create account"}

@@ -15,8 +15,8 @@
 The staff panel must:
 
 * offer public email/password registration that creates a tenant and its first
-  administrator immediately, then requires first-location creation on the main
-  page before the administrator can use the workspace, without email verification;
+  administrator immediately, then requires first-location creation in the
+  dashboard before the administrator can use the workspace, without email verification;
 * require an authenticated internal account;
 * show only locations and orders accessible to the account;
 * allow tenant administrators to switch between locations or view an aggregate queue;
@@ -41,6 +41,18 @@ The staff panel must:
   integration or credential identifiers, and raw permission tokens.
 
 #### Navigation and onboarding
+
+The panel application provides a public restaurant-owner landing page at
+`/`. It briefly explains QR-based order tracking and queue management
+without physical pagers or a customer app download. Its primary action links to
+public registration at `/registration`, while Sign in links to `/login` and the
+staff workspace lives at `/dashboard`. Signed-in visitors to `/` or `/login`
+are redirected to `/dashboard`; signed-out dashboard visitors go to `/login`
+after the session check. Authentication failures leave the public landing page
+usable and keep the existing recovery state on staff routes. The creator's email
+contact appears as secondary footer information; contacting the creator or
+receiving an invitation is not required to register. The page uses spacious typography and the shared
+responsive, accessible light/dark design language.
 
 The staff experience keeps the active queue visually primary. Administrative
 capabilities must not compete with frequent order creation, QR presentation,
