@@ -40,6 +40,9 @@ Prepare the local configuration and development keys:
 Setup prompts before replacing an existing `.env`, asks for the secrets
 directory with `secrets/` as its default, and asks whether to generate the local
 TLS certificate. Pressing Enter accepts the displayed default.
+Setup keeps existing secrets and TLS directories in place and leaves reused
+files untouched. Generated replacements are validated before installation;
+failed installations restore the previous file contents.
 
 Build and start Kairos:
 
