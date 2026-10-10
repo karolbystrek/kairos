@@ -20,6 +20,7 @@ import {
   X as CloseIcon,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import useSWR, { useSWRConfig } from "swr";
 import useSWRMutation from "swr/mutation";
 import { ZodError } from "zod";
@@ -44,9 +45,12 @@ import {
   type LoginCredentials,
 } from "@/src/api/authentication";
 import { listLocations } from "@/src/api/locations";
-import { isStaffCacheKey, staffLocationsKey } from "@/src/api/cache-keys";
+import {
+  currentAccountKey,
+  isStaffCacheKey,
+  staffLocationsKey,
+} from "@/src/api/cache-keys";
 
-const currentAccountKey = ["authentication", "current-account"] as const;
 const logoutKey = ["authentication", "logout"] as const;
 
 function DismissibleNotice({
@@ -225,7 +229,12 @@ function SignedOutPanel({
   );
 }
 
-export function StaffPanel() {
+export function StaffPanel({
+  screen = "dashboard",
+}: {
+  screen?: "dashboard" | "login";
+} = {}) {
+  const router = useRouter();
   const { mutate: mutateCache } = useSWRConfig();
   const [selectedWorkspace, setSelectedWorkspace] = useState("orders");
   const [requestedOrderLocationId, setRequestedOrderLocationId] =
@@ -249,7 +258,9 @@ export function StaffPanel() {
     error: locationsError,
     mutate: mutateLocations,
   } = useSWR(
-    account ? staffLocationsKey(account.accountId) : null,
+    account && screen === "dashboard"
+      ? staffLocationsKey(account.accountId)
+      : null,
     listLocations,
     { errorRetryCount: 3, shouldRetryOnError },
   );
@@ -313,7 +324,16 @@ export function StaffPanel() {
     accountError instanceof ApiError && accountError.status === 401;
   const isSignedOut = !account && !accountError && !isLoading;
 
-  if (isUnauthorized || isSignedOut) {
+  useEffect(() => {
+    if (screen === "login" && account && !isUnauthorized) {
+      router.replace("/dashboard");
+    }
+    if (screen === "dashboard" && (isUnauthorized || isSignedOut)) {
+      router.replace("/login");
+    }
+  }, [account, isSignedOut, isUnauthorized, router, screen]);
+
+  if (screen === "login" && (isUnauthorized || isSignedOut)) {
     return (
       <>
         <SignedOutPanel
@@ -326,7 +346,11 @@ export function StaffPanel() {
     );
   }
 
-  if (isLoading && !account) {
+  if (
+    (isLoading && !account) ||
+    (screen === "login" && account) ||
+    (screen === "dashboard" && (isUnauthorized || isSignedOut))
+  ) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <Spinner aria-label="Checking authentication" />

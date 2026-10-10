@@ -27,22 +27,31 @@ Operator, Tenant Registration Invitations, and verification staging are removed.
 Public registration collects email, password, and confirmation in one focused
 account form. Submitting it immediately validates and provisions the identity,
 commits one tenant and administrator locally, establishes the browser session,
-and opens the main panel page. Registration does not collect or create a location.
+and opens the staff workspace at `/dashboard`. Registration does not collect or
+create a location.
 The registration form has no step counter, progress bar, Next/Back controls, or
 persistent password-requirement paragraph. Account fields retain submitted values
 on recoverable failure and show corrective errors beside the affected control.
 Public Sign in ends with **Don't have an account? Create one.**, with only
 **Create one.** linked to the public `/registration` page. Registration ends with **Already have an
-account? Sign in.**, with only **Sign in.** linked to the main sign-in page.
+account? Sign in.**, with only **Sign in.** linked to `/login`.
 
-On the main page, an administrator whose tenant has no non-archived location
+The panel root `/` is the public restaurant-owner landing page. It checks the
+existing API session in the browser and redirects signed-in visitors to
+`/dashboard` without blocking public content when the check fails. `/login`
+also sends signed-in visitors to `/dashboard`. Signed-out access to `/dashboard`
+goes to `/login`, including after sign-out or session expiry; successful sign-in
+opens `/dashboard`. These redirects are navigation conveniences; API
+authorization remains authoritative.
+
+In the dashboard, an administrator whose tenant has no non-archived location
 must create the first location in the existing focused location-creation modal.
 Its required mode has no Close or Cancel action and cannot be dismissed with
 Escape or an outside click. Only successful location creation completes the
 onboarding and opens Orders selected to the created location. Failed creation
 retains the modal and entered name. Completion is derived from the server's
 saved location collection, with no browser flag or additional persisted
-onboarding status. Reload, subsequent sign-in, and direct main-page navigation
+onboarding status. Reload, subsequent sign-in, and direct dashboard navigation
 repeat the same check. This gate applies only to administrators; invited members
 already have a fixed location and do not create one. A disabled saved location
 counts as completed onboarding. Future email verification can precede the same
