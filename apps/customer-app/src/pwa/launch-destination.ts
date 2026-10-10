@@ -1,19 +1,13 @@
-import type {
-  StableCustomerDestination,
-  StoredTrackedOrder,
-} from "@/src/pwa/storage";
+import type { StableCustomerDestination } from "@/src/pwa/storage";
 
-import { isActiveOrderStatus } from "@/src/orders/order-status";
 import { getTrackedOrderHref } from "@/src/orders/order-route";
 
-export function resolveInstalledLaunchHref({
+export function resolveCustomerLaunchHref({
   installationTrackingReference,
   lastDestination,
-  orders,
 }: {
   installationTrackingReference: string | null;
   lastDestination: StableCustomerDestination | null;
-  orders: StoredTrackedOrder[];
 }): string {
   if (installationTrackingReference) {
     return getTrackedOrderHref(installationTrackingReference);
@@ -22,12 +16,6 @@ export function resolveInstalledLaunchHref({
   if (lastDestination?.kind !== "order") {
     return "/";
   }
-  const order = orders.find(
-    ({ trackingReference }) =>
-      trackingReference === lastDestination.trackingReference,
-  );
 
-  return order && isActiveOrderStatus(order.status)
-    ? getTrackedOrderHref(order.trackingReference)
-    : "/";
+  return getTrackedOrderHref(lastDestination.trackingReference);
 }

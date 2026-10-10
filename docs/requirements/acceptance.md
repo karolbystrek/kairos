@@ -177,16 +177,18 @@
 * Each browser or installed-app context independently retains active, explicit
   IndexedDB order snapshots in most-recently-opened order and removes terminal
   orders without allowing a stale response to resurrect them.
-* Home renders local active-order summaries without opening SSE, restores the
-  last stable Home or active-order destination on subsequent installed launches,
-  and tolerates unavailable or invalid local storage.
+* The default page offers one centered Scan QR code action with Notifications
+  and Appearance, without an order collection or history. The root route
+  restores the current unclosed order in browser and installed contexts,
+  including terminal orders, and tolerates unavailable or invalid local storage.
+* Active and loading orders expose no Home or close action. Completed and
+  canceled orders remain visible until Close order returns to the default page;
+  invalid or missing orders provide scanner recovery. Network errors preserve
+  the current destination.
 * The in-app scanner accepts only exact customer-origin order URLs, keeps
   scanning after invalid codes, stops every camera track on exit, supports
   camera switching, retains valid offline scans only in memory for retry, and
   provides device-Camera guidance when browser camera access fails.
-* Stopping one tracked order through swipe disclosure or its accessible overflow
-  menu removes only that local snapshot and backend enrollment, updates the
-  badge, and permits explicit retracking later.
 * The generated service worker precaches only the application shell and offline
   route, applies `NetworkOnly` to tracked-order REST, and shows an explicitly
   labeled last-known IndexedDB snapshot when navigation or REST is unavailable.
@@ -198,9 +200,9 @@
   replaces browser-rotated subscriptions idempotently, and enforces ten
   subscription contexts per order.
 * Disabling notifications removes the complete backend subscription before the
-  browser subscription. Stopping order tracking removes its enrollment while
-  preserving the app-level preference. Neither flow reports success while
-  offline.
+  browser subscription and does not report success while offline. Closing a
+  terminal order preserves the app-level preference and any pending final
+  notification.
 * `READY`, `COMPLETED`, and `CANCELED` generate privacy-minimal versioned push
   payloads. The customer service worker validates the payload, deduplicates
   stable event IDs, enforces reachable state transitions, replaces older

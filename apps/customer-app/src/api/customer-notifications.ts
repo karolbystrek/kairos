@@ -122,24 +122,6 @@ export async function disablePushSubscription(
   );
 }
 
-export async function removePushEnrollments(
-  subscription: SerializedPushSubscription,
-  trackingReferences: string[],
-): Promise<void> {
-  if (trackingReferences.length === 0) {
-    return;
-  }
-
-  await notificationMutation(
-    "/api/customer-notifications/v1/enrollments",
-    "DELETE",
-    {
-      subscription,
-      trackingReferences,
-    },
-  );
-}
-
 async function getCsrfToken(): Promise<string> {
   if (csrfToken) {
     return csrfToken;

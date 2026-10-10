@@ -8,7 +8,7 @@
 - [3.1 Order lifecycle](#31-order-lifecycle)
 - [3.2 Customer application](#32-customer-application)
 - [Installation and application identity](#installation-and-application-identity)
-- [Local orders and Home](#local-orders-and-home)
+- [Current order and scanner default page](#current-order-and-scanner-default-page)
 - [Scanner and offline behavior](#scanner-and-offline-behavior)
 - [Notification consent and subscriptions](#notification-consent-and-subscriptions)
 - [Push payloads and application badges](#push-payloads-and-application-badges)
@@ -68,60 +68,56 @@ continue to provide the ordinary web experience.
 
 The manifest uses `Kairos Order Tracking` as its full name and `Kairos` as its
 short name. Its stable application ID and scope cover the complete customer
-origin. Home uses the ordinary root start URL. An order page exposes an
-order-aware manifest with the same stable identity and a start URL that enters
-through Home with only the tracking reference required for bootstrap.
+origin. The scanner default page uses the ordinary root start URL. An order page
+exposes an order-aware manifest with the same stable identity and a start URL that enters
+through the root route with only the tracking reference required for bootstrap.
 
 An installation initiated from an order page opens that order on the first
 installed launch while retaining one stable Kairos application identity and
 origin-wide scope. Each browser or installed-app context subsequently retains
-its own local recently tracked orders. The contexts are not synchronized with
-one another, with another device, or through the backend. This local collection
-does not establish customer identity or order ownership.
+its own current-order destination and local tracking snapshots. The contexts
+are not synchronized with one another, with another device, or through the
+backend. Local tracking does not establish customer identity or order ownership.
 
-#### Local orders and Home
+#### Current order and scanner default page
 
-The local collection uses IndexedDB and retains only distinct active
-`IN_PREPARATION` or `READY` orders. Reopening an order refreshes its stored
-label, status, and server-provided `updatedAt` snapshot and moves it to the front
-of the collection. A terminal REST response or accepted push transition removes
-the order from that active collection. A short-lived terminal tombstone prevents
-an older response or push from resurrecting it. Home renders these stored
-summaries without opening SSE streams; when notifications are enabled it may
-reconcile the current browser push subscription and active enrollments with the
-API. Selecting an entry opens its tracking page, where the normal authoritative
-REST and SSE flow resumes.
+The default page shows one horizontally and vertically centered **Scan QR code**
+action, with Notifications and Appearance in the trailing utility group. Its
+label and icon scale together, with the large label above an oversized QR icon.
+The control has no resting container and reveals its button surface on hover,
+keyboard focus, or press. There is no order collection, history, Home control,
+swipe disclosure, or stop-tracking action.
 
-After the one-time installation launch, opening the installed application
-directly restores the last stable destination. It reopens that order only when
-its stored status is `IN_PREPARATION` or `READY`; otherwise it opens Home. Home
-displays only one horizontally and vertically centered scanner action when
-IndexedDB is empty, corrupt, unavailable, or inaccessible. Its label
-and icon scale together as the empty page's clear primary focus, with the large
-label above an oversized, still-dominant QR icon. The control has no resting
-container and reveals its button surface on hover, keyboard focus, or press.
-Active and terminal tracking views provide a quiet Home action.
+Opening an order records it as the current destination before REST succeeds.
+The root route restores that unclosed order in ordinary browser and installed
+contexts, including after it becomes terminal. Completion or cancellation does
+not navigate away: the terminal view stays visible until the customer selects
+**Close order**, which clears the current destination and returns to the scanner
+default page. Active and loading views have no close or default-page action.
+An invalid or missing order provides **Back to scanner** recovery; connectivity
+failures preserve the current destination. Browser controls remain free to leave
+the site or close it. Destination persistence is best effort when IndexedDB is
+unavailable or inaccessible.
 
-Home labels its active local collection **Your orders**. Swiping an order card
-left reveals a **Stop tracking** action, and the same action remains available
-through an accessible per-card overflow menu. Stopping tracking removes only
-that order's local snapshot and notification enrollment, updates the application
-badge, and does not prevent a later explicit scan or reopening from tracking the
-active order again.
-
-Each Home order row is itself the direct navigation target for that order and
-does not depend on explanatory copy telling the customer to select it.
+IndexedDB retains distinct active `IN_PREPARATION` or `READY` snapshots for
+explicit offline display and notification enrollment, without exposing a local
+collection. Reopening an order refreshes its stored label, status, and
+server-provided `updatedAt`. A terminal REST response or accepted push removes
+its active snapshot, while a short-lived terminal tombstone prevents an older
+response or push from resurrecting it. This cleanup does not clear the current
+destination. Closing a terminal view preserves app-level notification consent
+and eligibility for any pending final notification.
 
 #### Scanner and offline behavior
 
-Home opens a dedicated scanner view only after a direct customer action. The
-scanner prefers the rear camera, allows switching when multiple cameras are
+The default page opens a dedicated scanner view only after a direct customer
+action. The scanner prefers the rear camera, allows switching when multiple cameras are
 available, decodes locally, and accepts only customer-origin URLs whose exact
 path is `/orders/<UUID>`. Invalid codes leave scanning active with an inline
 error. Every camera track stops after success, cancellation, navigation, or
 unmount. Camera failure directs the customer to the device Camera app. A valid
 code scanned offline remains only in memory and can be retried after connectivity
-returns; it is not added to **Your orders** until the order loads successfully.
+returns; no tracking snapshot is stored until the order loads successfully.
 
 Order REST endpoints are network-only in the service worker. The application
 shell and a dedicated offline route are precached, while application code
@@ -146,13 +142,10 @@ The application exposes one persistent notification control in the top-right
 corner of every customer view. Its icon distinguishes enabled notifications
 from all off or unavailable states: a normal bell offers notification enabling,
 while a crossed bell indicates that notifications are currently enabled and
-the action will disable them. On order views, the Home action appears
-immediately alongside it. Disabling notifications durably retires the current
+the action will disable them. Disabling notifications durably retires the current
 subscription and all of its enrollments before removing the browser
-subscription. Stopping tracking removes the selected active-order enrollment
-but preserves the app-level notification preference for future orders. Both
-disabling notifications and stopping notification-enabled tracking require a
-network connection so the UI does not make a false backend-cleanup promise.
+subscription. Disabling notifications requires a network connection so the UI
+does not make a false backend-cleanup promise.
 Browser-initiated subscription replacement is reconciled once from the service
 worker and idempotently retried on the next application start if needed.
 
@@ -171,7 +164,7 @@ validates a versioned payload, deduplicates its stable event ID, and applies the
 transition only when it is reachable from the locally stored state graph.
 REST or SSE reaching the same state does not consume that notification. Terminal
 snapshot cleanup preserves eligibility for the final notification during the
-push freshness window; explicit tracking removal or notification opt-out
+push freshness window, including after Close order; notification opt-out
 suppresses pending notifications.
 Malformed or unprocessable payloads produce a generic, privacy-preserving
 notification. The foreground tracking page continues to use REST and SSE and

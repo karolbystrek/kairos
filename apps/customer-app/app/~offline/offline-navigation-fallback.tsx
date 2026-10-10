@@ -1,10 +1,10 @@
 "use client";
 
 import { Alert, Spinner } from "@heroui/react";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { CustomerToolbar } from "@/components/customer-toolbar";
+import { CustomerHome } from "@/app/customer-home";
 import { orderStatusLabels } from "@/src/orders/order-status";
 import {
   readTrackedOrder,
@@ -13,22 +13,41 @@ import {
 } from "@/src/pwa/storage";
 
 export function OfflineNavigationFallback() {
-  const router = useRouter();
+  const [isOrderRoute, setIsOrderRoute] = useState<boolean | undefined>(
+    undefined,
+  );
   const [snapshot, setSnapshot] = useState<
     StoredTrackedOrder | null | undefined
   >(undefined);
+
+  useEffect(() => {
+    const resumeTracking = () => window.location.reload();
+
+    window.addEventListener("online", resumeTracking);
+
+    return () => window.removeEventListener("online", resumeTracking);
+  }, []);
 
   useEffect(() => {
     const match = window.location.pathname.match(/^\/orders\/([^/]+)$/);
     const trackingReference = match?.[1] ? decodeURIComponent(match[1]) : null;
 
     if (!trackingReference) {
-      void Promise.resolve(null).then(setSnapshot);
+      void Promise.resolve().then(() => setIsOrderRoute(false));
 
       return;
     }
-    void readTrackedOrder(trackingReference).then(setSnapshot);
+    void rememberLastStableDestination({ kind: "order", trackingReference })
+      .then(() => readTrackedOrder(trackingReference))
+      .then((savedOrder) => {
+        setIsOrderRoute(true);
+        setSnapshot(savedOrder);
+      });
   }, []);
+
+  if (isOrderRoute === false) {
+    return <CustomerHome installationTrackingReference={null} />;
+  }
 
   if (snapshot === undefined) {
     return (
@@ -44,13 +63,7 @@ export function OfflineNavigationFallback() {
   if (!snapshot) {
     return (
       <section className="flex min-h-[calc(100svh-3rem)] flex-col">
-        <CustomerToolbar
-          onHome={() => {
-            void rememberLastStableDestination({ kind: "home" }).then(() => {
-              router.push("/");
-            });
-          }}
-        />
+        <CustomerToolbar />
         <div className="flex flex-1 items-center justify-center">
           <Alert className="w-full" status="warning">
             <Alert.Indicator />
@@ -69,13 +82,7 @@ export function OfflineNavigationFallback() {
 
   return (
     <section className="flex min-h-[calc(100svh-3rem)] flex-col">
-      <CustomerToolbar
-        onHome={() => {
-          void rememberLastStableDestination({ kind: "home" }).then(() => {
-            router.push("/");
-          });
-        }}
-      />
+      <CustomerToolbar />
       <Alert className="mt-4" status="warning">
         <Alert.Indicator />
         <Alert.Content>
