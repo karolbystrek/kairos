@@ -52,14 +52,14 @@ describe("order exit controls", () => {
   it.each([undefined, "IN_PREPARATION", "READY"] as const)(
     "provides no close action while the order is %s",
     (status) => {
-      expect(renderOrder(status)).not.toContain("Close order");
+      expect(renderOrder(status)).not.toContain("Zamknij zamówienie");
     },
   );
 
   it.each(["COMPLETED", "CANCELED"] as const)(
     "offers closing after the order is %s",
     (status) => {
-      expect(renderOrder(status)).toMatch(/<button[^>]*>.*Close order<\/button>/);
+      expect(renderOrder(status)).toMatch(/<button[^>]*>.*Zamknij zamówienie<\/button>/);
     },
   );
 });

@@ -27,7 +27,7 @@ export function FormTextField({
 
 export function FormSelect({
   label,
-  placeholder = `Select ${label.toLowerCase()}`,
+  placeholder = `Wybierz: ${label.toLocaleLowerCase("pl-PL")}`,
   children,
   ...props
 }: Omit<ComponentProps<typeof Select>, "children"> & {

@@ -26,14 +26,14 @@ const staffOrdersSchema = z.array(staffOrderSchema);
 export const customOrderLabelSchema = z
   .string()
   .trim()
-  .min(1, "Enter a custom label.")
+  .min(1, "Podaj własną etykietę.")
   .refine(
     (label) => Array.from(label).length <= 32,
-    "Use at most 32 characters.",
+    "Użyj maksymalnie 32 znaków.",
   )
   .refine(
     (label) => !/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/.test(label),
-    "Use one line of text.",
+    "Użyj jednej linii tekstu.",
   );
 
 export const createOrderInputSchema = z.discriminatedUnion("mode", [

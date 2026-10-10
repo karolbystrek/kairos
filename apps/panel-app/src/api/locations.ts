@@ -5,14 +5,14 @@ import { apiFetch, request } from "./api-fetch";
 export const managedLocationNameSchema = z
   .string()
   .trim()
-  .min(1, "Name is required")
+  .min(1, "Podaj nazwę.")
   .refine(
     (name) => Array.from(name).length <= 120,
-    "Name must contain at most 120 characters",
+    "Nazwa może mieć maksymalnie 120 znaków.",
   )
   .refine(
     (name) => !/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/.test(name),
-    "Use one line of text.",
+    "Użyj jednej linii tekstu.",
   );
 
 export const locationSchema = z.object({
@@ -35,7 +35,7 @@ export function sortLocations(locations: Location[]): Location[] {
     }
 
     return (
-      first.name.localeCompare(second.name, undefined, {
+      first.name.localeCompare(second.name, "pl-PL", {
         sensitivity: "base",
       }) || first.id.localeCompare(second.id)
     );

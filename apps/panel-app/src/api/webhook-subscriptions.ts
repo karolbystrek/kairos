@@ -35,12 +35,12 @@ const webhookSubscriptionsSchema = z.array(webhookSubscriptionSchema);
 const webhookSubscriptionInputSchema = z.object({
   name: managedIntegrationNameSchema,
   destinationUrl: z
-    .url("Destination must be a valid URL")
-    .max(2048, "Destination must not exceed 2048 characters"),
-  locationIds: z.array(z.uuid()).min(1, "Choose at least one location"),
+    .url("Podaj poprawny adres URL odbiorcy.")
+    .max(2048, "Adres URL odbiorcy może mieć maksymalnie 2048 znaków."),
+  locationIds: z.array(z.uuid()).min(1, "Wybierz co najmniej jeden lokal."),
   eventTypes: z
     .array(webhookEventTypeSchema)
-    .min(1, "Choose at least one event"),
+    .min(1, "Wybierz co najmniej jedno zdarzenie."),
 });
 
 const issuedWebhookSubscriptionSchema = z.object({

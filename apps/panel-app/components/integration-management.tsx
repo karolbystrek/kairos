@@ -138,7 +138,9 @@ function IntegrationDetails({
         <Alert status="danger">
           <Alert.Indicator />
           <Alert.Content>
-            <Alert.Title>Integration request failed</Alert.Title>
+            <Alert.Title>
+              Nie udało się wykonać operacji na integracji
+            </Alert.Title>
             <Alert.Description>
               {getIntegrationErrorMessage(actionError)}
             </Alert.Description>
@@ -147,7 +149,7 @@ function IntegrationDetails({
       )}
 
       <PanelDetailHeader
-        eyebrow="Integration"
+        eyebrow="Integracja"
         title={integration.name}
         titleEditor={
           isEditingName ? (
@@ -159,7 +161,7 @@ function IntegrationDetails({
                 fullWidth
                 isRequired
                 isDisabled={pendingAction === "rename"}
-                label="Integration name"
+                label="Nazwa integracji"
                 maxLength={64}
                 name="integration-name"
                 value={name}
@@ -169,7 +171,7 @@ function IntegrationDetails({
                 <Tooltip.Trigger>
                   <Button
                     isIconOnly
-                    aria-label="Confirm name"
+                    aria-label="Zatwierdź nazwę"
                     className="shrink-0 rounded-md"
                     isPending={pendingAction === "rename"}
                     type="submit"
@@ -177,13 +179,13 @@ function IntegrationDetails({
                     <CheckIcon size={19} />
                   </Button>
                 </Tooltip.Trigger>
-                <Tooltip.Content>Confirm</Tooltip.Content>
+                <Tooltip.Content>Potwierdź</Tooltip.Content>
               </Tooltip>
               <Tooltip delay={500}>
                 <Tooltip.Trigger>
                   <Button
                     isIconOnly
-                    aria-label="Cancel editing name"
+                    aria-label="Anuluj edycję nazwy"
                     className="shrink-0 rounded-md"
                     isDisabled={pendingAction === "rename"}
                     variant="tertiary"
@@ -192,7 +194,7 @@ function IntegrationDetails({
                     <CloseIcon size={19} />
                   </Button>
                 </Tooltip.Trigger>
-                <Tooltip.Content>Cancel</Tooltip.Content>
+                <Tooltip.Content>Anuluj</Tooltip.Content>
               </Tooltip>
             </form>
           ) : undefined
@@ -204,7 +206,7 @@ function IntegrationDetails({
                 <Tooltip.Trigger>
                   <Button
                     isIconOnly
-                    aria-label="Edit name"
+                    aria-label="Edytuj nazwę"
                     className="shrink-0 rounded-md"
                     variant="tertiary"
                     onPress={() => setIsEditingName(true)}
@@ -212,7 +214,7 @@ function IntegrationDetails({
                     <EditIcon size={17} />
                   </Button>
                 </Tooltip.Trigger>
-                <Tooltip.Content>Edit name</Tooltip.Content>
+                <Tooltip.Content>Edytuj nazwę</Tooltip.Content>
               </Tooltip>
             )}
             <Tooltip delay={500}>
@@ -220,8 +222,8 @@ function IntegrationDetails({
                 <Button
                   isIconOnly
                   aria-label={`${
-                    integration.status === "ENABLED" ? "Disable" : "Enable"
-                  } integration ${integration.name}`}
+                    integration.status === "ENABLED" ? "Wyłącz" : "Włącz"
+                  } integrację ${integration.name}`}
                   className="rounded-md"
                   isPending={pendingAction === "status"}
                   variant={
@@ -244,14 +246,14 @@ function IntegrationDetails({
                 </Button>
               </Tooltip.Trigger>
               <Tooltip.Content>
-                {integration.status === "ENABLED" ? "Disable" : "Enable"}
+                {integration.status === "ENABLED" ? "Wyłącz" : "Włącz"}
               </Tooltip.Content>
             </Tooltip>
             <Tooltip delay={500}>
               <Tooltip.Trigger>
                 <Button
                   isIconOnly
-                  aria-label={`Delete integration ${integration.name}`}
+                  aria-label={`Usuń integrację ${integration.name}`}
                   className="rounded-md"
                   isPending={pendingAction === "delete"}
                   variant="danger"
@@ -263,7 +265,7 @@ function IntegrationDetails({
                   <TrashIcon size={20} />
                 </Button>
               </Tooltip.Trigger>
-              <Tooltip.Content>Delete</Tooltip.Content>
+              <Tooltip.Content>Usuń</Tooltip.Content>
             </Tooltip>
           </>
         }
@@ -271,13 +273,13 @@ function IntegrationDetails({
 
       <Tabs>
         <Tabs.ListContainer>
-          <Tabs.List aria-label={`${integration.name} credentials`}>
+          <Tabs.List aria-label={`${integration.name} — klucze i webhooki`}>
             <Tabs.Tab id="api-keys">
-              <span className="tab-motion-content">API Keys</span>
+              <span className="tab-motion-content">Klucze API</span>
               <Tabs.Indicator />
             </Tabs.Tab>
             <Tabs.Tab id="webhooks">
-              <span className="tab-motion-content">Webhooks</span>
+              <span className="tab-motion-content">Webhooki</span>
               <Tabs.Indicator />
             </Tabs.Tab>
           </Tabs.List>
@@ -310,15 +312,17 @@ function IntegrationDetails({
       >
         <PanelPopup.Header>
           <PanelPopup.Icon status="warning" />
-          <PanelPopup.Heading>Disable {integration.name}?</PanelPopup.Heading>
+          <PanelPopup.Heading>
+            Wyłączyć integrację {integration.name}?
+          </PanelPopup.Heading>
         </PanelPopup.Header>
         <PanelPopup.Body>
-          Its API Keys will stop authenticating and future webhook fan-out will
-          pause until the integration is enabled again.
+          Klucze API przestaną działać, a wysyłanie nowych webhooków zostanie
+          wstrzymane do ponownego włączenia integracji.
         </PanelPopup.Body>
         <PanelPopup.Footer>
           <Button slot="close" variant="tertiary">
-            Cancel
+            Anuluj
           </Button>
           <Button
             isPending={pendingAction === "status"}
@@ -329,7 +333,7 @@ function IntegrationDetails({
               });
             }}
           >
-            Disable
+            Wyłącz
           </Button>
         </PanelPopup.Footer>
       </PanelPopup>
@@ -344,20 +348,22 @@ function IntegrationDetails({
       >
         <PanelPopup.Header>
           <PanelPopup.Icon status="danger" />
-          <PanelPopup.Heading>Delete {integration.name}?</PanelPopup.Heading>
+          <PanelPopup.Heading>
+            Usunąć integrację {integration.name}?
+          </PanelPopup.Heading>
         </PanelPopup.Header>
         <PanelPopup.Body className="flex flex-col gap-4">
           <p>
-            This permanently removes the integration from this workspace and
-            immediately blocks its API Keys and future webhook fan-out. Type its
-            exact name to confirm.
+            Integracja zostanie trwale usunięta z panelu. Jej klucze API i
+            wysyłanie nowych webhooków zostaną natychmiast zablokowane. Aby
+            potwierdzić, wpisz dokładną nazwę integracji.
           </p>
           <FormTextField
             fullWidth
             isRequired
             inputProps={{ autoComplete: "off" }}
             isDisabled={pendingAction === "delete"}
-            label={`Type ${integration.name} to confirm`}
+            label={`Wpisz ${integration.name} w celu potwierdzenia`}
             name="delete-integration-confirmation"
             value={deleteConfirmation}
             onChange={setDeleteConfirmation}
@@ -365,7 +371,7 @@ function IntegrationDetails({
         </PanelPopup.Body>
         <PanelPopup.Footer>
           <Button slot="close" variant="tertiary">
-            Cancel
+            Anuluj
           </Button>
           <Button
             isDisabled={deleteConfirmation !== integration.name}
@@ -377,7 +383,7 @@ function IntegrationDetails({
               });
             }}
           >
-            Delete
+            Usuń
           </Button>
         </PanelPopup.Footer>
       </PanelPopup>
@@ -490,12 +496,12 @@ export function IntegrationManagement({ accountId }: { accountId: string }) {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center gap-4">
-        <h1 className="page-title">Integrations</h1>
+        <h1 className="page-title">Integracje</h1>
         <Tooltip delay={500}>
           <Tooltip.Trigger>
             <Button
               isIconOnly
-              aria-label="New integration"
+              aria-label="Nowa integracja"
               className="rounded-md"
               size="lg"
               onPress={openCreate}
@@ -503,7 +509,7 @@ export function IntegrationManagement({ accountId }: { accountId: string }) {
               <PlusIcon size={20} />
             </Button>
           </Tooltip.Trigger>
-          <Tooltip.Content>New integration</Tooltip.Content>
+          <Tooltip.Content>Nowa integracja</Tooltip.Content>
         </Tooltip>
       </div>
 
@@ -511,7 +517,7 @@ export function IntegrationManagement({ accountId }: { accountId: string }) {
         <Alert status="danger">
           <Alert.Indicator />
           <Alert.Content>
-            <Alert.Title>Integration management unavailable</Alert.Title>
+            <Alert.Title>Zarządzanie integracjami jest niedostępne</Alert.Title>
             <Alert.Description>
               {getIntegrationErrorMessage(error)}
             </Alert.Description>
@@ -521,13 +527,13 @@ export function IntegrationManagement({ accountId }: { accountId: string }) {
 
       {areIntegrationsLoading || areLocationsLoading ? (
         <div className="flex min-h-80 items-center justify-center">
-          <Spinner aria-label="Loading integrations" />
+          <Spinner aria-label="Wczytywanie integracji" />
         </div>
       ) : integrations.length === 0 ? (
         <div className="py-12">
-          <h2 className="section-title">No integrations yet</h2>
+          <h2 className="section-title">Brak integracji</h2>
           <p className="mt-2 max-w-sm secondary-text">
-            Connect a point-of-sale system when you&apos;re ready.
+            Podłącz system sprzedażowy, gdy będziesz gotowy.
           </p>
         </div>
       ) : (
@@ -536,7 +542,7 @@ export function IntegrationManagement({ accountId }: { accountId: string }) {
             {integrations.map((integration) => (
               <PanelCard
                 key={integration.id}
-                accessibilityLabel={`View integration ${integration.name}`}
+                accessibilityLabel={`Pokaż integrację ${integration.name}`}
                 isSelected={integration.id === selectedIntegration?.id}
                 metadata={
                   <span
@@ -546,7 +552,9 @@ export function IntegrationManagement({ accountId }: { accountId: string }) {
                         : "secondary-text"
                     }
                   >
-                    {integration.status === "ENABLED" ? "Enabled" : "Disabled"}
+                    {integration.status === "ENABLED"
+                      ? "Włączona"
+                      : "Wyłączona"}
                   </span>
                 }
                 title={integration.name}
@@ -559,8 +567,8 @@ export function IntegrationManagement({ accountId }: { accountId: string }) {
           <div className="min-w-0">
             {enabledLocations.length === 0 && (
               <p className="mb-5 text-sm text-muted">
-                Enable a location in Locations before adding API Keys or
-                webhooks.
+                Włącz lokal w zakładce Lokale, aby dodać klucze API lub
+                webhooki.
               </p>
             )}
             {selectedIntegration && (
@@ -584,7 +592,7 @@ export function IntegrationManagement({ accountId }: { accountId: string }) {
         onOpenChange={setIsCreateOpen}
       >
         <PanelPopup.Header>
-          <PanelPopup.Heading>New integration</PanelPopup.Heading>
+          <PanelPopup.Heading>Nowa integracja</PanelPopup.Heading>
         </PanelPopup.Header>
         <form onSubmit={create}>
           <PanelPopup.Body className="flex flex-col gap-4">
@@ -592,7 +600,7 @@ export function IntegrationManagement({ accountId }: { accountId: string }) {
               <Alert status="danger">
                 <Alert.Indicator />
                 <Alert.Content>
-                  <Alert.Title>Integration could not be created</Alert.Title>
+                  <Alert.Title>Nie udało się utworzyć integracji</Alert.Title>
                   <Alert.Description>
                     {getIntegrationErrorMessage(createError)}
                   </Alert.Description>
@@ -603,7 +611,7 @@ export function IntegrationManagement({ accountId }: { accountId: string }) {
               fullWidth
               isRequired
               isDisabled={isCreating}
-              label="Integration name"
+              label="Nazwa integracji"
               maxLength={64}
               name="new-integration-name"
               value={name}
@@ -612,11 +620,11 @@ export function IntegrationManagement({ accountId }: { accountId: string }) {
           </PanelPopup.Body>
           <PanelPopup.Footer>
             <Button slot="close" variant="tertiary">
-              Cancel
+              Anuluj
             </Button>
             <Button isPending={isCreating} type="submit">
               <PlusIcon size={18} />
-              {isCreating ? "Creating…" : "Create"}
+              {isCreating ? "Tworzenie…" : "Utwórz"}
             </Button>
           </PanelPopup.Footer>
         </form>

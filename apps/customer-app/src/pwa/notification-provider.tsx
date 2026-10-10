@@ -107,7 +107,7 @@ export function CustomerPwaProvider({
       }
       setState("blocked");
       setMessage(
-        "Notifications are blocked. Restore them in your browser or device settings.",
+        "Powiadomienia są zablokowane. Włącz je w ustawieniach przeglądarki lub urządzenia.",
       );
 
       return;
@@ -200,7 +200,7 @@ export function CustomerPwaProvider({
     if (!supportsWebPush() || process.env.NODE_ENV !== "production") {
       setState("unsupported");
       setMessage(
-        "Notifications are unavailable in this browser or configuration. Tracking still works normally.",
+        "Powiadomienia są niedostępne w tej przeglądarce lub konfiguracji. Nadal możesz śledzić zamówienie.",
       );
 
       return;
@@ -208,7 +208,7 @@ export function CustomerPwaProvider({
     if (!navigator.onLine) {
       setState("disabled");
       setMessage(
-        "Connect to the internet and try enabling notifications again.",
+        "Połącz się z internetem i spróbuj ponownie włączyć powiadomienia.",
       );
 
       return;
@@ -216,7 +216,7 @@ export function CustomerPwaProvider({
     if (Notification.permission === "denied") {
       setState("blocked");
       setMessage(
-        "Notifications are blocked. Restore them in your browser or device settings.",
+        "Powiadomienia są zablokowane. Włącz je w ustawieniach przeglądarki lub urządzenia.",
       );
 
       return;
@@ -233,8 +233,8 @@ export function CustomerPwaProvider({
         setState(permission === "denied" ? "blocked" : "disabled");
         setMessage(
           permission === "denied"
-            ? "Notifications are blocked. Restore them in your browser or device settings."
-            : "Notification permission was not granted.",
+            ? "Powiadomienia są zablokowane. Włącz je w ustawieniach przeglądarki lub urządzenia."
+            : "Nie udzielono zgody na powiadomienia.",
         );
 
         return;
@@ -245,7 +245,7 @@ export function CustomerPwaProvider({
     } catch {
       setState("error");
       setMessage(
-        "Notifications could not be saved in this browser. Tracking still works normally.",
+        "Nie udało się zapisać powiadomień w tej przeglądarce. Nadal możesz śledzić zamówienie.",
       );
     } finally {
       changingNotifications.current = false;
@@ -260,7 +260,7 @@ export function CustomerPwaProvider({
     }
     if (!navigator.onLine) {
       setMessage(
-        "Connect to the internet and try disabling notifications again.",
+        "Połącz się z internetem i spróbuj ponownie wyłączyć powiadomienia.",
       );
 
       return;
@@ -480,8 +480,8 @@ function notificationErrorMessage(error: unknown): string {
     error instanceof NotificationApiError &&
     error.code === "CUSTOMER_PUSH_ENROLLMENT_LIMIT"
   ) {
-    return "This order already has the maximum number of notification subscribers. Tracking still works normally.";
+    return "Osiągnięto limit odbiorców powiadomień dla tego zamówienia. Nadal możesz je śledzić.";
   }
 
-  return "Notifications could not be updated. Check your connection and try again.";
+  return "Nie udało się zaktualizować powiadomień. Sprawdź połączenie i spróbuj ponownie.";
 }

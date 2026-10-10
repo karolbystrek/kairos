@@ -27,7 +27,7 @@ for (const role of ["dialog", "alertdialog"]) {
     assert.equal(backdrop.props.isDismissable, true);
     assert.equal(backdrop.props.isKeyboardDismissDisabled, false);
     assert.equal(dialog.props.role, role);
-    assert.equal(dialog.props.children[0].props["aria-label"], "Close");
+    assert.equal(dialog.props.children[0].props["aria-label"], "Zamknij");
     popup.props.onOpenChange(false);
     assert.deepEqual(changes, [false]);
   });

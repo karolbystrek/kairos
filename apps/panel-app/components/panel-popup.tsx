@@ -46,7 +46,7 @@ export function PanelPopup({
             role={role}
           >
             {!isRequired && (
-              <Modal.CloseTrigger aria-label="Close">
+              <Modal.CloseTrigger aria-label="Zamknij">
                 <X aria-hidden="true" size={20} />
               </Modal.CloseTrigger>
             )}

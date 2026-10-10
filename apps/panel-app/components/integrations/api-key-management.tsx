@@ -40,8 +40,8 @@ function replaceApiKey(keys: ApiKey[] | undefined, updated: ApiKey): ApiKey[] {
 
 function apiKeyAccessLabel(apiKey: ApiKey): string {
   return apiKey.scopes.includes("orders:write")
-    ? "Read and write orders"
-    : "Read orders";
+    ? "Odczyt i zapis zamówień"
+    : "Odczyt zamówień";
 }
 
 export function ApiKeyManagement({
@@ -123,9 +123,9 @@ export function ApiKeyManagement({
       });
 
       onSecretIssued({
-        title: `API Key issued: ${result.apiKey.name}`,
+        title: `Utworzono klucz API: ${result.apiKey.name}`,
         description:
-          "Store this credential in the external system that will call the Kairos API.",
+          "Zapisz ten klucz w systemie zewnętrznym, który będzie korzystać z API Kairos.",
         value: result.secret,
       });
       await mutateApiKeys(
@@ -185,9 +185,9 @@ export function ApiKeyManagement({
       const versionKey = staffApiKeyVersionsKey(accountId, apiKey.id);
 
       onSecretIssued({
-        title: `New API Key secret for ${apiKey.name}`,
+        title: `Nowy sekret klucza API: ${apiKey.name}`,
         description:
-          "Update the external system now. The old credential stops working 24 hours after this rotation.",
+          "Zaktualizuj teraz system zewnętrzny. Poprzedni klucz przestanie działać za 24 godziny.",
         value: result.secret,
         afterConfirmed: () => {
           void listApiKeyVersions(apiKey.id)
@@ -226,7 +226,9 @@ export function ApiKeyManagement({
         <Alert status="danger">
           <Alert.Indicator />
           <Alert.Content>
-            <Alert.Title>API Key request failed</Alert.Title>
+            <Alert.Title>
+              Nie udało się wykonać operacji na kluczu API
+            </Alert.Title>
             <Alert.Description>
               {getIntegrationErrorMessage(error)}
             </Alert.Description>
@@ -236,10 +238,10 @@ export function ApiKeyManagement({
 
       <section className="flex flex-col gap-3">
         <div>
-          <h3 className="text-xl font-semibold">Issue API Key</h3>
+          <h3 className="text-xl font-semibold">Utwórz klucz API</h3>
           <p className="text-sm text-muted">
-            Access cannot be changed later. Issue a replacement when its
-            permissions need to change.
+            Uprawnień nie można później zmienić. Jeśli potrzebujesz innych,
+            utwórz nowy klucz.
           </p>
         </div>
 
@@ -248,7 +250,7 @@ export function ApiKeyManagement({
             fullWidth
             isRequired
             isDisabled={Boolean(pendingAction)}
-            label="API key name"
+            label="Nazwa klucza API"
             maxLength={64}
             name="api-key-name"
             value={name}
@@ -264,13 +266,13 @@ export function ApiKeyManagement({
               setAccessMode(value === "WRITE" ? "WRITE" : "READ")
             }
           >
-            <Label>Order access</Label>
+            <Label>Dostęp do zamówień</Label>
             <Radio value="READ">
               <Radio.Content>
                 <Radio.Control>
                   <Radio.Indicator />
                 </Radio.Control>
-                Read
+                Odczyt
               </Radio.Content>
             </Radio>
             <Radio value="WRITE">
@@ -278,13 +280,13 @@ export function ApiKeyManagement({
                 <Radio.Control>
                   <Radio.Indicator />
                 </Radio.Control>
-                Read and write
+                Odczyt i zapis
               </Radio.Content>
             </Radio>
           </RadioGroup>
 
           <div className="flex flex-col gap-3">
-            <p className="text-sm font-medium">Locations</p>
+            <p className="text-sm font-medium">Lokale</p>
             <div className="flex flex-wrap gap-3">
               {enabledLocations.map((location) => (
                 <Button
@@ -313,7 +315,7 @@ export function ApiKeyManagement({
             value={expiration}
             onChange={setExpiration}
           >
-            <Label>Expiration (optional)</Label>
+            <Label>Data wygaśnięcia (opcjonalnie)</Label>
             <Input />
           </TextField>
 
@@ -323,18 +325,18 @@ export function ApiKeyManagement({
             isPending={pendingAction === "issue"}
             type="submit"
           >
-            {pendingAction === "issue" ? "Issuing…" : "Issue"}
+            {pendingAction === "issue" ? "Tworzenie…" : "Utwórz"}
           </Button>
         </form>
       </section>
 
       <section className="flex flex-col gap-3">
-        <h3 className="text-xl font-semibold">API Keys</h3>
+        <h3 className="text-xl font-semibold">Klucze API</h3>
 
         {areApiKeysLoading ? (
-          <Spinner aria-label="Loading API Keys" />
+          <Spinner aria-label="Wczytywanie kluczy API" />
         ) : apiKeys.length === 0 ? (
-          <p className="text-muted">No keys issued.</p>
+          <p className="text-muted">Brak kluczy API.</p>
         ) : (
           <div className="border-t border-separator">
             {apiKeys.map((apiKey) => (
@@ -351,40 +353,42 @@ export function ApiKeyManagement({
                         : "text-sm font-medium text-accent"
                     }
                   >
-                    {apiKey.revokedAt ? "Revoked" : "Active"}
+                    {apiKey.revokedAt ? "Unieważniony" : "Aktywny"}
                   </span>
                 </div>
 
                 <div>
-                  <p className="text-sm font-medium">Order access</p>
+                  <p className="text-sm font-medium">Dostęp do zamówień</p>
                   <p className="text-sm text-muted">
                     {apiKeyAccessLabel(apiKey)}
                   </p>
                 </div>
 
                 <div>
-                  <p className="text-sm font-medium">Locations</p>
+                  <p className="text-sm font-medium">Lokale</p>
                   <p className="break-all text-sm text-muted">
                     {apiKey.locationIds
                       .map(
                         (locationId) =>
                           locations.find(
                             (location) => location.id === locationId,
-                          )?.name ?? "Unavailable location",
+                          )?.name ?? "Niedostępny lokal",
                       )
                       .join(", ")}
                   </p>
                 </div>
 
                 <div className="text-sm text-muted">
-                  <p>Issued {formatIntegrationDateTime(apiKey.createdAt)}</p>
+                  <p>Utworzono {formatIntegrationDateTime(apiKey.createdAt)}</p>
                   <p>
                     {apiKey.expiresAt
-                      ? `Expires ${formatIntegrationDateTime(apiKey.expiresAt)}`
-                      : "Does not expire"}
+                      ? `Wygasa ${formatIntegrationDateTime(apiKey.expiresAt)}`
+                      : "Nie wygasa"}
                   </p>
                   {apiKey.revokedAt && (
-                    <p>Revoked {formatIntegrationDateTime(apiKey.revokedAt)}</p>
+                    <p>
+                      Unieważniono {formatIntegrationDateTime(apiKey.revokedAt)}
+                    </p>
                   )}
                 </div>
 
@@ -393,7 +397,7 @@ export function ApiKeyManagement({
                     variant="secondary"
                     onPress={() => setSelectedApiKeyId(apiKey.id)}
                   >
-                    Versions
+                    Wersje
                   </Button>
                   <Button
                     isDisabled={Boolean(apiKey.revokedAt)}
@@ -401,7 +405,7 @@ export function ApiKeyManagement({
                     variant="secondary"
                     onPress={() => rotate(apiKey)}
                   >
-                    Rotate
+                    Zmień sekret
                   </Button>
                   <Button
                     isDisabled={Boolean(apiKey.revokedAt)}
@@ -411,7 +415,7 @@ export function ApiKeyManagement({
                       if (!pendingAction) setApiKeyToRevoke(apiKey);
                     }}
                   >
-                    Revoke
+                    Unieważnij
                   </Button>
                 </div>
               </article>
@@ -431,16 +435,16 @@ export function ApiKeyManagement({
         <PanelPopup.Header>
           <PanelPopup.Icon status="danger" />
           <PanelPopup.Heading>
-            Revoke {apiKeyToRevoke?.name}?
+            Unieważnić klucz {apiKeyToRevoke?.name}?
           </PanelPopup.Heading>
         </PanelPopup.Header>
         <PanelPopup.Body>
-          Every secret version for this key will stop authenticating
-          immediately. This cannot be undone.
+          Wszystkie wersje sekretu tego klucza natychmiast przestaną działać.
+          Tej operacji nie można cofnąć.
         </PanelPopup.Body>
         <PanelPopup.Footer>
           <Button slot="close" variant="tertiary">
-            Cancel
+            Anuluj
           </Button>
           <Button
             isPending={pendingAction === `revoke-${apiKeyToRevoke?.id ?? ""}`}
@@ -453,7 +457,7 @@ export function ApiKeyManagement({
               });
             }}
           >
-            Revoke
+            Unieważnij
           </Button>
         </PanelPopup.Footer>
       </PanelPopup>
@@ -467,19 +471,19 @@ export function ApiKeyManagement({
       >
         <PanelPopup.Header>
           <PanelPopup.Heading>
-            {selectedApiKey?.name} versions
+            {selectedApiKey?.name} — wersje
           </PanelPopup.Heading>
         </PanelPopup.Header>
         <PanelPopup.Body className="flex flex-col gap-4">
           <p className="text-sm text-muted">
-            After rotation, the previous secret remains valid until the time
-            shown below.
+            Po zmianie poprzedni sekret pozostaje ważny do terminu podanego
+            poniżej.
           </p>
           {versionsError ? (
             <Alert status="danger">
               <Alert.Indicator />
               <Alert.Content>
-                <Alert.Title>Versions unavailable</Alert.Title>
+                <Alert.Title>Wersje są niedostępne</Alert.Title>
                 <Alert.Description>
                   {getIntegrationErrorMessage(versionsError)}
                 </Alert.Description>
@@ -487,10 +491,10 @@ export function ApiKeyManagement({
             </Alert>
           ) : areVersionsLoading ? (
             <div className="flex min-h-32 items-center justify-center">
-              <Spinner aria-label="Loading API Key versions" />
+              <Spinner aria-label="Wczytywanie wersji klucza API" />
             </div>
           ) : versions.length === 0 ? (
-            <p className="text-muted">No versions found.</p>
+            <p className="text-muted">Brak wersji.</p>
           ) : (
             <div className="border-t border-separator">
               {versions.map((version) => (
@@ -499,7 +503,7 @@ export function ApiKeyManagement({
                   className="flex flex-wrap items-center justify-between gap-3 border-b border-separator py-3"
                 >
                   <p className="text-sm text-muted">
-                    Issued {formatIntegrationDateTime(version.issuedAt)}
+                    Utworzono {formatIntegrationDateTime(version.issuedAt)}
                   </p>
                   <span
                     className={
@@ -509,12 +513,12 @@ export function ApiKeyManagement({
                     }
                   >
                     {version.retiredAt
-                      ? "Retired"
+                      ? "Wycofana"
                       : version.validUntil
-                        ? `Valid until ${formatIntegrationDateTime(
+                        ? `Ważna do ${formatIntegrationDateTime(
                             version.validUntil,
                           )}`
-                        : "Current"}
+                        : "Aktualna"}
                   </span>
                 </div>
               ))}

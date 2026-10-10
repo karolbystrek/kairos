@@ -30,6 +30,7 @@ export function createKairosManifest(startUrl: string): MetadataRoute.Manifest {
   return {
     name: siteConfig.name,
     short_name: "Kairos",
+    lang: "pl",
     description: siteConfig.description,
     id: "/",
     start_url: startUrl,

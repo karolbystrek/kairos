@@ -25,7 +25,7 @@ export function PanelDetailHeader({
           )}
         </div>
         <div
-          aria-label={`${eyebrow} actions`}
+          aria-label={`${eyebrow} — opcje`}
           className="flex shrink-0 items-center justify-end gap-2"
           role="group"
         >

@@ -25,15 +25,15 @@ export function NotificationIcon({ enabled }: { enabled: boolean }) {
 function notificationActionLabel(state: NotificationState): string {
   switch (state) {
     case "enabled":
-      return "Disable notifications";
+      return "Wyłącz powiadomienia";
     case "blocked":
-      return "Notifications are blocked";
+      return "Powiadomienia są zablokowane";
     case "unsupported":
-      return "Notifications are not supported";
+      return "Powiadomienia nie są obsługiwane";
     case "loading":
-      return "Loading notification settings";
+      return "Wczytywanie ustawień powiadomień";
     default:
-      return "Enable notifications";
+      return "Włącz powiadomienia";
   }
 }
 
@@ -52,11 +52,11 @@ export function NotificationControl() {
   const isUnavailable = state === "loading" || pendingAction !== null;
   const actionLabel =
     pendingAction === "enabling"
-      ? "Enabling notifications…"
+      ? "Włączanie powiadomień…"
       : pendingAction === "disabling"
-        ? "Disabling notifications…"
+        ? "Wyłączanie powiadomień…"
         : pendingAction === "requesting-permission"
-          ? "Waiting for notification permission…"
+          ? "Oczekiwanie na zgodę na powiadomienia…"
           : notificationActionLabel(state);
 
   return (
@@ -99,7 +99,7 @@ export function NotificationControl() {
                 <Tooltip.Trigger>
                   <Button
                     isIconOnly
-                    aria-label="Dismiss notification"
+                    aria-label="Zamknij komunikat"
                     className="notification-dismiss rounded-md"
                     variant="tertiary"
                     onPress={dismissMessage}
@@ -107,7 +107,7 @@ export function NotificationControl() {
                     <X aria-hidden="true" size={18} />
                   </Button>
                 </Tooltip.Trigger>
-                <Tooltip.Content>Dismiss</Tooltip.Content>
+                <Tooltip.Content>Zamknij</Tooltip.Content>
               </Tooltip>
             </Alert>
           </div>

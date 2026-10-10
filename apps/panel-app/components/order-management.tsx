@@ -38,10 +38,10 @@ const ordersKey = (accountId: string, scope: string) =>
 
 const laneDetails = {
   IN_PREPARATION: {
-    label: "In preparation",
+    label: "W przygotowaniu",
   },
   READY: {
-    label: "Ready",
+    label: "Gotowe",
   },
 } as const;
 
@@ -64,17 +64,17 @@ function getErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     switch (error.status) {
       case 403:
-        return "You are not allowed to manage these orders.";
+        return "Nie masz uprawnień do zarządzania tymi zamówieniami.";
       case 404:
-        return "The selected order or location is no longer available.";
+        return "Wybrane zamówienie lub lokal nie jest już dostępny.";
       case 409:
-        return "The order changed before this action completed. Review its current status and try again.";
+        return "Zamówienie zostało zmienione. Sprawdź jego obecny status i spróbuj ponownie.";
       default:
         return error.message;
     }
   }
 
-  return "Order data could not be loaded or updated. Check your connection and try again.";
+  return "Nie udało się wczytać lub zaktualizować zamówień. Sprawdź połączenie i spróbuj ponownie.";
 }
 
 function shouldRetryOnError(error: Error): boolean {
@@ -105,15 +105,15 @@ function elapsedTime(createdAt: string, now: number): string {
     Math.floor((now - new Date(createdAt).getTime()) / 60_000),
   );
 
-  if (minutes < 1) return "Just now";
-  if (minutes < 60) return `${minutes} min`;
+  if (minutes < 1) return "Przed chwilą";
+  if (minutes < 60) return `${minutes.toLocaleString("pl-PL")} min`;
 
   const hours = Math.floor(minutes / 60);
   const remainingMinutes = minutes % 60;
 
   return remainingMinutes > 0
-    ? `${hours} hr ${remainingMinutes} min`
-    : `${hours} hr`;
+    ? `${hours.toLocaleString("pl-PL")} godz. ${remainingMinutes.toLocaleString("pl-PL")} min`
+    : `${hours.toLocaleString("pl-PL")} godz.`;
 }
 
 function useMinuteClock() {
@@ -144,7 +144,7 @@ function LocationSelect({
   showAll: boolean;
 }) {
   const items = showAll
-    ? [{ id: "all", name: "All locations" }, ...locations]
+    ? [{ id: "all", name: "Wszystkie lokale" }, ...locations]
     : locations;
 
   return (
@@ -195,9 +195,9 @@ function OrderQrCode({
       <Alert status="danger">
         <Alert.Indicator />
         <Alert.Content>
-          <Alert.Title>QR code unavailable</Alert.Title>
+          <Alert.Title>Kod QR jest niedostępny</Alert.Title>
           <Alert.Description>
-            The customer QR code could not be generated.
+            Nie udało się wygenerować kodu QR dla klienta.
           </Alert.Description>
         </Alert.Content>
       </Alert>
@@ -207,7 +207,7 @@ function OrderQrCode({
   if (isLoading || !qrCode) {
     return (
       <div className="flex min-h-72 items-center justify-center">
-        <Spinner aria-label="Generating QR code" />
+        <Spinner aria-label="Generowanie kodu QR" />
       </div>
     );
   }
@@ -216,7 +216,7 @@ function OrderQrCode({
     <div className="flex w-full justify-center">
       <Image
         unoptimized
-        alt={`Tracking QR code for order ${order.label}`}
+        alt={`Kod QR do śledzenia zamówienia ${order.label}`}
         className="h-auto w-full max-w-[30rem]"
         height={640}
         src={qrCode}
@@ -246,15 +246,15 @@ function OrderCard({
   showLocation: boolean;
 }) {
   const nextStatus = nextStatuses[order.status];
-  const nextStatusLabel = nextStatus === "READY" ? "Ready" : "Complete";
+  const nextStatusLabel = nextStatus === "READY" ? "Gotowe" : "Zakończ";
   const nextStatusAccessibilityLabel =
     nextStatus === "READY"
-      ? `Mark order ${order.label} ready`
-      : `Complete order ${order.label}`;
+      ? `Oznacz zamówienie ${order.label} jako gotowe`
+      : `Zakończ zamówienie ${order.label}`;
 
   return (
     <PanelCard
-      accessibilityLabel={`Show QR code for order ${order.label}`}
+      accessibilityLabel={`Pokaż kod QR zamówienia ${order.label}`}
       metadata={
         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 secondary-text">
           {showLocation && locationName && (
@@ -285,7 +285,7 @@ function OrderCard({
             <Tooltip.Trigger>
               <Button
                 isIconOnly
-                aria-label={`Cancel order ${order.label}`}
+                aria-label={`Anuluj zamówienie ${order.label}`}
                 className="rounded-md"
                 isDisabled={isUpdating}
                 size="lg"
@@ -295,7 +295,7 @@ function OrderCard({
                 <CloseIcon size={20} />
               </Button>
             </Tooltip.Trigger>
-            <Tooltip.Content>Cancel order</Tooltip.Content>
+            <Tooltip.Content>Anuluj zamówienie</Tooltip.Content>
           </Tooltip>
         </>
       }
@@ -485,13 +485,13 @@ export function OrderManagement({
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center gap-4">
-        <h1 className="page-title">Orders</h1>
+        <h1 className="page-title">Zamówienia</h1>
         {enabledLocations.length > 0 && (
           <Tooltip delay={500}>
             <Tooltip.Trigger>
               <Button
                 isIconOnly
-                aria-label="New order"
+                aria-label="Nowe zamówienie"
                 className="rounded-md"
                 size="lg"
                 onPress={openCreate}
@@ -499,7 +499,7 @@ export function OrderManagement({
                 <PlusIcon size={20} />
               </Button>
             </Tooltip.Trigger>
-            <Tooltip.Content>New order</Tooltip.Content>
+            <Tooltip.Content>Nowe zamówienie</Tooltip.Content>
           </Tooltip>
         )}
       </div>
@@ -508,26 +508,26 @@ export function OrderManagement({
         <Alert status="danger">
           <Alert.Indicator />
           <Alert.Content>
-            <Alert.Title>Request failed</Alert.Title>
+            <Alert.Title>Nie udało się wykonać operacji</Alert.Title>
             <Alert.Description>{getErrorMessage(error)}</Alert.Description>
           </Alert.Content>
         </Alert>
       )}
 
       {areLocationsLoading ? (
-        <Spinner aria-label="Loading locations" />
+        <Spinner aria-label="Wczytywanie lokali" />
       ) : enabledLocations.length === 0 ? (
         <div className="flex flex-col items-start gap-4 py-12">
           <div>
-            <h2 className="section-title">No location</h2>
+            <h2 className="section-title">Brak lokalu</h2>
             <p className="mt-2 secondary-text">
-              Create a location before managing orders.
+              Utwórz lokal, aby zarządzać zamówieniami.
             </p>
           </div>
           {canManageLocations && (
             <Button onPress={() => setIsCreateLocationOpen(true)}>
               <PlusIcon size={18} />
-              Create location
+              Utwórz lokal
             </Button>
           )}
         </div>
@@ -537,7 +537,7 @@ export function OrderManagement({
             <LocationSelect
               showAll
               isDisabled={isCreatingOrder || isUpdatingOrder}
-              label="Queue location"
+              label="Lokal kolejki"
               locations={enabledLocations}
               selectedId={locationId}
               onChange={selectLocation}
@@ -546,7 +546,7 @@ export function OrderManagement({
 
           {areOrdersLoading ? (
             <div className="flex min-h-80 items-center justify-center">
-              <Spinner aria-label="Loading orders" />
+              <Spinner aria-label="Wczytywanie zamówień" />
             </div>
           ) : (
             <div className="grid gap-10 md:grid-cols-2 md:gap-0 md:divide-x md:divide-separator">
@@ -564,14 +564,14 @@ export function OrderManagement({
                         <h2 className="section-title">{lane.label}</h2>
                       </div>
                       <span className="text-sm tabular-nums secondary-text">
-                        {laneOrders.length}
+                        {laneOrders.length.toLocaleString("pl-PL")}
                       </span>
                     </header>
                     {laneOrders.length === 0 ? (
                       <p className="py-10 text-sm secondary-text">
                         {status === "READY"
-                          ? "No orders waiting for pickup"
-                          : "No orders being prepared"}
+                          ? "Brak zamówień do odbioru"
+                          : "Brak zamówień w przygotowaniu"}
                       </p>
                     ) : (
                       <div>
@@ -610,7 +610,7 @@ export function OrderManagement({
         onOpenChange={setIsCreateOpen}
       >
         <PanelPopup.Header>
-          <PanelPopup.Heading>New order</PanelPopup.Heading>
+          <PanelPopup.Heading>Nowe zamówienie</PanelPopup.Heading>
         </PanelPopup.Header>
         <form onSubmit={createOrder}>
           <PanelPopup.Body className="flex flex-col gap-4">
@@ -618,7 +618,7 @@ export function OrderManagement({
               <Alert status="danger">
                 <Alert.Indicator />
                 <Alert.Content>
-                  <Alert.Title>Order could not be created</Alert.Title>
+                  <Alert.Title>Nie udało się utworzyć zamówienia</Alert.Title>
                   <Alert.Description>
                     {getErrorMessage(createOrderError)}
                   </Alert.Description>
@@ -627,7 +627,7 @@ export function OrderManagement({
             )}
             {canViewTenantOrders && (
               <LocationSelect
-                label="Location"
+                label="Lokal"
                 locations={enabledLocations}
                 selectedId={createLocationId}
                 showAll={false}
@@ -638,10 +638,10 @@ export function OrderManagement({
               fullWidth
               isDisabled={isCreatingOrder}
               isInvalid={Boolean(customLabelError)}
-              label="Order label (optional)"
+              label="Etykieta zamówienia (opcjonalnie)"
               maxLength={32}
               name="custom-order-label"
-              placeholder="Order label (automatic if empty)"
+              placeholder="Etykieta zamówienia (puste pole nadaje ją automatycznie)"
               value={customLabel}
               onChange={(value) => {
                 setCustomLabel(value);
@@ -654,11 +654,11 @@ export function OrderManagement({
           </PanelPopup.Body>
           <PanelPopup.Footer>
             <Button slot="close" variant="tertiary">
-              Cancel
+              Anuluj
             </Button>
             <Button isPending={isCreatingOrder} type="submit">
               <PlusIcon size={18} />
-              {isCreatingOrder ? "Creating…" : "Create"}
+              {isCreatingOrder ? "Tworzenie…" : "Utwórz"}
             </Button>
           </PanelPopup.Footer>
         </form>
@@ -704,19 +704,19 @@ export function OrderManagement({
         <PanelPopup.Header>
           <PanelPopup.Icon status="danger" />
           <PanelPopup.Heading>
-            Cancel order {cancelOrder?.label}?
+            Anuluj zamówienie {cancelOrder?.label}?
           </PanelPopup.Heading>
         </PanelPopup.Header>
         <PanelPopup.Body>
           <p>
-            The customer will see that this order was canceled. This cannot be
-            undone.
+            Klient zobaczy, że zamówienie zostało anulowane. Tej operacji nie
+            można cofnąć.
           </p>
           {updateOrderError && (
             <Alert className="mt-4" status="danger">
               <Alert.Indicator />
               <Alert.Content>
-                <Alert.Title>Order could not be canceled</Alert.Title>
+                <Alert.Title>Nie udało się anulować zamówienia</Alert.Title>
                 <Alert.Description>
                   {getErrorMessage(updateOrderError)}
                 </Alert.Description>
@@ -726,7 +726,7 @@ export function OrderManagement({
         </PanelPopup.Body>
         <PanelPopup.Footer>
           <Button slot="close" variant="tertiary">
-            Keep order
+            Zachowaj zamówienie
           </Button>
           <Button
             isPending={isUpdatingOrder}
@@ -738,7 +738,7 @@ export function OrderManagement({
               });
             }}
           >
-            Cancel order
+            Anuluj zamówienie
           </Button>
         </PanelPopup.Footer>
       </PanelPopup>

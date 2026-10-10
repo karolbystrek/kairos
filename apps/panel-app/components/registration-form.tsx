@@ -19,6 +19,36 @@ import {
 import { ApiError } from "@/src/api/api-fetch";
 import { getCurrentAccount, logout } from "@/src/api/authentication";
 
+const registrationErrorMessages = new Map([
+  ["Email is required.", "Podaj adres e-mail."],
+  ["Enter a valid email address.", "Podaj poprawny adres e-mail."],
+  [
+    "Email must not exceed 200 characters.",
+    "Adres e-mail może mieć maksymalnie 200 znaków.",
+  ],
+  ["Password is required.", "Podaj hasło."],
+  ["Use at least 12 characters.", "Użyj co najmniej 12 znaków."],
+  [
+    "Password must not exceed 200 characters.",
+    "Hasło może mieć maksymalnie 200 znaków.",
+  ],
+  ["Confirm your password.", "Potwierdź hasło."],
+  [
+    "Password confirmation must not exceed 200 characters.",
+    "Potwierdzenie hasła może mieć maksymalnie 200 znaków.",
+  ],
+  ["Passwords must match.", "Hasła muszą być takie same."],
+  [
+    "An account with this email already exists. Sign in instead.",
+    "Konto z tym adresem e-mail już istnieje. Zaloguj się.",
+  ],
+  ["Password is too short.", "Hasło jest za krótkie."],
+  ["Include a lowercase letter.", "Dodaj małą literę."],
+  ["Include an uppercase letter.", "Dodaj wielką literę."],
+  ["Include a number.", "Dodaj cyfrę."],
+  ["Include a symbol.", "Dodaj znak specjalny."],
+]);
+
 export function RegistrationForm({ invited = false }: { invited?: boolean }) {
   const token = useSyncExternalStore(
     subscribeToHash,
@@ -54,7 +84,7 @@ export function RegistrationForm({ invited = false }: { invited?: boolean }) {
       await mutateAccount(undefined, { revalidate: true });
       setMessage("");
     } catch {
-      setMessage("Sign-out could not be completed. Try again.");
+      setMessage("Nie udało się wylogować. Spróbuj ponownie.");
     } finally {
       setPending(false);
     }
@@ -110,10 +140,20 @@ export function RegistrationForm({ invited = false }: { invited?: boolean }) {
         }
         setFieldErrors(errors);
       } else if (error instanceof ApiError && error.problem?.fieldErrors) {
-        setFieldErrors(error.problem.fieldErrors);
+        setFieldErrors(
+          Object.fromEntries(
+            Object.entries(error.problem.fieldErrors).map(
+              ([field, message]) => [
+                field,
+                registrationErrorMessages.get(message) ??
+                  "Sprawdź wartość tego pola.",
+              ],
+            ),
+          ),
+        );
       } else {
         setMessage(
-          "Registration could not be completed. Try again when your connection is available.",
+          "Nie udało się utworzyć konta. Spróbuj ponownie po odzyskaniu połączenia.",
         );
       }
     } finally {
@@ -125,14 +165,15 @@ export function RegistrationForm({ invited = false }: { invited?: boolean }) {
     <AuthFormLayout
       footer={
         <>
-          Already have an account? <Link href="/login">Sign in.</Link>
+          Masz już konto? <Link href="/login">Zaloguj się.</Link>
         </>
       }
-      title={invited ? "Join your team" : "Create account"}
+      title={invited ? "Dołącz do zespołu" : "Utwórz konto"}
     >
       {invitation && (
         <p>
-          {invitation.locationName} · {invitation.role.toLowerCase()}
+          {invitation.locationName} ·{" "}
+          {invitation.role === "MANAGER" ? "Kierownik" : "Pracownik"}
         </p>
       )}
       {invited && (terminalMessage || token === "" || previewError) && (
@@ -140,8 +181,8 @@ export function RegistrationForm({ invited = false }: { invited?: boolean }) {
           <Alert.Content>
             {terminalMessage ||
               (previewError
-                ? "The invitation could not be checked. Try again when your connection is available."
-                : "This invitation is invalid. Ask your team for a new link.")}
+                ? "Nie udało się sprawdzić zaproszenia. Spróbuj ponownie po odzyskaniu połączenia."
+                : "Zaproszenie jest nieprawidłowe. Poproś zespół o nowy link.")}
           </Alert.Content>
         </Alert>
       )}
@@ -149,18 +190,18 @@ export function RegistrationForm({ invited = false }: { invited?: boolean }) {
       {account && (
         <div className="flex flex-col gap-3">
           <p>
-            You are signed in as {account.email}. Sign out before creating
-            another account.
+            Korzystasz z konta {account.email}. Wyloguj się, aby utworzyć
+            kolejne konto.
           </p>
           <Button isPending={pending} onPress={() => void signOut()}>
-            Sign out
+            Wyloguj się
           </Button>
         </div>
       )}
       {accountError &&
         !(accountError instanceof ApiError && accountError.status === 401) && (
           <p role="alert">
-            Your sign-in state could not be checked. Try again.
+            Nie udało się sprawdzić stanu logowania. Spróbuj ponownie.
           </p>
         )}
       {!account && (
@@ -174,7 +215,7 @@ export function RegistrationForm({ invited = false }: { invited?: boolean }) {
               autoFocus: true,
             }}
             isDisabled={pending}
-            label="Email"
+            label="E-mail"
             maxLength={200}
             name="email"
             type="email"
@@ -189,7 +230,7 @@ export function RegistrationForm({ invited = false }: { invited?: boolean }) {
             errorMessage={fieldErrors.password}
             inputProps={{ autoComplete: "new-password" }}
             isDisabled={pending}
-            label="Password"
+            label="Hasło"
             maxLength={200}
             name="password"
             type="password"
@@ -208,7 +249,7 @@ export function RegistrationForm({ invited = false }: { invited?: boolean }) {
             errorMessage={fieldErrors.passwordConfirmation}
             inputProps={{ autoComplete: "new-password" }}
             isDisabled={pending}
-            label="Confirm password"
+            label="Potwierdź hasło"
             maxLength={200}
             name="passwordConfirmation"
             type="password"
@@ -234,7 +275,7 @@ export function RegistrationForm({ invited = false }: { invited?: boolean }) {
             isPending={pending}
             type="submit"
           >
-            Create account
+            Utwórz konto
           </Button>
         </form>
       )}
@@ -266,14 +307,14 @@ export function handleInvitationProblem(error: unknown): string | undefined {
   clearInvitationFragment();
   switch (error.problem?.type) {
     case "urn:kairos:problem:account-invitation-expired":
-      return "This invitation has expired. Ask your team for a new link.";
+      return "Zaproszenie wygasło. Poproś zespół o nowy link.";
     case "urn:kairos:problem:account-invitation-revoked":
-      return "This invitation was revoked. Ask your team for a new link.";
+      return "Zaproszenie zostało cofnięte. Poproś zespół o nowy link.";
     case "urn:kairos:problem:account-invitation-redeemed":
-      return "This invitation has already been used. Sign in if you created an account.";
+      return "Zaproszenie zostało już wykorzystane. Zaloguj się, jeśli masz utworzone konto.";
     default:
       return error.status === 404
-        ? "This invitation is invalid. Ask your team for a new link."
-        : "This invitation is unavailable. Ask your team for a new link.";
+        ? "Zaproszenie jest nieprawidłowe. Poproś zespół o nowy link."
+        : "Zaproszenie jest niedostępne. Poproś zespół o nowy link.";
   }
 }

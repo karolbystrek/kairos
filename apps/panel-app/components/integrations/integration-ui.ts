@@ -4,12 +4,12 @@ import { ApiError } from "@/src/api/api-fetch";
 
 export function getIntegrationErrorMessage(error: unknown): string {
   if (error instanceof ZodError) {
-    return error.issues[0]?.message ?? "The submitted values are not valid.";
+    return error.issues[0]?.message ?? "Wprowadzone dane są nieprawidłowe.";
   }
 
   if (error instanceof ApiError) return error.message;
 
-  return "The integration request could not be completed. Check your connection and try again.";
+  return "Nie udało się wykonać operacji na integracji. Sprawdź połączenie i spróbuj ponownie.";
 }
 
 export function shouldRetryIntegrationRequest(error: Error): boolean {
@@ -21,7 +21,7 @@ export function shouldRetryIntegrationRequest(error: Error): boolean {
 }
 
 export function formatIntegrationDateTime(value: string): string {
-  return new Intl.DateTimeFormat(undefined, {
+  return new Intl.DateTimeFormat("pl-PL", {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));

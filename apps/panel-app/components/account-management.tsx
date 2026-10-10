@@ -90,7 +90,7 @@ function deleteMutation(
 function getErrorMessage(error: unknown): string {
   if (error instanceof ApiError) return error.message;
 
-  return "Account management could not be completed. Check your connection and try again.";
+  return "Nie udało się wykonać operacji na koncie. Sprawdź połączenie i spróbuj ponownie.";
 }
 
 function shouldRetryOnError(error: Error): boolean {
@@ -114,7 +114,7 @@ function LocationSelect({
     <FormSelect
       fullWidth
       className="min-w-0 max-w-full"
-      label="Location"
+      label="Lokal"
       selectedKey={selectedId}
       onSelectionChange={(key) => {
         if (key !== null) onChange(String(key));
@@ -132,7 +132,7 @@ function LocationSelect({
 }
 
 function formatDateTime(value: string): string {
-  return new Intl.DateTimeFormat(undefined, {
+  return new Intl.DateTimeFormat("pl-PL", {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
@@ -344,12 +344,12 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-4">
-          <h1 className="page-title">Accounts</h1>
+          <h1 className="page-title">Konta</h1>
           <Tooltip delay={500}>
             <Tooltip.Trigger>
               <Button
                 isIconOnly
-                aria-label="New account"
+                aria-label="Nowe konto"
                 className="rounded-md"
                 isDisabled={enabledLocations.length === 0}
                 size="lg"
@@ -360,8 +360,8 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
             </Tooltip.Trigger>
             <Tooltip.Content>
               {enabledLocations.length === 0
-                ? "Enable a location before inviting an account"
-                : "New account"}
+                ? "Włącz lokal, aby zaprosić użytkownika"
+                : "Nowe konto"}
             </Tooltip.Content>
           </Tooltip>
         </div>
@@ -372,8 +372,8 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
                 isIconOnly
                 aria-label={
                   pendingInvitations.length > 0
-                    ? `Invitations, ${pendingInvitations.length} pending`
-                    : "Invitations"
+                    ? `Zaproszenia — oczekujące: ${pendingInvitations.length.toLocaleString("pl-PL")}`
+                    : "Zaproszenia"
                 }
                 className="rounded-md"
                 size="lg"
@@ -384,12 +384,12 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
               </Button>
               {pendingInvitations.length > 0 && (
                 <Badge color="accent" size="sm">
-                  {pendingInvitations.length}
+                  {pendingInvitations.length.toLocaleString("pl-PL")}
                 </Badge>
               )}
             </Badge.Anchor>
           </Tooltip.Trigger>
-          <Tooltip.Content>Invitations</Tooltip.Content>
+          <Tooltip.Content>Zaproszenia</Tooltip.Content>
         </Tooltip>
       </div>
 
@@ -397,7 +397,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
         <Alert status="danger">
           <Alert.Indicator />
           <Alert.Content>
-            <Alert.Title>Account request failed</Alert.Title>
+            <Alert.Title>Nie udało się wykonać operacji na koncie</Alert.Title>
             <Alert.Description>
               {getErrorMessage(collectionError)}
             </Alert.Description>
@@ -407,21 +407,21 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
 
       {!areLocationsLoading && enabledLocations.length === 0 && (
         <p className="text-sm text-muted">
-          Enable a location in Locations before inviting an account.
+          Włącz lokal w zakładce Lokale, aby zaprosić użytkownika.
         </p>
       )}
 
       {areLocationsLoading || areAccountsLoading ? (
         <div className="flex min-h-80 items-center justify-center">
-          <Spinner aria-label="Loading accounts" />
+          <Spinner aria-label="Wczytywanie kont" />
         </div>
       ) : accounts.length === 0 ? (
         <div className="py-12">
-          <h2 className="section-title">No managed accounts yet</h2>
+          <h2 className="section-title">Brak kont pracowników</h2>
           <p className="mt-2 max-w-sm secondary-text">
             {isAdministrator
-              ? "Invite a manager or operator to an existing location."
-              : "Invite an operator to your location."}
+              ? "Zaproś kierownika lub pracownika do istniejącego lokalu."
+              : "Zaproś pracownika do swojego lokalu."}
           </p>
         </div>
       ) : (
@@ -430,7 +430,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
             {accounts.map((managedAccount) => (
               <PanelCard
                 key={managedAccount.id}
-                accessibilityLabel={`View account ${managedAccount.email}`}
+                accessibilityLabel={`Pokaż konto ${managedAccount.email}`}
                 isSelected={managedAccount.id === selectedAccount?.id}
                 metadata={
                   <span
@@ -441,8 +441,8 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
                     }
                   >
                     {managedAccount.status === "ENABLED"
-                      ? "Enabled"
-                      : "Disabled"}
+                      ? "Włączone"
+                      : "Wyłączone"}
                   </span>
                 }
                 title={managedAccount.email}
@@ -455,7 +455,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
           {selectedAccount && (
             <section className="min-w-0">
               <PanelDetailHeader
-                eyebrow="Account"
+                eyebrow="Konto"
                 title={selectedAccount.email}
                 trailingActions={
                   <>
@@ -463,7 +463,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
                       <Tooltip.Trigger>
                         <Button
                           isIconOnly
-                          aria-label={`${selectedAccount.status === "ENABLED" ? "Disable" : "Enable"} account ${selectedAccount.email}`}
+                          aria-label={`${selectedAccount.status === "ENABLED" ? "Wyłącz" : "Włącz"} konto ${selectedAccount.email}`}
                           className="shrink-0 rounded-md"
                           isPending={isChangingStatus}
                           variant={
@@ -489,15 +489,15 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
                       </Tooltip.Trigger>
                       <Tooltip.Content>
                         {selectedAccount.status === "ENABLED"
-                          ? "Disable"
-                          : "Enable"}
+                          ? "Wyłącz"
+                          : "Włącz"}
                       </Tooltip.Content>
                     </Tooltip>
                     <Tooltip delay={500}>
                       <Tooltip.Trigger>
                         <Button
                           isIconOnly
-                          aria-label={`Delete account ${selectedAccount.email}`}
+                          aria-label={`Usuń konto ${selectedAccount.email}`}
                           className="shrink-0 rounded-md"
                           variant="danger"
                           onPress={() => {
@@ -510,7 +510,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
                           <DeleteIcon size={20} />
                         </Button>
                       </Tooltip.Trigger>
-                      <Tooltip.Content>Delete</Tooltip.Content>
+                      <Tooltip.Content>Usuń</Tooltip.Content>
                     </Tooltip>
                   </>
                 }
@@ -519,26 +519,26 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
               <dl className="mt-8 grid gap-5 border-t border-separator pt-6 sm:grid-cols-2">
                 <div>
                   <dt className="text-xs font-medium uppercase tracking-[0.12em] text-muted">
-                    Role
+                    Rola
                   </dt>
                   <dd className="mt-1 font-medium">
                     {selectedAccount.role === "MANAGER"
-                      ? "Manager"
-                      : "Operator"}
+                      ? "Kierownik"
+                      : "Pracownik"}
                   </dd>
                 </div>
                 <div>
                   <dt className="text-xs font-medium uppercase tracking-[0.12em] text-muted">
-                    Location
+                    Lokal
                   </dt>
                   <dd className="mt-1 font-medium">
                     {locationNames.get(selectedAccount.locationId) ??
-                      "Unavailable"}
+                      "Niedostępny"}
                   </dd>
                 </div>
                 <div>
                   <dt className="text-xs font-medium uppercase tracking-[0.12em] text-muted">
-                    Email
+                    E-mail
                   </dt>
                   <dd className="mt-1 break-words font-medium">
                     {selectedAccount.email}
@@ -546,10 +546,12 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
                 </div>
                 <div>
                   <dt className="text-xs font-medium uppercase tracking-[0.12em] text-muted">
-                    Created
+                    Utworzono
                   </dt>
                   <dd className="mt-1 font-medium">
-                    {new Date(selectedAccount.createdAt).toLocaleDateString()}
+                    {new Date(selectedAccount.createdAt).toLocaleDateString(
+                      "pl-PL",
+                    )}
                   </dd>
                 </div>
               </dl>
@@ -566,15 +568,15 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
       >
         <PanelPopup.Header>
           <PanelPopup.Heading>
-            {createdInvitation ? "Invitation link" : "New account"}
+            {createdInvitation ? "Link zaproszenia" : "Nowe konto"}
           </PanelPopup.Heading>
         </PanelPopup.Header>
         {createdInvitation ? (
           <PanelPopup.Body className="min-w-0 max-w-full pb-6">
             <OneTimeSecret
               secret={{
-                title: "Share this invitation",
-                description: `${createdInvitation.role === "MANAGER" ? "Manager" : "Operator"} · ${createdInvitation.locationName}`,
+                title: "Udostępnij zaproszenie",
+                description: `${createdInvitation.role === "MANAGER" ? "Kierownik" : "Pracownik"} · ${createdInvitation.locationName}`,
                 value: createdInvitation.invitationLink,
               }}
               onConfirmed={() => {
@@ -590,7 +592,9 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
                 <Alert status="danger">
                   <Alert.Indicator />
                   <Alert.Content>
-                    <Alert.Title>Invitation could not be created</Alert.Title>
+                    <Alert.Title>
+                      Nie udało się utworzyć zaproszenia
+                    </Alert.Title>
                     <Alert.Description>
                       {getErrorMessage(creationError)}
                     </Alert.Description>
@@ -605,7 +609,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
                 />
               ) : (
                 <div className="min-w-0 max-w-full">
-                  <p className="text-sm font-medium">Location</p>
+                  <p className="text-sm font-medium">Lokal</p>
                   <p className="mt-1 break-words text-sm text-muted">
                     {
                       locations.find((location) => location.id === locationId)
@@ -624,13 +628,13 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
                     setRole(value === "MANAGER" ? "MANAGER" : "OPERATOR")
                   }
                 >
-                  <Label>Role</Label>
+                  <Label>Rola</Label>
                   <Radio value="OPERATOR">
                     <Radio.Content>
                       <Radio.Control>
                         <Radio.Indicator />
                       </Radio.Control>
-                      Operator
+                      Pracownik
                     </Radio.Content>
                   </Radio>
                   <Radio value="MANAGER">
@@ -638,7 +642,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
                       <Radio.Control>
                         <Radio.Indicator />
                       </Radio.Control>
-                      Manager
+                      Kierownik
                     </Radio.Content>
                   </Radio>
                 </RadioGroup>
@@ -646,11 +650,11 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
             </PanelPopup.Body>
             <PanelPopup.Footer className="max-w-full flex-wrap">
               <Button slot="close" variant="tertiary">
-                Cancel
+                Anuluj
               </Button>
               <Button isPending={isCreating} type="submit">
                 <PlusIcon size={18} />
-                {isCreating ? "Creating…" : "Create invitation"}
+                {isCreating ? "Tworzenie…" : "Utwórz zaproszenie"}
               </Button>
             </PanelPopup.Footer>
           </form>
@@ -664,18 +668,18 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
         onOpenChange={setIsInvitationsOpen}
       >
         <PanelPopup.Header>
-          <PanelPopup.Heading>Pending invitations</PanelPopup.Heading>
+          <PanelPopup.Heading>Oczekujące zaproszenia</PanelPopup.Heading>
         </PanelPopup.Header>
         <PanelPopup.Body className="pb-6">
           {areInvitationsLoading ? (
             <div className="flex min-h-48 items-center justify-center">
-              <Spinner aria-label="Loading invitations" />
+              <Spinner aria-label="Wczytywanie zaproszeń" />
             </div>
           ) : invitationsError ? (
             <Alert status="danger">
               <Alert.Indicator />
               <Alert.Content>
-                <Alert.Title>Invitations could not load</Alert.Title>
+                <Alert.Title>Nie udało się wczytać zaproszeń</Alert.Title>
                 <Alert.Description>
                   {getErrorMessage(invitationsError)}
                 </Alert.Description>
@@ -685,13 +689,13 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
                   variant="danger"
                   onPress={() => void mutateInvitations()}
                 >
-                  Retry
+                  Spróbuj ponownie
                 </Button>
               </Alert.Content>
             </Alert>
           ) : pendingInvitations.length === 0 ? (
             <p className="py-12 text-center secondary-text">
-              No pending invitations
+              Brak oczekujących zaproszeń
             </p>
           ) : (
             <ul className="divide-y divide-separator">
@@ -702,25 +706,27 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
                 >
                   <div className="min-w-0">
                     <p className="font-semibold">
-                      {invitation.role === "MANAGER" ? "Manager" : "Operator"}
+                      {invitation.role === "MANAGER"
+                        ? "Kierownik"
+                        : "Pracownik"}
                       <span className="font-normal text-muted">
                         {" "}
                         · {invitation.locationName}
                       </span>
                     </p>
                     <p className="mt-1 text-sm text-muted">
-                      Created by {invitation.issuedByEmail} on{" "}
+                      Autor: {invitation.issuedByEmail}, data:{" "}
                       {formatDateTime(invitation.createdAt)}
                     </p>
                     <p className="mt-1 text-sm text-muted">
-                      Expires {formatDateTime(invitation.expiresAt)}
+                      Wygasa {formatDateTime(invitation.expiresAt)}
                     </p>
                   </div>
                   <Tooltip delay={500}>
                     <Tooltip.Trigger>
                       <Button
                         isIconOnly
-                        aria-label={`Revoke ${invitation.role === "MANAGER" ? "manager" : "operator"} invitation for ${invitation.locationName}`}
+                        aria-label={`Unieważnij zaproszenie do lokalu ${invitation.locationName} (rola: ${invitation.role === "MANAGER" ? "Kierownik" : "Pracownik"})`}
                         className="shrink-0 self-end rounded-md sm:self-auto"
                         variant="danger"
                         onPress={() => {
@@ -732,7 +738,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
                         <DisableIcon size={20} />
                       </Button>
                     </Tooltip.Trigger>
-                    <Tooltip.Content>Revoke</Tooltip.Content>
+                    <Tooltip.Content>Unieważnij</Tooltip.Content>
                   </Tooltip>
                 </li>
               ))}
@@ -751,20 +757,20 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
       >
         <PanelPopup.Header>
           <PanelPopup.Icon status="danger" />
-          <PanelPopup.Heading>Revoke invitation?</PanelPopup.Heading>
+          <PanelPopup.Heading>Unieważnić zaproszenie?</PanelPopup.Heading>
         </PanelPopup.Header>
         <PanelPopup.Body className="flex flex-col gap-4">
           <p>
-            The{" "}
-            {invitationToRevoke?.role === "MANAGER" ? "manager" : "operator"}{" "}
-            invitation for {invitationToRevoke?.locationName} will stop working
-            immediately.
+            Zaproszenie do lokalu {invitationToRevoke?.locationName}
+            (rola:{" "}
+            {invitationToRevoke?.role === "MANAGER" ? "Kierownik" : "Pracownik"}
+            ) natychmiast przestanie działać.
           </p>
           {revocationError && (
             <Alert status="danger">
               <Alert.Indicator />
               <Alert.Content>
-                <Alert.Title>Invitation could not be revoked</Alert.Title>
+                <Alert.Title>Nie udało się unieważnić zaproszenia</Alert.Title>
                 <Alert.Description>
                   {getErrorMessage(revocationError)}
                 </Alert.Description>
@@ -774,14 +780,14 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
         </PanelPopup.Body>
         <PanelPopup.Footer>
           <Button slot="close" variant="tertiary">
-            Cancel
+            Anuluj
           </Button>
           <Button
             isPending={isRevoking}
             variant="danger"
             onPress={() => void revokeInvitation()}
           >
-            Revoke
+            Unieważnij
           </Button>
         </PanelPopup.Footer>
       </PanelPopup>
@@ -797,16 +803,16 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
         <PanelPopup.Header>
           <PanelPopup.Icon status="warning" />
           <PanelPopup.Heading>
-            Disable {accountToDisable?.email}?
+            Wyłączyć konto {accountToDisable?.email}?
           </PanelPopup.Heading>
         </PanelPopup.Header>
         <PanelPopup.Body>
-          This account will be signed out, its pending invitations will be
-          revoked, and it cannot access the panel until enabled again.
+          Konto zostanie wylogowane, a jego oczekujące zaproszenia unieważnione.
+          Dostęp do panelu zostanie zablokowany do ponownego włączenia konta.
         </PanelPopup.Body>
         <PanelPopup.Footer>
           <Button slot="close" variant="tertiary">
-            Cancel
+            Anuluj
           </Button>
           <Button
             isPending={isChangingStatus}
@@ -818,7 +824,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
               });
             }}
           >
-            Disable
+            Wyłącz
           </Button>
         </PanelPopup.Footer>
       </PanelPopup>
@@ -838,21 +844,21 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
         <PanelPopup.Header>
           <PanelPopup.Icon status="danger" />
           <PanelPopup.Heading>
-            Delete {accountToDelete?.email}?
+            Usunąć konto {accountToDelete?.email}?
           </PanelPopup.Heading>
         </PanelPopup.Header>
         <PanelPopup.Body className="flex flex-col gap-4">
           <p>
-            This account will be signed out, disappear from Accounts, lose its
-            pending invitations, and never regain access. Type its exact email
-            to confirm.
+            Konto zostanie wylogowane, zniknie z listy kont i straci oczekujące
+            zaproszenia oraz dostęp do panelu. Aby potwierdzić, wpisz dokładny
+            adres e-mail konta.
           </p>
           <FormTextField
             fullWidth
             isRequired
             inputProps={{ autoComplete: "off" }}
             isDisabled={isDeleting}
-            label={`Type ${accountToDelete?.email} to confirm`}
+            label={`Wpisz ${accountToDelete?.email} w celu potwierdzenia`}
             name="delete-account-confirmation"
             value={deleteConfirmation}
             onChange={setDeleteConfirmation}
@@ -861,7 +867,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
             <Alert status="danger">
               <Alert.Indicator />
               <Alert.Content>
-                <Alert.Title>Account could not be deleted</Alert.Title>
+                <Alert.Title>Nie udało się usunąć konta</Alert.Title>
                 <Alert.Description>
                   {getErrorMessage(deletionError)}
                 </Alert.Description>
@@ -871,7 +877,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
         </PanelPopup.Body>
         <PanelPopup.Footer>
           <Button slot="close" variant="tertiary">
-            Cancel
+            Anuluj
           </Button>
           <Button
             isDisabled={deleteConfirmation !== accountToDelete?.email}
@@ -879,7 +885,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
             variant="danger"
             onPress={() => void removeAccount()}
           >
-            Delete
+            Usuń
           </Button>
         </PanelPopup.Footer>
       </PanelPopup>

@@ -6,12 +6,12 @@ import { authenticationResultSchema } from "./authentication";
 export const registrationInputSchema = z
   .object({
     email: requiredEmailInputSchema,
-    password: passwordInputSchema.min(12, "Use at least 12 characters."),
+    password: passwordInputSchema.min(12, "Użyj co najmniej 12 znaków."),
     passwordConfirmation: z.string(),
   })
   .refine(
     ({ password, passwordConfirmation }) => password === passwordConfirmation,
-    { message: "Passwords must match", path: ["passwordConfirmation"] },
+    { message: "Hasła muszą być takie same.", path: ["passwordConfirmation"] },
   );
 export type TenantRegistrationInput = z.input<typeof registrationInputSchema>;
 export function registerTenant(registration: TenantRegistrationInput) {

@@ -47,16 +47,16 @@ export function OneTimeSecret({
       <Alert status="warning">
         <Alert.Indicator />
         <Alert.Content>
-          <Alert.Title>Copy this secret now</Alert.Title>
+          <Alert.Title>Skopiuj teraz ten sekret</Alert.Title>
           <Alert.Description>
-            Kairos will not show it again after confirmation. Save it before
-            confirming.
+            Po potwierdzeniu Kairos nie pokaże go ponownie. Zapisz go przed
+            potwierdzeniem.
           </Alert.Description>
         </Alert.Content>
       </Alert>
 
       <TextField fullWidth isReadOnly value={secret.value}>
-        <Label>Secret</Label>
+        <Label>Sekret</Label>
         <div className="relative">
           <Input className="pr-12 font-mono" />
           <Tooltip delay={500}>
@@ -64,7 +64,9 @@ export function OneTimeSecret({
               <Button
                 isIconOnly
                 aria-label={
-                  copyStatus === "copied" ? "Secret copied" : "Copy secret"
+                  copyStatus === "copied"
+                    ? "Sekret skopiowany"
+                    : "Skopiuj sekret"
                 }
                 className="absolute right-1 top-1/2 -translate-y-1/2 rounded-md"
                 size="sm"
@@ -79,7 +81,7 @@ export function OneTimeSecret({
               </Button>
             </Tooltip.Trigger>
             <Tooltip.Content>
-              {copyStatus === "copied" ? "Copied" : "Copy secret"}
+              {copyStatus === "copied" ? "Skopiowano" : "Skopiuj sekret"}
             </Tooltip.Content>
           </Tooltip>
         </div>
@@ -87,12 +89,12 @@ export function OneTimeSecret({
 
       {copyStatus === "failed" && (
         <p className="text-sm text-danger">
-          Clipboard access failed. Select and copy the secret manually.
+          Nie udało się skopiować do schowka. Zaznacz i skopiuj sekret ręcznie.
         </p>
       )}
 
       <div className="flex justify-end">
-        <Button onPress={onConfirmed}>Confirm</Button>
+        <Button onPress={onConfirmed}>Potwierdź</Button>
       </div>
     </section>
   );
