@@ -24,7 +24,7 @@ issue. Issues describe context, goals and acceptance criteria, not implementatio
 details. Discuss implementation choices when implementing the issue.
 
 When working on a GitHub issue, set the conversation title to that issue's exact
-title. Update the conversation title when switching to another issue.
+title.
 
 Create a new `<issue>-<topic>` branch from current `main` for tracked work, or a
 descriptive branch for issue-exempt work. Validate, commit all task changes in
