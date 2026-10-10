@@ -47,10 +47,9 @@ export function OneTimeSecret({
       <Alert status="warning">
         <Alert.Indicator />
         <Alert.Content>
-          <Alert.Title>Skopiuj teraz ten sekret</Alert.Title>
+          <Alert.Title>Zapisz sekret</Alert.Title>
           <Alert.Description>
-            Po potwierdzeniu Kairos nie pokaże go ponownie. Zapisz go przed
-            potwierdzeniem.
+            Po potwierdzeniu nie pokażemy go ponownie.
           </Alert.Description>
         </Alert.Content>
       </Alert>
@@ -94,7 +93,10 @@ export function OneTimeSecret({
       )}
 
       <div className="flex justify-end">
-        <Button onPress={onConfirmed}>Potwierdź</Button>
+        <Button onPress={onConfirmed}>
+          <CheckIcon size={18} />
+          Zapisano sekret
+        </Button>
       </div>
     </section>
   );

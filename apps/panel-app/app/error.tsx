@@ -1,5 +1,6 @@
 "use client";
 
+import { RefreshCw } from "lucide-react";
 import { Alert, Button } from "@heroui/react";
 import { useEffect } from "react";
 
@@ -27,7 +28,7 @@ export default function Error({
             panel.
           </Alert.Description>
           <Button className="mt-4" size="sm" variant="danger" onPress={reset}>
-            Spróbuj ponownie
+            <RefreshCw aria-hidden="true" size={18} /> Spróbuj ponownie
           </Button>
         </Alert.Content>
       </Alert>

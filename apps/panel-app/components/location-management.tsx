@@ -4,18 +4,18 @@ import type { FormEvent } from "react";
 
 import { Alert, Button, Spinner, Tooltip } from "@heroui/react";
 import {
-  ArrowRight as ArrowRightIcon,
+  ArrowUpRight,
   Ban as DisableIcon,
   Check as EnableIcon,
   Pencil as EditIcon,
   Plus as PlusIcon,
   Trash2 as DeleteIcon,
-  X as CancelIcon,
 } from "lucide-react";
 import { useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
 import { ZodError } from "zod";
 
+import { HoldToConfirmButton } from "@/components/hold-to-confirm-button";
 import { PanelPopup } from "@/components/panel-popup";
 import { FormTextField } from "@/components/form-controls";
 import { LocationCreationModal } from "@/components/location-creation-modal";
@@ -79,8 +79,6 @@ export function LocationManagement({
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editName, setEditName] = useState<string>();
   const [editReviewUrl, setEditReviewUrl] = useState<string>();
-  const [confirmation, setConfirmation] = useState<Confirmation>();
-  const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [error, setError] = useState<unknown>();
   const [actionError, setActionError] = useState<unknown>();
   const [pendingAction, setPendingAction] = useState<string>();
@@ -107,6 +105,7 @@ export function LocationManagement({
     setEditName(undefined);
     setEditReviewUrl(undefined);
     setError(undefined);
+    setActionError(undefined);
   }
 
   async function updateCachedLocation(updated: Location) {
@@ -168,8 +167,8 @@ export function LocationManagement({
     }
   }
 
-  async function confirmAction() {
-    if (!confirmation || pendingAction) return;
+  async function confirmAction(confirmation: Confirmation) {
+    if (pendingAction) return;
 
     const actionKey = `${confirmation.kind}-${confirmation.location.id}`;
 
@@ -194,8 +193,6 @@ export function LocationManagement({
 
         await updateCachedLocation(updated);
       }
-      setConfirmation(undefined);
-      setDeleteConfirmation("");
       await revalidateCascadeState();
     } catch (caught) {
       setActionError(caught);
@@ -204,35 +201,20 @@ export function LocationManagement({
     }
   }
 
-  function openConfirmation(next: Confirmation) {
-    if (pendingAction) return;
-    setActionError(undefined);
-    setDeleteConfirmation("");
-    setConfirmation(next);
-  }
-
-  const confirmationTitle = confirmation
-    ? confirmation.kind === "disable"
-      ? `Wyłączyć ${confirmation.location.name}?`
-      : confirmation.kind === "enable"
-        ? `Włączyć ${confirmation.location.name}?`
-        : `Usunąć ${confirmation.location.name}?`
-    : "Potwierdź operację na lokalu";
-
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center gap-4">
-        <h1 className="page-title">Lokale</h1>
+        <h1 className="sr-only">Lokale</h1>
         <Tooltip delay={500}>
           <Tooltip.Trigger>
             <Button
-              isIconOnly
               aria-label="Nowy lokal"
               className="rounded-md"
               size="lg"
               onPress={() => setIsCreateOpen(true)}
             >
               <PlusIcon size={20} />
+              Nowy lokal
             </Button>
           </Tooltip.Trigger>
           <Tooltip.Content>Nowy lokal</Tooltip.Content>
@@ -272,7 +254,6 @@ export function LocationManagement({
                 isSelected={location.id === selectedLocation?.id}
                 status={location.status}
                 title={location.name}
-                trailing={<ArrowRightIcon size={17} />}
                 onPress={() => {
                   selectLocation(location.id);
                 }}
@@ -282,6 +263,7 @@ export function LocationManagement({
 
           {selectedLocation && (
             <PanelPopup
+              key={selectedLocation.id}
               isOpen
               aria-label={`Lokal ${selectedLocation.name}`}
               onOpenChange={(open) => {
@@ -292,6 +274,25 @@ export function LocationManagement({
                 <PanelDetailHeader
                   eyebrow="Lokal"
                   title={selectedLocation.name}
+                  titleAction={
+                    editName === undefined ? (
+                      <Tooltip delay={500}>
+                        <Tooltip.Trigger>
+                          <Button
+                            isIconOnly
+                            aria-label="Edytuj nazwę lokalu"
+                            className="entity-name-edit shrink-0"
+                            isDisabled={Boolean(pendingAction)}
+                            variant="secondary"
+                            onPress={() => setEditName(selectedLocation.name)}
+                          >
+                            <EditIcon size={18} />
+                          </Button>
+                        </Tooltip.Trigger>
+                        <Tooltip.Content>Edytuj nazwę lokalu</Tooltip.Content>
+                      </Tooltip>
+                    ) : undefined
+                  }
                   titleEditor={
                     editName === undefined ? undefined : (
                       <form
@@ -314,13 +315,13 @@ export function LocationManagement({
                         <Tooltip delay={500}>
                           <Tooltip.Trigger>
                             <Button
-                              isIconOnly
                               aria-label="Zapisz nazwę lokalu"
                               className="shrink-0 rounded-md"
                               isPending={pendingAction === "rename"}
                               type="submit"
                             >
                               <EnableIcon size={20} />
+                              Zapisz
                             </Button>
                           </Tooltip.Trigger>
                           <Tooltip.Content>Zapisz</Tooltip.Content>
@@ -328,7 +329,6 @@ export function LocationManagement({
                         <Tooltip delay={500}>
                           <Tooltip.Trigger>
                             <Button
-                              isIconOnly
                               aria-label="Anuluj edycję nazwy lokalu"
                               className="shrink-0 rounded-md"
                               isDisabled={pendingAction === "rename"}
@@ -339,7 +339,7 @@ export function LocationManagement({
                                 setError(undefined);
                               }}
                             >
-                              <CancelIcon size={20} />
+                              Anuluj
                             </Button>
                           </Tooltip.Trigger>
                           <Tooltip.Content>Anuluj</Tooltip.Content>
@@ -350,82 +350,56 @@ export function LocationManagement({
                   trailingActions={
                     editName === undefined ? (
                       <>
-                        <Tooltip delay={500}>
-                          <Tooltip.Trigger>
-                            <Button
-                              isIconOnly
-                              aria-label="Edytuj nazwę lokalu"
-                              className="rounded-md"
-                              onPress={() => setEditName(selectedLocation.name)}
-                            >
-                              <EditIcon size={20} />
-                            </Button>
-                          </Tooltip.Trigger>
-                          <Tooltip.Content>Edytuj</Tooltip.Content>
-                        </Tooltip>
-                        <Tooltip delay={500}>
-                          <Tooltip.Trigger>
-                            <Button
-                              isIconOnly
-                              aria-label={`${selectedLocation.status === "ENABLED" ? "Wyłącz" : "Włącz"} lokal`}
-                              className="rounded-md"
-                              variant={
-                                selectedLocation.status === "ENABLED"
-                                  ? "danger"
-                                  : "secondary"
-                              }
-                              onPress={() =>
-                                openConfirmation({
-                                  kind:
-                                    selectedLocation.status === "ENABLED"
-                                      ? "disable"
-                                      : "enable",
-                                  location: selectedLocation,
-                                })
-                              }
-                            >
-                              {selectedLocation.status === "ENABLED" ? (
-                                <DisableIcon size={20} />
-                              ) : (
-                                <EnableIcon size={20} />
-                              )}
-                            </Button>
-                          </Tooltip.Trigger>
-                          <Tooltip.Content>
-                            {selectedLocation.status === "ENABLED"
-                              ? "Wyłącz"
-                              : "Włącz"}
-                          </Tooltip.Content>
-                        </Tooltip>
-                        <Tooltip delay={500}>
-                          <Tooltip.Trigger>
-                            <Button
-                              isIconOnly
-                              aria-label="Usuń lokal"
-                              className="rounded-md"
-                              isDisabled={
-                                locations.length <= 1 ||
-                                selectedLocation.status !== "DISABLED"
-                              }
-                              variant="danger"
-                              onPress={() =>
-                                openConfirmation({
-                                  kind: "delete",
-                                  location: selectedLocation,
-                                })
-                              }
-                            >
-                              <DeleteIcon size={20} />
-                            </Button>
-                          </Tooltip.Trigger>
-                          <Tooltip.Content>
-                            {locations.length <= 1
-                              ? "Nie można usunąć ostatniego lokalu"
-                              : selectedLocation.status === "DISABLED"
-                                ? "Usuń"
-                                : "Wyłącz przed usunięciem"}
-                          </Tooltip.Content>
-                        </Tooltip>
+                        {selectedLocation.status === "ENABLED" ? (
+                          <HoldToConfirmButton
+                            isDisabled={Boolean(pendingAction)}
+                            isPending={
+                              pendingAction === `disable-${selectedLocation.id}`
+                            }
+                            onConfirm={() =>
+                              confirmAction({
+                                kind: "disable",
+                                location: selectedLocation,
+                              })
+                            }
+                          >
+                            <DisableIcon size={18} /> Przytrzymaj, aby wyłączyć
+                          </HoldToConfirmButton>
+                        ) : (
+                          <Button
+                            isDisabled={Boolean(pendingAction)}
+                            isPending={
+                              pendingAction === `enable-${selectedLocation.id}`
+                            }
+                            variant="secondary"
+                            onPress={() =>
+                              void confirmAction({
+                                kind: "enable",
+                                location: selectedLocation,
+                              })
+                            }
+                          >
+                            <EnableIcon size={18} /> Włącz
+                          </Button>
+                        )}
+                        <HoldToConfirmButton
+                          isDisabled={
+                            Boolean(pendingAction) ||
+                            locations.length <= 1 ||
+                            selectedLocation.status !== "DISABLED"
+                          }
+                          isPending={
+                            pendingAction === `delete-${selectedLocation.id}`
+                          }
+                          onConfirm={() =>
+                            confirmAction({
+                              kind: "delete",
+                              location: selectedLocation,
+                            })
+                          }
+                        >
+                          <DeleteIcon size={18} /> Przytrzymaj, aby usunąć
+                        </HoldToConfirmButton>
                       </>
                     ) : null
                   }
@@ -436,6 +410,36 @@ export function LocationManagement({
                     ? "Włączony"
                     : "Wyłączony"}
                 </p>
+                <p className="mt-3 text-sm text-muted">
+                  {selectedLocation.status === "ENABLED"
+                    ? "Wyłączenie wyłączy i wyloguje przypisane konta oraz unieważni zaproszenia. Najpierw zakończ aktywne zamówienia."
+                    : "Włączenie obejmie wszystkie przypisane konta, także wyłączone osobno. Usunięcie lokalu i kont jest nieodwracalne. Historia zamówień pozostanie dostępna."}
+                </p>
+                {actionError !== undefined && (
+                  <Alert status="danger">
+                    <Alert.Content>
+                      <Alert.Title>
+                        Nie udało się wykonać operacji na lokalu
+                      </Alert.Title>
+                      <Alert.Description>
+                        {hasActiveOrdersConflict
+                          ? "Najpierw zakończ lub anuluj aktywne zamówienia."
+                          : getErrorMessage(actionError)}
+                      </Alert.Description>
+                    </Alert.Content>
+                  </Alert>
+                )}
+                {hasActiveOrdersConflict && (
+                  <Button
+                    variant="secondary"
+                    onPress={() => {
+                      selectLocation();
+                      onViewOrders(selectedLocation.id);
+                    }}
+                  >
+                    <ArrowUpRight size={18} /> Pokaż zamówienia
+                  </Button>
+                )}
                 {error !== undefined && (
                   <Alert status="danger">
                     <Alert.Content>
@@ -464,7 +468,7 @@ export function LocationManagement({
                     onChange={setEditReviewUrl}
                   />
                   <p className="secondary-text">
-                    Klienci otrzymują jedno zaproszenie po odebraniu zamówienia.
+                    Zaproszenie do opinii wysyłamy raz, po odebraniu zamówienia.
                   </p>
                   <Button
                     className="self-start"
@@ -472,7 +476,7 @@ export function LocationManagement({
                     isPending={pendingAction === "reviews"}
                     type="submit"
                   >
-                    Zapisz ustawienia opinii
+                    <EnableIcon size={18} /> Zapisz ustawienia opinii
                   </Button>
                 </form>
                 {locations.length <= 1 && (
@@ -492,110 +496,6 @@ export function LocationManagement({
         onCreated={(location) => selectLocation(location.id)}
         onOpenChange={setIsCreateOpen}
       />
-
-      <PanelPopup
-        className="sm:max-w-[480px]"
-        isOpen={Boolean(confirmation)}
-        role="alertdialog"
-        onOpenChange={(open) => {
-          if (!open) {
-            setConfirmation(undefined);
-            setActionError(undefined);
-            setDeleteConfirmation("");
-          }
-        }}
-      >
-        <PanelPopup.Header>
-          <PanelPopup.Icon
-            status={confirmation?.kind === "enable" ? "warning" : "danger"}
-          />
-          <PanelPopup.Heading>{confirmationTitle}</PanelPopup.Heading>
-        </PanelPopup.Header>
-        <PanelPopup.Body className="flex flex-col gap-4">
-          {confirmation?.kind === "disable" && (
-            <p>
-              Przypisane konta zostaną wyłączone i wylogowane. Oczekujące
-              zaproszenia do tego lokalu zostaną unieważnione.
-            </p>
-          )}
-          {confirmation?.kind === "enable" && (
-            <p>
-              Wszystkie przypisane konta, które nie są zarchiwizowane, zostaną
-              włączone, również te wyłączone osobno.
-            </p>
-          )}
-          {confirmation?.kind === "delete" && (
-            <>
-              <p>
-                Lokal i przypisane konta znikną z panelu zarządzania i nie
-                będzie można ich przywrócić. Historia zamówień pozostanie
-                dostępna. Aby potwierdzić, wpisz dokładną nazwę lokalu.
-              </p>
-              <FormTextField
-                fullWidth
-                isRequired
-                inputProps={{ autoComplete: "off" }}
-                isDisabled={Boolean(pendingAction)}
-                label={`Wpisz ${confirmation.location.name} w celu potwierdzenia`}
-                name="delete-location-confirmation"
-                value={deleteConfirmation}
-                onChange={setDeleteConfirmation}
-              />
-            </>
-          )}
-          {actionError !== undefined && (
-            <Alert status="danger">
-              <Alert.Indicator />
-              <Alert.Content>
-                <Alert.Title>
-                  {hasActiveOrdersConflict
-                    ? "Najpierw zakończ aktywne zamówienia"
-                    : "Nie udało się wykonać operacji na lokalu"}
-                </Alert.Title>
-                <Alert.Description>
-                  {hasActiveOrdersConflict
-                    ? "Przed wyłączeniem lokalu zakończ lub anuluj wszystkie aktywne zamówienia."
-                    : getErrorMessage(actionError)}
-                </Alert.Description>
-              </Alert.Content>
-            </Alert>
-          )}
-        </PanelPopup.Body>
-        <PanelPopup.Footer>
-          <Button slot="close" variant="tertiary">
-            Anuluj
-          </Button>
-          {hasActiveOrdersConflict && confirmation && (
-            <Button
-              variant="secondary"
-              onPress={() => {
-                const locationId = confirmation.location.id;
-
-                setConfirmation(undefined);
-                setActionError(undefined);
-                onViewOrders(locationId);
-              }}
-            >
-              Pokaż zamówienia
-            </Button>
-          )}
-          <Button
-            isDisabled={
-              confirmation?.kind === "delete" &&
-              deleteConfirmation !== confirmation.location.name
-            }
-            isPending={Boolean(pendingAction)}
-            variant={confirmation?.kind === "enable" ? "primary" : "danger"}
-            onPress={() => void confirmAction()}
-          >
-            {confirmation?.kind === "disable"
-              ? "Wyłącz"
-              : confirmation?.kind === "enable"
-                ? "Włącz"
-                : "Usuń"}
-          </Button>
-        </PanelPopup.Footer>
-      </PanelPopup>
     </div>
   );
 }

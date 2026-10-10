@@ -1,7 +1,7 @@
 "use client";
 
 import { Button, Modal } from "@heroui/react";
-import { X } from "lucide-react";
+import { Star, X } from "lucide-react";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import useSWR from "swr";
 
@@ -114,7 +114,11 @@ export function ReviewInvitation() {
               </Modal.Heading>
             </Modal.Header>
             <Modal.Footer>
-              <Button variant="secondary" onPress={dismiss}>
+              <Button
+                aria-label="Zamknij"
+                variant="secondary"
+                onPress={dismiss}
+              >
                 Zamknij
               </Button>
               <Button
@@ -128,6 +132,7 @@ export function ReviewInvitation() {
                   dismiss();
                 }}
               >
+                <Star aria-hidden="true" size={18} />
                 Wystaw opinię w Google
               </Button>
             </Modal.Footer>

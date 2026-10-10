@@ -74,7 +74,7 @@ pending colour separates invitations from enabled and disabled accounts, without
 visible status text on the card; assistive technology receives the status and
 the detail popup states it explicitly. Selecting an invitation opens its email,
 role, location, issuer, creation time, expiration time, and Revoke action.
-Revocation requires focused confirmation identifying the recipient and target
+Revocation uses the inline hold confirmation defined in [staff panel requirements](staff-panel.md#lifecycle-vocabulary-and-confirmations), identifying the recipient and target
 because it makes an already shared link unusable. Redeemed, revoked, and expired
 invitations disappear from the collection after revalidation; redeemed accounts
 then appear as created accounts. Terminal metadata remains in PostgreSQL for

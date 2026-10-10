@@ -1,5 +1,6 @@
 "use client";
 
+import { LogOut, UserPlus } from "lucide-react";
 import { useSyncExternalStore, useState, type FormEvent } from "react";
 import { Alert, Button, Link } from "@heroui/react";
 import useSWR from "swr";
@@ -206,7 +207,7 @@ export function RegistrationForm({ invited = false }: { invited?: boolean }) {
             kolejne konto.
           </p>
           <Button isPending={pending} onPress={() => void signOut()}>
-            Wyloguj się
+            <LogOut aria-hidden="true" size={18} /> Wyloguj się
           </Button>
         </div>
       )}
@@ -288,7 +289,7 @@ export function RegistrationForm({ invited = false }: { invited?: boolean }) {
             isPending={pending}
             type="submit"
           >
-            Utwórz konto
+            <UserPlus aria-hidden="true" size={18} /> Utwórz konto
           </Button>
         </form>
       )}

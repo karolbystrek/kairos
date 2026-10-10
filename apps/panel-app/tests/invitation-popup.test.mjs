@@ -67,7 +67,7 @@ function workspace(kind = "account-management", collections = {}) {
   function elements(node) {
     if (!node || typeof node !== "object") return [];
     if (Array.isArray(node)) return node.flatMap(elements);
-    return [node, ...elements(node.props?.children), ...elements(node.props?.trailingActions), ...elements(node.props?.titleEditor)];
+    return [node, ...elements(node.props?.children), ...elements(node.props?.trailingActions), ...elements(node.props?.titleEditor), ...elements(node.props?.titleAction)];
   }
   function render() {
     cursor = 0;
@@ -164,7 +164,7 @@ test("invitation loading and failure preserve loaded accounts and offer invitati
   assert.ok(loading.nodes().some(node => node.props?.["aria-label"] === "Wczytywanie zaproszeń"));
   const failed = workspace("account-management", { accounts: [account], errors: { invitations: new Error("Unavailable") } });
   assert.equal(failed.nodes().filter(node => node.type === "PanelCard").length, 1);
-  const retry = failed.nodes().find(node => node.props?.children === "Spróbuj ponownie");
+  const retry = failed.nodes().find(node => node.props?.["aria-label"] === "Spróbuj ponownie wczytać zaproszenia");
   assert.ok(retry);
   retry.props.onPress();
   assert.deepEqual(failed.requests, [{ retry: "invitations" }]);

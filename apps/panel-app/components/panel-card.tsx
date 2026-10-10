@@ -29,7 +29,7 @@ export function PanelCard({
         <Button
           aria-current={isSelected ? "true" : undefined}
           aria-label={accessibilityLabel}
-          className="absolute inset-0 z-0 bg-transparent outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset"
+          className="absolute inset-0 z-0 bg-transparent outline-none"
           variant="tertiary"
           onPress={onPress}
         >

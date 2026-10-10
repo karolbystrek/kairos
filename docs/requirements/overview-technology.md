@@ -81,8 +81,12 @@ tokens rather than the standalone authentication-page layout.
 #### Appearance and popup behavior
 
 Keep popups quick to read: use a clear title and direct actions, and omit
-secondary text that repeats the title. Include instructions only when needed
-to complete the action, using short steps rather than explanatory paragraphs.
+secondary text that repeats the title or action. Routine confirmations such as
+logout omit explanatory captions; titles and buttons communicate the decision.
+Retain concise instructions only for non-obvious setup, irreversible effects,
+access/account cascades, recovery and one-time secrets. Confirmation headers
+place one compact warning icon alongside the title; they never repeat the
+button's action icon. Warning icons use yellow/amber in both appearances.
 
 The shared visual character is direct, neutral, and hospitality-oriented
 without restaurant-themed decoration. Light appearance uses a true white page,
@@ -162,9 +166,8 @@ designed primarily for tablet use,
 especially 11- to 14-inch touch-and-pointer devices, while remaining complete
 and responsive on desktop and mobile. Mobile staff use is expected to be
 infrequent. Staff roles use the same interface language and workspace styling;
-capabilities still determine which operations are available. Product copy is
-English-only in the current scope, but layouts must tolerate longer future
-localized text without depending on short English labels.
+capabilities still determine which operations are available. Product copy in both frontends is Polish. Layouts must tolerate long labels
+without depending on short text.
 
 #### Navigation, cards and interaction
 
@@ -177,10 +180,12 @@ selected segment, without glass effects, decorative borders, or shadows.
 
 Interactive staff cards across Orders, Locations, Accounts, and Integrations
 use one reusable Panel Card anatomy: a direct full-card target, primary identity,
-supporting metadata, and an optional trailing accessory or action group. They
+supporting metadata, and an optional trailing accessory or action group.
+Location, Account, Invitation and Integration cards omit navigation arrows;
+the full-card target and motion communicate that they are clickable. They
 share the medium corner scale, page surface at rest, one-pixel separators, and
-an 8-pixel inter-card rhythm with immediate hover, keyboard-focus, and pressed
-feedback. Management collection cards use restrained colour surfaces for
+an 8-pixel inter-card rhythm with immediate motion feedback on hover and press,
+and a subtle neutral focus indicator for keyboard navigation only. Management collection cards use restrained colour surfaces for
 enabled, disabled, and pending status; explicit status appears in their detail
 popup. Order selection retains its blue selection surface without a decorative
 leading edge. Cards keep identity and compact accessories inline across phone, tablet,
@@ -188,7 +193,9 @@ and desktop widths; essential text reflows instead of being removed.
 
 Routine interactive surfaces in both frontends use one shared short motion
 system: a restrained scale lift on precise-pointer hover, immediate compression
-while pressed, and a subtle spring-like return on release. Stateful spatial
+while pressed, and a subtle spring-like return on release. Hover does not change
+background, text, border colour or opacity. Mouse and touch focus do not add
+rings; keyboard focus remains visible with a subtle neutral outline. Stateful spatial
 transitions that communicate a changed location or support direct manipulation
 remain purposeful exceptions.
 Reduced-motion preferences retain non-spatial state feedback while suppressing
@@ -201,9 +208,14 @@ a stable column on desktop and mobile.
 
 Action controls are icon-first where a familiar symbol communicates their
 meaning, including Home, Scan, Notifications, Appearance, QR, More, Close, and
-Switch camera. Primary workflow transitions, authentication, and destructive
-confirmations retain concise visible text, usually paired with an icon, because
-those actions do not have an unambiguous universal symbol. Every icon-only
+Switch camera. Major actions, including creation, editing, saving, disabling, enabling and
+deletion, pair a Lucide icon with visible Polish text. Secondary popup and prompt
+actions, including Cancel, Not now and Close, use explicit Polish text such as
+**Anuluj**, **Nie teraz** and **Zamknij**. Top-right Close, appearance and
+account-switching utilities remain compact icon-only controls. Entity name editing
+uses an icon-only button immediately beside the name, with a transparent
+background and no border. Paired popup
+actions each occupy half of the available row width and wrap long text. Every icon-only
 control has an accessible name and, where pointer input is expected, a tooltip.
 Both frontends source interface glyphs from Lucide React so repeated actions
 share one stroke, proportion, and optical language. Application code does not

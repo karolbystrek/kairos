@@ -107,7 +107,7 @@
   and preserves terminal customer tracking and historical attribution.
 * An authorized administrator or manager can delete the same manageable member
   Accounts whose statuses they may manage. Delete accepts an enabled or disabled
-  account, requires exact-email confirmation, archives it atomically, invalidates
+  account, requires inline hold confirmation, archives it atomically, invalidates
   earlier authentication and revokes pending invitations, retains its historical
   assignment and reserved identity, and removes it from ordinary account lists.
 * Accounts, Locations, and Integrations initially show responsive card collections
@@ -141,8 +141,8 @@
   Creation, list, and preview expose it; invited registration displays it
   read-only beside clearly spaced location/role context. Mismatched redemption
   email is rejected before provider provisioning and rechecked atomically.
-  Details identify the fixed role and location, creator, creation time, and expiry. Its direct icon-only Revoke action
-  requires confirmation, and terminal invitations leave the collection while their
+  Details identify the fixed role and location, creator, creation time, and expiry. Its icon-and-text Revoke action
+  requires inline hold confirmation, and terminal invitations leave the collection while their
   secret-free metadata is retained indefinitely for audit without a history UI
   in the current development scope.
 * Redemption requires the issuer to remain enabled and authorized. A signed-in

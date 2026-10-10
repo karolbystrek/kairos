@@ -13,11 +13,13 @@ import {
   Check as CheckIcon,
   Pencil as EditIcon,
   Trash2 as TrashIcon,
+  Plus,
+  RefreshCw,
 } from "lucide-react";
 import { useState } from "react";
 import useSWR from "swr";
 
-import { PanelPopup } from "@/components/panel-popup";
+import { HoldToConfirmButton } from "@/components/hold-to-confirm-button";
 import { FormTextField } from "@/components/form-controls";
 import {
   formatIntegrationDateTime,
@@ -211,7 +213,7 @@ function WebhookEditor({
       <div>
         <h4 className="font-semibold">Edytuj {subscription.name}</h4>
         <p className="text-sm text-muted">
-          Zmiany dotyczą tylko powiadomień utworzonych po tej aktualizacji.
+          Zmiany obejmą tylko nowe powiadomienia.
         </p>
       </div>
       <form className="flex flex-col gap-4" onSubmit={submit}>
@@ -221,11 +223,17 @@ function WebhookEditor({
           locations={locations}
           onChange={setDraft}
         />
-        <div className="flex flex-wrap gap-3">
+        <div className="confirmation-actions">
           <Button isPending={isPending} type="submit">
+            <CheckIcon size={18} />
             {isPending ? "Zapisywanie…" : "Zapisz"}
           </Button>
-          <Button isDisabled={isPending} variant="secondary" onPress={onCancel}>
+          <Button
+            aria-label="Anuluj edycję webhooka"
+            isDisabled={isPending}
+            variant="secondary"
+            onPress={onCancel}
+          >
             Anuluj
           </Button>
         </div>
@@ -499,8 +507,8 @@ export function WebhookSubscriptionManagement({
     ? confirmation.kind === "disable"
       ? "Wysyłanie webhooków zostanie wstrzymane do ponownego włączenia subskrypcji."
       : confirmation.kind === "delete"
-        ? "Webhook zostanie usunięty, a powiadomienia przestaną być wysyłane. Tej operacji nie można cofnąć."
-        : "Ta wersja sekretu natychmiast przestanie weryfikować podpisy. Upewnij się, że odbiorca już jej nie używa."
+        ? "Powiadomienia przestaną być wysyłane. Usunięcia nie można cofnąć."
+        : "Sekret przestanie weryfikować podpisy. Odbiorca musi już używać nowej wersji."
     : "";
   const confirmationLabel = confirmation
     ? confirmation.kind === "disable"
@@ -538,8 +546,7 @@ export function WebhookSubscriptionManagement({
         <div>
           <h3 className="text-xl font-semibold">Nowy webhook</h3>
           <p className="text-sm text-muted">
-            Nowe subskrypcje są wyłączone, aby skonfigurować odbiorcę przed
-            rozpoczęciem wysyłania powiadomień.
+            Nowy webhook jest wyłączony. Włącz go po skonfigurowaniu odbiorcy.
           </p>
         </div>
         <form className="flex max-w-3xl flex-col gap-4" onSubmit={create}>
@@ -555,6 +562,7 @@ export function WebhookSubscriptionManagement({
             isPending={pendingAction === "create"}
             type="submit"
           >
+            <Plus size={18} />
             {pendingAction === "create" ? "Tworzenie…" : "Utwórz"}
           </Button>
         </form>
@@ -620,13 +628,13 @@ export function WebhookSubscriptionManagement({
                   <Tooltip delay={500}>
                     <Tooltip.Trigger>
                       <Button
-                        isIconOnly
                         aria-label={`Edytuj webhook ${subscription.name}`}
                         className="rounded-md"
                         variant="tertiary"
                         onPress={() => setEditedSubscriptionId(subscription.id)}
                       >
                         <EditIcon size={17} />
+                        Edytuj
                       </Button>
                     </Tooltip.Trigger>
                     <Tooltip.Content>Edytuj</Tooltip.Content>
@@ -634,7 +642,6 @@ export function WebhookSubscriptionManagement({
                   <Tooltip delay={500}>
                     <Tooltip.Trigger>
                       <Button
-                        isIconOnly
                         aria-label={`${
                           subscription.status === "ENABLED" ? "Wyłącz" : "Włącz"
                         } webhook ${subscription.name}`}
@@ -661,6 +668,7 @@ export function WebhookSubscriptionManagement({
                         ) : (
                           <CheckIcon size={20} />
                         )}
+                        {subscription.status === "ENABLED" ? "Wyłącz" : "Włącz"}
                       </Button>
                     </Tooltip.Trigger>
                     <Tooltip.Content>
@@ -672,12 +680,12 @@ export function WebhookSubscriptionManagement({
                     variant="secondary"
                     onPress={() => rotate(subscription)}
                   >
+                    <RefreshCw size={18} />
                     Zmień sekret
                   </Button>
                   <Tooltip delay={500}>
                     <Tooltip.Trigger>
                       <Button
-                        isIconOnly
                         aria-label={`Usuń webhook ${subscription.name}`}
                         className="rounded-md"
                         isPending={
@@ -690,11 +698,49 @@ export function WebhookSubscriptionManagement({
                         }}
                       >
                         <TrashIcon size={20} />
+                        Usuń
                       </Button>
                     </Tooltip.Trigger>
                     <Tooltip.Content>Usuń</Tooltip.Content>
                   </Tooltip>
                 </div>
+
+                {confirmation &&
+                  confirmation.subscription.id === subscription.id && (
+                    <section
+                      aria-label={confirmationTitle}
+                      className="flex flex-col gap-3"
+                    >
+                      <h4 className="font-semibold">{confirmationTitle}</h4>
+                      <p className="text-sm text-muted">
+                        {confirmationDescription}
+                      </p>
+                      <div className="confirmation-actions">
+                        <HoldToConfirmButton
+                          key={`${confirmation.kind}-${confirmation.subscription.id}-${confirmation.kind === "retire" ? confirmation.versionId : ""}`}
+                          isDisabled={Boolean(pendingAction)}
+                          isPending={isConfirmationPending}
+                          onConfirm={confirmDestructiveAction}
+                        >
+                          {confirmation.kind === "disable" ? (
+                            <DisableIcon size={18} />
+                          ) : (
+                            <TrashIcon size={18} />
+                          )}
+                          Przytrzymaj, aby{" "}
+                          {confirmationLabel.toLocaleLowerCase("pl-PL")}
+                        </HoldToConfirmButton>
+                        <Button
+                          aria-label="Anuluj operację na webhooku"
+                          isDisabled={Boolean(pendingAction)}
+                          variant="tertiary"
+                          onPress={() => setConfirmation(undefined)}
+                        >
+                          Anuluj
+                        </Button>
+                      </div>
+                    </section>
+                  )}
 
                 <div className="border-t border-separator pt-3">
                   <p className="mb-2 text-sm font-medium">
@@ -736,6 +782,7 @@ export function WebhookSubscriptionManagement({
                               });
                             }}
                           >
+                            <TrashIcon size={18} />
                             Wycofaj
                           </Button>
                         )}
@@ -759,35 +806,6 @@ export function WebhookSubscriptionManagement({
           onSave={(input) => save(editedSubscription, input)}
         />
       )}
-
-      <PanelPopup
-        className="sm:max-w-[440px]"
-        isOpen={Boolean(confirmation)}
-        role="alertdialog"
-        onOpenChange={(open) => {
-          if (!open) setConfirmation(undefined);
-        }}
-      >
-        <PanelPopup.Header>
-          <PanelPopup.Icon
-            status={confirmation?.kind === "disable" ? "warning" : "danger"}
-          />
-          <PanelPopup.Heading>{confirmationTitle}</PanelPopup.Heading>
-        </PanelPopup.Header>
-        <PanelPopup.Body>{confirmationDescription}</PanelPopup.Body>
-        <PanelPopup.Footer>
-          <Button slot="close" variant="tertiary">
-            Anuluj
-          </Button>
-          <Button
-            isPending={isConfirmationPending}
-            variant="danger"
-            onPress={() => void confirmDestructiveAction()}
-          >
-            {confirmationLabel}
-          </Button>
-        </PanelPopup.Footer>
-      </PanelPopup>
     </div>
   );
 }

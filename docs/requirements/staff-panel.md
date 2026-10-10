@@ -92,7 +92,7 @@ The active queue uses adjacent **In preparation** and **Ready** sections on
 tablet and desktop and the same two sections stacked vertically on mobile.
 These sections use headings, counts, whitespace, and a shared separator rather
 than large rounded lane containers. Order creation begins from one compact,
-icon-only plus action immediately beside the **Orders** title. Its focused
+icon-and-text creation action at the start of the active workspace. Its focused
 sheet contains one optional label field whose
 placeholder communicates the automatic default; leaving it empty requests an
 automatic label and entering text requests a custom label, without a separate
@@ -100,8 +100,10 @@ mode selector. Successful creation continues directly into a large,
 dismissible customer QR sheet; explicitly requesting an existing order's QR
 uses the same presentation. The underlying queue remains visible to preserve
 context. The Orders, Locations, Accounts, and Integrations creation actions
-share one 44-pixel icon-control geometry, accessible name, and pointer tooltip beside
-their respective page titles on every layout. The queue-location selector
+share one 44-pixel control height, an icon with Polish text, an accessible name
+and a pointer tooltip above the workspace content on every layout. Repeated Orders, Locations, Accounts and
+Integrations titles are visually hidden; the selected navigation tab identifies
+the workspace, while an accessible heading remains for assistive technology. The queue-location selector
 remains an independent filter beneath the page header.
 
 When a tenant has no enabled location, whether none have been created or every
@@ -148,7 +150,7 @@ shared geometry, touch targets, focus and press feedback remain consistent.
 Selecting an invitation opens its recipient, role, location, issuer, creation
 and expiration times, and confirmed Revoke action. Selecting an existing account
 opens its details and permitted status and Delete actions. Disable retains its
-confirmation; Delete retains exact-email confirmation. Both enabled and disabled
+hold confirmation; Delete uses hold confirmation. Both enabled and disabled
 manageable accounts can be deleted.
 
 Integration details retain the compact segmented control between API Keys and
@@ -184,10 +186,9 @@ other example identity.
 
 Repeated administrative actions use one shared visual vocabulary across the
 panel: Edit uses the pencil, Disable uses the prohibited-state symbol, Enable
-uses the check, and Delete uses the trash symbol. Their compact icon-only
-controls share the same size, corner treatment, accessible naming, and pointer
-tooltip. Focused confirmation dialogs retain explicit text labels for
-consequential actions.
+uses the check, and Delete uses the trash symbol. Their icon-and-text
+controls share size, corner treatment and accessible naming. Consequential
+controls include explicit Polish labels and nearby consequence text.
 
 #### Lifecycle vocabulary and confirmations
 
@@ -204,32 +205,33 @@ application and frontend request functions use `update...Status` naming.
 Orders, Account Invitations, credentials, sessions, and delivery workers retain
 their distinct domain-specific state machines.
 
-Panel actions that immediately remove access, stop delivery, invalidate a
-credential, retire an active secret version, cancel an order, or remove a
-resource require a focused confirmation before the request is sent. This
-includes disabling locations, accounts, integrations, and enabled webhook
-subscriptions; revoking API Keys; retiring overlapping webhook secrets; and
-deleting locations, accounts, integrations, or webhook subscriptions.
-Re-enabling a resource and other non-destructive transitions do not add an
-unnecessary confirmation step.
+Administrative actions that remove access, stop delivery, invalidate a credential,
+retire an active secret version, or delete a resource require deliberate hold
+confirmation before the request is sent. This includes disabling Locations,
+Accounts, Integrations and Webhook Subscriptions; revoking Account Invitations
+and API Keys; retiring overlapping webhook secrets; and deleting managed
+resources. The action stays within the existing detail popup or inline section,
+with consequence text identifying the affected resource. It never opens a second
+confirmation popup. Order cancellation and logout retain their existing focused
+confirmation flows.
 
-Location re-enabling is a deliberate exception because it changes every
-assigned non-archived member account to `ENABLED`. Its focused confirmation
-explains that effect before the request is sent. Location Delete is available only while the
-location is disabled, requires the administrator to type the exact location
-name, and explains that the location and assigned accounts disappear from
-ordinary management and cannot be restored while historical orders remain
-readable.
+Hold controls use Polish text such as **Przytrzymaj, aby usunąć** and require
+1.6 seconds of uninterrupted pointer, touch, Space or Enter input. The progress
+fill is linear; release, moving outside, losing focus, cancellation, disabling
+or unmounting prevents submission. Reduced motion replaces the moving fill with
+static feedback without shortening the confirmation period. Assistive virtual
+activation, which supplies no hold events, requires two explicit activations;
+the second is labelled **Potwierdź operację**. Pending requests cannot repeat,
+failed requests retain error feedback and allow retry, and there is no undo.
+This replaces typed location-name, integration-name and account-email checks.
 
-Account Delete requires a focused destructive confirmation and the exact,
-exact normalized email before it can be submitted. The confirmation explains
-that the account will be signed out, disappear from ordinary Accounts, lose its
-pending invitations, and never regain access. A failed request keeps the dialog
-and entered confirmation value in place, while success clears the selection if
-the archived account was open and revalidates account and invitation state.
-
-Disabling an integration requires confirmation and explains the immediate
-credential and webhook effect. The archival operation is presented to staff as
-**Delete**, requires a separate destructive confirmation, and remains disabled
-until the administrator types the integration name exactly. The API continues
-to archive the resource internally.
+Re-enabling remains an ordinary click. Location Enable explains beside its
+control that every assigned non-archived member account becomes `ENABLED`,
+including accounts disabled independently. Location Delete is available only
+while disabled and never for the last non-archived location; it explains that
+the location and assigned accounts cannot be restored while historical orders
+remain readable. Account Delete signs the account out, removes it from ordinary
+Accounts, revokes pending invitations and permanently removes access. Success
+clears the archived selection and revalidates account and invitation state.
+Integration Disable explains the immediate credential and webhook effect;
+Delete irreversibly archives the integration internally.

@@ -2,6 +2,7 @@
 
 import type { FormEvent } from "react";
 
+import { RefreshCw, LogIn, LogOut } from "lucide-react";
 import {
   Alert,
   Button,
@@ -192,6 +193,7 @@ function LoginForm({
         />
 
         <Button isPending={isPending} type="submit">
+          <LogIn aria-hidden="true" size={18} />
           {isPending ? "Logowanie…" : "Zaloguj się"}
         </Button>
       </form>
@@ -374,7 +376,7 @@ export function StaffPanel({
                 variant="danger"
                 onPress={() => void mutateAccount()}
               >
-                Spróbuj ponownie
+                <RefreshCw aria-hidden="true" size={18} /> Spróbuj ponownie
               </Button>
             </div>
           </Alert.Content>
@@ -393,7 +395,9 @@ export function StaffPanel({
     return locationsError ? (
       <div className="flex flex-col gap-4 py-12">
         <p role="alert">Nie udało się wczytać lokali. Spróbuj ponownie.</p>
-        <Button onPress={() => void mutateLocations()}>Spróbuj ponownie</Button>
+        <Button onPress={() => void mutateLocations()}>
+          <RefreshCw aria-hidden="true" size={18} /> Spróbuj ponownie
+        </Button>
       </div>
     ) : (
       <Spinner aria-label="Wczytywanie lokali" />
@@ -602,13 +606,8 @@ export function StaffPanel({
               : "Wyloguj się?"}
           </PanelPopup.Heading>
         </PanelPopup.Header>
-        <PanelPopup.Body className="flex flex-col gap-4">
-          <p>
-            {signOutScope === "everywhere"
-              ? "Nastąpi wylogowanie ze wszystkich urządzeń, również tego."
-              : "Nastąpi wylogowanie z tego urządzenia. Aby zarządzać zamówieniami, zaloguj się ponownie."}
-          </p>
-          {logoutError && (
+        {logoutError && (
+          <PanelPopup.Body>
             <Alert status="danger">
               <Alert.Indicator />
               <Alert.Content>
@@ -618,10 +617,10 @@ export function StaffPanel({
                 </Alert.Description>
               </Alert.Content>
             </Alert>
-          )}
-        </PanelPopup.Body>
+          </PanelPopup.Body>
+        )}
         <PanelPopup.Footer>
-          <Button slot="close" variant="tertiary">
+          <Button aria-label="Anuluj" slot="close" variant="tertiary">
             Anuluj
           </Button>
           <Button
@@ -629,6 +628,7 @@ export function StaffPanel({
             variant="danger"
             onPress={() => void signOut(signOutScope === "everywhere")}
           >
+            <LogOut aria-hidden="true" size={18} />
             {signOutScope === "everywhere"
               ? "Wyloguj ze wszystkich urządzeń"
               : "Wyloguj się"}

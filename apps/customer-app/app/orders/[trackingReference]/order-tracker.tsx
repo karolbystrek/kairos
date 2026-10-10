@@ -1,7 +1,7 @@
 "use client";
 
 import { Alert, Button, Spinner } from "@heroui/react";
-import { X } from "lucide-react";
+import { ScanLine, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
@@ -275,6 +275,7 @@ export function OrderTracker({
                   variant="secondary"
                   onPress={() => void closeOrder()}
                 >
+                  <ScanLine aria-hidden="true" size={18} />
                   Wróć do skanera
                 </Button>
               )}

@@ -5,17 +5,16 @@ import type { PendingOneTimeSecret } from "./integrations/one-time-secret";
 
 import { Alert, Button, Spinner, Tabs, Tooltip } from "@heroui/react";
 import {
-  ArrowRight as ArrowRightIcon,
   Ban as DisableIcon,
   Check as CheckIcon,
   Pencil as EditIcon,
   Plus as PlusIcon,
   Trash2 as TrashIcon,
-  X as CloseIcon,
 } from "lucide-react";
 import { useState } from "react";
 import useSWR from "swr";
 
+import { HoldToConfirmButton } from "@/components/hold-to-confirm-button";
 import { PanelPopup } from "@/components/panel-popup";
 import { FormTextField } from "@/components/form-controls";
 import { ApiKeyManagement } from "@/components/integrations/api-key-management";
@@ -54,8 +53,6 @@ function IntegrationDetails({
 }) {
   const [name, setName] = useState(integration.name);
   const [isEditingName, setIsEditingName] = useState(false);
-  const [confirmation, setConfirmation] = useState<"disable" | "delete">();
-  const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [pendingAction, setPendingAction] = useState<string>();
   const [actionError, setActionError] = useState<unknown>();
 
@@ -122,11 +119,6 @@ function IntegrationDetails({
     }
   }
 
-  function closeConfirmation() {
-    setConfirmation(undefined);
-    setDeleteConfirmation("");
-  }
-
   function cancelRename() {
     setName(integration.name);
     setIsEditingName(false);
@@ -151,6 +143,24 @@ function IntegrationDetails({
       <PanelDetailHeader
         eyebrow="Integracja"
         title={integration.name}
+        titleAction={
+          !isEditingName ? (
+            <Tooltip delay={500}>
+              <Tooltip.Trigger>
+                <Button
+                  isIconOnly
+                  aria-label="Edytuj nazwę"
+                  className="entity-name-edit shrink-0"
+                  variant="tertiary"
+                  onPress={() => setIsEditingName(true)}
+                >
+                  <EditIcon size={17} />
+                </Button>
+              </Tooltip.Trigger>
+              <Tooltip.Content>Edytuj nazwę</Tooltip.Content>
+            </Tooltip>
+          ) : undefined
+        }
         titleEditor={
           isEditingName ? (
             <form
@@ -170,13 +180,13 @@ function IntegrationDetails({
               <Tooltip delay={500}>
                 <Tooltip.Trigger>
                   <Button
-                    isIconOnly
                     aria-label="Zatwierdź nazwę"
                     className="shrink-0 rounded-md"
                     isPending={pendingAction === "rename"}
                     type="submit"
                   >
                     <CheckIcon size={19} />
+                    Zapisz
                   </Button>
                 </Tooltip.Trigger>
                 <Tooltip.Content>Potwierdź</Tooltip.Content>
@@ -184,14 +194,13 @@ function IntegrationDetails({
               <Tooltip delay={500}>
                 <Tooltip.Trigger>
                   <Button
-                    isIconOnly
                     aria-label="Anuluj edycję nazwy"
                     className="shrink-0 rounded-md"
                     isDisabled={pendingAction === "rename"}
                     variant="tertiary"
                     onPress={cancelRename}
                   >
-                    <CloseIcon size={19} />
+                    Anuluj
                   </Button>
                 </Tooltip.Trigger>
                 <Tooltip.Content>Anuluj</Tooltip.Content>
@@ -201,78 +210,42 @@ function IntegrationDetails({
         }
         trailingActions={
           <>
-            {!isEditingName && (
-              <Tooltip delay={500}>
-                <Tooltip.Trigger>
-                  <Button
-                    isIconOnly
-                    aria-label="Edytuj nazwę"
-                    className="shrink-0 rounded-md"
-                    variant="tertiary"
-                    onPress={() => setIsEditingName(true)}
-                  >
-                    <EditIcon size={17} />
-                  </Button>
-                </Tooltip.Trigger>
-                <Tooltip.Content>Edytuj nazwę</Tooltip.Content>
-              </Tooltip>
+            {integration.status === "ENABLED" ? (
+              <HoldToConfirmButton
+                isDisabled={Boolean(pendingAction)}
+                isPending={pendingAction === "status"}
+                onConfirm={changeStatus}
+              >
+                <DisableIcon size={18} /> Przytrzymaj, aby wyłączyć
+              </HoldToConfirmButton>
+            ) : (
+              <Button
+                isDisabled={Boolean(pendingAction)}
+                isPending={pendingAction === "status"}
+                variant="secondary"
+                onPress={() => void changeStatus()}
+              >
+                <CheckIcon size={18} /> Włącz
+              </Button>
             )}
-            <Tooltip delay={500}>
-              <Tooltip.Trigger>
-                <Button
-                  isIconOnly
-                  aria-label={`${
-                    integration.status === "ENABLED" ? "Wyłącz" : "Włącz"
-                  } integrację ${integration.name}`}
-                  className="rounded-md"
-                  isPending={pendingAction === "status"}
-                  variant={
-                    integration.status === "ENABLED" ? "danger" : "secondary"
-                  }
-                  onPress={() => {
-                    if (pendingAction) return;
-                    if (integration.status === "ENABLED") {
-                      setConfirmation("disable");
-                    } else {
-                      void changeStatus();
-                    }
-                  }}
-                >
-                  {integration.status === "ENABLED" ? (
-                    <DisableIcon size={20} />
-                  ) : (
-                    <CheckIcon size={20} />
-                  )}
-                </Button>
-              </Tooltip.Trigger>
-              <Tooltip.Content>
-                {integration.status === "ENABLED" ? "Wyłącz" : "Włącz"}
-              </Tooltip.Content>
-            </Tooltip>
-            <Tooltip delay={500}>
-              <Tooltip.Trigger>
-                <Button
-                  isIconOnly
-                  aria-label={`Usuń integrację ${integration.name}`}
-                  className="rounded-md"
-                  isPending={pendingAction === "delete"}
-                  variant="danger"
-                  onPress={() => {
-                    if (pendingAction) return;
-                    setConfirmation("delete");
-                  }}
-                >
-                  <TrashIcon size={20} />
-                </Button>
-              </Tooltip.Trigger>
-              <Tooltip.Content>Usuń</Tooltip.Content>
-            </Tooltip>
+            <HoldToConfirmButton
+              isDisabled={Boolean(pendingAction)}
+              isPending={pendingAction === "delete"}
+              onConfirm={remove}
+            >
+              <TrashIcon size={18} /> Przytrzymaj, aby usunąć
+            </HoldToConfirmButton>
           </>
         }
       />
 
       <p className="text-sm text-muted">
         Status: {integration.status === "ENABLED" ? "Włączona" : "Wyłączona"}
+      </p>
+
+      <p className="text-sm text-muted">
+        Wyłączenie zablokuje klucze API i nowe webhooki do ponownego włączenia.
+        Usunięcie jest nieodwracalne.
       </p>
 
       <Tabs>
@@ -305,114 +278,6 @@ function IntegrationDetails({
           />
         </Tabs.Panel>
       </Tabs>
-
-      <PanelPopup
-        className="sm:max-w-[420px]"
-        isOpen={confirmation === "disable"}
-        role="alertdialog"
-        onOpenChange={(open) => {
-          if (!open) closeConfirmation();
-        }}
-      >
-        <PanelPopup.Header>
-          <PanelPopup.Icon status="warning" />
-          <PanelPopup.Heading>
-            Wyłączyć integrację {integration.name}?
-          </PanelPopup.Heading>
-        </PanelPopup.Header>
-        <PanelPopup.Body className="flex flex-col gap-4">
-          <p>
-            Klucze API przestaną działać, a wysyłanie nowych webhooków zostanie
-            wstrzymane do ponownego włączenia integracji.
-          </p>
-          {Boolean(actionError) && (
-            <Alert status="danger">
-              <Alert.Content>
-                <Alert.Title>Nie udało się wyłączyć integracji</Alert.Title>
-                <Alert.Description>
-                  {getIntegrationErrorMessage(actionError)}
-                </Alert.Description>
-              </Alert.Content>
-            </Alert>
-          )}
-        </PanelPopup.Body>
-        <PanelPopup.Footer>
-          <Button slot="close" variant="tertiary">
-            Anuluj
-          </Button>
-          <Button
-            isPending={pendingAction === "status"}
-            variant="danger"
-            onPress={() => {
-              void changeStatus().then((changed) => {
-                if (changed) closeConfirmation();
-              });
-            }}
-          >
-            Wyłącz
-          </Button>
-        </PanelPopup.Footer>
-      </PanelPopup>
-
-      <PanelPopup
-        className="sm:max-w-[460px]"
-        isOpen={confirmation === "delete"}
-        role="alertdialog"
-        onOpenChange={(open) => {
-          if (!open) closeConfirmation();
-        }}
-      >
-        <PanelPopup.Header>
-          <PanelPopup.Icon status="danger" />
-          <PanelPopup.Heading>
-            Usunąć integrację {integration.name}?
-          </PanelPopup.Heading>
-        </PanelPopup.Header>
-        <PanelPopup.Body className="flex flex-col gap-4">
-          <p>
-            Integracja zostanie trwale usunięta z panelu. Jej klucze API i
-            wysyłanie nowych webhooków zostaną natychmiast zablokowane. Aby
-            potwierdzić, wpisz dokładną nazwę integracji.
-          </p>
-          <FormTextField
-            fullWidth
-            isRequired
-            inputProps={{ autoComplete: "off" }}
-            isDisabled={pendingAction === "delete"}
-            label={`Wpisz ${integration.name} w celu potwierdzenia`}
-            name="delete-integration-confirmation"
-            value={deleteConfirmation}
-            onChange={setDeleteConfirmation}
-          />
-          {Boolean(actionError) && (
-            <Alert status="danger">
-              <Alert.Content>
-                <Alert.Title>Nie udało się usunąć integracji</Alert.Title>
-                <Alert.Description>
-                  {getIntegrationErrorMessage(actionError)}
-                </Alert.Description>
-              </Alert.Content>
-            </Alert>
-          )}
-        </PanelPopup.Body>
-        <PanelPopup.Footer>
-          <Button slot="close" variant="tertiary">
-            Anuluj
-          </Button>
-          <Button
-            isDisabled={deleteConfirmation !== integration.name}
-            isPending={pendingAction === "delete"}
-            variant="danger"
-            onPress={() => {
-              void remove().then((removed) => {
-                if (removed) closeConfirmation();
-              });
-            }}
-          >
-            Usuń
-          </Button>
-        </PanelPopup.Footer>
-      </PanelPopup>
     </div>
   );
 }
@@ -521,17 +386,17 @@ export function IntegrationManagement({ accountId }: { accountId: string }) {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center gap-4">
-        <h1 className="page-title">Integracje</h1>
+        <h1 className="sr-only">Integracje</h1>
         <Tooltip delay={500}>
           <Tooltip.Trigger>
             <Button
-              isIconOnly
               aria-label="Nowa integracja"
               className="rounded-md"
               size="lg"
               onPress={openCreate}
             >
               <PlusIcon size={20} />
+              Nowa integracja
             </Button>
           </Tooltip.Trigger>
           <Tooltip.Content>Nowa integracja</Tooltip.Content>
@@ -573,7 +438,6 @@ export function IntegrationManagement({ accountId }: { accountId: string }) {
                   integration.status === "ENABLED" ? "ENABLED" : "DISABLED"
                 }
                 title={integration.name}
-                trailing={<ArrowRightIcon size={17} />}
                 onPress={() => setSelectedIntegrationId(integration.id)}
               />
             ))}
@@ -643,7 +507,11 @@ export function IntegrationManagement({ accountId }: { accountId: string }) {
             />
           </PanelPopup.Body>
           <PanelPopup.Footer>
-            <Button slot="close" variant="tertiary">
+            <Button
+              aria-label="Anuluj tworzenie integracji"
+              slot="close"
+              variant="tertiary"
+            >
               Anuluj
             </Button>
             <Button isPending={isCreating} type="submit">

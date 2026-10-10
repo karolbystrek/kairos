@@ -35,7 +35,7 @@ export function NotificationGuide() {
               <Modal.Heading>
                 {installationRequired
                   ? "Dodaj Kairos do ekranu początkowego"
-                  : "Dowiedz się, kiedy zamówienie będzie gotowe"}
+                  : "Włączyć powiadomienia?"}
               </Modal.Heading>
             </Modal.Header>
             {installationRequired && (
@@ -72,7 +72,11 @@ export function NotificationGuide() {
               </Modal.Body>
             )}
             <Modal.Footer>
-              <Button variant="secondary" onPress={dismissGuide}>
+              <Button
+                aria-label="Nie teraz"
+                variant="secondary"
+                onPress={dismissGuide}
+              >
                 Nie teraz
               </Button>
               {!installationRequired && (
@@ -83,6 +87,7 @@ export function NotificationGuide() {
                     void enable();
                   }}
                 >
+                  <Bell aria-hidden="true" size={18} />
                   Włącz powiadomienia
                 </Button>
               )}
