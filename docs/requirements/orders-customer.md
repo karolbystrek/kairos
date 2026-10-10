@@ -138,7 +138,7 @@ current browser push subscription. New active orders are enrolled silently, and
 terminal orders are removed after their final notification delivery has been
 materialized. The API limits a subscription to ten contexts per order.
 
-Four seconds after the first order loads successfully, the application shows a
+Three seconds after the first order loads successfully, the application shows a
 compact, dismissible notification popup when permission can be requested, or
 an illustrated installation guide on Apple mobile devices requiring Home Screen
 installation. Navigation away cancels the delay. Enabled, granted, blocked, and
@@ -149,6 +149,11 @@ the same tap handler, without waiting for animation completion. The Apple guide
 uses three steps: Share in Safari, Add to Home Screen, then open Kairos and tap
 the bell. The bell reopens required installation instructions after dismissal;
 other contexts enable directly or show inline blocked/unsupported guidance.
+The bell immediately reflects the requested state after permission is granted,
+with a pending label until subscription persistence finishes. Disabling receives
+the same immediate feedback. Pending actions prevent duplicate taps, while
+failure restores the confirmed state and shows inline error guidance. Icon
+changes use a short crossfade with reduced-motion support.
 Tracking remains usable without installation or notifications.
 
 The application exposes one persistent notification control in the top-right

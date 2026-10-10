@@ -10,9 +10,16 @@ import {
 } from "@/src/pwa/notification-provider";
 
 export function NotificationIcon({ enabled }: { enabled: boolean }) {
-  const Icon = enabled ? BellOff : Bell;
-
-  return <Icon aria-hidden="true" size={20} />;
+  return (
+    <span
+      aria-hidden="true"
+      className="notification-icon"
+      data-enabled={enabled}
+    >
+      <Bell className="notification-icon-off" size={20} />
+      <BellOff className="notification-icon-on" size={20} />
+    </span>
+  );
 }
 
 function notificationActionLabel(state: NotificationState): string {
@@ -31,11 +38,26 @@ function notificationActionLabel(state: NotificationState): string {
 }
 
 export function NotificationControl() {
-  const { disable, dismissMessage, requestEnable, message, state } =
-    useCustomerNotifications();
-  const isEnabled = state === "enabled";
-  const isUnavailable = state === "loading";
-  const actionLabel = notificationActionLabel(state);
+  const {
+    disable,
+    dismissMessage,
+    requestEnable,
+    message,
+    pendingAction,
+    state,
+  } = useCustomerNotifications();
+  const isEnabled =
+    pendingAction === "enabling" ||
+    (state === "enabled" && pendingAction !== "disabling");
+  const isUnavailable = state === "loading" || pendingAction !== null;
+  const actionLabel =
+    pendingAction === "enabling"
+      ? "Enabling notifications…"
+      : pendingAction === "disabling"
+        ? "Disabling notifications…"
+        : pendingAction === "requesting-permission"
+          ? "Waiting for notification permission…"
+          : notificationActionLabel(state);
 
   return (
     <>
@@ -43,8 +65,9 @@ export function NotificationControl() {
         <Tooltip.Trigger>
           <Button
             isIconOnly
+            aria-busy={pendingAction !== null}
             aria-label={actionLabel}
-            aria-pressed={isEnabled}
+            aria-pressed={state === "enabled"}
             className="rounded-md"
             isDisabled={isUnavailable}
             variant={isEnabled ? "primary" : "tertiary"}

@@ -51,6 +51,7 @@ type CustomerNotificationContextValue = {
   enrollOrder: (trackingReference: string) => Promise<void>;
   message: string | null;
   state: NotificationState;
+  pendingAction: "requesting-permission" | "enabling" | "disabling" | null;
   guideOpen: boolean;
   dismissGuide: () => void;
   requestEnable: () => void;
@@ -68,6 +69,9 @@ export function CustomerPwaProvider({
   const [state, setState] = useState<NotificationState>("loading");
   const [message, setMessage] = useState<string | null>(null);
   const [guideOpen, setGuideOpen] = useState(false);
+  const [pendingAction, setPendingAction] =
+    useState<CustomerNotificationContextValue["pendingAction"]>(null);
+  const changingNotifications = useRef(false);
   const guideDismissed = useRef(false);
   const firstOrderSeen = useRef(false);
   const synchronizing = useRef<Promise<void> | null>(null);
@@ -172,7 +176,7 @@ export function CustomerPwaProvider({
       }
     })();
     const handleOnline = () => {
-      if (active) {
+      if (active && !changingNotifications.current) {
         void synchronize();
       }
     };
@@ -186,6 +190,7 @@ export function CustomerPwaProvider({
   }, [synchronize]);
 
   const enable = useCallback(async () => {
+    if (changingNotifications.current) return;
     setMessage(null);
     if (requiresNotificationInstallation()) {
       setState("installation-required");
@@ -216,6 +221,8 @@ export function CustomerPwaProvider({
 
       return;
     }
+    changingNotifications.current = true;
+    setPendingAction("requesting-permission");
     try {
       const permission =
         Notification.permission === "granted"
@@ -232,6 +239,7 @@ export function CustomerPwaProvider({
 
         return;
       }
+      setPendingAction("enabling");
       await updateNotificationMetadata({ notificationsEnabled: true });
       await synchronize();
     } catch {
@@ -239,10 +247,14 @@ export function CustomerPwaProvider({
       setMessage(
         "Notifications could not be saved in this browser. Tracking still works normally.",
       );
+    } finally {
+      changingNotifications.current = false;
+      setPendingAction(null);
     }
   }, [synchronize]);
 
   const disable = useCallback(async () => {
+    if (changingNotifications.current) return;
     if (!supportsWebPush()) {
       return;
     }
@@ -253,6 +265,8 @@ export function CustomerPwaProvider({
 
       return;
     }
+    changingNotifications.current = true;
+    setPendingAction("disabling");
     try {
       const registration = await navigator.serviceWorker.ready;
       const subscription = await registration.pushManager.getSubscription();
@@ -273,12 +287,19 @@ export function CustomerPwaProvider({
     } catch (error) {
       setState("enabled");
       setMessage(notificationErrorMessage(error));
+    } finally {
+      changingNotifications.current = false;
+      setPendingAction(null);
     }
   }, []);
 
   const enrollOrder = useCallback(
     async (trackingReference: string) => {
-      if (state !== "enabled" || !navigator.onLine) {
+      if (
+        state !== "enabled" ||
+        !navigator.onLine ||
+        changingNotifications.current
+      ) {
         return;
       }
       const metadata = await readNotificationMetadata();
@@ -337,6 +358,7 @@ export function CustomerPwaProvider({
       enrollOrder,
       message,
       state,
+      pendingAction,
       guideOpen,
       dismissGuide,
       requestEnable,
@@ -349,6 +371,7 @@ export function CustomerPwaProvider({
       enrollOrder,
       message,
       state,
+      pendingAction,
       guideOpen,
       dismissGuide,
       requestEnable,

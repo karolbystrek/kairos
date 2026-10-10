@@ -176,7 +176,7 @@ export function OrderTracker({
 
   useEffect(() => {
     if (!hasLoadedOrder) return;
-    const timer = window.setTimeout(showGuideForOrder, 4000);
+    const timer = window.setTimeout(showGuideForOrder, 3000);
 
     return () => window.clearTimeout(timer);
   }, [hasLoadedOrder, showGuideForOrder, trackingReference]);

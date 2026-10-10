@@ -302,6 +302,37 @@ body {
 	}
 }
 
+.notification-icon {
+	position: relative;
+	display: inline-block;
+	width: 20px;
+	height: 20px;
+	flex: none;
+	--ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.notification-icon svg {
+	position: absolute;
+	inset: 0;
+	transition: opacity 160ms var(--ease-out), transform 160ms var(--ease-out);
+}
+
+.notification-icon-on,
+.notification-icon[data-enabled="true"] .notification-icon-off {
+	opacity: 0;
+	transform: scale(0.9);
+}
+
+.notification-icon-off,
+.notification-icon[data-enabled="true"] .notification-icon-on {
+	opacity: 1;
+	transform: scale(1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.notification-icon svg { transform: none !important; }
+}
+
 .notification-dismiss {
 	flex: none;
 }
