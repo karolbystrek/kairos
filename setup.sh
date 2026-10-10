@@ -14,7 +14,7 @@ secrets_argument=""
 
 temporary_environment_file=""
 working_directory=""
-backup_directory=""
+installed_files=""
 
 usage() {
     cat <<EOF
@@ -105,17 +105,20 @@ cleanup() {
     if [ -n "${temporary_environment_file}" ] && [ -f "${temporary_environment_file}" ]; then
         rm -f -- "${temporary_environment_file}"
     fi
-    if [ -n "${working_directory}" ] && [ -d "${working_directory}" ]; then
-        rm -rf -- "${working_directory}"
-    fi
-    if [ -n "${backup_directory}" ] && [ -d "${backup_directory}" ]; then
-        if [ ! -e "${secrets_directory}" ]; then
-            if ! mv "${backup_directory}" "${secrets_directory}"; then
-                echo "The previous secrets directory remains at ${backup_directory}." >&2
+    rollback_failed=false
+    for installed_file in ${installed_files}; do
+        if [ -f "${working_directory}/backup/${installed_file}" ]; then
+            if ! mv -f "${working_directory}/backup/${installed_file}" "${secrets_directory}/${installed_file}"; then
+                rollback_failed=true
             fi
-        else
-            echo "The previous secrets directory remains at ${backup_directory}." >&2
+        elif ! rm -f "${secrets_directory}/${installed_file}"; then
+            rollback_failed=true
         fi
+    done
+    if [ "${rollback_failed}" = true ]; then
+        echo "Could not restore all previous secrets; backups remain at ${working_directory}." >&2
+    elif [ -n "${working_directory}" ] && [ -d "${working_directory}" ]; then
+        rm -rf -- "${working_directory}"
     fi
 }
 
@@ -531,14 +534,6 @@ for key_name in ${key_names}; do
     chmod 0400 "${new_secrets_directory}/${key_name}"
 done
 
-# Preserve externally managed regular files without provider-specific handling.
-for preserved_file in "${secrets_directory}"/* "${secrets_directory}"/.[!.]* "${secrets_directory}"/..?*; do
-    [ -f "${preserved_file}" ] && [ ! -L "${preserved_file}" ] || continue
-    preserved_name="$(basename -- "${preserved_file}")"
-    is_key_name "${preserved_name}" && continue
-    cp -p "${preserved_file}" "${new_secrets_directory}/${preserved_name}"
-done
-
 validate_key_set "${new_secrets_directory}" || fail "The prepared application key set failed validation."
 
 if [ "${tls_action}" = generate ]; then
@@ -577,23 +572,37 @@ elif [ "${existing_tls_status}" = valid ]; then
         "${new_tls_directory}/tls.key" || fail "The preserved TLS certificate and private key failed validation."
 fi
 
-if [ -d "${secrets_directory}" ]; then
-    backup_directory="$(mktemp -d "${secrets_parent}/.kairos-setup.backup.XXXXXX")"
-    rmdir "${backup_directory}"
-    if ! mv "${secrets_directory}" "${backup_directory}"; then
-        fail "Could not move the existing secrets directory aside."
-    fi
-    if ! mv "${new_secrets_directory}" "${secrets_directory}"; then
-        if ! mv "${backup_directory}" "${secrets_directory}"; then
-            echo "Could not restore the previous secrets directory from ${backup_directory}." >&2
+# Keep directory identities stable for Docker Desktop bind mounts.
+mkdir -p "${secrets_directory}"
+chmod 0700 "${secrets_directory}"
+replacement_files=""
+if [ "${final_key_action}" = generate ]; then
+    for key_name in ${key_names}; do
+        if [ "${key_name}" = zitadel-masterkey ] && [ -f "${secrets_directory}/${key_name}" ]; then
+            continue
         fi
-        fail "Could not install the prepared secrets directory."
-    fi
-    rm -rf -- "${backup_directory}"
-    backup_directory=""
-else
-    mv "${new_secrets_directory}" "${secrets_directory}"
+        replacement_files="${replacement_files} ${key_name}"
+    done
 fi
+if [ "${tls_action}" = generate ]; then
+    mkdir -p "${tls_directory}"
+    chmod 0700 "${tls_directory}"
+    replacement_files="${replacement_files} tls/tls.crt tls/tls.key"
+fi
+
+mkdir -p "${working_directory}/backup/tls"
+for replacement_file in ${replacement_files}; do
+    if [ -f "${secrets_directory}/${replacement_file}" ]; then
+        cp -p "${secrets_directory}/${replacement_file}" "${working_directory}/backup/${replacement_file}"
+    fi
+done
+for replacement_file in ${replacement_files}; do
+    installed_files="${replacement_file} ${installed_files}"
+    if ! mv -f "${new_secrets_directory}/${replacement_file}" "${secrets_directory}/${replacement_file}"; then
+        fail "Could not install ${replacement_file}; restoring previous secrets."
+    fi
+done
+installed_files=""
 
 rm -rf -- "${working_directory}"
 working_directory=""
