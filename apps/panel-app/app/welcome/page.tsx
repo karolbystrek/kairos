@@ -40,7 +40,7 @@ export default function Welcome() {
           })}
           href="/registration"
         >
-          Create your restaurant account
+          Get started
         </Link>
       </section>
 
