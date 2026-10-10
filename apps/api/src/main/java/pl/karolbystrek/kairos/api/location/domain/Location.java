@@ -11,6 +11,7 @@ import lombok.Getter;
 import lombok.NonNull;
 import lombok.NoArgsConstructor;
 
+import java.util.Objects;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -51,6 +52,12 @@ public class Location {
     @Column(name = "last_enabled_at", nullable = false)
     private Instant lastEnabledAt;
 
+    @Column(name = "google_review_url", length = 2048)
+    private String googleReviewUrl;
+
+    @Column(name = "review_configuration_id")
+    private UUID reviewConfigurationId;
+
     @Column(name = "archived_at")
     private Instant archivedAt;
 
@@ -70,6 +77,16 @@ public class Location {
         location.updatedAt = now;
         location.lastEnabledAt = now;
         return location;
+    }
+
+    public void configureReviews(String url, @NonNull Instant now) {
+        requireNotArchived();
+        if (Objects.equals(googleReviewUrl, url)) {
+            return;
+        }
+        googleReviewUrl = url;
+        reviewConfigurationId = url == null ? null : UUID.randomUUID();
+        updatedAt = now;
     }
 
     public void rename(@NonNull ManagedLocationName name, @NonNull Instant now) {
@@ -98,6 +115,9 @@ public class Location {
             return;
         }
         status = LocationStatus.DISABLED;
+        if (googleReviewUrl != null) {
+            reviewConfigurationId = UUID.randomUUID();
+        }
         updatedAt = now;
     }
 

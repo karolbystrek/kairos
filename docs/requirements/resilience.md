@@ -23,6 +23,11 @@
   valid earlier `Retry-After` time. Other `4xx` responses terminate only the
   delivery; `404` and `410` also retire the complete subscription and its
   enrollments.
+* Optional review push delivery starts at the captured completion follow-up due
+  time, with the same ten-minute freshness window and bounded retries measured
+  from that due time. It has its own identity/topic and cannot replace completion
+  notifications. The location's configuration identity and enabled state are
+  revalidated before submission; there are no scheduled reminder deliveries.
 * A push is revalidated against the authoritative order immediately before
   submission. A queued notification that no longer represents the current
   order state is superseded rather than sent. Uncertain crash recovery may

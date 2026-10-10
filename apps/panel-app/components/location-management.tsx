@@ -30,6 +30,7 @@ import {
   renameLocation,
   sortLocations,
   updateLocationStatus,
+  updateLocationReviewLink,
   type Location,
 } from "@/src/api/locations";
 
@@ -77,6 +78,7 @@ export function LocationManagement({
   const [selectedLocationId, setSelectedLocationId] = useState<string>();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editName, setEditName] = useState<string>();
+  const [editReviewUrl, setEditReviewUrl] = useState<string>();
   const [confirmation, setConfirmation] = useState<Confirmation>();
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [error, setError] = useState<unknown>();
@@ -130,6 +132,27 @@ export function LocationManagement({
 
       await updateCachedLocation(updated);
       setEditName(undefined);
+      void mutateLocations();
+    } catch (caught) {
+      setError(caught);
+    } finally {
+      setPendingAction(undefined);
+    }
+  }
+
+  async function submitReviews(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedLocation || pendingAction) return;
+    setError(undefined);
+    setPendingAction("reviews");
+    try {
+      const updated = await updateLocationReviewLink(
+        selectedLocation.id,
+        editReviewUrl ?? selectedLocation.googleReviewUrl ?? "",
+      );
+
+      await updateCachedLocation(updated);
+      setEditReviewUrl(undefined);
       void mutateLocations();
     } catch (caught) {
       setError(caught);
@@ -256,6 +279,7 @@ export function LocationManagement({
                 onPress={() => {
                   setSelectedLocationId(location.id);
                   setEditName(undefined);
+                  setEditReviewUrl(undefined);
                   setError(undefined);
                 }}
               />
@@ -310,6 +334,7 @@ export function LocationManagement({
                             variant="tertiary"
                             onPress={() => {
                               setEditName(undefined);
+                              setEditReviewUrl(undefined);
                               setError(undefined);
                             }}
                           >
@@ -404,6 +429,35 @@ export function LocationManagement({
                   ) : null
                 }
               />
+              <form
+                className="mt-6 flex flex-col gap-3"
+                onSubmit={submitReviews}
+              >
+                <FormTextField
+                  fullWidth
+                  inputProps={{ type: "url" }}
+                  isDisabled={Boolean(pendingAction)}
+                  label="Google review link"
+                  maxLength={2048}
+                  name="google-review-url"
+                  placeholder="Google review link (disabled if empty)"
+                  value={
+                    editReviewUrl ?? selectedLocation.googleReviewUrl ?? ""
+                  }
+                  onChange={setEditReviewUrl}
+                />
+                <p className="secondary-text">
+                  Customers receive one invitation after completing an order.
+                </p>
+                <Button
+                  className="self-start"
+                  isDisabled={Boolean(pendingAction)}
+                  isPending={pendingAction === "reviews"}
+                  type="submit"
+                >
+                  Save review settings
+                </Button>
+              </form>
               {locations.length <= 1 && (
                 <p className="mt-4 text-sm text-muted">
                   Your last location can be disabled, but cannot be deleted.

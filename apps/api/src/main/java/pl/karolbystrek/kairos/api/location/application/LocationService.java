@@ -31,10 +31,12 @@ import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
 import pl.karolbystrek.kairos.api.order.infrastructure.persistence.CustomerOrderRepository;
 import pl.karolbystrek.kairos.api.tenant.infrastructure.persistence.TenantRepository;
 
+import java.net.URI;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -74,12 +76,19 @@ public class LocationService {
 
     @Transactional
     public LocationView create(StaffPrincipal principal, String candidateName) {
+        return create(principal, candidateName, null);
+    }
+
+    @Transactional
+    public LocationView create(StaffPrincipal principal, String candidateName, String googleReviewUrl) {
         var access = requireAdministrator(principal, true);
         tenantRepository.findForUpdateById(access.tenantId())
             .orElseThrow(LocationNotFoundException::new);
         var name = parseName(candidateName);
         requireNameAvailable(access.tenantId(), name, null);
-        var location = Location.create(access.tenantId(), name, clock.instant());
+        var now = clock.instant();
+        var location = Location.create(access.tenantId(), name, now);
+        location.configureReviews(parseReviewUrl(googleReviewUrl), now);
         try {
             locationRepository.saveAndFlush(location);
         }
@@ -88,6 +97,33 @@ public class LocationService {
         }
         log.info("Account {} created location {}", access.accountId(), location.getId());
         return LocationView.from(location);
+    }
+
+    @Transactional
+    public LocationView updateReviewLink(StaffPrincipal principal, UUID locationId, String candidateUrl) {
+        var access = requireAdministrator(principal, true);
+        var location = requireMutableLocationForUpdate(locationId, access.tenantId());
+        location.configureReviews(parseReviewUrl(candidateUrl), clock.instant());
+        return LocationView.from(location);
+    }
+
+    private static String parseReviewUrl(String candidate) {
+        if (candidate == null || candidate.isBlank()) {
+            return null;
+        }
+        var url = candidate.strip();
+        try {
+            var uri = URI.create(url);
+            if (url.length() > 2048 || !"https".equals(uri.getScheme()) || uri.getHost() == null
+                    || uri.getRawUserInfo() != null || (uri.getPort() != -1 && uri.getPort() != 443)
+                    || !Set.of("g.page", "maps.app.goo.gl", "search.google.com", "www.google.com", "maps.google.com").contains(uri.getHost())
+                    || uri.getRawFragment() != null || uri.getRawPath() == null || uri.getRawPath().isBlank()) {
+                throw new IllegalArgumentException();
+            }
+            return url;
+        } catch (IllegalArgumentException exception) {
+            throw new InvalidLocationRequestException("Use an HTTPS Google Maps or Google review link");
+        }
     }
 
     @Transactional

@@ -7,7 +7,8 @@ import {
 } from "@/src/orders/order-status";
 
 const DATABASE_NAME = "kairos-customer";
-const DATABASE_VERSION = 1;
+const DATABASE_VERSION = 2;
+const REVIEW_STORE = "reviews";
 const ORDER_STORE = "orders";
 const METADATA_STORE = "metadata";
 const EVENT_STORE = "push-events";
@@ -122,6 +123,11 @@ function openDatabase(): Promise<IDBDatabase> {
     request.onupgradeneeded = () => {
       const database = request.result;
 
+      if (!database.objectStoreNames.contains(REVIEW_STORE)) {
+        database.createObjectStore(REVIEW_STORE, {
+          keyPath: "trackingReference",
+        });
+      }
       if (!database.objectStoreNames.contains(ORDER_STORE)) {
         database.createObjectStore(ORDER_STORE, {
           keyPath: "trackingReference",
@@ -282,7 +288,7 @@ export async function rememberTrackedOrder(
   try {
     await withDatabase(async (database) => {
       const transaction = database.transaction(
-        [ORDER_STORE, TOMBSTONE_STORE, METADATA_STORE],
+        [ORDER_STORE, TOMBSTONE_STORE, METADATA_STORE, REVIEW_STORE],
         "readwrite",
       );
       const orderStore = transaction.objectStore(ORDER_STORE);
@@ -304,6 +310,12 @@ export async function rememberTrackedOrder(
       } else {
         const metadata = await readMetadataFromTransaction(transaction);
 
+        if (parsed.data.status === "COMPLETED") {
+          await rememberReviewInTransaction(
+            transaction,
+            parsed.data.trackingReference,
+          );
+        }
         orderStore.delete(parsed.data.trackingReference);
         tombstoneStore.put({
           trackingReference: parsed.data.trackingReference,
@@ -333,6 +345,7 @@ export async function rememberTrackedOrder(
   } catch {
     // Explicit offline state is best effort and never blocks live tracking.
   }
+  notifyReviewStorageChange();
 }
 
 export async function pruneTerminalTrackedOrders(): Promise<
@@ -419,7 +432,7 @@ export async function removeTrackedOrder(
   try {
     await withDatabase(async (database) => {
       const transaction = database.transaction(
-        [ORDER_STORE, TOMBSTONE_STORE, METADATA_STORE],
+        [ORDER_STORE, TOMBSTONE_STORE, METADATA_STORE, REVIEW_STORE],
         "readwrite",
       );
 
@@ -496,7 +509,7 @@ export async function applyPushTransition(
 ): Promise<PushTransitionResult> {
   return withDatabase(async (database) => {
     const transaction = database.transaction(
-      [ORDER_STORE, METADATA_STORE, EVENT_STORE, TOMBSTONE_STORE],
+      [ORDER_STORE, METADATA_STORE, EVENT_STORE, TOMBSTONE_STORE, REVIEW_STORE],
       "readwrite",
     );
     const events = transaction.objectStore(EVENT_STORE);
@@ -589,6 +602,12 @@ export async function applyPushTransition(
         });
       }
     } else {
+      if (transition.status === "COMPLETED") {
+        await rememberReviewInTransaction(
+          transaction,
+          transition.trackingReference,
+        );
+      }
       orderStore.delete(transition.trackingReference);
       transaction.objectStore(TOMBSTONE_STORE).put({
         trackingReference: transition.trackingReference,
@@ -709,4 +728,118 @@ function canApplyStatus(current: OrderStatus, candidate: OrderStatus): boolean {
 
 function isNotificationMetadata(value: unknown): value is NotificationMetadata {
   return typeof value === "object" && value !== null;
+}
+
+const reviewRecordSchema = z
+  .object({
+    trackingReference: z.uuid(),
+    consumed: z.boolean(),
+    notified: z.boolean(),
+  })
+  .strict();
+
+async function rememberReviewInTransaction(
+  transaction: IDBTransaction,
+  trackingReference: string,
+) {
+  const store = transaction.objectStore(REVIEW_STORE);
+  const current = reviewRecordSchema.safeParse(
+    await requestResult(store.get(trackingReference)),
+  );
+
+  if (!current.success)
+    store.put({ trackingReference, consumed: false, notified: false });
+}
+
+function notifyReviewStorageChange() {
+  if (typeof window !== "undefined")
+    window.dispatchEvent(new Event("kairos-reviews-changed"));
+}
+
+export async function rememberReviewReference(
+  trackingReference: string,
+): Promise<void> {
+  if (!z.uuid().safeParse(trackingReference).success) return;
+  await withDatabase(async (database) => {
+    const transaction = database.transaction(REVIEW_STORE, "readwrite");
+
+    await rememberReviewInTransaction(transaction, trackingReference);
+    await transactionComplete(transaction);
+  });
+  notifyReviewStorageChange();
+}
+
+export async function readReviewReferences(): Promise<string[]> {
+  return withDatabase(async (database) => {
+    const transaction = database.transaction(
+      [REVIEW_STORE, ORDER_STORE],
+      "readonly",
+    );
+    const [reviews, orders] = await Promise.all([
+      requestResult(transaction.objectStore(REVIEW_STORE).getAll()),
+      requestResult(transaction.objectStore(ORDER_STORE).getAll()),
+    ]);
+    const records = reviews
+      .map((value) => reviewRecordSchema.safeParse(value))
+      .filter((result) => result.success)
+      .map((result) => result.data);
+    const consumed = new Set(
+      records
+        .filter((record) => record.consumed)
+        .map((record) => record.trackingReference),
+    );
+
+    return Array.from(
+      new Set([
+        ...records
+          .filter((record) => !record.consumed)
+          .map((record) => record.trackingReference),
+        ...orders
+          .map((value) => storedOrderSchema.safeParse(value))
+          .filter((result) => result.success)
+          .map((result) => result.data.trackingReference),
+      ]),
+    ).filter((reference) => !consumed.has(reference));
+  });
+}
+
+export async function consumeReviewInvitation(
+  trackingReference: string,
+): Promise<void> {
+  await withDatabase(async (database) => {
+    const transaction = database.transaction(REVIEW_STORE, "readwrite");
+
+    transaction
+      .objectStore(REVIEW_STORE)
+      .put({ trackingReference, consumed: true, notified: true });
+    await transactionComplete(transaction);
+  });
+  notifyReviewStorageChange();
+}
+
+export async function applyReviewPush(
+  trackingReference: string,
+): Promise<boolean> {
+  if (!z.uuid().safeParse(trackingReference).success) return false;
+
+  return withDatabase(async (database) => {
+    const transaction = database.transaction(
+      [REVIEW_STORE, METADATA_STORE],
+      "readwrite",
+    );
+    const metadata = await readMetadataFromTransaction(transaction);
+    const store = transaction.objectStore(REVIEW_STORE);
+    const current = reviewRecordSchema.safeParse(
+      await requestResult(store.get(trackingReference)),
+    );
+    const shouldDisplay =
+      metadata.notificationsEnabled === true &&
+      !(current.success && (current.data.consumed || current.data.notified));
+
+    if (shouldDisplay)
+      store.put({ trackingReference, consumed: false, notified: true });
+    await transactionComplete(transaction);
+
+    return shouldDisplay;
+  });
 }

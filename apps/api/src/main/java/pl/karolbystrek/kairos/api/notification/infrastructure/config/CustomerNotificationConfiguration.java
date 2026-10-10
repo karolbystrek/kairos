@@ -9,7 +9,7 @@ import pl.karolbystrek.kairos.api.notification.infrastructure.security.VapidKeyL
 import pl.karolbystrek.kairos.api.notification.infrastructure.security.VapidKeyMaterial;
 
 @Configuration(proxyBeanMethods = false)
-@EnableConfigurationProperties(CustomerNotificationProperties.class)
+@EnableConfigurationProperties({CustomerNotificationProperties.class, ReviewInvitationProperties.class})
 public class CustomerNotificationConfiguration {
 
     @Bean

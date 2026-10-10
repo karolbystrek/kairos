@@ -30,6 +30,8 @@ transition snapshot and notification trigger; opening or focusing the
 application still reconciles authoritative state through REST. At-least-once
 delivery, unordered push services, and multiple subscriptions require stable
 event IDs, state-graph monotonicity, replacement tags, and pre-submission checks
-against current PostgreSQL order state. Authenticated staff queue streaming
-remains deferred. Future genuinely bidirectional features may introduce
+against current PostgreSQL order state. Review-enabled completions also materialize one delayed review delivery before
+terminal enrollments are removed. This distinct notification kind does not enter
+the order state graph or affect the active-order badge; clicks recover an in-app
+prompt through REST. Authenticated staff queue streaming remains deferred. Future genuinely bidirectional features may introduce
 WebSocket independently rather than changing the SSE or Web Push contracts.

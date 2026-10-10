@@ -21,7 +21,7 @@ import java.util.UUID;
         name = "customer_push_deliveries",
         uniqueConstraints = @UniqueConstraint(
                 name = "customer_push_deliveries_event_subscription_key",
-                columnNames = {"outbox_event_id", "subscription_id"}
+                columnNames = {"outbox_event_id", "subscription_id", "kind"}
         )
 )
 @Getter
@@ -39,6 +39,10 @@ public class CustomerPushDelivery {
 
     @Column(name = "order_id", nullable = false)
     private UUID orderId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 32)
+    private CustomerPushKind kind;
 
     @Column(columnDefinition = "TEXT")
     private String payload;
@@ -94,10 +98,19 @@ public class CustomerPushDelivery {
         delivery.subscriptionId = subscriptionId;
         delivery.orderId = orderId;
         delivery.payload = payload;
+        delivery.kind = CustomerPushKind.ORDER_STATUS;
         delivery.status = CustomerPushDeliveryStatus.PENDING;
         delivery.nextAttemptAt = now;
         delivery.deadlineAt = deadlineAt;
         delivery.createdAt = now;
+        return delivery;
+    }
+
+    public static CustomerPushDelivery createReview(UUID eventId, UUID subscriptionId, UUID orderId,
+            String payload, Instant dueAt, Duration freshnessWindow, Instant now) {
+        var delivery = create(eventId, subscriptionId, orderId, payload, dueAt.plus(freshnessWindow), now);
+        delivery.kind = CustomerPushKind.REVIEW;
+        delivery.nextAttemptAt = dueAt;
         return delivery;
     }
 

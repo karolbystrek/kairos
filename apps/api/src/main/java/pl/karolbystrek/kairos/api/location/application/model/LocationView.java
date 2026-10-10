@@ -11,7 +11,8 @@ public record LocationView(
         String name,
         LocationStatus status,
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+        String googleReviewUrl
 ) {
     public static LocationView from(Location location) {
         return new LocationView(
@@ -19,7 +20,8 @@ public record LocationView(
             location.getName(),
             location.getStatus(),
             location.getCreatedAt(),
-            location.getUpdatedAt()
+            location.getUpdatedAt(),
+            location.getGoogleReviewUrl()
         );
     }
 }

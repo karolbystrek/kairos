@@ -96,6 +96,13 @@ Orders, standardizes the managed-resource lifecycle vocabulary, adds Account
 archival through Delete, and applies the Location cascades and contracts
 specified in [location lifecycle](locations.md) and [HTTP contracts](http-contracts.md), across the schema, API, panel, and automated verification.
 
+Optional per-location Google review invitations now include administrator link
+configuration, configurable completion delay, one initial review push and a
+closable return-to-app prompt. No reminder schedule or review metrics are added.
+Consent/legal notices and real-user legal readiness remain owned by
+[issue #71](https://github.com/karolbystrek/kairos/issues/71); physical-device
+acceptance remains outstanding.
+
 ### Outstanding security and acceptance
 
 Outstanding security and acceptance work:

@@ -50,6 +50,12 @@ public class CustomerOrder {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @Column(name = "review_due_at")
+    private Instant reviewDueAt;
+
+    @Column(name = "review_configuration_id")
+    private UUID reviewConfigurationId;
+
     @Column(name = "external_integration_id")
     private UUID externalIntegrationId;
 
@@ -87,6 +93,19 @@ public class CustomerOrder {
         order.externalIdempotencyKey = idempotencyKey;
         order.externalRequestFingerprint = requestFingerprint;
         return order;
+    }
+
+    public void scheduleReview(@NonNull Instant dueAt) {
+        if (status == OrderStatus.COMPLETED && location.isEnabled() && location.getGoogleReviewUrl() != null) {
+            reviewDueAt = dueAt;
+            reviewConfigurationId = location.getReviewConfigurationId();
+        }
+    }
+
+    public boolean isReviewEligible() {
+        return status == OrderStatus.COMPLETED && reviewDueAt != null && reviewConfigurationId != null
+                && location.isEnabled() && location.getGoogleReviewUrl() != null
+                && reviewConfigurationId.equals(location.getReviewConfigurationId());
     }
 
     public boolean transitionTo(@NonNull OrderStatus target, @NonNull Instant now) {

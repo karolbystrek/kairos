@@ -21,6 +21,7 @@ export const locationSchema = z.object({
   status: z.enum(["ENABLED", "DISABLED"]),
   createdAt: z.iso.datetime({ offset: true }),
   updatedAt: z.iso.datetime({ offset: true }),
+  googleReviewUrl: z.string().nullable().optional(),
 });
 
 const locationsSchema = z.array(locationSchema);
@@ -57,9 +58,13 @@ function locationMutation(
   });
 }
 
-export function createLocation(name: string): Promise<Location> {
+export function createLocation(
+  name: string,
+  googleReviewUrl?: string,
+): Promise<Location> {
   return locationMutation("/api/locations/v1", "POST", {
     name: managedLocationNameSchema.parse(name),
+    googleReviewUrl: googleReviewUrl?.trim() || null,
   });
 }
 
@@ -91,4 +96,17 @@ export async function deleteLocation(locationId: string): Promise<boolean> {
   });
 
   return true;
+}
+
+export function updateLocationReviewLink(
+  locationId: string,
+  googleReviewUrl: string,
+): Promise<Location> {
+  return locationMutation(
+    `/api/locations/v1/${encodeURIComponent(locationId)}/reviews`,
+    "PUT",
+    {
+      googleReviewUrl: googleReviewUrl.trim() || null,
+    },
+  );
 }

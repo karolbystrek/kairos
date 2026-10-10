@@ -66,6 +66,8 @@ kairos:
       delivery-poll-delay: 500ms
       initial-delay: 1s
     destination-policy: "${WEBHOOK_DESTINATION_POLICY:PUBLIC_HTTPS}"
+  review-invitations:
+    delay: "${REVIEW_INVITATION_DELAY:30m}"
   customer-notifications:
     vapid:
       public-key-location: "file:/run/secrets/vapid-public.pem"
