@@ -23,6 +23,9 @@ issues; small documentation edits and mechanical cleanups do not require an
 issue. Issues describe context, goals and acceptance criteria, not implementation
 details. Discuss implementation choices when implementing the issue.
 
+When working on a GitHub issue, set the conversation title to that issue's exact
+title.
+
 Create a new `<issue>-<topic>` branch from current `main` for tracked work, or a
 descriptive branch for issue-exempt work. Validate, commit all task changes in
 one Conventional Commit, and open a PR to `main`. Stop for user verification
