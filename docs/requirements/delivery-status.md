@@ -15,6 +15,8 @@
 The current walking vertical slice is implemented for local development:
 
 * persisted labeled-order creation and controlled transitions;
+* public restaurant-owner landing page at the panel application's `/welcome`,
+  with direct registration/sign-in actions and secondary creator contact;
 * authenticated, tenant- and location-authorized staff operations;
 * backend-mediated self-hosted ZITADEL email/password authentication, immediate
   public tenant registration, fixed manually shared manager/operator invitations,

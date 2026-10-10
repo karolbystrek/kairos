@@ -42,6 +42,15 @@ The staff panel must:
 
 #### Navigation and onboarding
 
+The panel application provides a public restaurant-owner landing page at
+`/welcome`. It briefly explains QR-based order tracking and queue management
+without physical pagers or a customer app download. Its primary action links to
+public registration at `/registration`, while Sign in links to `/`, which remains
+the staff panel and sign-in entry point. The creator's email contact appears as
+secondary footer information; contacting the creator or receiving an invitation
+is not required to register. The page uses spacious typography and the shared
+responsive, accessible light/dark design language.
+
 The staff experience keeps the active queue visually primary. Administrative
 capabilities must not compete with frequent order creation, QR presentation,
 or valid order transitions merely because they are available to the signed-in

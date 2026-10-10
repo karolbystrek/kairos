@@ -172,6 +172,24 @@ body {
 	padding-block: 0;
 }
 
+.panel-page:has(.welcome-page) {
+	padding-block: 0;
+}
+
+.welcome-title {
+	font-size: var(--type-display);
+	font-weight: 650;
+	letter-spacing: -0.04em;
+	line-height: 1.08;
+	text-wrap: balance;
+}
+
+.welcome-page .button {
+	height: auto;
+	min-height: var(--control-touch);
+	padding-block: var(--space-3);
+}
+
 .auth-form-layout {
 	display: flex;
 	min-height: 100dvh;
