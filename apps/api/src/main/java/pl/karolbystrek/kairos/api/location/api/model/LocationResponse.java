@@ -11,7 +11,8 @@ public record LocationResponse(
         String name,
         LocationStatus status,
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+        String googleReviewUrl
 ) {
     public static LocationResponse from(LocationView location) {
         return new LocationResponse(
@@ -19,7 +20,8 @@ public record LocationResponse(
             location.name(),
             location.status(),
             location.createdAt(),
-            location.updatedAt()
+            location.updatedAt(),
+            location.googleReviewUrl()
         );
     }
 }

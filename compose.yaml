@@ -66,6 +66,7 @@ services:
   api:
     image: kairos-api:local
     environment:
+      REVIEW_INVITATION_DELAY: "${REVIEW_INVITATION_DELAY:-30m}"
       ZITADEL_API_URL:
       ZITADEL_TOKEN_LOCATION:
       NEXT_PUBLIC_API_BASE_URL:

@@ -36,6 +36,8 @@ services:
         NEXT_TELEMETRY_DISABLED:
 
   api:
+    environment:
+      REVIEW_INVITATION_DELAY: "${REVIEW_INVITATION_DELAY:-1m}"
     build:
       context: ./apps/api
       dockerfile: Dockerfile

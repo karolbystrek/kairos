@@ -46,6 +46,7 @@ export function LocationCreationModal({
 }) {
   const { mutate } = useSWRConfig();
   const [name, setName] = useState("");
+  const [reviewUrl, setReviewUrl] = useState("");
   const [error, setError] = useState<unknown>();
   const [isCreating, setIsCreating] = useState(false);
 
@@ -53,6 +54,7 @@ export function LocationCreationModal({
     onOpenChange(open);
     if (!open) {
       setName("");
+      setReviewUrl("");
       setError(undefined);
     }
   }
@@ -65,7 +67,7 @@ export function LocationCreationModal({
     setIsCreating(true);
     try {
       const validatedName = managedLocationNameSchema.parse(name);
-      const location = await createLocation(validatedName);
+      const location = await createLocation(validatedName, reviewUrl);
 
       await mutate(
         staffLocationsKey(accountId),
@@ -79,6 +81,7 @@ export function LocationCreationModal({
       onCreated(location);
       onOpenChange(false);
       setName("");
+      setReviewUrl("");
       void mutate(staffLocationsKey(accountId));
     } catch (caught) {
       setError(caught);
@@ -123,6 +126,17 @@ export function LocationCreationModal({
               setName(value);
               setError(undefined);
             }}
+          />
+          <FormTextField
+            fullWidth
+            inputProps={{ type: "url" }}
+            isDisabled={isCreating}
+            label="Google review link (optional)"
+            maxLength={2048}
+            name="google-review-url"
+            placeholder="Google review link (disabled if empty)"
+            value={reviewUrl}
+            onChange={setReviewUrl}
           />
         </PanelPopup.Body>
         <PanelPopup.Footer>

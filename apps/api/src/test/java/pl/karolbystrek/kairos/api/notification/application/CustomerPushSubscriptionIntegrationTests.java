@@ -17,6 +17,8 @@ import pl.karolbystrek.kairos.api.integration.testsupport.IntegrationTestFixture
 import pl.karolbystrek.kairos.api.integration.testsupport.MutableTestClock;
 import pl.karolbystrek.kairos.api.integration.testsupport.MutableTestClockConfiguration;
 import pl.karolbystrek.kairos.api.notification.application.exception.CustomerPushEnrollmentLimitException;
+import pl.karolbystrek.kairos.api.location.application.LocationService;
+import pl.karolbystrek.kairos.api.location.domain.LocationStatus;
 import pl.karolbystrek.kairos.api.notification.application.exception.InvalidCustomerPushSubscriptionException;
 import pl.karolbystrek.kairos.api.notification.application.model.CustomerPushSubscriptionInput;
 import pl.karolbystrek.kairos.api.notification.application.model.WebPushResult;
@@ -72,6 +74,9 @@ class CustomerPushSubscriptionIntegrationTests extends RedisListenerIsolatedInte
 
     @Autowired
     private OrderService orderService;
+
+    @Autowired
+    private LocationService locationService;
 
     private final JdbcTemplate jdbcTemplate = PostgresTestDatabase.ownerDatabase();
 
@@ -165,6 +170,62 @@ class CustomerPushSubscriptionIntegrationTests extends RedisListenerIsolatedInte
         jdbcTemplate.update("DELETE FROM locations WHERE tenant_id = ?", tenantId);
         jdbcTemplate.update("DELETE FROM tenants WHERE id = ?", tenantId);
         endpointHashes.clear();
+    }
+
+    @Test
+    void suppressesPendingReviewAfterDisableAndReenableOrSubscriptionRetirement() {
+        locationService.updateReviewLink(tenant.administrator(), tenant.firstLocationId(), "https://g.page/r/example/review");
+        var order = createOrder();
+        var input = newSubscription();
+        subscriptionService.reconcile(input, List.of(order.trackingReference()));
+        orderService.updateStatus(tenant.administrator(), order.id(), OrderStatus.READY);
+        orderService.updateStatus(tenant.administrator(), order.id(), OrderStatus.COMPLETED);
+        while (fanoutService.fanOutAvailable() > 0) { }
+        var completion = claimService.claimAvailable().getFirst();
+        completionService.complete(completion.id(), completion.claimToken(), completion.subscriptionId(), clock.instant(), new WebPushResult(201, null, null, null));
+        locationService.updateStatus(tenant.administrator(), tenant.firstLocationId(), LocationStatus.DISABLED);
+        locationService.updateStatus(tenant.administrator(), tenant.firstLocationId(), LocationStatus.ENABLED);
+        assertThat(orderService.findTrackedOrder(order.trackingReference()).reviewInvitation()).isNull();
+        clock.advance(Duration.ofMinutes(30));
+        assertThat(claimService.claimAvailable()).isEmpty();
+        assertThat(jdbcTemplate.queryForObject("SELECT status FROM customer_push_deliveries WHERE kind = 'REVIEW'", String.class)).isEqualTo("SUPERSEDED");
+        var another = createOrder();
+        subscriptionService.reconcile(input, List.of(another.trackingReference()));
+        orderService.updateStatus(tenant.administrator(), another.id(), OrderStatus.READY);
+        orderService.updateStatus(tenant.administrator(), another.id(), OrderStatus.COMPLETED);
+        while (fanoutService.fanOutAvailable() > 0) { }
+        subscriptionService.disable(input);
+        clock.advance(Duration.ofMinutes(30));
+        assertThat(claimService.claimAvailable()).isEmpty();
+    }
+
+    @Test
+    void schedulesOneReviewAfterCompletionAndPreservesTerminalCleanup() {
+        var configurationId = UUID.randomUUID();
+        jdbcTemplate.update("UPDATE locations SET google_review_url = ?, review_configuration_id = ? WHERE id = ?",
+                "https://g.page/r/example/review", configurationId, tenant.firstLocationId());
+        var order = createOrder();
+        var input = newSubscription();
+        subscriptionService.reconcile(input, List.of(order.trackingReference()));
+        orderService.updateStatus(tenant.administrator(), order.id(), OrderStatus.READY);
+        orderService.updateStatus(tenant.administrator(), order.id(), OrderStatus.COMPLETED);
+        orderService.updateStatus(tenant.administrator(), order.id(), OrderStatus.COMPLETED);
+        while (fanoutService.fanOutAvailable() > 0) { }
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM customer_push_enrollments", Integer.class)).isZero();
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM customer_push_deliveries WHERE kind = 'REVIEW'", Integer.class)).isEqualTo(1);
+        var due = orderService.findTrackedOrder(order.trackingReference()).reviewInvitation().dueAt();
+        assertThat(due).isEqualTo(Instant.parse("2026-07-26T12:30:00Z"));
+        var completion = claimService.claimAvailable();
+        assertThat(completion).hasSize(1);
+        var finalNotification = completion.getFirst();
+        completionService.complete(finalNotification.id(), finalNotification.claimToken(), finalNotification.subscriptionId(),
+                clock.instant(), new WebPushResult(201, null, null, null));
+        clock.advance(Duration.ofMinutes(29));
+        assertThat(claimService.claimAvailable()).isEmpty();
+        clock.advance(Duration.ofMinutes(1));
+        var review = claimService.claimAvailable();
+        assertThat(review).hasSize(1);
+        assertThat(review.getFirst().payload()).contains("\"kind\":\"REVIEW\"");
     }
 
     @Test

@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import pl.karolbystrek.kairos.api.location.api.model.LocationNameRequest;
+import pl.karolbystrek.kairos.api.location.api.model.LocationReviewLinkRequest;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
 import pl.karolbystrek.kairos.api.location.api.model.LocationResponse;
 import pl.karolbystrek.kairos.api.location.api.model.UpdateLocationStatusRequest;
@@ -43,7 +44,7 @@ class LocationController {
         @AuthenticationPrincipal StaffPrincipal principal,
         @Valid @RequestBody LocationNameRequest request
     ) {
-        return LocationResponse.from(locationService.create(principal, request.name()));
+        return LocationResponse.from(locationService.create(principal, request.name(), request.googleReviewUrl()));
     }
 
     @PutMapping("/{locationId}")
@@ -53,6 +54,15 @@ class LocationController {
         @Valid @RequestBody LocationNameRequest request
     ) {
         return LocationResponse.from(locationService.rename(principal, locationId, request.name()));
+    }
+
+    @PutMapping("/{locationId}/reviews")
+    LocationResponse updateReviewLink(
+        @AuthenticationPrincipal StaffPrincipal principal,
+        @PathVariable UUID locationId,
+        @Valid @RequestBody LocationReviewLinkRequest request
+    ) {
+        return LocationResponse.from(locationService.updateReviewLink(principal, locationId, request.googleReviewUrl()));
     }
 
     @PutMapping("/{locationId}/status")

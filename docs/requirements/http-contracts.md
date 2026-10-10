@@ -55,6 +55,7 @@ and extends that browser contract as follows:
 GET    /api/locations/v1
 POST   /api/locations/v1
 PUT    /api/locations/v1/{locationId}
+PUT    /api/locations/v1/{locationId}/reviews
 PUT    /api/locations/v1/{locationId}/status
 DELETE /api/locations/v1/{locationId}
 
@@ -86,12 +87,16 @@ Tenant Registration Invitation resource families no longer exist.
 
 #### Location and account mutations
 
-Location creation accepts only the display name and returns the new enabled
+Location creation accepts the display name and optional `googleReviewUrl` and returns the new enabled
 representation with `201`. Rename accepts only the display name. The location
 status operation accepts only `ENABLED` or `DISABLED`; archival remains the
 Delete operation. Rename and status return the updated representation with
 `200`, while Delete returns `204`. Repeating the current normalized name or
-status and repeating a successful Delete are idempotent.
+status and repeating a successful Delete are idempotent. Location representations
+include nullable `googleReviewUrl`. The administrator-only reviews operation
+accepts `{ "googleReviewUrl": "https://g.page/.../review" }`, or null/blank to
+disable invitations, and returns the updated location with `200`. Invalid links
+return `400`; changing/removing the link invalidates outstanding invitations.
 
 Every location mutation requires tenant-administrator authority and locks the
 tenant-scoped location before checking or changing it. Cross-tenant targets are
@@ -152,6 +157,11 @@ custom label in its validated body. External creation additionally requires
 `Idempotency-Key`. Desired-state updates use idempotent `PUT`; a same-state
 request returns the unchanged representation without another history, customer
 event, or outbox event.
+
+Tracked-order representations include nullable `reviewInvitation` with `dueAt`,
+`locationName`, and `googleReviewUrl` only while completion remains eligible.
+Possession of the ordinary tracking reference grants this read-only follow-up;
+no customer identity or staff access is introduced.
 
 #### Container runtime and environment
 

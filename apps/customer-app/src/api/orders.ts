@@ -3,10 +3,32 @@ import { z } from "zod";
 import { apiUrl } from "@/src/api/api-url";
 import { orderStatusSchema } from "@/src/orders/order-status";
 
+export const reviewInvitationSchema = z.object({
+  dueAt: z.iso.datetime({ offset: true }),
+  locationName: z.string(),
+  googleReviewUrl: z.url().refine((value) => {
+    const url = new URL(value);
+
+    return (
+      url.protocol === "https:" &&
+      !url.username &&
+      !url.password &&
+      [
+        "g.page",
+        "maps.app.goo.gl",
+        "search.google.com",
+        "www.google.com",
+        "maps.google.com",
+      ].includes(url.hostname)
+    );
+  }),
+});
+
 export const customerOrderSchema = z.object({
   label: z.string(),
   status: orderStatusSchema,
   updatedAt: z.iso.datetime({ offset: true }),
+  reviewInvitation: reviewInvitationSchema.nullish(),
 });
 
 export const orderStatusChangedEventSchema = z.object({

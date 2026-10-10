@@ -12,6 +12,7 @@
 - [Scanner and offline behavior](#scanner-and-offline-behavior)
 - [Notification consent and subscriptions](#notification-consent-and-subscriptions)
 - [Push payloads and application badges](#push-payloads-and-application-badges)
+- [Google review invitations](#google-review-invitations)
 
 ## 3. Functional Requirements
 
@@ -175,8 +176,8 @@ that clears the current message without changing notification settings.
 
 #### Push payloads and application badges
 
-Background notifications are generated for `READY`, `COMPLETED`, and `CANCELED`
-transitions only. Their title is the global Kairos brand, their body describes
+Order-status notifications are generated for `READY`, `COMPLETED`, and `CANCELED`
+transitions only. Optional review invitations use a separate payload and tag. Their title is the global Kairos brand, their body describes
 the state without disclosing the order label, and their click target is the
 order route. Notifications use one replacement tag per order. The service worker
 validates a versioned payload, deduplicates its stable event ID, and applies the
@@ -195,3 +196,35 @@ enrolled for notifications. Kairos does not add Background Sync, Periodic
 Background Sync, Screen Wake Lock, synthetic audio, or a separate background
 polling promise. The service worker does not force `skipWaiting` or immediately
 claim existing clients; an update activates through the browser lifecycle.
+
+#### Google review invitations
+
+Locations may enable one initial Google review invitation per completed order
+in each anonymous browser context. Canceled orders never qualify. The API
+captures the due time at completion: `REVIEW_INVITATION_DELAY` defaults to `30m`,
+and local Compose defaults to `1m`. Changes affect future completions; no repeat
+reminders are scheduled.
+
+Subscribed browsers receive a delayed, privacy-minimal review push. Its click
+opens the same closable in-app prompt available when a customer returns after
+the delay or keeps the app open until it elapses. The prompt uses neutral wording
+and offers Review on Google and Dismiss; opening Google or dismissal consumes
+the invitation in that browser context. No satisfaction filtering, incentives,
+positive-rating requests or review metrics are included. See
+[Google's contribution policy](https://support.google.com/business/answer/7400114).
+
+Active snapshots, live streams and ordinary enrollments still end normally.
+A separate IndexedDB record preserves only the tracking reference and consumed/
+notification state; REST revalidates invitation eligibility and the Google link
+before presentation. Offline recovery does not present cached review eligibility.
+Review clicks preserve the existing current-order destination. Removing/changing
+the review link or disabling/archiving the location suppresses outstanding
+invitations permanently, including after re-enablement. Notification opt-out
+suppresses pending review pushes. Browser-storage clearing loses local follow-up
+and dismissal state; separate devices/contexts are not a shared customer identity.
+
+Legal assessment, required consent controls, notices and withdrawal behavior are
+owned by [issue #71](https://github.com/karolbystrek/kairos/issues/71), not this
+increment. Existing browser notification permission is not declared to establish
+review-marketing consent. Real-user legal readiness remains dependent on that
+assessment; this feature adds no separate consent UI.

@@ -61,8 +61,8 @@ The database schema must include tables covering the following concepts. Names a
   browser, and last-observed time.
 * **Customer push enrollments:** the many-to-many association between a complete
   browser push subscription and active order tracking references.
-* **Customer push deliveries:** one mutable retry row per outbox event and
-  subscription, including the privacy-minimal payload, freshness deadline,
+* **Customer push deliveries:** one mutable retry row per outbox event,
+  subscription and notification kind, including the privacy-minimal payload, freshness deadline,
   claim state, attempt count, next-attempt time, bounded outcome details, and
   accepted, superseded, canceled, expired, or terminal dead-letter state.
 * **External order creation identity:** integration-and-location-scoped idempotency value and canonical creation-input fingerprint associated with the created order.
@@ -108,3 +108,9 @@ is supplied. Fresh PostgreSQL entrypoint initialization provisions restricted
 roles before Spring Flyway applies V1. See
 [database roles and initialization](../deployment/DATABASE.md). Volume resets are
 separately authorized operator actions.
+
+Locations retain an optional Google review link and its configuration identity.
+Completion captures the due time and configuration identity on the order; later
+configuration changes/disablement invalidate outstanding follow-ups without
+keeping terminal notification enrollments. Completion and review deliveries have
+separate kinds, stable notification identities and transport topics.

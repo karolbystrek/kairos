@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import pl.karolbystrek.kairos.api.location.domain.Location;
+import pl.karolbystrek.kairos.api.notification.infrastructure.config.ReviewInvitationProperties;
 import pl.karolbystrek.kairos.api.order.application.model.ExternalOrderCreation;
 import pl.karolbystrek.kairos.api.order.application.model.OrderInitiator;
 import pl.karolbystrek.kairos.api.order.application.model.OrderStatusChangedEvent;
@@ -29,6 +30,7 @@ public class OrderCommandService {
     private final OrderHistoryRepository historyRepository;
     private final OrderEventOutbox eventOutbox;
     private final ApplicationEventPublisher eventPublisher;
+    private final ReviewInvitationProperties reviewProperties;
 
     @Transactional(propagation = Propagation.MANDATORY)
     public CustomerOrder create(
@@ -68,6 +70,9 @@ public class OrderCommandService {
             return false;
         }
 
+        if (target == OrderStatus.COMPLETED) {
+            order.scheduleReview(now.plus(reviewProperties.delay()));
+        }
         historyRepository.save(historyFor(order, target, now, initiator));
         var eventId = eventOutbox.recordStatusChanged(order, now);
         eventPublisher.publishEvent(new OrderStatusChangedEvent(

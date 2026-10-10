@@ -6,6 +6,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 import pl.karolbystrek.kairos.api.notification.domain.CustomerPushDelivery;
+import pl.karolbystrek.kairos.api.notification.domain.CustomerPushKind;
 import pl.karolbystrek.kairos.api.notification.domain.CustomerPushDeliveryStatus;
 import pl.karolbystrek.kairos.api.notification.infrastructure.config.CustomerNotificationProperties;
 import pl.karolbystrek.kairos.api.notification.infrastructure.persistence.CustomerPushDeliveryRepository;
@@ -77,9 +78,10 @@ public class CustomerPushOutboxFanoutService {
                     enrollment.getSubscriptionId()
             ).orElse(null);
             if (subscription == null
-                    || deliveryRepository.existsByOutboxEventIdAndSubscriptionId(
+                    || deliveryRepository.existsByOutboxEventIdAndSubscriptionIdAndKind(
                     event.getId(),
-                    enrollment.getSubscriptionId()
+                    enrollment.getSubscriptionId(),
+                    CustomerPushKind.ORDER_STATUS
             )) {
                 continue;
             }
@@ -98,6 +100,12 @@ public class CustomerPushOutboxFanoutService {
                     deadline,
                     now
             ));
+            if (currentOrder.isReviewEligible()) {
+                deliveryRepository.save(CustomerPushDelivery.createReview(
+                        event.getId(), enrollment.getSubscriptionId(), event.getOrderId(),
+                        payloadFactory.createReview(event, currentOrder.getReviewDueAt()),
+                        currentOrder.getReviewDueAt(), properties.delivery().freshnessWindow(), now));
+            }
         }
         if (event.getStatus().isTerminal()) {
             enrollmentRepository.deleteAllByOrderId(event.getOrderId());

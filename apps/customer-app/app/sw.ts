@@ -10,6 +10,7 @@ import { apiOrigin, apiUrl } from "@/src/api/api-url";
 import { updateApplicationBadge } from "@/src/pwa/badge";
 import {
   applyPushTransition,
+  applyReviewPush,
   readNotificationMetadata,
   updateNotificationMetadata,
   type SerializedPushSubscription,
@@ -48,6 +49,15 @@ const pushPayloadSchema = z.strictObject({
   status: z.enum(["IN_PREPARATION", "READY", "COMPLETED", "CANCELED"]),
   transitionedAt: z.iso.datetime({ offset: true }),
   orderUrl: z.string().check(z.startsWith("/orders/")),
+});
+
+const reviewPayloadSchema = z.strictObject({
+  version: z.literal(2),
+  kind: z.literal("REVIEW"),
+  eventId: z.uuid(),
+  trackingReference: z.uuid(),
+  dueAt: z.iso.datetime({ offset: true }),
+  orderUrl: z.string(),
 });
 
 const serwist = new Serwist({
@@ -111,6 +121,37 @@ async function handlePush(event: PushEvent): Promise<void> {
   } catch {
     candidate = null;
   }
+  const review = z.safeParse(reviewPayloadSchema, candidate);
+
+  if (review.success) {
+    const payload = review.data;
+
+    if (
+      payload.orderUrl !== `/?review=${payload.trackingReference}` ||
+      Date.parse(payload.dueAt) > Date.now()
+    )
+      return;
+    try {
+      if (!(await applyReviewPush(payload.trackingReference))) return;
+      await self.registration.showNotification("Kairos", {
+        body: "Share your experience on Google",
+        tag: `kairos-review-${payload.trackingReference}`,
+        data: { orderUrl: payload.orderUrl },
+      });
+      const clients = await self.clients.matchAll({
+        includeUncontrolled: true,
+        type: "window",
+      });
+
+      clients.forEach((client) =>
+        client.postMessage({ type: "KAIROS_REVIEW_AVAILABLE" }),
+      );
+    } catch {
+      // A review is optional; storage failure must not bypass deduplication.
+    }
+
+    return;
+  }
   const result = z.safeParse(pushPayloadSchema, candidate);
 
   if (!result.success) {
@@ -172,6 +213,8 @@ async function handlePush(event: PushEvent): Promise<void> {
 
 async function openOrFocus(orderUrl: string): Promise<void> {
   const target = new URL(orderUrl, self.location.origin);
+
+  if (target.origin !== self.location.origin) return;
   const clients = await self.clients.matchAll({
     includeUncontrolled: true,
     type: "window",
@@ -180,7 +223,9 @@ async function openOrFocus(orderUrl: string): Promise<void> {
     const current = new URL(client.url);
 
     return (
-      current.origin === target.origin && current.pathname === target.pathname
+      current.origin === target.origin &&
+      current.pathname === target.pathname &&
+      current.search === target.search
     );
   });
 

@@ -19,6 +19,9 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
+import java.util.List;
+import pl.karolbystrek.kairos.api.location.application.exception.InvalidLocationRequestException;
+import pl.karolbystrek.kairos.api.location.application.exception.LocationNotFoundException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -33,6 +36,24 @@ class LocationServiceIntegrationTests extends RedisListenerIsolatedIntegrationTe
     private LocationService locationService;
 
     private final JdbcTemplate jdbcTemplate = PostgresTestDatabase.ownerDatabase();
+
+    @Test
+    void configuresReviewsOnlyForTheOwningAdministratorAndRejectsUnsafeLinks() {
+        var tenantId = insertTenant();
+        var administrator = insertAccount(tenantId, TenantRole.ADMIN, AccountStatus.ENABLED);
+        var location = locationService.create(administrator, "Reviews");
+        assertThat(location.googleReviewUrl()).isNull();
+        var enabled = locationService.updateReviewLink(administrator, location.id(), "https://g.page/r/example/review");
+        assertThat(enabled.googleReviewUrl()).isEqualTo("https://g.page/r/example/review");
+        var other = insertAccount(insertTenant(), TenantRole.ADMIN, AccountStatus.ENABLED);
+        assertThatThrownBy(() -> locationService.updateReviewLink(other, location.id(), null))
+            .isInstanceOf(LocationNotFoundException.class);
+        for (var url : List.of("http://g.page/r/example/review", "https://g.page.evil.test/review", "https://user@g.page/review", "javascript:alert(1)", "https:/review")) {
+            assertThatThrownBy(() -> locationService.updateReviewLink(administrator, location.id(), url))
+                .isInstanceOf(InvalidLocationRequestException.class);
+        }
+        assertThat(locationService.updateReviewLink(administrator, location.id(), null).googleReviewUrl()).isNull();
+    }
 
     @Test
     void createsRenamesSortsAndReusesAnArchivedNormalizedName() {

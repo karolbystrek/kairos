@@ -9,9 +9,12 @@ import java.time.Instant;
 public record TrackedOrderView(
         @NonNull String label,
         OrderStatus status,
-        Instant updatedAt
+        Instant updatedAt,
+        ReviewInvitationView reviewInvitation
 ) {
     public static TrackedOrderView from(CustomerOrder order) {
-        return new TrackedOrderView(order.getLabel(), order.getStatus(), order.getUpdatedAt());
+        return new TrackedOrderView(order.getLabel(), order.getStatus(), order.getUpdatedAt(),
+                order.isReviewEligible() ? new ReviewInvitationView(order.getReviewDueAt(),
+                        order.getLocation().getName(), order.getLocation().getGoogleReviewUrl()) : null);
     }
 }

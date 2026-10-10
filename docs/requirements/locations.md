@@ -14,10 +14,16 @@ administrator completes mandatory first-location onboarding. After that, its
 last non-archived location cannot be deleted. A tenant may have no enabled
 locations after all its locations are disabled.
 Only a tenant administrator manages the location lifecycle. The editable
-location property in this increment is its
-display name; its IANA time zone remains fixed at `UTC`. Enabled and disabled
+location properties are its display name and optional Google review link; its IANA time zone remains fixed at `UTC`. Enabled and disabled
 location names are unique within a tenant after trimming and case
 normalization. An archived location releases its name for reuse.
+
+The Google review link is absent by default, disabling invitations. First-location
+onboarding and subsequent creation accept the optional link; administrators can
+change or remove it in location management. Only HTTPS links on the supported
+Google Maps/review hosts are accepted, without credentials or fragments and with
+at most 2048 characters. Review invitation behavior is defined in
+[customer requirements](orders-customer.md#google-review-invitations).
 
 Disabling a location makes the location and everything scoped to it ineligible
 for operational use. Every non-archived manager or operator account assigned to
