@@ -99,12 +99,13 @@ class AccountInvitationApiIntegrationTests extends RedisListenerIsolatedIntegrat
         var result = mockMvc.perform(withAuthenticationAndCsrf(apiPost("/account-invitations/v1")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
-                    {"locationId":"%s","role":"MANAGER"}
+                    {"locationId":"%s","role":"MANAGER","email":"INVITED.PERSON@EXAMPLE.COM"}
                     """.formatted(locationId))))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.locationId").value(locationId.toString()))
             .andExpect(jsonPath("$.locationName").value("Main restaurant"))
             .andExpect(jsonPath("$.role").value("MANAGER"))
+            .andExpect(jsonPath("$.email").value("invited.person@example.com"))
             .andExpect(jsonPath("$.invitationLink").value(Matchers.startsWith(
                 "http://localhost:3001/account-registration#invitation="
             )))
@@ -120,7 +121,7 @@ class AccountInvitationApiIntegrationTests extends RedisListenerIsolatedIntegrat
         var persisted = jdbcTemplate.queryForMap(
             """
                 SELECT tenant_id, location_id, issued_by_account_id, assignment_role,
-                       token_hash, state, expires_at, redeemed_account_id
+                       email, token_hash, state, expires_at, redeemed_account_id
                 FROM account_invitations
                 WHERE id = ?
                 """,
@@ -133,6 +134,7 @@ class AccountInvitationApiIntegrationTests extends RedisListenerIsolatedIntegrat
         assertThat(persisted.get("location_id")).isEqualTo(locationId);
         assertThat(persisted.get("issued_by_account_id")).isEqualTo(administrator.accountId());
         assertThat(persisted.get("assignment_role")).isEqualTo("MANAGER");
+        assertThat(persisted.get("email")).isEqualTo("invited.person@example.com");
         assertThat(persisted.get("state")).isEqualTo("PENDING");
         assertThat(persisted.get("redeemed_account_id")).isNull();
         assertThat(persisted.get("token_hash")).isEqualTo(sha256(rawToken));
@@ -150,7 +152,8 @@ class AccountInvitationApiIntegrationTests extends RedisListenerIsolatedIntegrat
                 .content(objectMapper.writeValueAsString(Map.of("token", token))), csrf))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.locationName").value("Main restaurant"))
-            .andExpect(jsonPath("$.role").value("OPERATOR"));
+            .andExpect(jsonPath("$.role").value("OPERATOR"))
+            .andExpect(jsonPath("$.email").value("invited.person@example.com"));
 
         var redemption = mockMvc.perform(withCsrf(apiPost("/account-invitation-redemptions/v1")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -197,6 +200,32 @@ class AccountInvitationApiIntegrationTests extends RedisListenerIsolatedIntegrat
             .andExpect(jsonPath("$.type").value(
                 "urn:kairos:problem:account-invitation-redeemed"
             ));
+    }
+
+    @Test
+    void mismatchedEmailDoesNotProvisionIdentityOrConsumeInvitation() throws Exception {
+        var created = createInvitation("OPERATOR");
+        mockMvc.perform(withCsrf(apiPost("/account-invitation-redemptions/v1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(redemptionJson(tokenFrom(created), "", "someone.else@example.com")), csrfCookie()))
+            .andExpect(status().isBadRequest());
+        Mockito.verify(identityProvider, Mockito.never()).createUser(ArgumentMatchers.anyString(), ArgumentMatchers.anyString());
+        assertThat(invitationState(UUID.fromString(created.get("id").asText()))).isEqualTo("PENDING");
+    }
+
+    @Test
+    void invitationRequiresValidRecipientEmail() throws Exception {
+        for (var email : List.of("", "not-an-email", "a".repeat(201) + "@example.com")) {
+            mockMvc.perform(withAuthenticationAndCsrf(apiPost("/account-invitations/v1")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(Map.of("locationId", locationId,
+                        "role", "OPERATOR", "email", email)))))
+                .andExpect(status().isBadRequest());
+        }
+        mockMvc.perform(withAuthenticationAndCsrf(apiPost("/account-invitations/v1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("locationId", locationId, "role", "OPERATOR")))))
+            .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -352,7 +381,9 @@ class AccountInvitationApiIntegrationTests extends RedisListenerIsolatedIntegrat
                 "locationId",
                 targetLocationId,
                 "role",
-                role
+                role,
+                "email",
+                "invited.person@example.com"
             )));
     }
 
@@ -409,7 +440,7 @@ class AccountInvitationApiIntegrationTests extends RedisListenerIsolatedIntegrat
         var result = mockMvc.perform(withAuthenticationAndCsrf(apiPost("/account-invitations/v1")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
-                    {"locationId":"%s","role":"%s"}
+                    {"locationId":"%s","role":"%s","email":"invited.person@example.com"}
                     """.formatted(locationId, role))))
             .andExpect(status().isCreated())
             .andReturn();

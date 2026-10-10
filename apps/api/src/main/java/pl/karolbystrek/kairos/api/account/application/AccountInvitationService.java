@@ -2,6 +2,7 @@ package pl.karolbystrek.kairos.api.account.application;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,11 +29,13 @@ import pl.karolbystrek.kairos.api.account.infrastructure.persistence.AccountInvi
 import pl.karolbystrek.kairos.api.account.infrastructure.persistence.AccountRepository;
 import pl.karolbystrek.kairos.api.account.infrastructure.persistence.LocationAssignmentRepository;
 import pl.karolbystrek.kairos.api.authentication.application.OneTimeBearerTokenService;
+import pl.karolbystrek.kairos.api.authentication.application.exception.RegistrationValidationException;
 import pl.karolbystrek.kairos.api.persistence.infrastructure.DatabaseAccessContext;
 
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
 @Service
@@ -54,7 +57,8 @@ public class AccountInvitationService {
     public CreatedAccountInvitation create(
         StaffPrincipal actor,
         UUID locationId,
-        AssignmentRole role
+        AssignmentRole role,
+        String email
     ) {
         var access = staffAccessService.resolveForUpdate(actor);
         if (!access.isTenantAdmin()) access.requireLocationAccess(access.tenantId(), locationId);
@@ -72,6 +76,7 @@ public class AccountInvitationService {
             location.id(),
             access.accountId(),
             role,
+            email.strip().toLowerCase(Locale.ROOT),
             token.hash(),
             clock.instant()
         );
@@ -184,7 +189,7 @@ public class AccountInvitationService {
         requireIssuerAuthority(invitation);
         var location = requireLocation(invitation);
         requireEnabledLocation(location);
-        return new AccountInvitationPreview(location.name(), invitation.getAssignmentRole(), invitation.getExpiresAt());
+        return new AccountInvitationPreview(invitation.getEmail(), location.name(), invitation.getAssignmentRole(), invitation.getExpiresAt());
     }
 
     @Transactional
@@ -200,6 +205,7 @@ public class AccountInvitationService {
             .orElseThrow(AccountInvitationNotFoundException::new);
         var now = clock.instant();
         requireAvailable(invitation, now);
+        requireRecipientEmail(invitation.getEmail(), email);
         requireIssuerAuthority(invitation);
         requireEnabledLocation(location);
         var account = accountCreationService.create(Account.provisionMember(
@@ -210,6 +216,13 @@ public class AccountInvitationService {
         invitationRepository.flush();
         log.info("Account invitation {} redeemed into account {}", invitation.getId(), account.getId());
         return new StaffPrincipal(account.getId(), account.getTenantId(), account.getTenantRole());
+    }
+
+    public static void requireRecipientEmail(String invitedEmail, String email) {
+        if (!invitedEmail.equals(email.strip().toLowerCase(Locale.ROOT))) {
+            throw new RegistrationValidationException(HttpStatus.BAD_REQUEST, "email",
+                "Email must match the invitation.");
+        }
     }
 
     private void requireIssuerAuthority(AccountInvitation invitation) {
@@ -289,6 +302,7 @@ public class AccountInvitationService {
     ) {
         return new AccountInvitationView(
             invitation.getId(),
+            invitation.getEmail(),
             invitation.getLocationId(),
             location.name(),
             invitation.getAssignmentRole(),

@@ -8,6 +8,7 @@ import java.util.UUID;
 
 public record CreatedAccountInvitationResponse(
     UUID id,
+    String email,
     UUID locationId,
     String locationName,
     AssignmentRole role,
@@ -26,6 +27,7 @@ public record CreatedAccountInvitationResponse(
             : panelOrigin;
         return new CreatedAccountInvitationResponse(
             invitation.id(),
+            invitation.email(),
             invitation.locationId(),
             invitation.locationName(),
             invitation.role(),

@@ -46,7 +46,7 @@ class AccountInvitationController {
         @Valid @RequestBody CreateAccountInvitationRequest request
     ) {
         return CreatedAccountInvitationResponse.from(
-            invitationService.create(principal, request.locationId(), request.role()),
+            invitationService.create(principal, request.locationId(), request.role(), request.email()),
             origins.panel()
         );
     }

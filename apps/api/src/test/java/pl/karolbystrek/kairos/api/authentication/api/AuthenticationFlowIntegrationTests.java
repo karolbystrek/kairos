@@ -194,8 +194,8 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
     @Test
     void providerIdentityIsCleanedUpWhenInvitationBecomesUnavailableBeforeCommit() throws Exception {
         var tenant = new IntegrationTestFixture(database).createTenant();
-        var invitation = invitations.create(tenant.administrator(), tenant.firstLocationId(), AssignmentRole.MANAGER);
         var email = email();
+        var invitation = invitations.create(tenant.administrator(), tenant.firstLocationId(), AssignmentRole.MANAGER, email);
         configure(email);
         doAnswer(call -> {
             invitations.revoke(tenant.administrator(), invitation.invitation().id());

@@ -95,12 +95,19 @@ export function LocationManagement({
     shouldRetryOnError,
   });
 
-  const selectedLocation =
-    locations.find((location) => location.id === selectedLocationId) ??
-    locations[0];
+  const selectedLocation = locations.find(
+    (location) => location.id === selectedLocationId,
+  );
   const hasActiveOrdersConflict =
     actionError instanceof ApiError &&
     actionError.problem?.type === activeOrdersProblemType;
+
+  function selectLocation(locationId?: string) {
+    setSelectedLocationId(locationId);
+    setEditName(undefined);
+    setEditReviewUrl(undefined);
+    setError(undefined);
+  }
 
   async function updateCachedLocation(updated: Location) {
     await mutateLocations(
@@ -178,7 +185,7 @@ export function LocationManagement({
             ),
           { revalidate: false },
         );
-        setSelectedLocationId(undefined);
+        selectLocation();
       } else {
         const updated = await updateLocationStatus(
           confirmation.location.id,
@@ -256,222 +263,233 @@ export function LocationManagement({
           </p>
         </div>
       ) : (
-        <div className="grid gap-6 md:grid-cols-[minmax(220px,0.65fr)_minmax(0,1.35fr)]">
-          <section className="border-t border-separator pt-2 md:border-r md:border-t-0 md:pr-6 md:pt-0">
+        <>
+          <section aria-label="Lokale" className="entity-card-grid">
             {locations.map((location) => (
               <PanelCard
                 key={location.id}
-                accessibilityLabel={`Pokaż lokal ${location.name}`}
+                accessibilityLabel={`Pokaż lokal ${location.name}, ${location.status === "ENABLED" ? "włączony" : "wyłączony"}`}
                 isSelected={location.id === selectedLocation?.id}
-                metadata={
-                  <span
-                    className={
-                      location.status === "ENABLED"
-                        ? "text-accent"
-                        : "secondary-text"
-                    }
-                  >
-                    {location.status === "ENABLED" ? "Włączony" : "Wyłączony"}
-                  </span>
-                }
+                status={location.status}
                 title={location.name}
                 trailing={<ArrowRightIcon size={17} />}
                 onPress={() => {
-                  setSelectedLocationId(location.id);
-                  setEditName(undefined);
-                  setEditReviewUrl(undefined);
-                  setError(undefined);
+                  selectLocation(location.id);
                 }}
               />
             ))}
           </section>
 
           {selectedLocation && (
-            <section className="min-w-0">
-              <PanelDetailHeader
-                eyebrow="Lokal"
-                title={selectedLocation.name}
-                titleEditor={
-                  editName === undefined ? undefined : (
-                    <form
-                      className="flex min-w-0 items-end gap-2"
-                      onSubmit={submitRename}
-                    >
-                      <FormTextField
-                        fullWidth
-                        isRequired
-                        isDisabled={pendingAction === "rename"}
-                        label="Nazwa lokalu"
-                        maxLength={120}
-                        name="location-name"
-                        value={editName}
-                        onChange={(value) => {
-                          setEditName(value);
-                          setError(undefined);
-                        }}
-                      />
-                      <Tooltip delay={500}>
-                        <Tooltip.Trigger>
-                          <Button
-                            isIconOnly
-                            aria-label="Zapisz nazwę lokalu"
-                            className="shrink-0 rounded-md"
-                            isPending={pendingAction === "rename"}
-                            type="submit"
-                          >
-                            <EnableIcon size={20} />
-                          </Button>
-                        </Tooltip.Trigger>
-                        <Tooltip.Content>Zapisz</Tooltip.Content>
-                      </Tooltip>
-                      <Tooltip delay={500}>
-                        <Tooltip.Trigger>
-                          <Button
-                            isIconOnly
-                            aria-label="Anuluj edycję nazwy lokalu"
-                            className="shrink-0 rounded-md"
-                            isDisabled={pendingAction === "rename"}
-                            variant="tertiary"
-                            onPress={() => {
-                              setEditName(undefined);
-                              setEditReviewUrl(undefined);
-                              setError(undefined);
-                            }}
-                          >
-                            <CancelIcon size={20} />
-                          </Button>
-                        </Tooltip.Trigger>
-                        <Tooltip.Content>Anuluj</Tooltip.Content>
-                      </Tooltip>
-                    </form>
-                  )
-                }
-                trailingActions={
-                  editName === undefined ? (
-                    <>
-                      <Tooltip delay={500}>
-                        <Tooltip.Trigger>
-                          <Button
-                            isIconOnly
-                            aria-label="Edytuj nazwę lokalu"
-                            className="rounded-md"
-                            onPress={() => setEditName(selectedLocation.name)}
-                          >
-                            <EditIcon size={20} />
-                          </Button>
-                        </Tooltip.Trigger>
-                        <Tooltip.Content>Edytuj</Tooltip.Content>
-                      </Tooltip>
-                      <Tooltip delay={500}>
-                        <Tooltip.Trigger>
-                          <Button
-                            isIconOnly
-                            aria-label={`${selectedLocation.status === "ENABLED" ? "Wyłącz" : "Włącz"} lokal`}
-                            className="rounded-md"
-                            variant={
-                              selectedLocation.status === "ENABLED"
-                                ? "danger"
-                                : "secondary"
-                            }
-                            onPress={() =>
-                              openConfirmation({
-                                kind:
-                                  selectedLocation.status === "ENABLED"
-                                    ? "disable"
-                                    : "enable",
-                                location: selectedLocation,
-                              })
-                            }
-                          >
-                            {selectedLocation.status === "ENABLED" ? (
-                              <DisableIcon size={20} />
-                            ) : (
+            <PanelPopup
+              isOpen
+              aria-label={`Lokal ${selectedLocation.name}`}
+              onOpenChange={(open) => {
+                if (!open) selectLocation();
+              }}
+            >
+              <PanelPopup.Body className="pb-6 pt-12">
+                <PanelDetailHeader
+                  eyebrow="Lokal"
+                  title={selectedLocation.name}
+                  titleEditor={
+                    editName === undefined ? undefined : (
+                      <form
+                        className="flex min-w-0 items-end gap-2"
+                        onSubmit={submitRename}
+                      >
+                        <FormTextField
+                          fullWidth
+                          isRequired
+                          isDisabled={pendingAction === "rename"}
+                          label="Nazwa lokalu"
+                          maxLength={120}
+                          name="location-name"
+                          value={editName}
+                          onChange={(value) => {
+                            setEditName(value);
+                            setError(undefined);
+                          }}
+                        />
+                        <Tooltip delay={500}>
+                          <Tooltip.Trigger>
+                            <Button
+                              isIconOnly
+                              aria-label="Zapisz nazwę lokalu"
+                              className="shrink-0 rounded-md"
+                              isPending={pendingAction === "rename"}
+                              type="submit"
+                            >
                               <EnableIcon size={20} />
-                            )}
-                          </Button>
-                        </Tooltip.Trigger>
-                        <Tooltip.Content>
-                          {selectedLocation.status === "ENABLED"
-                            ? "Wyłącz"
-                            : "Włącz"}
-                        </Tooltip.Content>
-                      </Tooltip>
-                      <Tooltip delay={500}>
-                        <Tooltip.Trigger>
-                          <Button
-                            isIconOnly
-                            aria-label="Usuń lokal"
-                            className="rounded-md"
-                            isDisabled={
-                              locations.length <= 1 ||
-                              selectedLocation.status !== "DISABLED"
-                            }
-                            variant="danger"
-                            onPress={() =>
-                              openConfirmation({
-                                kind: "delete",
-                                location: selectedLocation,
-                              })
-                            }
-                          >
-                            <DeleteIcon size={20} />
-                          </Button>
-                        </Tooltip.Trigger>
-                        <Tooltip.Content>
-                          {locations.length <= 1
-                            ? "Nie można usunąć ostatniego lokalu"
-                            : selectedLocation.status === "DISABLED"
-                              ? "Usuń"
-                              : "Wyłącz przed usunięciem"}
-                        </Tooltip.Content>
-                      </Tooltip>
-                    </>
-                  ) : null
-                }
-              />
-              <form
-                className="mt-6 flex flex-col gap-3"
-                onSubmit={submitReviews}
-              >
-                <FormTextField
-                  fullWidth
-                  inputProps={{ type: "url" }}
-                  isDisabled={Boolean(pendingAction)}
-                  label="Link do opinii Google"
-                  maxLength={2048}
-                  name="google-review-url"
-                  placeholder="Link do opinii Google (puste pole wyłącza zaproszenia)"
-                  value={
-                    editReviewUrl ?? selectedLocation.googleReviewUrl ?? ""
+                            </Button>
+                          </Tooltip.Trigger>
+                          <Tooltip.Content>Zapisz</Tooltip.Content>
+                        </Tooltip>
+                        <Tooltip delay={500}>
+                          <Tooltip.Trigger>
+                            <Button
+                              isIconOnly
+                              aria-label="Anuluj edycję nazwy lokalu"
+                              className="shrink-0 rounded-md"
+                              isDisabled={pendingAction === "rename"}
+                              variant="tertiary"
+                              onPress={() => {
+                                setEditName(undefined);
+                                setEditReviewUrl(undefined);
+                                setError(undefined);
+                              }}
+                            >
+                              <CancelIcon size={20} />
+                            </Button>
+                          </Tooltip.Trigger>
+                          <Tooltip.Content>Anuluj</Tooltip.Content>
+                        </Tooltip>
+                      </form>
+                    )
                   }
-                  onChange={setEditReviewUrl}
+                  trailingActions={
+                    editName === undefined ? (
+                      <>
+                        <Tooltip delay={500}>
+                          <Tooltip.Trigger>
+                            <Button
+                              isIconOnly
+                              aria-label="Edytuj nazwę lokalu"
+                              className="rounded-md"
+                              onPress={() => setEditName(selectedLocation.name)}
+                            >
+                              <EditIcon size={20} />
+                            </Button>
+                          </Tooltip.Trigger>
+                          <Tooltip.Content>Edytuj</Tooltip.Content>
+                        </Tooltip>
+                        <Tooltip delay={500}>
+                          <Tooltip.Trigger>
+                            <Button
+                              isIconOnly
+                              aria-label={`${selectedLocation.status === "ENABLED" ? "Wyłącz" : "Włącz"} lokal`}
+                              className="rounded-md"
+                              variant={
+                                selectedLocation.status === "ENABLED"
+                                  ? "danger"
+                                  : "secondary"
+                              }
+                              onPress={() =>
+                                openConfirmation({
+                                  kind:
+                                    selectedLocation.status === "ENABLED"
+                                      ? "disable"
+                                      : "enable",
+                                  location: selectedLocation,
+                                })
+                              }
+                            >
+                              {selectedLocation.status === "ENABLED" ? (
+                                <DisableIcon size={20} />
+                              ) : (
+                                <EnableIcon size={20} />
+                              )}
+                            </Button>
+                          </Tooltip.Trigger>
+                          <Tooltip.Content>
+                            {selectedLocation.status === "ENABLED"
+                              ? "Wyłącz"
+                              : "Włącz"}
+                          </Tooltip.Content>
+                        </Tooltip>
+                        <Tooltip delay={500}>
+                          <Tooltip.Trigger>
+                            <Button
+                              isIconOnly
+                              aria-label="Usuń lokal"
+                              className="rounded-md"
+                              isDisabled={
+                                locations.length <= 1 ||
+                                selectedLocation.status !== "DISABLED"
+                              }
+                              variant="danger"
+                              onPress={() =>
+                                openConfirmation({
+                                  kind: "delete",
+                                  location: selectedLocation,
+                                })
+                              }
+                            >
+                              <DeleteIcon size={20} />
+                            </Button>
+                          </Tooltip.Trigger>
+                          <Tooltip.Content>
+                            {locations.length <= 1
+                              ? "Nie można usunąć ostatniego lokalu"
+                              : selectedLocation.status === "DISABLED"
+                                ? "Usuń"
+                                : "Wyłącz przed usunięciem"}
+                          </Tooltip.Content>
+                        </Tooltip>
+                      </>
+                    ) : null
+                  }
                 />
-                <p className="secondary-text">
-                  Klienci otrzymują jedno zaproszenie po odebraniu zamówienia.
-                </p>
-                <Button
-                  className="self-start"
-                  isDisabled={Boolean(pendingAction)}
-                  isPending={pendingAction === "reviews"}
-                  type="submit"
-                >
-                  Zapisz ustawienia opinii
-                </Button>
-              </form>
-              {locations.length <= 1 && (
                 <p className="mt-4 text-sm text-muted">
-                  Ostatni lokal można wyłączyć, ale nie można go usunąć.
+                  Status:{" "}
+                  {selectedLocation.status === "ENABLED"
+                    ? "Włączony"
+                    : "Wyłączony"}
                 </p>
-              )}
-            </section>
+                {error !== undefined && (
+                  <Alert status="danger">
+                    <Alert.Content>
+                      <Alert.Title>Nie udało się zapisać zmian</Alert.Title>
+                      <Alert.Description>
+                        {getErrorMessage(error)}
+                      </Alert.Description>
+                    </Alert.Content>
+                  </Alert>
+                )}
+                <form
+                  className="mt-6 flex flex-col gap-3"
+                  onSubmit={submitReviews}
+                >
+                  <FormTextField
+                    fullWidth
+                    inputProps={{ type: "url" }}
+                    isDisabled={Boolean(pendingAction)}
+                    label="Link do opinii Google"
+                    maxLength={2048}
+                    name="google-review-url"
+                    placeholder="Link do opinii Google (puste pole wyłącza zaproszenia)"
+                    value={
+                      editReviewUrl ?? selectedLocation.googleReviewUrl ?? ""
+                    }
+                    onChange={setEditReviewUrl}
+                  />
+                  <p className="secondary-text">
+                    Klienci otrzymują jedno zaproszenie po odebraniu zamówienia.
+                  </p>
+                  <Button
+                    className="self-start"
+                    isDisabled={Boolean(pendingAction)}
+                    isPending={pendingAction === "reviews"}
+                    type="submit"
+                  >
+                    Zapisz ustawienia opinii
+                  </Button>
+                </form>
+                {locations.length <= 1 && (
+                  <p className="mt-4 text-sm text-muted">
+                    Ostatni lokal można wyłączyć, ale nie można go usunąć.
+                  </p>
+                )}
+              </PanelPopup.Body>
+            </PanelPopup>
           )}
-        </div>
+        </>
       )}
 
       <LocationCreationModal
         accountId={accountId}
         isOpen={isCreateOpen}
-        onCreated={(location) => setSelectedLocationId(location.id)}
+        onCreated={(location) => selectLocation(location.id)}
         onOpenChange={setIsCreateOpen}
       />
 

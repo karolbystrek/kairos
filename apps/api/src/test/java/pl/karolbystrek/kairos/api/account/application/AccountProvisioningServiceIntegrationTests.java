@@ -81,7 +81,8 @@ class AccountProvisioningServiceIntegrationTests extends RedisListenerIsolatedIn
         var invitation = invitationService.create(
             principal(managerId, tenantId, TenantRole.MEMBER),
             locationId,
-            AssignmentRole.OPERATOR
+            AssignmentRole.OPERATOR,
+            "pending@example.com"
         );
         var sessionId = insertSession(managerId);
         var administratorSession = insertSession(administratorId);
@@ -154,7 +155,8 @@ class AccountProvisioningServiceIntegrationTests extends RedisListenerIsolatedIn
         var invitation = invitationService.create(
             principal(managerId, tenantId, TenantRole.MEMBER),
             locationId,
-            AssignmentRole.OPERATOR
+            AssignmentRole.OPERATOR,
+            "pending@example.com"
         );
         var sessionId = insertSession(managerId);
         var administratorSession = insertSession(administratorId);

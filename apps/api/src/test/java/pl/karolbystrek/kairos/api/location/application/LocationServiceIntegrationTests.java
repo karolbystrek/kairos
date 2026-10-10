@@ -351,8 +351,8 @@ class LocationServiceIntegrationTests extends RedisListenerIsolatedIntegrationTe
             """
             INSERT INTO account_invitations (
                 id, tenant_id, location_id, issued_by_account_id, assignment_role,
-                token_hash, state, expires_at, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, 'OPERATOR', ?, 'PENDING', ?, ?, ?)
+                email, token_hash, state, expires_at, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, 'OPERATOR', 'pending@example.com', ?, 'PENDING', ?, ?, ?)
             """,
             id,
             tenantId,

@@ -26,7 +26,10 @@ public class OnboardingService {
     public Registration register(String email, String password, String invitation) {
         if (accounts.identityConflict(email, null))
             throw new RegistrationValidationException(HttpStatus.CONFLICT, "email", "An account with this email already exists. Sign in instead.");
-        if (invitation != null) invitations.preview(invitation);
+        if (invitation != null) {
+            var preview = invitations.preview(invitation);
+            AccountInvitationService.requireRecipientEmail(preview.email(), email);
+        }
         String subject;
         try {
             subject = provider.createUser(email, password);

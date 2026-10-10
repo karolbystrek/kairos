@@ -130,52 +130,41 @@ in an overflow menu.
 
 #### Management collections and details
 
-Locations, Accounts, and External Integrations use responsive
-collection-and-detail navigation. New member-account access begins in a focused account-invitation
-sheet that captures only the fixed location and manager or operator role;
-the invited person supplies account identity and credentials when redeeming
-the resulting link. The Accounts collection contains only non-archived created
-accounts. A
-trailing icon-only **Invitations** control opens a
-focused HeroUI modal for unredeemed Account Invitations and their actions
-without making invitations a peer workspace destination. The control remains
-available with a zero count so its location does not change with state, has an
-accessible name and pointer tooltip, and shows its positive pending count in a
-HeroUI badge while omitting the badge at zero. The
-modal is centered on tablet and desktop and adapts to a near-full-screen sheet
-on mobile. Selecting an existing account opens its detail surface; an
-integration detail uses a compact segmented control to switch between API Keys
-and Webhooks. Account and integration details share one header anatomy: the
-resource-type eyebrow and title or inline title editor remain leading, while a
-regular-sized icon action rail remains trailing in a stable order. Integration
-identity is read-only in the normal detail view and becomes editable only
-through the Edit control in that rail; edit mode exposes direct confirm and
-cancel controls in place of the title.
-Contextual action labels omit a repeated entity name when the selected detail
-already makes the target unambiguous. The new-integration sheet keeps its
-single name field visually unlabeled and uses the direct **Integration name**
-placeholder while retaining an assistive-technology label.
+Locations, Accounts, and External Integrations initially show only responsive
+card collections and relevant creation controls, with no automatic selection or
+persistent right-hand details. Selecting a card opens details and applicable
+management actions in the shared centered popup, adapted to available mobile
+space. There is no collection search or filtering in this increment.
 
-Account and integration collection cards use the shared Panel Card directly,
-including its comfortable padding, minimum touch size, rounded geometry,
-separator rhythm, focus and pressed feedback, and responsive reflow. They use
-the restrained blue selection surface for the open resource with a stronger
-blue-tinted hover state. Each card shows the resource status beneath its name;
-the detail header does not duplicate that status. The selected account's
-icon-only status action remains in the shared trailing header rail, exposes an
-accessible name and pointer tooltip, and retains confirmation before disabling
-access. A following icon-only Delete action remains available for an enabled or
-disabled manageable account.
+New member access begins in an invitation popup capturing recipient email,
+fixed location, and manager or operator role. The resulting once-revealed link
+is copied and shared manually. Accounts includes non-archived created accounts
+and manageable pending invitations in one collection. Both card kinds show
+email, role, and location; location and integration cards show name. Card colour
+alone visually communicates enabled, disabled, or pending status. Accessible
+card labels expose status, and the detail popup states it explicitly. Existing
+shared geometry, touch targets, focus and press feedback remain consistent.
 
-The Locations collection follows the same anatomy. Its enabled cards appear
-first in display-name order, followed by disabled cards in display-name order,
-with stable identity as the deterministic tie-breaker. Each card shows the
-location status beneath its name. Selecting one opens a detail surface whose
-stable action rail contains Edit, Disable or Enable, and Delete. Delete remains
-visible but unavailable until the location is disabled and at least one other
-non-archived location exists. The detail explains that the last location can be
-disabled but cannot be deleted. The detail uses no
-time-zone editor or unrelated operational fields.
+Selecting an invitation opens its recipient, role, location, issuer, creation
+and expiration times, and confirmed Revoke action. Selecting an existing account
+opens its details and permitted status and Delete actions. Disable retains its
+confirmation; Delete retains exact-email confirmation. Both enabled and disabled
+manageable accounts can be deleted.
+
+Integration details retain the compact segmented control between API Keys and
+Webhooks and their one-time secret handling. Detail headers share the
+resource-type eyebrow, title or inline editor, and stable trailing action rail.
+Integration identity becomes editable only through Edit; direct confirm/cancel
+controls replace the title in edit mode. Contextual labels omit a repeated
+entity name when the popup makes the target unambiguous. The new-integration
+popup uses the direct **Integration name** placeholder with an accessible label.
+
+Location cards retain enabled-first display-name ordering with stable identity
+as a tie-breaker. The popup action rail contains Edit, Disable or Enable, and
+Delete. Delete remains visible but unavailable until the location is disabled
+and another non-archived location exists. Details explain that the last location
+can be disabled but cannot be deleted, and offer no time-zone editor or unrelated
+operational fields.
 
 If confirmed location disablement is rejected because the location still has
 active orders, the location remains enabled and the panel explains that those

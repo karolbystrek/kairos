@@ -25,7 +25,7 @@ async function submitRegistration({ invited = false, fails = false } = {}) {
       useSyncExternalStore: () => invited ? "invitation-token" : "",
       useState: initial => [cursor < values.length ? values[cursor++] : initial, () => {}],
     };
-    if (name === "swr") return { default: key => ({ data: key?.[0] === "invitation-preview" ? { locationName: "Restaurant", role: "OPERATOR" } : undefined }) };
+    if (name === "swr") return { default: key => ({ data: key?.[0] === "invitation-preview" ? { email: "invited@example.com", locationName: "Restaurant", role: "OPERATOR" } : undefined }) };
     if (name === "@/src/api/tenant-registrations") return {
       registrationInputSchema: { parse: input => input },
       registerTenant: input => createAccount("tenant", input),
@@ -47,10 +47,16 @@ async function submitRegistration({ invited = false, fails = false } = {}) {
       if (found) return found;
     }
   }
-  const rendered = form(exports.RegistrationForm({ invited }));
+  const tree = exports.RegistrationForm({ invited });
+  function fields(node) {
+    if (!node || typeof node !== "object") return [];
+    if (Array.isArray(node)) return node.flatMap(fields);
+    return [...(node.type === "FormTextField" ? [node.props] : []), ...fields(node.props?.children)];
+  }
+  const rendered = form(tree);
   assert.ok(rendered);
   await rendered.props.onSubmit({ preventDefault() {} });
-  return { redirects, requests };
+  return { redirects, requests, fields: fields(tree) };
 }
 
 for (const invited of [false, true]) {
@@ -64,4 +70,12 @@ for (const invited of [false, true]) {
 test("failed registration does not navigate away", async () => {
   const view = await submitRegistration({ fails: true });
   assert.deepEqual(view.redirects, []);
+});
+
+test("invited registration fixes the email from the invitation instead of editable form state", async () => {
+  const view = await submitRegistration({ invited: true });
+  const email = view.fields.find(field => field.name === "email");
+  assert.equal(email.value, "invited@example.com");
+  assert.equal(email.isReadOnly, true);
+  assert.equal(view.requests[0].input.email, "invited@example.com");
 });

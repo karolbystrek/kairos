@@ -26,6 +26,7 @@
 	--accent-soft: #e8f3ff;
 	--accent-soft-foreground: #0058ad;
 	--success: #0a84ff;
+	--invitation-status: #b97900;
 	--warning: #0a84ff;
 	--warning-foreground: #ffffff;
 	--warning-soft: #e8f3ff;
@@ -107,6 +108,7 @@
 	--accent-soft: #082c50;
 	--accent-soft-foreground: #64b5ff;
 	--success: #0071e3;
+	--invitation-status: #ffd60a;
 	--warning: #0071e3;
 	--warning-foreground: #ffffff;
 	--warning-soft: #082c50;
@@ -754,4 +756,34 @@ body {
 		--separator: #6e6e73;
 		--text-secondary: #d1d1d6;
 	}
+}
+
+.entity-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
+  gap: var(--space-3);
+}
+
+.entity-card-grid .panel-card {
+  min-height: 7rem;
+  padding: var(--space-4);
+  border: 1px solid var(--separator);
+}
+
+.entity-card-grid .panel-card + .panel-card {
+  margin-top: 0;
+}
+
+.entity-card-grid .panel-card[data-status="ENABLED"] {
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--separator));
+}
+
+.entity-card-grid .panel-card[data-status="DISABLED"] {
+  background: var(--surface-secondary);
+}
+
+.entity-card-grid .panel-card[data-status="PENDING"] {
+  background: color-mix(in srgb, var(--invitation-status) 12%, var(--surface));
+  border-color: color-mix(in srgb, var(--invitation-status) 35%, var(--separator));
 }
