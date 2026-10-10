@@ -9,7 +9,9 @@
 
 ## Commands and scope
 
-- Run automated tests for the affected scope when practical. Browser or manual
+- Run only focused tests for affected behavior when useful. Do not run full local
+  suites unless the user explicitly requests them; PR CI runs the full suites.
+  Browser or manual
   runtime checks remain opt-in and should run only when the user explicitly
   requests them or when they are needed to diagnose a runtime problem.
 - Use repository-owned commands:
@@ -53,6 +55,6 @@
 
 Backend verification uses disposable PostgreSQL 18 through the JUnit launcher.
 Docker is required; missing Docker fails the suite rather than skipping it.
-Run `./mvnw --batch-mode verify` from `apps/api`, or add
+When explicitly requested, run `./mvnw --batch-mode verify` from `apps/api`, or add
 `-f apps/api/pom.xml` when invoking the wrapper from the repository root.
 See [local development](local-development.md) for container and fixture safety.

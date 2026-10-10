@@ -3,15 +3,23 @@
 import { Alert, Button, Tooltip } from "@heroui/react";
 import { Bell, BellOff, X } from "lucide-react";
 
+import { NotificationGuide } from "@/src/pwa/notification-guide";
 import {
   type NotificationState,
   useCustomerNotifications,
 } from "@/src/pwa/notification-provider";
 
 export function NotificationIcon({ enabled }: { enabled: boolean }) {
-  const Icon = enabled ? BellOff : Bell;
-
-  return <Icon aria-hidden="true" size={20} />;
+  return (
+    <span
+      aria-hidden="true"
+      className="notification-icon"
+      data-enabled={enabled}
+    >
+      <Bell className="notification-icon-off" size={20} />
+      <BellOff className="notification-icon-on" size={20} />
+    </span>
+  );
 }
 
 function notificationActionLabel(state: NotificationState): string {
@@ -30,11 +38,26 @@ function notificationActionLabel(state: NotificationState): string {
 }
 
 export function NotificationControl() {
-  const { disable, dismissMessage, enable, message, state } =
-    useCustomerNotifications();
-  const isEnabled = state === "enabled";
-  const isUnavailable = state === "loading" || state === "unsupported";
-  const actionLabel = notificationActionLabel(state);
+  const {
+    disable,
+    dismissMessage,
+    requestEnable,
+    message,
+    pendingAction,
+    state,
+  } = useCustomerNotifications();
+  const isEnabled =
+    pendingAction === "enabling" ||
+    (state === "enabled" && pendingAction !== "disabling");
+  const isUnavailable = state === "loading" || pendingAction !== null;
+  const actionLabel =
+    pendingAction === "enabling"
+      ? "Enabling notifications…"
+      : pendingAction === "disabling"
+        ? "Disabling notifications…"
+        : pendingAction === "requesting-permission"
+          ? "Waiting for notification permission…"
+          : notificationActionLabel(state);
 
   return (
     <>
@@ -42,13 +65,15 @@ export function NotificationControl() {
         <Tooltip.Trigger>
           <Button
             isIconOnly
+            aria-busy={pendingAction !== null}
             aria-label={actionLabel}
-            aria-pressed={isEnabled}
+            aria-pressed={state === "enabled"}
             className="rounded-md"
-            isDisabled={isUnavailable || state === "blocked"}
+            isDisabled={isUnavailable}
             variant={isEnabled ? "primary" : "tertiary"}
             onPress={() => {
-              void (isEnabled ? disable() : enable());
+              if (isEnabled) void disable();
+              else requestEnable();
             }}
           >
             <NotificationIcon enabled={isEnabled} />
@@ -56,6 +81,7 @@ export function NotificationControl() {
         </Tooltip.Trigger>
         <Tooltip.Content>{actionLabel}</Tooltip.Content>
       </Tooltip>
+      <NotificationGuide />
       {message && (
         <div className="notification-region fixed inset-x-0 z-50 px-5 sm:px-6">
           <div className="mx-auto max-w-[var(--content-customer)]">

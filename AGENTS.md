@@ -39,6 +39,9 @@ parallel execution meaningfully reduces completion time. Avoid delegation when
 coordination costs outweigh the benefit or changes overlap. Delegation alone
 never requires a separate issue or branch.
 
+Do not run full test suites locally unless the user explicitly requests them.
+Use focused checks for the affected scope; rely on PR CI for full-suite coverage.
+
 ## Cloud resource approval
 
 Agents may use AWS CLI and Cloudflare CLI/API tools for read-only inspection.

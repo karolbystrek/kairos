@@ -112,7 +112,7 @@ export function OrderTracker({
   trackingReference: string;
 }) {
   const router = useRouter();
-  const { enrollOrder } = useCustomerNotifications();
+  const { enrollOrder, showGuideForOrder } = useCustomerNotifications();
   const [isStreamConnected, setIsStreamConnected] = useState(false);
   const [offlineOrder, setOfflineOrder] = useState<StoredTrackedOrder | null>(
     null,
@@ -171,6 +171,15 @@ export function OrderTracker({
       window.removeEventListener("offline", synchronizeConnectivity);
     };
   }, []);
+
+  const hasLoadedOrder = Boolean(order);
+
+  useEffect(() => {
+    if (!hasLoadedOrder) return;
+    const timer = window.setTimeout(showGuideForOrder, 3000);
+
+    return () => window.clearTimeout(timer);
+  }, [hasLoadedOrder, showGuideForOrder, trackingReference]);
 
   useEffect(() => {
     if (!order) {

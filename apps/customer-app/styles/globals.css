@@ -238,6 +238,103 @@ body {
 	box-shadow: none;
 }
 
+/* Reuse the easing token with a stronger curve for notification onboarding. */
+.notification-guide-backdrop,
+.notification-guide-container {
+	--ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.notification-installation-steps {
+	display: grid;
+	gap: var(--space-6);
+	padding: 0;
+	list-style: none;
+}
+
+.notification-installation-steps li {
+	display: flex;
+	align-items: center;
+	gap: var(--space-4);
+}
+
+.notification-installation-icon {
+	display: grid;
+	place-items: center;
+	flex: none;
+	width: 3rem;
+	height: 3rem;
+	border-radius: var(--radius-medium);
+	background: var(--accent-soft);
+	color: var(--accent-soft-foreground);
+}
+
+.notification-guide-backdrop[data-entering="true"],
+.notification-guide-backdrop[data-exiting="true"] {
+	animation-timing-function: var(--ease-out);
+}
+
+.notification-guide-container[data-entering="true"] {
+	animation: notification-guide-in 250ms var(--ease-out);
+}
+
+.notification-guide-container[data-exiting="true"] {
+	animation: notification-guide-out 150ms var(--ease-out);
+}
+
+@keyframes notification-guide-in {
+	from { opacity: 0; transform: scale(0.96); }
+	to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes notification-guide-out {
+	from { opacity: 1; transform: scale(1); }
+	to { opacity: 0; transform: scale(0.96); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+	.notification-guide-container[data-entering="true"],
+	.notification-guide-container[data-exiting="true"],
+	.notification-guide-backdrop[data-entering="true"],
+	.notification-guide-backdrop[data-exiting="true"] {
+		animation: none;
+	}
+}
+
+.notification-icon {
+	position: relative;
+	display: inline-block;
+	width: 20px;
+	height: 20px;
+	flex: none;
+	--ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.notification-icon svg {
+	position: absolute;
+	inset: 0;
+	margin: 0;
+	width: 100%;
+	height: 100%;
+	transition: opacity 160ms var(--ease-out), transform 160ms var(--ease-out);
+}
+
+.notification-icon-on,
+.notification-icon[data-enabled="true"] .notification-icon-off {
+	opacity: 0;
+	transform: scale(0.9);
+}
+
+.notification-icon-off,
+.notification-icon[data-enabled="true"] .notification-icon-on {
+	opacity: 1;
+	transform: scale(1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.notification-icon svg { transform: none !important; }
+}
+
 .notification-dismiss {
 	flex: none;
 }

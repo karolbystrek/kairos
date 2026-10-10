@@ -19,6 +19,12 @@ import {
   replacePushSubscription,
   serializePushSubscription,
 } from "@/src/api/customer-notifications";
+import {
+  readGuideDismissal,
+  rememberGuideDismissal,
+  requiresNotificationInstallation,
+  shouldShowNotificationGuide,
+} from "@/src/pwa/notification-onboarding";
 import { migrateLegacyRecentlyTrackedOrders } from "@/src/pwa/recently-tracked-orders";
 import { updateApplicationBadge } from "@/src/pwa/badge";
 import {
@@ -45,6 +51,11 @@ type CustomerNotificationContextValue = {
   enrollOrder: (trackingReference: string) => Promise<void>;
   message: string | null;
   state: NotificationState;
+  pendingAction: "requesting-permission" | "enabling" | "disabling" | null;
+  guideOpen: boolean;
+  dismissGuide: () => void;
+  requestEnable: () => void;
+  showGuideForOrder: () => void;
 };
 
 const CustomerNotificationContext =
@@ -57,10 +68,22 @@ export function CustomerPwaProvider({
 }) {
   const [state, setState] = useState<NotificationState>("loading");
   const [message, setMessage] = useState<string | null>(null);
+  const [guideOpen, setGuideOpen] = useState(false);
+  const [pendingAction, setPendingAction] =
+    useState<CustomerNotificationContextValue["pendingAction"]>(null);
+  const changingNotifications = useRef(false);
+  const guideDismissed = useRef(false);
+  const firstOrderSeen = useRef(false);
   const synchronizing = useRef<Promise<void> | null>(null);
   const dismissMessage = useCallback(() => setMessage(null), []);
 
   const synchronize = useCallback(async () => {
+    if (requiresNotificationInstallation()) {
+      setState("installation-required");
+      setMessage(null);
+
+      return;
+    }
     if (!supportsWebPush()) {
       setState("unsupported");
       setMessage(null);
@@ -98,12 +121,8 @@ export function CustomerPwaProvider({
       return;
     }
     if (Notification.permission !== "granted") {
-      setState(isIosOutsideStandalone() ? "installation-required" : "disabled");
-      setMessage(
-        isIosOutsideStandalone()
-          ? "Add Kairos to your Home Screen, open it there, then enable notifications."
-          : null,
-      );
+      setState("disabled");
+      setMessage(null);
 
       return;
     }
@@ -123,6 +142,7 @@ export function CustomerPwaProvider({
       await operation;
       setState("enabled");
       setMessage(null);
+      setGuideOpen(false);
     } catch (error) {
       setState("error");
       setMessage(notificationErrorMessage(error));
@@ -156,7 +176,7 @@ export function CustomerPwaProvider({
       }
     })();
     const handleOnline = () => {
-      if (active) {
+      if (active && !changingNotifications.current) {
         void synchronize();
       }
     };
@@ -170,16 +190,17 @@ export function CustomerPwaProvider({
   }, [synchronize]);
 
   const enable = useCallback(async () => {
+    if (changingNotifications.current) return;
     setMessage(null);
-    if (!supportsWebPush()) {
-      setState("unsupported");
+    if (requiresNotificationInstallation()) {
+      setState("installation-required");
 
       return;
     }
-    if (isIosOutsideStandalone()) {
-      setState("installation-required");
+    if (!supportsWebPush() || process.env.NODE_ENV !== "production") {
+      setState("unsupported");
       setMessage(
-        "On iPhone or iPad, use Share → Add to Home Screen, then open Kairos from the Home Screen.",
+        "Notifications are unavailable in this browser or configuration. Tracking still works normally.",
       );
 
       return;
@@ -200,22 +221,25 @@ export function CustomerPwaProvider({
 
       return;
     }
-    const permission =
-      Notification.permission === "granted"
-        ? "granted"
-        : await Notification.requestPermission();
-
-    if (permission !== "granted") {
-      setState(permission === "denied" ? "blocked" : "disabled");
-      setMessage(
-        permission === "denied"
-          ? "Notifications are blocked. Restore them in your browser or device settings."
-          : "Notification permission was not granted.",
-      );
-
-      return;
-    }
+    changingNotifications.current = true;
+    setPendingAction("requesting-permission");
     try {
+      const permission =
+        Notification.permission === "granted"
+          ? "granted"
+          : await Notification.requestPermission();
+
+      if (permission !== "granted") {
+        setState(permission === "denied" ? "blocked" : "disabled");
+        setMessage(
+          permission === "denied"
+            ? "Notifications are blocked. Restore them in your browser or device settings."
+            : "Notification permission was not granted.",
+        );
+
+        return;
+      }
+      setPendingAction("enabling");
       await updateNotificationMetadata({ notificationsEnabled: true });
       await synchronize();
     } catch {
@@ -223,10 +247,14 @@ export function CustomerPwaProvider({
       setMessage(
         "Notifications could not be saved in this browser. Tracking still works normally.",
       );
+    } finally {
+      changingNotifications.current = false;
+      setPendingAction(null);
     }
   }, [synchronize]);
 
   const disable = useCallback(async () => {
+    if (changingNotifications.current) return;
     if (!supportsWebPush()) {
       return;
     }
@@ -237,6 +265,8 @@ export function CustomerPwaProvider({
 
       return;
     }
+    changingNotifications.current = true;
+    setPendingAction("disabling");
     try {
       const registration = await navigator.serviceWorker.ready;
       const subscription = await registration.pushManager.getSubscription();
@@ -257,12 +287,19 @@ export function CustomerPwaProvider({
     } catch (error) {
       setState("enabled");
       setMessage(notificationErrorMessage(error));
+    } finally {
+      changingNotifications.current = false;
+      setPendingAction(null);
     }
   }, []);
 
   const enrollOrder = useCallback(
     async (trackingReference: string) => {
-      if (state !== "enabled" || !navigator.onLine) {
+      if (
+        state !== "enabled" ||
+        !navigator.onLine ||
+        changingNotifications.current
+      ) {
         return;
       }
       const metadata = await readNotificationMetadata();
@@ -277,6 +314,42 @@ export function CustomerPwaProvider({
     [state, synchronize],
   );
 
+  const dismissGuide = useCallback(() => {
+    guideDismissed.current = true;
+    rememberGuideDismissal();
+    setGuideOpen(false);
+  }, []);
+
+  const shouldShowGuide = useCallback(
+    (automatic: boolean) =>
+      shouldShowNotificationGuide({
+        state,
+        installationRequired: requiresNotificationInstallation(),
+        permission:
+          typeof Notification === "undefined"
+            ? undefined
+            : Notification.permission,
+        dismissed: guideDismissed.current || readGuideDismissal(),
+        automatic,
+      }),
+    [state],
+  );
+
+  const showGuideForOrder = useCallback(() => {
+    if (state === "loading" || firstOrderSeen.current) return;
+    firstOrderSeen.current = true;
+    if (shouldShowGuide(true)) setGuideOpen(true);
+  }, [state, shouldShowGuide]);
+
+  const requestEnable = useCallback(() => {
+    if (shouldShowGuide(false)) {
+      setGuideOpen(true);
+    } else {
+      dismissGuide();
+      void enable();
+    }
+  }, [dismissGuide, enable, shouldShowGuide]);
+
   const value = useMemo<CustomerNotificationContextValue>(
     () => ({
       disable,
@@ -285,8 +358,25 @@ export function CustomerPwaProvider({
       enrollOrder,
       message,
       state,
+      pendingAction,
+      guideOpen,
+      dismissGuide,
+      requestEnable,
+      showGuideForOrder,
     }),
-    [disable, dismissMessage, enable, enrollOrder, message, state],
+    [
+      disable,
+      dismissMessage,
+      enable,
+      enrollOrder,
+      message,
+      state,
+      pendingAction,
+      guideOpen,
+      dismissGuide,
+      requestEnable,
+      showGuideForOrder,
+    ],
   );
 
   return (
@@ -371,21 +461,6 @@ function supportsWebPush(): boolean {
     "PushManager" in window &&
     "Notification" in window
   );
-}
-
-function isIosOutsideStandalone(): boolean {
-  if (typeof window === "undefined") {
-    return false;
-  }
-  const navigatorWithStandalone = navigator as Navigator & {
-    standalone?: boolean;
-  };
-  const ios = /iPad|iPhone|iPod/.test(navigator.userAgent);
-  const standalone =
-    window.matchMedia("(display-mode: standalone)").matches ||
-    navigatorWithStandalone.standalone === true;
-
-  return ios && !standalone;
 }
 
 function keysEqual(current: ArrayBuffer | null, expected: Uint8Array): boolean {
