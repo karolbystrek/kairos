@@ -25,17 +25,17 @@ export function NotificationGuide() {
           <Modal.Dialog>
             <Tooltip delay={500}>
               <Tooltip.Trigger>
-                <Modal.CloseTrigger aria-label="Dismiss notification guide">
+                <Modal.CloseTrigger aria-label="Zamknij instrukcję powiadomień">
                   <X aria-hidden="true" size={20} />
                 </Modal.CloseTrigger>
               </Tooltip.Trigger>
-              <Tooltip.Content>Dismiss</Tooltip.Content>
+              <Tooltip.Content>Zamknij</Tooltip.Content>
             </Tooltip>
             <Modal.Header className="pr-8">
               <Modal.Heading>
                 {installationRequired
-                  ? "Add Kairos to Home Screen"
-                  : "Know when it’s ready"}
+                  ? "Dodaj Kairos do ekranu początkowego"
+                  : "Dowiedz się, kiedy zamówienie będzie gotowe"}
               </Modal.Heading>
             </Modal.Header>
             {installationRequired && (
@@ -47,7 +47,7 @@ export function NotificationGuide() {
                     </span>
                     <div>
                       <span className="text-muted text-sm">1</span>
-                      <p>Tap Share in Safari</p>
+                      <p>Stuknij Udostępnij w Safari</p>
                     </div>
                   </li>
                   <li>
@@ -56,7 +56,7 @@ export function NotificationGuide() {
                     </span>
                     <div>
                       <span className="text-muted text-sm">2</span>
-                      <p>Add to Home Screen</p>
+                      <p>Dodaj do ekranu początkowego</p>
                     </div>
                   </li>
                   <li>
@@ -65,7 +65,7 @@ export function NotificationGuide() {
                     </span>
                     <div>
                       <span className="text-muted text-sm">3</span>
-                      <p>Open Kairos → tap the bell</p>
+                      <p>Otwórz Kairos → stuknij dzwonek</p>
                     </div>
                   </li>
                 </ol>
@@ -73,7 +73,7 @@ export function NotificationGuide() {
             )}
             <Modal.Footer>
               <Button variant="secondary" onPress={dismissGuide}>
-                Not now
+                Nie teraz
               </Button>
               {!installationRequired && (
                 <Button
@@ -83,7 +83,7 @@ export function NotificationGuide() {
                     void enable();
                   }}
                 >
-                  Enable notifications
+                  Włącz powiadomienia
                 </Button>
               )}
             </Modal.Footer>

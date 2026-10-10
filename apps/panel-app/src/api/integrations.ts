@@ -5,14 +5,14 @@ import { apiFetch, request } from "./api-fetch";
 export const managedIntegrationNameSchema = z
   .string()
   .trim()
-  .min(1, "Name is required")
+  .min(1, "Podaj nazwę.")
   .refine(
     (name) => Array.from(name).length <= 64,
-    "Name must contain at most 64 characters",
+    "Nazwa może mieć maksymalnie 64 znaki.",
   )
   .refine(
     (name) => !/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/.test(name),
-    "Use one line of text.",
+    "Użyj jednej linii tekstu.",
   );
 
 export const externalIntegrationStatusSchema = z.enum([

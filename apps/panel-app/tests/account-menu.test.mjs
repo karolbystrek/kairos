@@ -83,7 +83,7 @@ function panel(screen = "dashboard") {
     signIn: () => find(node => node.type?.name === "SignedOutPanel").onSignIn({ email: "staff@example.com", password: "password" }),
     expire: () => expireSession(),
     passwordDialog: () => find(node => node.type === "PasswordChangeDialog"),
-    choose: key => find(node => node.props?.["aria-label"] === "Account actions").onAction(key),
+    choose: key => find(node => node.props?.["aria-label"] === "Opcje konta").onAction(key),
     dialog: () => find(node => node.props?.isOpen !== undefined && node.props?.onOpenChange && node.props?.role === "alertdialog"),
     async confirm() {
       find(node => node.props?.variant === "danger" && node.props?.onPress).onPress();

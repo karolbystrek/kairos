@@ -21,14 +21,14 @@ import {
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof ZodError) {
-    return error.issues[0]?.message ?? "Enter a valid location name.";
+    return error.issues[0]?.message ?? "Podaj prawidłową nazwę lokalu.";
   }
   if (error instanceof ApiError && error.status === 409) {
-    return "A location with that name already exists.";
+    return "Lokal o tej nazwie już istnieje.";
   }
   if (error instanceof ApiError) return error.message;
 
-  return "The location could not be created. Check your connection and try again.";
+  return "Nie udało się utworzyć lokalu. Sprawdź połączenie i spróbuj ponownie.";
 }
 
 export function LocationCreationModal({
@@ -99,7 +99,7 @@ export function LocationCreationModal({
     >
       <PanelPopup.Header>
         <PanelPopup.Heading>
-          {isRequired ? "Create your first location" : "New location"}
+          {isRequired ? "Utwórz pierwszy lokal" : "Nowy lokal"}
         </PanelPopup.Heading>
       </PanelPopup.Header>
       <form onSubmit={submit}>
@@ -108,7 +108,7 @@ export function LocationCreationModal({
             <Alert status="danger">
               <Alert.Indicator />
               <Alert.Content>
-                <Alert.Title>Location could not be created</Alert.Title>
+                <Alert.Title>Nie udało się utworzyć lokalu</Alert.Title>
                 <Alert.Description>{getErrorMessage(error)}</Alert.Description>
               </Alert.Content>
             </Alert>
@@ -118,7 +118,7 @@ export function LocationCreationModal({
             isRequired
             inputProps={{ autoComplete: "organization" }}
             isDisabled={isCreating}
-            label="Location name"
+            label="Nazwa lokalu"
             maxLength={120}
             name="location-name"
             value={name}
@@ -131,10 +131,10 @@ export function LocationCreationModal({
             fullWidth
             inputProps={{ type: "url" }}
             isDisabled={isCreating}
-            label="Google review link (optional)"
+            label="Link do opinii Google (opcjonalnie)"
             maxLength={2048}
             name="google-review-url"
-            placeholder="Google review link (disabled if empty)"
+            placeholder="Link do opinii Google (puste pole wyłącza zaproszenia)"
             value={reviewUrl}
             onChange={setReviewUrl}
           />
@@ -142,12 +142,12 @@ export function LocationCreationModal({
         <PanelPopup.Footer>
           {!isRequired && (
             <Button slot="close" variant="tertiary">
-              Cancel
+              Anuluj
             </Button>
           )}
           <Button isPending={isCreating} type="submit">
             <PlusIcon size={18} />
-            {isCreating ? "Creating…" : "Create"}
+            {isCreating ? "Tworzenie…" : "Utwórz"}
           </Button>
         </PanelPopup.Footer>
       </form>

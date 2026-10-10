@@ -54,7 +54,7 @@ export function OfflineNavigationFallback() {
       <section className="flex min-h-[calc(100svh-3rem)] flex-col">
         <CustomerToolbar />
         <div className="flex flex-1 items-center justify-center">
-          <Spinner aria-label="Loading saved order status" />
+          <Spinner aria-label="Wczytywanie zapisanego statusu zamówienia" />
         </div>
       </section>
     );
@@ -68,10 +68,10 @@ export function OfflineNavigationFallback() {
           <Alert className="w-full" status="warning">
             <Alert.Indicator />
             <Alert.Content>
-              <Alert.Title>You are offline</Alert.Title>
+              <Alert.Title>Brak połączenia z internetem</Alert.Title>
               <Alert.Description>
-                No saved status is available for this order. Reconnect to check
-                its status.
+                Brak zapisanego statusu tego zamówienia. Połącz się z
+                internetem, aby sprawdzić status.
               </Alert.Description>
             </Alert.Content>
           </Alert>
@@ -86,15 +86,15 @@ export function OfflineNavigationFallback() {
       <Alert className="mt-4" status="warning">
         <Alert.Indicator />
         <Alert.Content>
-          <Alert.Title>You’re offline</Alert.Title>
+          <Alert.Title>Brak połączenia z internetem</Alert.Title>
           <Alert.Description>
-            Last known status from{" "}
-            {new Date(snapshot.updatedAt).toLocaleString()}.
+            Ostatni znany status z{" "}
+            {new Date(snapshot.updatedAt).toLocaleString("pl-PL")}.
           </Alert.Description>
         </Alert.Content>
       </Alert>
       <div className="flex flex-1 flex-col items-center justify-center py-12 text-center">
-        <p className="text-sm secondary-text">Order {snapshot.label}</p>
+        <p className="text-sm secondary-text">Zamówienie {snapshot.label}</p>
         <h1 className="status-title mt-4 max-w-[14ch]">
           {orderStatusLabels[snapshot.status]}
         </h1>

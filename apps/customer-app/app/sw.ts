@@ -134,7 +134,7 @@ async function handlePush(event: PushEvent): Promise<void> {
     try {
       if (!(await applyReviewPush(payload.trackingReference))) return;
       await self.registration.showNotification("Kairos", {
-        body: "Share your experience on Google",
+        body: "Podziel się opinią w Google",
         tag: `kairos-review-${payload.trackingReference}`,
         data: { orderUrl: payload.orderUrl },
       });
@@ -156,7 +156,7 @@ async function handlePush(event: PushEvent): Promise<void> {
 
   if (!result.success) {
     await self.registration.showNotification("Kairos", {
-      body: "Your order status changed. Open Kairos for the latest status.",
+      body: "Status zamówienia się zmienił. Otwórz Kairos, aby sprawdzić aktualny status.",
       tag: "kairos-generic-order-update",
       data: { orderUrl: "/" },
     });
@@ -175,7 +175,7 @@ async function handlePush(event: PushEvent): Promise<void> {
     });
   } catch {
     await self.registration.showNotification("Kairos", {
-      body: "Your order status changed. Open Kairos for the latest status.",
+      body: "Status zamówienia się zmienił. Otwórz Kairos, aby sprawdzić aktualny status.",
       tag: "kairos-generic-order-update",
       data: { orderUrl: "/" },
     });
@@ -400,12 +400,12 @@ function toBase64Url(value: ArrayBuffer): string {
 function notificationBody(status: OrderStatus): string {
   switch (status) {
     case "READY":
-      return "Your order is ready for pickup";
+      return "Twoje zamówienie jest gotowe do odbioru";
     case "CANCELED":
-      return "Your order was canceled";
+      return "Twoje zamówienie zostało anulowane";
     case "COMPLETED":
-      return "Your order has been completed";
+      return "Twoje zamówienie zostało zrealizowane";
     case "IN_PREPARATION":
-      return "Your order is in preparation";
+      return "Twoje zamówienie jest w przygotowaniu";
   }
 }

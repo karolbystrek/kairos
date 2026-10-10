@@ -43,10 +43,10 @@ const webhookEventTypes = [
 ] as const satisfies readonly WebhookEventType[];
 
 const webhookEventLabels: Record<WebhookEventType, string> = {
-  "order.created": "Order created",
-  "order.ready": "Order ready",
-  "order.completed": "Order completed",
-  "order.canceled": "Order canceled",
+  "order.created": "Utworzono zamówienie",
+  "order.ready": "Zamówienie gotowe do odbioru",
+  "order.completed": "Zamówienie zrealizowane",
+  "order.canceled": "Zamówienie anulowane",
 };
 
 type SubscriptionDraft = {
@@ -103,7 +103,7 @@ function SubscriptionFields({
         fullWidth
         isRequired
         isDisabled={isDisabled}
-        label="Webhook name"
+        label="Nazwa webhooka"
         maxLength={64}
         name="webhook-name"
         value={draft.name}
@@ -119,17 +119,17 @@ function SubscriptionFields({
           spellCheck: false,
         }}
         isDisabled={isDisabled}
-        label="Destination URL"
+        label="Adres docelowy"
         maxLength={2048}
         name="webhook-destination"
-        placeholder="Destination URL (https://…)"
+        placeholder="Adres docelowy (https://…)"
         type="url"
         value={draft.destinationUrl}
         onChange={(destinationUrl) => onChange({ ...draft, destinationUrl })}
       />
 
       <div className="flex flex-col gap-3">
-        <p className="text-sm font-medium">Locations</p>
+        <p className="text-sm font-medium">Lokale</p>
         <div className="flex flex-wrap gap-3">
           {locations.map((location) => (
             <Button
@@ -155,7 +155,7 @@ function SubscriptionFields({
       </div>
 
       <div className="flex flex-col gap-3">
-        <p className="text-sm font-medium">Events</p>
+        <p className="text-sm font-medium">Zdarzenia</p>
         <div className="flex flex-wrap gap-3">
           {webhookEventTypes.map((eventType) => (
             <Button
@@ -209,9 +209,9 @@ function WebhookEditor({
   return (
     <section className="flex flex-col gap-4 border-y border-separator py-5">
       <div>
-        <h4 className="font-semibold">Edit {subscription.name}</h4>
+        <h4 className="font-semibold">Edytuj {subscription.name}</h4>
         <p className="text-sm text-muted">
-          Changes apply only to deliveries created after this update.
+          Zmiany dotyczą tylko powiadomień utworzonych po tej aktualizacji.
         </p>
       </div>
       <form className="flex flex-col gap-4" onSubmit={submit}>
@@ -223,10 +223,10 @@ function WebhookEditor({
         />
         <div className="flex flex-wrap gap-3">
           <Button isPending={isPending} type="submit">
-            {isPending ? "Saving…" : "Save"}
+            {isPending ? "Zapisywanie…" : "Zapisz"}
           </Button>
           <Button isDisabled={isPending} variant="secondary" onPress={onCancel}>
-            Cancel
+            Anuluj
           </Button>
         </div>
       </form>
@@ -289,9 +289,9 @@ export function WebhookSubscriptionManagement({
       const result = await createWebhookSubscription(integrationId, draft);
 
       onSecretIssued({
-        title: `Signing secret for ${result.subscription.name}`,
+        title: `Sekret podpisu: ${result.subscription.name}`,
         description:
-          "Configure this signing secret at the webhook recipient, then return to enable the subscription.",
+          "Ustaw ten sekret podpisu u odbiorcy webhooka, a następnie włącz subskrypcję.",
         value: result.signingSecret,
       });
       await mutateSubscriptions(
@@ -416,9 +416,9 @@ export function WebhookSubscriptionManagement({
       };
 
       onSecretIssued({
-        title: `New signing secret for ${subscription.name}`,
+        title: `Nowy sekret podpisu: ${subscription.name}`,
         description:
-          "Update the webhook recipient now. The old signing secret stops working 24 hours after this rotation.",
+          "Zaktualizuj teraz konfigurację odbiorcy webhooka. Poprzedni sekret podpisu przestanie działać za 24 godziny.",
         value: result.signingSecret,
         afterConfirmed: () => {
           void listWebhookSubscriptions(integrationId)
@@ -490,25 +490,25 @@ export function WebhookSubscriptionManagement({
 
   const confirmationTitle = confirmation
     ? confirmation.kind === "disable"
-      ? `Disable ${confirmation.subscription.name}?`
+      ? `Wyłączyć ${confirmation.subscription.name}?`
       : confirmation.kind === "delete"
-        ? `Delete ${confirmation.subscription.name}?`
-        : `Retire this secret for ${confirmation.subscription.name}?`
+        ? `Usunąć ${confirmation.subscription.name}?`
+        : `Wycofać ten sekret dla ${confirmation.subscription.name}?`
     : "";
   const confirmationDescription = confirmation
     ? confirmation.kind === "disable"
-      ? "Webhook deliveries will pause until this subscription is enabled again."
+      ? "Wysyłanie webhooków zostanie wstrzymane do ponownego włączenia subskrypcji."
       : confirmation.kind === "delete"
-        ? "The webhook will be removed and future deliveries will stop. This cannot be undone."
-        : "This secret version will stop validating signatures immediately. Confirm that the recipient no longer uses it."
+        ? "Webhook zostanie usunięty, a powiadomienia przestaną być wysyłane. Tej operacji nie można cofnąć."
+        : "Ta wersja sekretu natychmiast przestanie weryfikować podpisy. Upewnij się, że odbiorca już jej nie używa."
     : "";
   const confirmationLabel = confirmation
     ? confirmation.kind === "disable"
-      ? "Disable"
+      ? "Wyłącz"
       : confirmation.kind === "delete"
-        ? "Delete"
-        : "Retire"
-    : "Confirm";
+        ? "Usuń"
+        : "Wycofaj"
+    : "Potwierdź";
   const isConfirmationPending = confirmation
     ? pendingAction ===
       (confirmation.kind === "disable"
@@ -524,7 +524,9 @@ export function WebhookSubscriptionManagement({
         <Alert status="danger">
           <Alert.Indicator />
           <Alert.Content>
-            <Alert.Title>Webhook request failed</Alert.Title>
+            <Alert.Title>
+              Nie udało się wykonać operacji na webhooku
+            </Alert.Title>
             <Alert.Description>
               {getIntegrationErrorMessage(error)}
             </Alert.Description>
@@ -534,10 +536,10 @@ export function WebhookSubscriptionManagement({
 
       <section className="flex flex-col gap-3">
         <div>
-          <h3 className="text-xl font-semibold">New webhook</h3>
+          <h3 className="text-xl font-semibold">Nowy webhook</h3>
           <p className="text-sm text-muted">
-            New subscriptions start disabled so the recipient can be configured
-            before delivery begins.
+            Nowe subskrypcje są wyłączone, aby skonfigurować odbiorcę przed
+            rozpoczęciem wysyłania powiadomień.
           </p>
         </div>
         <form className="flex max-w-3xl flex-col gap-4" onSubmit={create}>
@@ -553,18 +555,18 @@ export function WebhookSubscriptionManagement({
             isPending={pendingAction === "create"}
             type="submit"
           >
-            {pendingAction === "create" ? "Creating…" : "Create"}
+            {pendingAction === "create" ? "Tworzenie…" : "Utwórz"}
           </Button>
         </form>
       </section>
 
       <section className="flex flex-col gap-3">
-        <h3 className="text-xl font-semibold">Webhooks</h3>
+        <h3 className="text-xl font-semibold">Webhooki</h3>
 
         {areSubscriptionsLoading ? (
-          <Spinner aria-label="Loading webhook subscriptions" />
+          <Spinner aria-label="Wczytywanie subskrypcji webhooków" />
         ) : subscriptions.length === 0 ? (
-          <p className="text-muted">No webhooks configured.</p>
+          <p className="text-muted">Brak skonfigurowanych webhooków.</p>
         ) : (
           <div className="border-t border-separator">
             {subscriptions.map((subscription) => (
@@ -581,26 +583,28 @@ export function WebhookSubscriptionManagement({
                         : "text-sm secondary-text"
                     }
                   >
-                    {subscription.status === "ENABLED" ? "Enabled" : "Disabled"}
+                    {subscription.status === "ENABLED"
+                      ? "Włączony"
+                      : "Wyłączony"}
                   </span>
                 </div>
 
                 <div>
-                  <p className="text-sm font-medium">Destination</p>
+                  <p className="text-sm font-medium">Adres docelowy</p>
                   <p className="break-all text-sm text-muted">
                     {subscription.destinationUrl}
                   </p>
                 </div>
 
                 <div>
-                  <p className="text-sm font-medium">Locations</p>
+                  <p className="text-sm font-medium">Lokale</p>
                   <p className="break-all text-sm text-muted">
                     {subscription.locationIds
                       .map(
                         (locationId) =>
                           locations.find(
                             (location) => location.id === locationId,
-                          )?.name ?? "Unavailable location",
+                          )?.name ?? "Niedostępny lokal",
                       )
                       .join(", ")}
                   </p>
@@ -617,7 +621,7 @@ export function WebhookSubscriptionManagement({
                     <Tooltip.Trigger>
                       <Button
                         isIconOnly
-                        aria-label={`Edit webhook ${subscription.name}`}
+                        aria-label={`Edytuj webhook ${subscription.name}`}
                         className="rounded-md"
                         variant="tertiary"
                         onPress={() => setEditedSubscriptionId(subscription.id)}
@@ -625,16 +629,14 @@ export function WebhookSubscriptionManagement({
                         <EditIcon size={17} />
                       </Button>
                     </Tooltip.Trigger>
-                    <Tooltip.Content>Edit</Tooltip.Content>
+                    <Tooltip.Content>Edytuj</Tooltip.Content>
                   </Tooltip>
                   <Tooltip delay={500}>
                     <Tooltip.Trigger>
                       <Button
                         isIconOnly
                         aria-label={`${
-                          subscription.status === "ENABLED"
-                            ? "Disable"
-                            : "Enable"
+                          subscription.status === "ENABLED" ? "Wyłącz" : "Włącz"
                         } webhook ${subscription.name}`}
                         className="rounded-md"
                         isPending={
@@ -662,7 +664,7 @@ export function WebhookSubscriptionManagement({
                       </Button>
                     </Tooltip.Trigger>
                     <Tooltip.Content>
-                      {subscription.status === "ENABLED" ? "Disable" : "Enable"}
+                      {subscription.status === "ENABLED" ? "Wyłącz" : "Włącz"}
                     </Tooltip.Content>
                   </Tooltip>
                   <Button
@@ -670,13 +672,13 @@ export function WebhookSubscriptionManagement({
                     variant="secondary"
                     onPress={() => rotate(subscription)}
                   >
-                    Rotate
+                    Zmień sekret
                   </Button>
                   <Tooltip delay={500}>
                     <Tooltip.Trigger>
                       <Button
                         isIconOnly
-                        aria-label={`Delete webhook ${subscription.name}`}
+                        aria-label={`Usuń webhook ${subscription.name}`}
                         className="rounded-md"
                         isPending={
                           pendingAction === `archive-${subscription.id}`
@@ -690,13 +692,13 @@ export function WebhookSubscriptionManagement({
                         <TrashIcon size={20} />
                       </Button>
                     </Tooltip.Trigger>
-                    <Tooltip.Content>Delete</Tooltip.Content>
+                    <Tooltip.Content>Usuń</Tooltip.Content>
                   </Tooltip>
                 </div>
 
                 <div className="border-t border-separator pt-3">
                   <p className="mb-2 text-sm font-medium">
-                    Signing-secret versions
+                    Wersje sekretu podpisu
                   </p>
                   <div className="flex flex-col gap-3">
                     {subscription.signingSecretVersions.map((version) => (
@@ -706,18 +708,19 @@ export function WebhookSubscriptionManagement({
                       >
                         <div>
                           <p className="text-xs text-muted">
-                            Issued {formatIntegrationDateTime(version.issuedAt)}
+                            Utworzono{" "}
+                            {formatIntegrationDateTime(version.issuedAt)}
                           </p>
                           <p className="text-xs text-muted">
                             {version.retiredAt
-                              ? `Retired ${formatIntegrationDateTime(
+                              ? `Wycofano ${formatIntegrationDateTime(
                                   version.retiredAt,
                                 )}`
                               : version.validUntil
-                                ? `Valid until ${formatIntegrationDateTime(
+                                ? `Ważna do ${formatIntegrationDateTime(
                                     version.validUntil,
                                   )}`
-                                : "Current"}
+                                : "Aktualna"}
                           </p>
                         </div>
                         {version.validUntil && !version.retiredAt && (
@@ -733,7 +736,7 @@ export function WebhookSubscriptionManagement({
                               });
                             }}
                           >
-                            Retire
+                            Wycofaj
                           </Button>
                         )}
                       </div>
@@ -774,7 +777,7 @@ export function WebhookSubscriptionManagement({
         <PanelPopup.Body>{confirmationDescription}</PanelPopup.Body>
         <PanelPopup.Footer>
           <Button slot="close" variant="tertiary">
-            Cancel
+            Anuluj
           </Button>
           <Button
             isPending={isConfirmationPending}

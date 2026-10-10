@@ -38,10 +38,10 @@ function getTrackingErrorMessage(error: unknown): string {
     error instanceof ApiError &&
     (error.status === 400 || error.status === 404)
   ) {
-    return "This order could not be found.";
+    return "Nie znaleziono tego zamówienia.";
   }
 
-  return "The latest order status could not be loaded.";
+  return "Nie udało się pobrać aktualnego statusu zamówienia.";
 }
 
 function isActive(order: CustomerOrder | undefined): boolean {
@@ -49,10 +49,10 @@ function isActive(order: CustomerOrder | undefined): boolean {
 }
 
 const statusCopy = {
-  IN_PREPARATION: "We’re preparing your order",
-  READY: "Ready for pickup",
-  COMPLETED: "Order complete",
-  CANCELED: "Order canceled",
+  IN_PREPARATION: "Przygotowujemy Twoje zamówienie",
+  READY: "Gotowe do odbioru",
+  COMPLETED: "Zamówienie zrealizowane",
+  CANCELED: "Zamówienie anulowane",
 } as const;
 
 function useOrderEventStream({
@@ -249,7 +249,7 @@ export function OrderTracker({
       <section className="flex min-h-[calc(100svh-3rem)] flex-col">
         <CustomerToolbar />
         <div className="flex flex-1 items-center justify-center">
-          <Spinner aria-label="Loading order" />
+          <Spinner aria-label="Wczytywanie zamówienia" />
         </div>
       </section>
     );
@@ -263,10 +263,10 @@ export function OrderTracker({
           <Alert className="w-full" status="danger">
             <Alert.Indicator />
             <Alert.Content>
-              <Alert.Title>Order unavailable</Alert.Title>
+              <Alert.Title>Zamówienie niedostępne</Alert.Title>
               <Alert.Description>
                 {!isOnline && offlineLookupComplete
-                  ? "You're offline and no saved status is available for this order. Reconnect to check its status."
+                  ? "Brak połączenia i zapisanego statusu tego zamówienia. Połącz się z internetem, aby sprawdzić status."
                   : getTrackingErrorMessage(error)}
               </Alert.Description>
               {isOrderUnavailable && (
@@ -275,7 +275,7 @@ export function OrderTracker({
                   variant="secondary"
                   onPress={() => void closeOrder()}
                 >
-                  Back to scanner
+                  Wróć do skanera
                 </Button>
               )}
             </Alert.Content>
@@ -293,11 +293,13 @@ export function OrderTracker({
           <Alert.Indicator />
           <Alert.Content>
             <Alert.Title>
-              {isOnline ? "Status may be outdated" : "You’re offline"}
+              {isOnline
+                ? "Status może być nieaktualny"
+                : "Brak połączenia z internetem"}
             </Alert.Title>
             <Alert.Description>
-              Last known status from{" "}
-              {new Date(displayedOrder.updatedAt).toLocaleString()}.
+              Ostatni znany status z{" "}
+              {new Date(displayedOrder.updatedAt).toLocaleString("pl-PL")}.
             </Alert.Description>
           </Alert.Content>
         </Alert>
@@ -306,7 +308,9 @@ export function OrderTracker({
         aria-live="polite"
         className="flex flex-1 flex-col items-center justify-center py-12 text-center sm:py-16"
       >
-        <p className="text-sm secondary-text">Order {displayedOrder.label}</p>
+        <p className="text-sm secondary-text">
+          Zamówienie {displayedOrder.label}
+        </p>
         <h1 className="status-title mt-4 max-w-[14ch]">
           {statusCopy[displayedOrder.status]}
         </h1>
@@ -317,7 +321,7 @@ export function OrderTracker({
             onPress={() => void closeOrder()}
           >
             <X aria-hidden="true" size={20} />
-            Close order
+            Zamknij zamówienie
           </Button>
         )}
       </div>

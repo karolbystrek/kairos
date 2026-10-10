@@ -75,7 +75,7 @@ function DismissibleNotice({
         <Tooltip.Trigger>
           <Button
             isIconOnly
-            aria-label="Dismiss notification"
+            aria-label="Zamknij powiadomienie"
             className="notice-dismiss rounded-md"
             variant="tertiary"
             onPress={onDismiss}
@@ -83,7 +83,7 @@ function DismissibleNotice({
             <CloseIcon size={18} />
           </Button>
         </Tooltip.Trigger>
-        <Tooltip.Content>Dismiss</Tooltip.Content>
+        <Tooltip.Content>Zamknij</Tooltip.Content>
       </Tooltip>
     </Alert>
   );
@@ -113,17 +113,17 @@ function shouldRetryOnError(error: Error): boolean {
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof ZodError) {
-    return error.issues[0]?.message ?? "The submitted values are not valid.";
+    return error.issues[0]?.message ?? "Wprowadzone dane są nieprawidłowe.";
   }
 
   if (error instanceof ApiError) return error.message;
 
-  return "The request could not be completed. Check your connection and try again.";
+  return "Nie udało się wykonać operacji. Sprawdź połączenie i spróbuj ponownie.";
 }
 
 function getLoginErrorMessage(error: unknown): string {
   if (error instanceof ApiError && error.status === 401) {
-    return "The email or password is incorrect.";
+    return "Nieprawidłowy e-mail lub hasło.";
   }
 
   return getErrorMessage(error);
@@ -157,7 +157,7 @@ function LoginForm({
         <DismissibleNotice
           description={getLoginErrorMessage(error)}
           status="danger"
-          title="Sign-in failed"
+          title="Nie udało się zalogować"
           onDismiss={onDismissError}
         />
       )}
@@ -171,7 +171,7 @@ function LoginForm({
             spellCheck: false,
           }}
           isDisabled={isPending}
-          label="Email"
+          label="E-mail"
           maxLength={200}
           name="email"
           type="email"
@@ -183,7 +183,7 @@ function LoginForm({
           isRequired
           inputProps={{ autoComplete: "current-password" }}
           isDisabled={isPending}
-          label="Password"
+          label="Hasło"
           maxLength={200}
           name="password"
           type="password"
@@ -192,7 +192,7 @@ function LoginForm({
         />
 
         <Button isPending={isPending} type="submit">
-          {isPending ? "Signing in…" : "Sign in"}
+          {isPending ? "Logowanie…" : "Zaloguj się"}
         </Button>
       </form>
     </div>
@@ -214,10 +214,10 @@ function SignedOutPanel({
     <AuthFormLayout
       footer={
         <>
-          Don’t have an account? <Link href="/registration">Create one.</Link>
+          Nie masz konta? <Link href="/registration">Utwórz je.</Link>
         </>
       }
-      title="Welcome back"
+      title="Witaj ponownie"
     >
       <LoginForm
         error={loginError}
@@ -353,7 +353,7 @@ export function StaffPanel({
   ) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
-        <Spinner aria-label="Checking authentication" />
+        <Spinner aria-label="Sprawdzanie sesji" />
       </div>
     );
   }
@@ -364,7 +364,7 @@ export function StaffPanel({
         <Alert className="max-w-xl" status="danger">
           <Alert.Indicator />
           <Alert.Content>
-            <Alert.Title>Authentication unavailable</Alert.Title>
+            <Alert.Title>Logowanie jest niedostępne</Alert.Title>
             <Alert.Description>
               {getErrorMessage(accountError)}
             </Alert.Description>
@@ -374,7 +374,7 @@ export function StaffPanel({
                 variant="danger"
                 onPress={() => void mutateAccount()}
               >
-                Try again
+                Spróbuj ponownie
               </Button>
             </div>
           </Alert.Content>
@@ -392,11 +392,11 @@ export function StaffPanel({
   if (canManageLocations && !locations) {
     return locationsError ? (
       <div className="flex flex-col gap-4 py-12">
-        <p role="alert">Your locations could not be loaded. Try again.</p>
-        <Button onPress={() => void mutateLocations()}>Retry</Button>
+        <p role="alert">Nie udało się wczytać lokali. Spróbuj ponownie.</p>
+        <Button onPress={() => void mutateLocations()}>Spróbuj ponownie</Button>
       </div>
     ) : (
-      <Spinner aria-label="Loading locations" />
+      <Spinner aria-label="Wczytywanie lokali" />
     );
   }
   const needsFirstLocation = canManageLocations && hasNoLocations;
@@ -407,18 +407,18 @@ export function StaffPanel({
         <Tooltip delay={500}>
           <Tooltip.Trigger>
             <Dropdown.Trigger
-              aria-label="Account"
+              aria-label="Konto"
               className="icon-menu-trigger icon-menu-trigger--touch"
               isDisabled={isLoggingOut}
             >
               <AccountIcon aria-hidden="true" size={20} />
             </Dropdown.Trigger>
           </Tooltip.Trigger>
-          <Tooltip.Content>Account</Tooltip.Content>
+          <Tooltip.Content>Konto</Tooltip.Content>
         </Tooltip>
         <Dropdown.Popover placement="bottom end">
           <Dropdown.Menu
-            aria-label="Account actions"
+            aria-label="Opcje konta"
             onAction={(key) => {
               if (key === "password") {
                 setIsPasswordChangeOpen(true);
@@ -428,9 +428,11 @@ export function StaffPanel({
               }
             }}
           >
-            <Dropdown.Item id="password">Change password</Dropdown.Item>
-            <Dropdown.Item id="device">Sign out</Dropdown.Item>
-            <Dropdown.Item id="everywhere">Sign out everywhere</Dropdown.Item>
+            <Dropdown.Item id="password">Zmień hasło</Dropdown.Item>
+            <Dropdown.Item id="device">Wyloguj się</Dropdown.Item>
+            <Dropdown.Item id="everywhere">
+              Wyloguj ze wszystkich urządzeń
+            </Dropdown.Item>
           </Dropdown.Menu>
         </Dropdown.Popover>
       </Dropdown>
@@ -443,7 +445,7 @@ export function StaffPanel({
         <Alert status="warning">
           <Alert.Indicator />
           <Alert.Content>
-            <Alert.Title>Account refresh failed</Alert.Title>
+            <Alert.Title>Nie udało się odświeżyć konta</Alert.Title>
             <Alert.Description>
               {getErrorMessage(accountError)}
             </Alert.Description>
@@ -460,13 +462,13 @@ export function StaffPanel({
             <div aria-hidden="true" className="panel-workspace-spacer" />
             <Tabs.ListContainer className="mobile-navigation panel-navigation">
               <Tabs.List
-                aria-label="Staff workspace"
+                aria-label="Panel obsługi"
                 className="w-full justify-around sm:w-auto"
               >
                 <Tabs.Tab id="orders">
                   <span className="tab-motion-content">
                     <OrdersIcon size={18} />
-                    <span>Orders</span>
+                    <span>Zamówienia</span>
                   </span>
                   <Tabs.Indicator />
                 </Tabs.Tab>
@@ -474,7 +476,7 @@ export function StaffPanel({
                   <Tabs.Tab id="locations">
                     <span className="tab-motion-content">
                       <LocationsIcon size={18} />
-                      <span>Locations</span>
+                      <span>Lokale</span>
                     </span>
                     <Tabs.Indicator />
                   </Tabs.Tab>
@@ -483,7 +485,7 @@ export function StaffPanel({
                   <Tabs.Tab id="accounts" isDisabled={hasNoLocations}>
                     <span className="tab-motion-content">
                       <TeamIcon size={18} />
-                      <span>Accounts</span>
+                      <span>Konta</span>
                     </span>
                     <Tabs.Indicator />
                   </Tabs.Tab>
@@ -492,7 +494,7 @@ export function StaffPanel({
                   <Tabs.Tab id="integrations" isDisabled={hasNoLocations}>
                     <span className="tab-motion-content">
                       <IntegrationIcon size={18} />
-                      <span>Integrations</span>
+                      <span>Integracje</span>
                     </span>
                     <Tabs.Indicator />
                   </Tabs.Tab>
@@ -596,21 +598,21 @@ export function StaffPanel({
           <PanelPopup.Icon status="warning" />
           <PanelPopup.Heading>
             {signOutScope === "everywhere"
-              ? "Sign out everywhere?"
-              : "Sign out?"}
+              ? "Wyloguj ze wszystkich urządzeń?"
+              : "Wyloguj się?"}
           </PanelPopup.Heading>
         </PanelPopup.Header>
         <PanelPopup.Body className="flex flex-col gap-4">
           <p>
             {signOutScope === "everywhere"
-              ? "You will be signed out on all devices, including this one."
-              : "You will be signed out on this device and need to sign in again to manage orders."}
+              ? "Nastąpi wylogowanie ze wszystkich urządzeń, również tego."
+              : "Nastąpi wylogowanie z tego urządzenia. Aby zarządzać zamówieniami, zaloguj się ponownie."}
           </p>
           {logoutError && (
             <Alert status="danger">
               <Alert.Indicator />
               <Alert.Content>
-                <Alert.Title>Sign-out failed</Alert.Title>
+                <Alert.Title>Nie udało się wylogować</Alert.Title>
                 <Alert.Description>
                   {getErrorMessage(logoutError)}
                 </Alert.Description>
@@ -620,14 +622,16 @@ export function StaffPanel({
         </PanelPopup.Body>
         <PanelPopup.Footer>
           <Button slot="close" variant="tertiary">
-            Cancel
+            Anuluj
           </Button>
           <Button
             isPending={isLoggingOut}
             variant="danger"
             onPress={() => void signOut(signOutScope === "everywhere")}
           >
-            {signOutScope === "everywhere" ? "Sign out everywhere" : "Sign out"}
+            {signOutScope === "everywhere"
+              ? "Wyloguj ze wszystkich urządzeń"
+              : "Wyloguj się"}
           </Button>
         </PanelPopup.Footer>
       </PanelPopup>

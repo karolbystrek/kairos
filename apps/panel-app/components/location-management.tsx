@@ -43,20 +43,20 @@ type Confirmation =
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof ZodError) {
-    return error.issues[0]?.message ?? "Enter a valid location name.";
+    return error.issues[0]?.message ?? "Podaj prawidłową nazwę lokalu.";
   }
   if (
     error instanceof ApiError &&
     error.problem?.type === "urn:kairos:problem:location-last-location"
   ) {
-    return "Your last location cannot be deleted. Disable it instead.";
+    return "Nie można usunąć ostatniego lokalu. Możesz go wyłączyć.";
   }
   if (error instanceof ApiError && error.status === 409) {
-    return "This action conflicts with the current location state.";
+    return "Nie można wykonać tej operacji w obecnym stanie lokalu.";
   }
   if (error instanceof ApiError) return error.message;
 
-  return "Location management could not be completed. Check your connection and try again.";
+  return "Nie udało się wykonać operacji na lokalu. Sprawdź połączenie i spróbuj ponownie.";
 }
 
 function shouldRetryOnError(error: Error): boolean {
@@ -206,21 +206,21 @@ export function LocationManagement({
 
   const confirmationTitle = confirmation
     ? confirmation.kind === "disable"
-      ? `Disable ${confirmation.location.name}?`
+      ? `Wyłączyć ${confirmation.location.name}?`
       : confirmation.kind === "enable"
-        ? `Enable ${confirmation.location.name}?`
-        : `Delete ${confirmation.location.name}?`
-    : "Confirm location action";
+        ? `Włączyć ${confirmation.location.name}?`
+        : `Usunąć ${confirmation.location.name}?`
+    : "Potwierdź operację na lokalu";
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center gap-4">
-        <h1 className="page-title">Locations</h1>
+        <h1 className="page-title">Lokale</h1>
         <Tooltip delay={500}>
           <Tooltip.Trigger>
             <Button
               isIconOnly
-              aria-label="New location"
+              aria-label="Nowy lokal"
               className="rounded-md"
               size="lg"
               onPress={() => setIsCreateOpen(true)}
@@ -228,7 +228,7 @@ export function LocationManagement({
               <PlusIcon size={20} />
             </Button>
           </Tooltip.Trigger>
-          <Tooltip.Content>New location</Tooltip.Content>
+          <Tooltip.Content>Nowy lokal</Tooltip.Content>
         </Tooltip>
       </div>
 
@@ -236,7 +236,7 @@ export function LocationManagement({
         <Alert status="danger">
           <Alert.Indicator />
           <Alert.Content>
-            <Alert.Title>Location request failed</Alert.Title>
+            <Alert.Title>Nie udało się wykonać operacji na lokalu</Alert.Title>
             <Alert.Description>
               {getErrorMessage(error ?? locationsError)}
             </Alert.Description>
@@ -246,13 +246,13 @@ export function LocationManagement({
 
       {isLoading ? (
         <div className="flex min-h-80 items-center justify-center">
-          <Spinner aria-label="Loading locations" />
+          <Spinner aria-label="Wczytywanie lokali" />
         </div>
       ) : locations.length === 0 ? (
         <div className="py-12">
-          <h2 className="section-title">No locations yet</h2>
+          <h2 className="section-title">Brak lokali</h2>
           <p className="mt-2 max-w-sm secondary-text">
-            Create a location to start managing orders and staff access.
+            Utwórz lokal, aby zarządzać zamówieniami i dostępem pracowników.
           </p>
         </div>
       ) : (
@@ -261,7 +261,7 @@ export function LocationManagement({
             {locations.map((location) => (
               <PanelCard
                 key={location.id}
-                accessibilityLabel={`View location ${location.name}`}
+                accessibilityLabel={`Pokaż lokal ${location.name}`}
                 isSelected={location.id === selectedLocation?.id}
                 metadata={
                   <span
@@ -271,7 +271,7 @@ export function LocationManagement({
                         : "secondary-text"
                     }
                   >
-                    {location.status === "ENABLED" ? "Enabled" : "Disabled"}
+                    {location.status === "ENABLED" ? "Włączony" : "Wyłączony"}
                   </span>
                 }
                 title={location.name}
@@ -289,7 +289,7 @@ export function LocationManagement({
           {selectedLocation && (
             <section className="min-w-0">
               <PanelDetailHeader
-                eyebrow="Location"
+                eyebrow="Lokal"
                 title={selectedLocation.name}
                 titleEditor={
                   editName === undefined ? undefined : (
@@ -301,7 +301,7 @@ export function LocationManagement({
                         fullWidth
                         isRequired
                         isDisabled={pendingAction === "rename"}
-                        label="Location name"
+                        label="Nazwa lokalu"
                         maxLength={120}
                         name="location-name"
                         value={editName}
@@ -314,7 +314,7 @@ export function LocationManagement({
                         <Tooltip.Trigger>
                           <Button
                             isIconOnly
-                            aria-label="Save location name"
+                            aria-label="Zapisz nazwę lokalu"
                             className="shrink-0 rounded-md"
                             isPending={pendingAction === "rename"}
                             type="submit"
@@ -322,13 +322,13 @@ export function LocationManagement({
                             <EnableIcon size={20} />
                           </Button>
                         </Tooltip.Trigger>
-                        <Tooltip.Content>Save</Tooltip.Content>
+                        <Tooltip.Content>Zapisz</Tooltip.Content>
                       </Tooltip>
                       <Tooltip delay={500}>
                         <Tooltip.Trigger>
                           <Button
                             isIconOnly
-                            aria-label="Cancel editing location name"
+                            aria-label="Anuluj edycję nazwy lokalu"
                             className="shrink-0 rounded-md"
                             isDisabled={pendingAction === "rename"}
                             variant="tertiary"
@@ -341,7 +341,7 @@ export function LocationManagement({
                             <CancelIcon size={20} />
                           </Button>
                         </Tooltip.Trigger>
-                        <Tooltip.Content>Cancel</Tooltip.Content>
+                        <Tooltip.Content>Anuluj</Tooltip.Content>
                       </Tooltip>
                     </form>
                   )
@@ -353,20 +353,20 @@ export function LocationManagement({
                         <Tooltip.Trigger>
                           <Button
                             isIconOnly
-                            aria-label="Edit location name"
+                            aria-label="Edytuj nazwę lokalu"
                             className="rounded-md"
                             onPress={() => setEditName(selectedLocation.name)}
                           >
                             <EditIcon size={20} />
                           </Button>
                         </Tooltip.Trigger>
-                        <Tooltip.Content>Edit</Tooltip.Content>
+                        <Tooltip.Content>Edytuj</Tooltip.Content>
                       </Tooltip>
                       <Tooltip delay={500}>
                         <Tooltip.Trigger>
                           <Button
                             isIconOnly
-                            aria-label={`${selectedLocation.status === "ENABLED" ? "Disable" : "Enable"} location`}
+                            aria-label={`${selectedLocation.status === "ENABLED" ? "Wyłącz" : "Włącz"} lokal`}
                             className="rounded-md"
                             variant={
                               selectedLocation.status === "ENABLED"
@@ -392,15 +392,15 @@ export function LocationManagement({
                         </Tooltip.Trigger>
                         <Tooltip.Content>
                           {selectedLocation.status === "ENABLED"
-                            ? "Disable"
-                            : "Enable"}
+                            ? "Wyłącz"
+                            : "Włącz"}
                         </Tooltip.Content>
                       </Tooltip>
                       <Tooltip delay={500}>
                         <Tooltip.Trigger>
                           <Button
                             isIconOnly
-                            aria-label="Delete location"
+                            aria-label="Usuń lokal"
                             className="rounded-md"
                             isDisabled={
                               locations.length <= 1 ||
@@ -419,10 +419,10 @@ export function LocationManagement({
                         </Tooltip.Trigger>
                         <Tooltip.Content>
                           {locations.length <= 1
-                            ? "Your last location cannot be deleted"
+                            ? "Nie można usunąć ostatniego lokalu"
                             : selectedLocation.status === "DISABLED"
-                              ? "Delete"
-                              : "Disable before deleting"}
+                              ? "Usuń"
+                              : "Wyłącz przed usunięciem"}
                         </Tooltip.Content>
                       </Tooltip>
                     </>
@@ -437,17 +437,17 @@ export function LocationManagement({
                   fullWidth
                   inputProps={{ type: "url" }}
                   isDisabled={Boolean(pendingAction)}
-                  label="Google review link"
+                  label="Link do opinii Google"
                   maxLength={2048}
                   name="google-review-url"
-                  placeholder="Google review link (disabled if empty)"
+                  placeholder="Link do opinii Google (puste pole wyłącza zaproszenia)"
                   value={
                     editReviewUrl ?? selectedLocation.googleReviewUrl ?? ""
                   }
                   onChange={setEditReviewUrl}
                 />
                 <p className="secondary-text">
-                  Customers receive one invitation after completing an order.
+                  Klienci otrzymują jedno zaproszenie po odebraniu zamówienia.
                 </p>
                 <Button
                   className="self-start"
@@ -455,12 +455,12 @@ export function LocationManagement({
                   isPending={pendingAction === "reviews"}
                   type="submit"
                 >
-                  Save review settings
+                  Zapisz ustawienia opinii
                 </Button>
               </form>
               {locations.length <= 1 && (
                 <p className="mt-4 text-sm text-muted">
-                  Your last location can be disabled, but cannot be deleted.
+                  Ostatni lokal można wyłączyć, ale nie można go usunąć.
                 </p>
               )}
             </section>
@@ -496,29 +496,29 @@ export function LocationManagement({
         <PanelPopup.Body className="flex flex-col gap-4">
           {confirmation?.kind === "disable" && (
             <p>
-              Assigned accounts will be disabled and signed out. Pending
-              invitations for this location will be revoked.
+              Przypisane konta zostaną wyłączone i wylogowane. Oczekujące
+              zaproszenia do tego lokalu zostaną unieważnione.
             </p>
           )}
           {confirmation?.kind === "enable" && (
             <p>
-              Every assigned non-archived account will be enabled, even if it
-              was disabled independently.
+              Wszystkie przypisane konta, które nie są zarchiwizowane, zostaną
+              włączone, również te wyłączone osobno.
             </p>
           )}
           {confirmation?.kind === "delete" && (
             <>
               <p>
-                The location and its assigned accounts will disappear from
-                ordinary management and cannot be restored. Historical orders
-                remain readable. Type its exact name to confirm.
+                Lokal i przypisane konta znikną z panelu zarządzania i nie
+                będzie można ich przywrócić. Historia zamówień pozostanie
+                dostępna. Aby potwierdzić, wpisz dokładną nazwę lokalu.
               </p>
               <FormTextField
                 fullWidth
                 isRequired
                 inputProps={{ autoComplete: "off" }}
                 isDisabled={Boolean(pendingAction)}
-                label={`Type ${confirmation.location.name} to confirm`}
+                label={`Wpisz ${confirmation.location.name} w celu potwierdzenia`}
                 name="delete-location-confirmation"
                 value={deleteConfirmation}
                 onChange={setDeleteConfirmation}
@@ -531,12 +531,12 @@ export function LocationManagement({
               <Alert.Content>
                 <Alert.Title>
                   {hasActiveOrdersConflict
-                    ? "Active orders must be resolved"
-                    : "Location action failed"}
+                    ? "Najpierw zakończ aktywne zamówienia"
+                    : "Nie udało się wykonać operacji na lokalu"}
                 </Alert.Title>
                 <Alert.Description>
                   {hasActiveOrdersConflict
-                    ? "Complete or cancel every active order before disabling this location."
+                    ? "Przed wyłączeniem lokalu zakończ lub anuluj wszystkie aktywne zamówienia."
                     : getErrorMessage(actionError)}
                 </Alert.Description>
               </Alert.Content>
@@ -545,7 +545,7 @@ export function LocationManagement({
         </PanelPopup.Body>
         <PanelPopup.Footer>
           <Button slot="close" variant="tertiary">
-            Cancel
+            Anuluj
           </Button>
           {hasActiveOrdersConflict && confirmation && (
             <Button
@@ -558,7 +558,7 @@ export function LocationManagement({
                 onViewOrders(locationId);
               }}
             >
-              View orders
+              Pokaż zamówienia
             </Button>
           )}
           <Button
@@ -571,10 +571,10 @@ export function LocationManagement({
             onPress={() => void confirmAction()}
           >
             {confirmation?.kind === "disable"
-              ? "Disable"
+              ? "Wyłącz"
               : confirmation?.kind === "enable"
-                ? "Enable"
-                : "Delete"}
+                ? "Włącz"
+                : "Usuń"}
           </Button>
         </PanelPopup.Footer>
       </PanelPopup>

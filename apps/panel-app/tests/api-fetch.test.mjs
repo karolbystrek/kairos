@@ -118,7 +118,7 @@ test("public registration rejects a short password before making a request", () 
   const api = client(() => { throw new Error("Invalid registration must not reach the network"); });
   assert.throws(() => api.registration.registerTenant({
     email: "admin@example.com", password: "short", passwordConfirmation: "short",
-  }), /12 characters/i);
+  }), /12 znaków/i);
 });
 
 test("public registration submits account details without a location", async () => {

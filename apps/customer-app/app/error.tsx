@@ -21,10 +21,10 @@ export default function Error({
       <Alert className="max-w-lg" status="danger">
         <Alert.Indicator />
         <Alert.Content>
-          <Alert.Title>Kairos could not open this view</Alert.Title>
-          <Alert.Description>Try loading the view again.</Alert.Description>
+          <Alert.Title>Nie udało się otworzyć tego widoku</Alert.Title>
+          <Alert.Description>Spróbuj ponownie wczytać widok.</Alert.Description>
           <Button className="mt-4" size="sm" variant="danger" onPress={reset}>
-            Try again
+            Spróbuj ponownie
           </Button>
         </Alert.Content>
       </Alert>

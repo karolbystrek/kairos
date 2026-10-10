@@ -65,16 +65,16 @@ export function CustomerHome({
       <div className="flex min-h-[calc(100svh-3rem)] items-center justify-center">
         {isReady ? (
           <Button
-            aria-label="Scan QR code"
+            aria-label="Zeskanuj kod QR"
             className="empty-scan-action"
             variant="tertiary"
             onPress={() => router.push("/scan")}
           >
-            <span className="empty-scan-action-label">Scan QR code</span>
+            <span className="empty-scan-action-label">Zeskanuj kod QR</span>
             <QrCode className="empty-scan-action-icon" size={128} />
           </Button>
         ) : (
-          <Spinner aria-label="Opening Kairos" />
+          <Spinner aria-label="Otwieranie Kairos" />
         )}
       </div>
     </section>

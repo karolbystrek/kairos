@@ -30,8 +30,8 @@ const apiKeyVersionsSchema = z.array(apiKeyVersionSchema);
 
 const issueApiKeyInputSchema = z.object({
   name: managedIntegrationNameSchema,
-  scopes: z.array(apiKeyScopeSchema).min(1, "Choose an API Key scope"),
-  locationIds: z.array(z.uuid()).min(1, "Choose at least one location"),
+  scopes: z.array(apiKeyScopeSchema).min(1, "Wybierz uprawnienia klucza API."),
+  locationIds: z.array(z.uuid()).min(1, "Wybierz co najmniej jeden lokal."),
   expiresAt: z.iso.datetime({ offset: true }).nullable(),
 });
 

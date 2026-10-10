@@ -21,12 +21,13 @@ export default function Error({
       <Alert className="max-w-lg" status="danger">
         <Alert.Indicator />
         <Alert.Content>
-          <Alert.Title>The staff workspace could not load</Alert.Title>
+          <Alert.Title>Nie udało się wczytać panelu obsługi</Alert.Title>
           <Alert.Description>
-            No order action was submitted. Try loading the workspace again.
+            Nie wysłano żadnej operacji na zamówieniu. Spróbuj ponownie wczytać
+            panel.
           </Alert.Description>
           <Button className="mt-4" size="sm" variant="danger" onPress={reset}>
-            Try again
+            Spróbuj ponownie
           </Button>
         </Alert.Content>
       </Alert>

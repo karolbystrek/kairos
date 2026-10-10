@@ -105,18 +105,17 @@ export function ReviewInvitation() {
           size="sm"
         >
           <Modal.Dialog>
-            <Modal.CloseTrigger aria-label="Dismiss review invitation">
+            <Modal.CloseTrigger aria-label="Zamknij zaproszenie do wystawienia opinii">
               <X aria-hidden="true" size={20} />
             </Modal.CloseTrigger>
             <Modal.Header className="pr-8">
               <Modal.Heading>
-                Share your experience at {current?.invitation.locationName} on
-                Google
+                Podziel się opinią o {current?.invitation.locationName} w Google
               </Modal.Heading>
             </Modal.Header>
             <Modal.Footer>
               <Button variant="secondary" onPress={dismiss}>
-                Dismiss
+                Zamknij
               </Button>
               <Button
                 onPress={() => {
@@ -129,7 +128,7 @@ export function ReviewInvitation() {
                   dismiss();
                 }}
               >
-                Review on Google
+                Wystaw opinię w Google
               </Button>
             </Modal.Footer>
           </Modal.Dialog>

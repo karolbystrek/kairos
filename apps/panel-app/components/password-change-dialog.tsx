@@ -34,7 +34,7 @@ export function PasswordChangeDialog({
     event.preventDefault();
     if (pending) return;
     if (password !== confirmation) {
-      setError("Passwords must match.");
+      setError("Hasła muszą być takie same.");
 
       return;
     }
@@ -50,8 +50,8 @@ export function PasswordChangeDialog({
     } catch (failure) {
       setError(
         failure instanceof ApiError && failure.status === 400
-          ? "Check your current password. The new password must contain at least 12 characters."
-          : "Password could not be changed. Try again.",
+          ? "Sprawdź obecne hasło. Nowe hasło musi mieć co najmniej 12 znaków."
+          : "Nie udało się zmienić hasła. Spróbuj ponownie.",
       );
     } finally {
       setPending(false);
@@ -61,19 +61,17 @@ export function PasswordChangeDialog({
   return (
     <PanelPopup isOpen={isOpen} onOpenChange={close}>
       <PanelPopup.Header>
-        <PanelPopup.Heading>Change password</PanelPopup.Heading>
+        <PanelPopup.Heading>Zmień hasło</PanelPopup.Heading>
       </PanelPopup.Header>
       <form onSubmit={submit}>
         <PanelPopup.Body className="flex flex-col gap-4">
-          <p>
-            You will be signed out on every device after changing your password.
-          </p>
+          <p>Po zmianie hasła nastąpi wylogowanie ze wszystkich urządzeń.</p>
           {error && <p role="alert">{error}</p>}
           <FormTextField
             isRequired
             inputProps={{ autoComplete: "current-password" }}
             isDisabled={pending}
-            label="Current password"
+            label="Obecne hasło"
             maxLength={200}
             type="password"
             value={current}
@@ -83,7 +81,7 @@ export function PasswordChangeDialog({
             isRequired
             inputProps={{ autoComplete: "new-password" }}
             isDisabled={pending}
-            label="New password"
+            label="Nowe hasło"
             maxLength={200}
             type="password"
             value={password}
@@ -93,7 +91,7 @@ export function PasswordChangeDialog({
             isRequired
             inputProps={{ autoComplete: "new-password" }}
             isDisabled={pending}
-            label="Confirm password"
+            label="Potwierdź hasło"
             maxLength={200}
             type="password"
             value={confirmation}
@@ -102,10 +100,10 @@ export function PasswordChangeDialog({
         </PanelPopup.Body>
         <PanelPopup.Footer>
           <Button variant="tertiary" onPress={() => close(false)}>
-            Cancel
+            Anuluj
           </Button>
           <Button isPending={pending} type="submit">
-            Change password
+            Zmień hasło
           </Button>
         </PanelPopup.Footer>
       </form>

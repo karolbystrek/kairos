@@ -71,10 +71,10 @@ function workspace(kind = "account-management") {
   }
   return {
     requests,
-    open: () => find(node => node.props?.["aria-label"] === (kind === "account-management" ? "New account" : "New order")).onPress(),
+    open: () => find(node => node.props?.["aria-label"] === (kind === "account-management" ? "Nowe konto" : "Nowe zamówienie")).onPress(),
     popup: () => find(node => node.type === "PanelPopup" && node.props.size === "lg"),
     submit: () => find(node => node.type === "form").onSubmit({ preventDefault() {} }),
-    filter: () => find(node => node.props?.label === "Queue location"),
+    filter: () => find(node => node.props?.label === "Lokal kolejki"),
     secret: () => find(node => node.type === "OneTimeSecret"),
     complete: result => complete(result),
   };

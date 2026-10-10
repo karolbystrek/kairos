@@ -59,7 +59,9 @@ export function OrderScanner() {
       const resolution = resolveScanResult(value, navigator.onLine);
 
       if (resolution.kind === "invalid") {
-        setInlineError("This QR code is not a Kairos order. Keep scanning.");
+        setInlineError(
+          "Ten kod QR nie prowadzi do zamówienia Kairos. Skanuj dalej.",
+        );
 
         return;
       }
@@ -181,7 +183,7 @@ export function OrderScanner() {
       await scanner.setCamera(nextCamera.id);
       setCurrentCameraId(nextCamera.id);
     } catch {
-      setInlineError("The camera could not be switched. Keep scanning.");
+      setInlineError("Nie udało się przełączyć aparatu. Skanuj dalej.");
     } finally {
       setIsSwitchingCamera(false);
     }
@@ -193,15 +195,15 @@ export function OrderScanner() {
         <Alert status="warning">
           <Alert.Indicator />
           <Alert.Content>
-            <Alert.Title>Camera unavailable</Alert.Title>
+            <Alert.Title>Aparat niedostępny</Alert.Title>
             <Alert.Description>
-              Open your device Camera app and scan the restaurant&apos;s QR code
-              there instead.
+              Otwórz aplikację aparatu na urządzeniu i zeskanuj w niej kod QR
+              restauracji.
             </Alert.Description>
           </Alert.Content>
         </Alert>
         <Button variant="secondary" onPress={cancel}>
-          Back to scanner
+          Wróć do skanera
         </Button>
       </section>
     );
@@ -213,9 +215,9 @@ export function OrderScanner() {
         <Alert status="warning">
           <Alert.Indicator />
           <Alert.Content>
-            <Alert.Title>Valid order found</Alert.Title>
+            <Alert.Title>Znaleziono zamówienie</Alert.Title>
             <Alert.Description>
-              Reconnect to the internet, then retry to load this order.
+              Połącz się z internetem i spróbuj ponownie wczytać zamówienie.
             </Alert.Description>
           </Alert.Content>
         </Alert>
@@ -225,10 +227,10 @@ export function OrderScanner() {
             variant="primary"
             onPress={() => navigateToOrder(pendingOrder.href)}
           >
-            {isOnline ? "Retry" : "Waiting for connection…"}
+            {isOnline ? "Spróbuj ponownie" : "Oczekiwanie na połączenie…"}
           </Button>
           <Button variant="secondary" onPress={cancel}>
-            Cancel
+            Anuluj
           </Button>
         </div>
       </section>
@@ -239,16 +241,16 @@ export function OrderScanner() {
     <section className="flex flex-col gap-6">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="page-title">Scan an order</h1>
+          <h1 className="page-title">Zeskanuj zamówienie</h1>
           <p className="mt-3 secondary-text">
-            Point the camera at a Kairos QR code.
+            Skieruj aparat na kod QR Kairos.
           </p>
         </div>
         <Tooltip delay={500}>
           <Tooltip.Trigger>
             <Button
               isIconOnly
-              aria-label="Close scanner"
+              aria-label="Zamknij skaner"
               className="rounded-md"
               variant="tertiary"
               onPress={cancel}
@@ -256,7 +258,7 @@ export function OrderScanner() {
               <X aria-hidden="true" size={20} />
             </Button>
           </Tooltip.Trigger>
-          <Tooltip.Content>Close scanner</Tooltip.Content>
+          <Tooltip.Content>Zamknij skaner</Tooltip.Content>
         </Tooltip>
       </div>
 
@@ -265,13 +267,13 @@ export function OrderScanner() {
           ref={videoRef}
           muted
           playsInline
-          aria-label="Camera preview for scanning an order QR code"
+          aria-label="Podgląd aparatu do skanowania kodu QR zamówienia"
           className="size-full object-cover"
         />
         {view === "requesting-camera" && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/70 text-white">
-            <Spinner aria-label="Requesting camera access" />
-            <p className="text-sm">Requesting camera access…</p>
+            <Spinner aria-label="Oczekiwanie na dostęp do aparatu" />
+            <p className="text-sm">Oczekiwanie na dostęp do aparatu…</p>
           </div>
         )}
         {view === "scanning" && (
@@ -291,7 +293,7 @@ export function OrderScanner() {
             <Tooltip.Trigger>
               <Button
                 isIconOnly
-                aria-label="Switch camera"
+                aria-label="Przełącz aparat"
                 className="rounded-md"
                 isDisabled={isSwitchingCamera}
                 size="sm"
@@ -303,7 +305,7 @@ export function OrderScanner() {
                 <SwitchCamera aria-hidden="true" size={20} />
               </Button>
             </Tooltip.Trigger>
-            <Tooltip.Content>Switch camera</Tooltip.Content>
+            <Tooltip.Content>Przełącz aparat</Tooltip.Content>
           </Tooltip>
         )}
       </div>

@@ -68,19 +68,19 @@ export class ApiError extends Error {
 function defaultErrorMessage(status: number): string {
   switch (status) {
     case 400:
-      return "Check the submitted values and try again.";
+      return "Sprawdź wprowadzone dane i spróbuj ponownie.";
     case 401:
-      return "Your session has expired. Sign in again to continue.";
+      return "Sesja wygasła. Zaloguj się ponownie, aby kontynuować.";
     case 403:
-      return "You are not allowed to perform this action.";
+      return "Nie masz uprawnień do wykonania tej czynności.";
     case 404:
-      return "The requested resource was not found.";
+      return "Nie znaleziono żądanych danych.";
     case 409:
-      return "The request conflicts with the current state.";
+      return "Nie można wykonać tej czynności w obecnym stanie.";
     case 429:
-      return "Too many requests. Please wait and try again.";
+      return "Zbyt wiele żądań. Poczekaj i spróbuj ponownie.";
     default:
-      return "The request could not be completed. Check your connection and try again.";
+      return "Nie udało się wykonać żądania. Sprawdź połączenie i spróbuj ponownie.";
   }
 }
 

@@ -38,10 +38,10 @@ function registrationPage() {
 }
 
 for (const [reason, status, guidance] of [
-  ["expired", 410, /expired/i],
-  ["revoked", 410, /revoked/i],
-  ["redeemed", 410, /already.*used/i],
-  ["invalid", 404, /invalid/i],
+  ["expired", 410, /wygasło/i],
+  ["revoked", 410, /cofnięte/i],
+  ["redeemed", 410, /już wykorzystane/i],
+  ["invalid", 404, /nieprawidłowe/i],
 ]) {
   test(`${reason} invitations remove their bearer fragment and give safe guidance`, () => {
     const view = registrationPage();

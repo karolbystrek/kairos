@@ -1,4 +1,4 @@
 export const siteConfig = {
-  name: "Kairos Staff Panel",
-  description: "Manage restaurant orders with Kairos.",
+  name: "Kairos — Panel obsługi",
+  description: "Zarządzaj zamówieniami restauracji z Kairos.",
 };

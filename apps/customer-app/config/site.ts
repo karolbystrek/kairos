@@ -1,4 +1,4 @@
 export const siteConfig = {
-  name: "Kairos Order Tracking",
-  description: "Track a restaurant order with Kairos.",
+  name: "Kairos — śledzenie zamówień",
+  description: "Śledź zamówienie w restauracji z Kairos.",
 };
