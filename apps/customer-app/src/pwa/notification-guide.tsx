@@ -6,7 +6,8 @@ import { Bell, Share, SquarePlus, X } from "lucide-react";
 import { useCustomerNotifications } from "@/src/pwa/notification-provider";
 
 export function NotificationGuide() {
-  const { dismissGuide, guideOpen } = useCustomerNotifications();
+  const { dismissGuide, enable, guideOpen, state } = useCustomerNotifications();
+  const installationRequired = state === "installation-required";
 
   return (
     <Modal
@@ -31,44 +32,67 @@ export function NotificationGuide() {
               <Tooltip.Content>Dismiss</Tooltip.Content>
             </Tooltip>
             <Modal.Header className="pr-8">
-              <Modal.Heading>Get order notifications</Modal.Heading>
+              <Modal.Heading>
+                {installationRequired
+                  ? "Get order notifications"
+                  : "Know when it’s ready"}
+              </Modal.Heading>
             </Modal.Header>
             <Modal.Body>
-              <p className="text-muted">On iPhone or iPad, add Kairos first.</p>
-              <ol className="notification-installation-steps">
-                <li>
-                  <span className="notification-installation-icon">
-                    <Share aria-hidden="true" size={24} />
-                  </span>
-                  <div>
-                    <span className="text-muted text-sm">1</span>
-                    <p>Tap Share in Safari</p>
-                  </div>
-                </li>
-                <li>
-                  <span className="notification-installation-icon">
-                    <SquarePlus aria-hidden="true" size={24} />
-                  </span>
-                  <div>
-                    <span className="text-muted text-sm">2</span>
-                    <p>Add to Home Screen</p>
-                  </div>
-                </li>
-                <li>
-                  <span className="notification-installation-icon">
-                    <Bell aria-hidden="true" size={24} />
-                  </span>
-                  <div>
-                    <span className="text-muted text-sm">3</span>
-                    <p>Open Kairos → tap the bell</p>
-                  </div>
-                </li>
-              </ol>
+              {installationRequired ? (
+                <>
+                  <p className="text-muted">
+                    On iPhone or iPad, add Kairos first.
+                  </p>
+                  <ol className="notification-installation-steps">
+                    <li>
+                      <span className="notification-installation-icon">
+                        <Share aria-hidden="true" size={24} />
+                      </span>
+                      <div>
+                        <span className="text-muted text-sm">1</span>
+                        <p>Tap Share in Safari</p>
+                      </div>
+                    </li>
+                    <li>
+                      <span className="notification-installation-icon">
+                        <SquarePlus aria-hidden="true" size={24} />
+                      </span>
+                      <div>
+                        <span className="text-muted text-sm">2</span>
+                        <p>Add to Home Screen</p>
+                      </div>
+                    </li>
+                    <li>
+                      <span className="notification-installation-icon">
+                        <Bell aria-hidden="true" size={24} />
+                      </span>
+                      <div>
+                        <span className="text-muted text-sm">3</span>
+                        <p>Open Kairos → tap the bell</p>
+                      </div>
+                    </li>
+                  </ol>
+                </>
+              ) : (
+                <p>Get a notification when your order is ready.</p>
+              )}
             </Modal.Body>
             <Modal.Footer>
               <Button variant="secondary" onPress={dismissGuide}>
                 Not now
               </Button>
+              {!installationRequired && (
+                <Button
+                  variant="primary"
+                  onPress={() => {
+                    dismissGuide();
+                    void enable();
+                  }}
+                >
+                  Enable notifications
+                </Button>
+              )}
             </Modal.Footer>
           </Modal.Dialog>
         </Modal.Container>

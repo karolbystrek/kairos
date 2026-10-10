@@ -52,7 +52,6 @@ type CustomerNotificationContextValue = {
   message: string | null;
   state: NotificationState;
   guideOpen: boolean;
-  hintOpen: boolean;
   dismissGuide: () => void;
   requestEnable: () => void;
   showGuideForOrder: () => void;
@@ -69,7 +68,6 @@ export function CustomerPwaProvider({
   const [state, setState] = useState<NotificationState>("loading");
   const [message, setMessage] = useState<string | null>(null);
   const [guideOpen, setGuideOpen] = useState(false);
-  const [hintOpen, setHintOpen] = useState(false);
   const guideDismissed = useRef(false);
   const firstOrderSeen = useRef(false);
   const synchronizing = useRef<Promise<void> | null>(null);
@@ -141,7 +139,6 @@ export function CustomerPwaProvider({
       setState("enabled");
       setMessage(null);
       setGuideOpen(false);
-      setHintOpen(false);
     } catch (error) {
       setState("error");
       setMessage(notificationErrorMessage(error));
@@ -300,7 +297,6 @@ export function CustomerPwaProvider({
     guideDismissed.current = true;
     rememberGuideDismissal();
     setGuideOpen(false);
-    setHintOpen(false);
   }, []);
 
   const shouldShowGuide = useCallback(
@@ -308,6 +304,10 @@ export function CustomerPwaProvider({
       shouldShowNotificationGuide({
         state,
         installationRequired: requiresNotificationInstallation(),
+        permission:
+          typeof Notification === "undefined"
+            ? undefined
+            : Notification.permission,
         dismissed: guideDismissed.current || readGuideDismissal(),
         automatic,
       }),
@@ -318,14 +318,6 @@ export function CustomerPwaProvider({
     if (state === "loading" || firstOrderSeen.current) return;
     firstOrderSeen.current = true;
     if (shouldShowGuide(true)) setGuideOpen(true);
-    else if (
-      !guideDismissed.current &&
-      !readGuideDismissal() &&
-      (state === "disabled" || state === "error") &&
-      typeof Notification !== "undefined" &&
-      Notification.permission === "default"
-    )
-      setHintOpen(true);
   }, [state, shouldShowGuide]);
 
   const requestEnable = useCallback(() => {
@@ -346,7 +338,6 @@ export function CustomerPwaProvider({
       message,
       state,
       guideOpen,
-      hintOpen,
       dismissGuide,
       requestEnable,
       showGuideForOrder,
@@ -359,7 +350,6 @@ export function CustomerPwaProvider({
       message,
       state,
       guideOpen,
-      hintOpen,
       dismissGuide,
       requestEnable,
       showGuideForOrder,

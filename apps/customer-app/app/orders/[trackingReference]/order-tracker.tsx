@@ -172,12 +172,19 @@ export function OrderTracker({
     };
   }, []);
 
+  const hasLoadedOrder = Boolean(order);
+
+  useEffect(() => {
+    if (!hasLoadedOrder) return;
+    const timer = window.setTimeout(showGuideForOrder, 4000);
+
+    return () => window.clearTimeout(timer);
+  }, [hasLoadedOrder, showGuideForOrder, trackingReference]);
+
   useEffect(() => {
     if (!order) {
       return;
     }
-
-    showGuideForOrder();
 
     const transitionIdentity = `${order.status}:${order.updatedAt}`;
 
@@ -203,7 +210,7 @@ export function OrderTracker({
         await enrollOrder(trackingReference);
       }
     });
-  }, [enrollOrder, order, trackingReference, showGuideForOrder]);
+  }, [enrollOrder, order, trackingReference]);
 
   useEffect(() => {
     if (!error || order) {

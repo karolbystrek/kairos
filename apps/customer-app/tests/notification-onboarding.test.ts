@@ -26,6 +26,15 @@ describe("notification onboarding", () => {
     expect(shouldShowNotificationGuide({ state, installationRequired: true, dismissed: false, automatic: true })).toBe(false);
   });
 
+  it("invites supported customers only while permission is undecided", () => {
+    const context = { state: "disabled" as const, installationRequired: false, dismissed: false, automatic: true };
+    expect(shouldShowNotificationGuide({ ...context, permission: "default" })).toBe(true);
+    expect(shouldShowNotificationGuide({ ...context, permission: "granted" })).toBe(false);
+    expect(shouldShowNotificationGuide({ ...context, permission: "denied" })).toBe(false);
+    expect(shouldShowNotificationGuide({ ...context, permission: "default", dismissed: true })).toBe(false);
+    expect(shouldShowNotificationGuide({ ...context, permission: "default", automatic: false })).toBe(false);
+  });
+
   it("remembers dismissal across reads without storing an order identifier", () => {
     const values = new Map<string, string>();
     vi.stubGlobal("window", { localStorage: { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => values.set(key, value) } });

@@ -31,63 +31,33 @@ function notificationActionLabel(state: NotificationState): string {
 }
 
 export function NotificationControl() {
-  const {
-    disable,
-    dismissGuide,
-    dismissMessage,
-    hintOpen,
-    requestEnable,
-    message,
-    state,
-  } = useCustomerNotifications();
+  const { disable, dismissMessage, requestEnable, message, state } =
+    useCustomerNotifications();
   const isEnabled = state === "enabled";
   const isUnavailable = state === "loading";
   const actionLabel = notificationActionLabel(state);
 
   return (
     <>
-      <div className="notification-invitation" data-inviting={hintOpen}>
-        <Tooltip delay={500}>
-          <Tooltip.Trigger>
-            <Button
-              isIconOnly
-              aria-hidden={!hintOpen}
-              aria-label="Dismiss notification invitation"
-              className="notification-invitation-dismiss"
-              isDisabled={!hintOpen}
-              variant="tertiary"
-              onPress={dismissGuide}
-            >
-              <X aria-hidden="true" size={18} />
-            </Button>
-          </Tooltip.Trigger>
-          <Tooltip.Content>Not now</Tooltip.Content>
-        </Tooltip>
-        <Tooltip delay={500}>
-          <Tooltip.Trigger>
-            <Button
-              aria-label={hintOpen ? "Notify me" : actionLabel}
-              aria-pressed={isEnabled}
-              className="notification-toggle"
-              isDisabled={isUnavailable}
-              variant={hintOpen || isEnabled ? "primary" : "tertiary"}
-              onPress={() => {
-                if (isEnabled) void disable();
-                else requestEnable();
-              }}
-            >
-              <span
-                aria-hidden="true"
-                className="notification-invitation-label"
-              >
-                Notify me
-              </span>
-              <NotificationIcon enabled={isEnabled} />
-            </Button>
-          </Tooltip.Trigger>
-          <Tooltip.Content>{actionLabel}</Tooltip.Content>
-        </Tooltip>
-      </div>
+      <Tooltip delay={500}>
+        <Tooltip.Trigger>
+          <Button
+            isIconOnly
+            aria-label={actionLabel}
+            aria-pressed={isEnabled}
+            className="rounded-md"
+            isDisabled={isUnavailable}
+            variant={isEnabled ? "primary" : "tertiary"}
+            onPress={() => {
+              if (isEnabled) void disable();
+              else requestEnable();
+            }}
+          >
+            <NotificationIcon enabled={isEnabled} />
+          </Button>
+        </Tooltip.Trigger>
+        <Tooltip.Content>{actionLabel}</Tooltip.Content>
+      </Tooltip>
       <NotificationGuide />
       {message && (
         <div className="notification-region fixed inset-x-0 z-50 px-5 sm:px-6">
