@@ -41,6 +41,7 @@ import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.List;
@@ -239,6 +240,34 @@ class CustomerPushSubscriptionIntegrationTests extends RedisListenerIsolatedInte
         assertThat(subscriptionCount(replacement)).isOne();
         subscriptionService.disable(replacement);
         assertThat(count("customer_push_enrollments")).isZero();
+    }
+
+    @Test
+    void rejectsMalformedOutOfRangeAndOffCurveKeysBeforePersistingEnrollments() {
+        var order = createOrder();
+        var valid = newSubscription();
+        var offCurve = new byte[65];
+        offCurve[0] = 0x04;
+        offCurve[32] = 1;
+        offCurve[64] = 1;
+        var outOfRange = offCurve.clone();
+        Arrays.fill(outOfRange, 1, 33, (byte) 0xff);
+        var outOfRangeY = offCurve.clone();
+        Arrays.fill(outOfRangeY, 33, 65, (byte) 0xff);
+        var compressedPrefix = offCurve.clone();
+        compressedPrefix[0] = 0x03;
+        for (var key : List.of(offCurve, outOfRange, outOfRangeY, compressedPrefix, new byte[64])) {
+            var invalid = new CustomerPushSubscriptionInput(valid.endpoint(), base64Url(key), valid.auth(), null);
+            assertThatThrownBy(() -> subscriptionService.reconcile(invalid, List.of(order.trackingReference())))
+                    .isInstanceOf(InvalidCustomerPushSubscriptionException.class);
+            assertThat(count("customer_push_subscriptions")).isZero();
+            assertThat(count("customer_push_enrollments")).isZero();
+        }
+        subscriptionService.reconcile(valid, List.of(order.trackingReference()));
+        assertThat(count("customer_push_subscriptions")).isOne();
+        assertThat(count("customer_push_enrollments")).isOne();
+        subscriptionService.disable(valid);
+        assertThat(count("customer_push_subscriptions")).isZero();
     }
 
     @Test
