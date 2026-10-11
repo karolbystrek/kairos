@@ -50,6 +50,14 @@ class WebhookDestinationPolicyTests {
                 .isEqualTo("http://127.0.0.1:9080/events");
     }
 
+    @Test
+    void preservesEncodedPathAndQueryDelimiters() {
+        var policy = new WebhookDestinationPolicy(properties(
+                WebhookProperties.DestinationPolicy.PUBLIC_HTTPS));
+        var destination = "https://8.8.8.8/hooks/a%2Fb?token=x%26role%3Dadmin%25";
+        assertThat(policy.requireAllowed(destination).toString()).isEqualTo(destination);
+    }
+
     private static WebhookProperties properties(
             WebhookProperties.DestinationPolicy destinationPolicy
     ) {

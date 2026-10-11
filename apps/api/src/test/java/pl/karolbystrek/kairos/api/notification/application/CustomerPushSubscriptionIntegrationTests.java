@@ -220,6 +220,28 @@ class CustomerPushSubscriptionIntegrationTests extends RedisListenerIsolatedInte
     }
 
     @Test
+    void preservesEncodedEndpointCapabilityAcrossEnrollmentAndRemoval() {
+        var order = createOrder();
+        var original = newSubscription();
+        var input = new CustomerPushSubscriptionInput(
+                original.endpoint() + "/a%2Fb?token=x%26role%3Dadmin%25",
+                original.p256dh(), original.auth(), null);
+        endpointHashes.add(sha256(input.endpoint()));
+        subscriptionService.reconcile(input, List.of(order.trackingReference()));
+        assertThat(subscriptionCount(input)).isOne();
+        orderService.updateStatus(tenant.administrator(), order.id(), OrderStatus.READY);
+        while (fanoutService.fanOutAvailable() > 0) { }
+        assertThat(claimService.claimAvailable()).singleElement()
+                .satisfies(delivery -> assertThat(delivery.endpoint()).isEqualTo(input.endpoint()));
+        var replacement = newSubscription();
+        subscriptionService.replace(input, replacement, List.of(order.trackingReference()));
+        assertThat(subscriptionCount(input)).isZero();
+        assertThat(subscriptionCount(replacement)).isOne();
+        subscriptionService.disable(replacement);
+        assertThat(count("customer_push_enrollments")).isZero();
+    }
+
+    @Test
     void concurrentReconciliationCreatesOneSubscriptionAndEnrollment() throws Exception {
         var order = createOrder();
         var input = newSubscription();
