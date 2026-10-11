@@ -798,7 +798,8 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
     SELECT EXISTS(SELECT 1 FROM public.orders o JOIN public.locations l ON l.id=o.location_id WHERE o.id=order_access.order_id
         AND (kairos_security.staff_location(l.id) OR kairos_security.integration_location(l.id,writing)
         OR (NOT writing AND customer AND kairos_security.setting('scope') IN ('tracking','push')
-            AND kairos_security.includes('references',o.tracking_reference) AND l.status='ENABLED')
+            AND kairos_security.includes('references',o.tracking_reference)
+            AND (l.status='ENABLED' OR o.status IN ('COMPLETED','CANCELED')))
         OR (NOT writing AND EXISTS(SELECT 1 FROM public.order_outbox_events e WHERE e.order_id=o.id AND kairos_security.event_access(e.id)))))
 $$;
 CREATE FUNCTION kairos_security.subscription_access(subscription uuid) RETURNS boolean
