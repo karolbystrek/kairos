@@ -469,6 +469,38 @@ class CustomerPushSubscriptionIntegrationTests extends RedisListenerIsolatedInte
         assertThat(cleanupService.clean()).isEqualTo(1);
         assertThat(jdbcTemplate.queryForList("SELECT status FROM customer_push_deliveries", String.class))
                 .containsExactly("PENDING");
+        assertThat(claimService.claimAvailable()).hasSize(1);
+        assertThat(cleanupService.clean()).isZero();
+        assertThat(jdbcTemplate.queryForList("SELECT status FROM customer_push_deliveries", String.class))
+                .containsExactly("PROCESSING");
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = CustomerPushDeliveryStatus.class,
+            names = {"ACCEPTED", "SUPERSEDED", "CANCELED", "EXPIRED", "DEAD_LETTERED"})
+    void cleanupUsesTheDocumentedTerminalRetentionBoundary(CustomerPushDeliveryStatus status) {
+        var order = createOrder();
+        subscriptionService.reconcile(newSubscription(), List.of(order.trackingReference()));
+        orderService.updateStatus(tenant.administrator(), order.id(), OrderStatus.READY);
+        while (fanoutService.fanOutAvailable() > 0) { }
+        var completedAt = clock.instant();
+        jdbcTemplate.update("""
+                UPDATE customer_push_deliveries SET status = ?, payload = NULL,
+                    completed_at = ? WHERE order_id = ?
+                """, status.name(), Timestamp.from(completedAt), order.id());
+        clock.advance(Duration.ofDays(7));
+        assertThat(cleanupService.clean()).isZero();
+        clock.advance(Duration.ofSeconds(1));
+        var successful = List.of(CustomerPushDeliveryStatus.ACCEPTED,
+                CustomerPushDeliveryStatus.SUPERSEDED, CustomerPushDeliveryStatus.CANCELED).contains(status);
+        assertThat(cleanupService.clean()).isEqualTo(successful ? 1 : 0);
+        if (!successful) {
+            clock.setInstant(completedAt.plus(Duration.ofDays(30)));
+            assertThat(cleanupService.clean()).isZero();
+            clock.advance(Duration.ofSeconds(1));
+            assertThat(cleanupService.clean()).isOne();
+        }
+        assertThat(count("customer_push_deliveries")).isZero();
     }
 
     private static StringRedisTemplate stringRedisTemplate() {

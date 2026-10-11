@@ -1078,7 +1078,7 @@ CREATE FUNCTION public.next_terminal_push_delivery(successful_cutoff timestamptz
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE selected uuid;
 BEGIN
-    SELECT id INTO selected FROM public.customer_push_deliveries WHERE (status='ACCEPTED' AND completed_at<successful_cutoff) OR (status IN ('DEAD_LETTERED','EXPIRED','SUPERSEDED','CANCELED') AND completed_at<failed_cutoff) ORDER BY completed_at,id LIMIT 1 FOR UPDATE SKIP LOCKED;
+    SELECT id INTO selected FROM public.customer_push_deliveries WHERE (status IN ('ACCEPTED','SUPERSEDED','CANCELED') AND completed_at<successful_cutoff) OR (status IN ('DEAD_LETTERED','EXPIRED') AND completed_at<failed_cutoff) ORDER BY completed_at,id LIMIT 1 FOR UPDATE SKIP LOCKED;
     IF selected IS NOT NULL THEN PERFORM set_config('kairos.selected','PUSH_CLEANUP:' || selected::text,true); END IF;
     RETURN selected;
 END $$;
