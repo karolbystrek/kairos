@@ -19,9 +19,6 @@ export const staffIntegrationsKey = (accountId: string) =>
 export const staffApiKeysKey = (accountId: string, integrationId: string) =>
   [staffCachePrefix, accountId, "api-keys", integrationId] as const;
 
-export const staffApiKeyVersionsKey = (accountId: string, apiKeyId: string) =>
-  [staffCachePrefix, accountId, "api-key-versions", apiKeyId] as const;
-
 export const staffWebhookSubscriptionsKey = (
   accountId: string,
   integrationId: string,

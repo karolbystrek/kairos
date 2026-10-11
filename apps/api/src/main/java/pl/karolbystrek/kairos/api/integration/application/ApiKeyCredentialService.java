@@ -21,15 +21,15 @@ public class ApiKeyCredentialService {
     private final SecureRandom secureRandom = new SecureRandom();
 
     public IssuedApiKeyCredential issue() {
-        var versionId = UUID.randomUUID();
+        var apiKeyId = UUID.randomUUID();
         var randomBytes = new byte[SECRET_BYTES];
         secureRandom.nextBytes(randomBytes);
         var randomValue = Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
-        var value = PREFIX + versionId + "." + randomValue;
-        return new IssuedApiKeyCredential(versionId, value, hash(value));
+        var value = PREFIX + apiKeyId + "." + randomValue;
+        return new IssuedApiKeyCredential(apiKeyId, value, hash(value));
     }
 
-    public UUID parseVersionId(String credential) {
+    public UUID parseApiKeyId(String credential) {
         if (credential == null || !credential.startsWith(PREFIX)) {
             throw new IllegalArgumentException("Invalid API Key credential");
         }
@@ -45,11 +45,11 @@ public class ApiKeyCredentialService {
             throw new IllegalArgumentException("Invalid API Key credential");
         }
 
-        var versionId = UUID.fromString(idValue);
-        if (!versionId.toString().equals(idValue)) {
+        var apiKeyId = UUID.fromString(idValue);
+        if (!apiKeyId.toString().equals(idValue)) {
             throw new IllegalArgumentException("Invalid API Key credential");
         }
-        return versionId;
+        return apiKeyId;
     }
 
     public boolean matches(String credential, String expectedHash) {

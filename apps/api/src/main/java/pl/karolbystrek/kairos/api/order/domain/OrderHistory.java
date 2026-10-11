@@ -48,9 +48,6 @@ public class OrderHistory {
     @Column(name = "initiator_api_key_id")
     private UUID initiatorApiKeyId;
 
-    @Column(name = "initiator_api_key_version_id")
-    private UUID initiatorApiKeyVersionId;
-
     public static OrderHistory record(
             @NonNull CustomerOrder order,
             @NonNull OrderStatus status,
@@ -80,14 +77,12 @@ public class OrderHistory {
             @NonNull OrderStatus status,
             @NonNull Instant createdAt,
             @NonNull UUID integrationId,
-            @NonNull UUID apiKeyId,
-            @NonNull UUID apiKeyVersionId
+            @NonNull UUID apiKeyId
     ) {
         var history = record(order, status, createdAt);
         history.initiatorType = InitiatorType.INTEGRATION;
         history.initiatorId = integrationId;
         history.initiatorApiKeyId = apiKeyId;
-        history.initiatorApiKeyVersionId = apiKeyVersionId;
         return history;
     }
 

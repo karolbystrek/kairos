@@ -15,14 +15,18 @@ import java.util.UUID;
 public interface ApiKeyRepository extends JpaRepository<ApiKey, UUID> {
 
     @EntityGraph(attributePaths = {"integration", "scopes", "locationAccess"})
-    List<ApiKey> findAllByIntegration_IdAndTenantIdOrderByCreatedAtAsc(
+    List<ApiKey> findAllByIntegration_IdAndTenantIdAndDeletedAtIsNullOrderByCreatedAtAsc(
             UUID integrationId,
             UUID tenantId
     );
 
-    boolean existsByIntegration_IdAndNormalizedName(UUID integrationId, String normalizedName);
+    boolean existsByIntegration_IdAndNormalizedNameAndDeletedAtIsNull(UUID integrationId, String normalizedName);
 
-    Optional<ApiKey> findByIdAndTenantId(UUID apiKeyId, UUID tenantId);
+    @Query("select apiKey.integration.id from ApiKey apiKey where apiKey.id = :apiKeyId and apiKey.tenantId = :tenantId")
+    Optional<UUID> findIntegrationIdByIdAndTenantId(
+        @Param("apiKeyId") UUID apiKeyId,
+        @Param("tenantId") UUID tenantId
+    );
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<ApiKey> findForUpdateByIdAndTenantId(UUID apiKeyId, UUID tenantId);

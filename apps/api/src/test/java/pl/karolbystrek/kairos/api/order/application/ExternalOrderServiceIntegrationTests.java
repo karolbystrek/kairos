@@ -233,16 +233,6 @@ class ExternalOrderServiceIntegrationTests extends RedisListenerIsolatedIntegrat
                 UUID.class,
                 created.order().id()
         )).containsOnly(issuedKey.apiKey().id());
-        assertThat(jdbcTemplate.queryForList(
-                """
-                SELECT initiator_api_key_version_id
-                FROM order_history
-                WHERE order_id = ?
-                ORDER BY id
-                """,
-                UUID.class,
-                created.order().id()
-        )).containsOnly(issuedKey.version().id());
 
         assertThatThrownBy(() -> orderService.updateStatus(
                 principal,

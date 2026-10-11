@@ -17,7 +17,7 @@ public record ApiKeyView(
         @NonNull List<String> scopes,
         @NonNull List<UUID> locationIds,
         Instant expiresAt,
-        Instant revokedAt,
+        Instant lastUsedAt,
         @NonNull Instant createdAt
 ) {
 
@@ -37,7 +37,7 @@ public record ApiKeyView(
                 scopes,
                 locationIds,
                 apiKey.getExpiresAt(),
-                apiKey.getRevokedAt(),
+                apiKey.getLastUsedAt(),
                 apiKey.getCreatedAt()
         );
     }

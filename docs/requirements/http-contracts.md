@@ -140,9 +140,10 @@ returns `404`, and any valid existing panel session receives `403`.
 
 The authenticated administrator management families are
 `/api/external-integrations/v1`, `/api/api-keys/v1`,
-`/api/api-key-versions/v1`, `/api/webhook-subscriptions/v1`, and
-`/api/webhook-signing-secrets/v1`. Their lifecycle operations use the flat
-resource-family convention and never accept client-supplied tenant ownership.
+`/api/webhook-subscriptions/v1`, and `/api/webhook-signing-secrets/v1`. Their
+lifecycle operations use the flat resource-family convention and never accept
+client-supplied tenant ownership. API Keys support only list, create, and
+`DELETE /api/api-keys/v1/{apiKeyId}`.
 
 The implemented External Integration order contract is:
 

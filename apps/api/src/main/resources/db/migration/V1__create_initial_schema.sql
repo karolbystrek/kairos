@@ -77,8 +77,10 @@ CREATE TABLE api_keys
     tenant_id       UUID                     NOT NULL,
     name            VARCHAR(64)              NOT NULL,
     normalized_name VARCHAR(128)             NOT NULL,
+    secret_hash     VARCHAR(64)              NOT NULL UNIQUE,
     expires_at      TIMESTAMP WITH TIME ZONE,
-    revoked_at      TIMESTAMP WITH TIME ZONE,
+    deleted_at      TIMESTAMP WITH TIME ZONE,
+    last_used_at    TIMESTAMP WITH TIME ZONE,
     created_at      TIMESTAMP WITH TIME ZONE NOT NULL,
     CONSTRAINT api_keys_integration_tenant_fk
         FOREIGN KEY (integration_id, tenant_id)
@@ -87,13 +89,15 @@ CREATE TABLE api_keys
     CONSTRAINT api_keys_name_stripped_check CHECK (name = TRIM(name)),
     CONSTRAINT api_keys_normalized_name_not_blank_check CHECK (TRIM(normalized_name) <> ''),
     CONSTRAINT api_keys_expiry_check CHECK (expires_at IS NULL OR expires_at > created_at),
-    CONSTRAINT api_keys_revoked_at_check CHECK (revoked_at IS NULL OR revoked_at >= created_at),
-    CONSTRAINT api_keys_integration_name_key UNIQUE (integration_id, normalized_name),
+    CONSTRAINT api_keys_deleted_at_check CHECK (deleted_at IS NULL OR deleted_at >= created_at),
+    CONSTRAINT api_keys_last_used_at_check CHECK (last_used_at IS NULL OR last_used_at >= created_at),
     CONSTRAINT api_keys_id_tenant_key UNIQUE (id, tenant_id),
     CONSTRAINT api_keys_id_integration_key UNIQUE (id, integration_id)
 );
 
 CREATE INDEX api_keys_integration_id_idx ON api_keys (integration_id, created_at);
+-- Deleted keys stay as tombstones for order history, so only active keys reserve their name.
+CREATE UNIQUE INDEX api_keys_integration_name_key ON api_keys (integration_id, normalized_name) WHERE deleted_at IS NULL;
 
 CREATE TABLE api_key_scopes
 (
@@ -119,26 +123,6 @@ CREATE TABLE api_key_location_access
 
 CREATE INDEX api_key_location_access_location_idx
     ON api_key_location_access (location_id, api_key_id);
-
-CREATE TABLE api_key_versions
-(
-    id          UUID PRIMARY KEY,
-    api_key_id  UUID                     NOT NULL REFERENCES api_keys (id),
-    secret_hash VARCHAR(64)              NOT NULL UNIQUE,
-    issued_at   TIMESTAMP WITH TIME ZONE NOT NULL,
-    valid_until TIMESTAMP WITH TIME ZONE,
-    retired_at  TIMESTAMP WITH TIME ZONE,
-    CONSTRAINT api_key_versions_valid_until_check CHECK (
-        valid_until IS NULL OR valid_until > issued_at
-        ),
-    CONSTRAINT api_key_versions_retired_at_check CHECK (
-        retired_at IS NULL OR retired_at >= issued_at
-        ),
-    CONSTRAINT api_key_versions_id_key_key UNIQUE (id, api_key_id)
-);
-
-CREATE INDEX api_key_versions_key_issued_idx
-    ON api_key_versions (api_key_id, issued_at DESC);
 
 CREATE TABLE webhook_subscriptions
 (
@@ -413,30 +397,22 @@ CREATE TABLE order_history
     initiator_type               VARCHAR(32),
     initiator_id                 UUID,
     initiator_api_key_id         UUID,
-    initiator_api_key_version_id UUID,
     CONSTRAINT order_history_integration_key_fk
         FOREIGN KEY (initiator_api_key_id, initiator_id)
             REFERENCES api_keys (id, integration_id),
-    CONSTRAINT order_history_integration_key_version_fk
-        FOREIGN KEY (initiator_api_key_version_id, initiator_api_key_id)
-            REFERENCES api_key_versions (id, api_key_id),
     CONSTRAINT order_history_initiator_check CHECK (
         (initiator_type IS NULL
             AND initiator_id IS NULL
-            AND initiator_api_key_id IS NULL
-            AND initiator_api_key_version_id IS NULL)
+            AND initiator_api_key_id IS NULL)
         OR (initiator_type IS NOT NULL AND initiator_type = 'SYSTEM'
             AND initiator_id IS NULL
-            AND initiator_api_key_id IS NULL
-            AND initiator_api_key_version_id IS NULL)
+            AND initiator_api_key_id IS NULL)
         OR (initiator_type IS NOT NULL AND initiator_type = 'USER'
             AND initiator_id IS NOT NULL
-            AND initiator_api_key_id IS NULL
-            AND initiator_api_key_version_id IS NULL)
+            AND initiator_api_key_id IS NULL)
         OR (initiator_type IS NOT NULL AND initiator_type = 'INTEGRATION'
             AND initiator_id IS NOT NULL
-            AND initiator_api_key_id IS NOT NULL
-            AND initiator_api_key_version_id IS NOT NULL)
+            AND initiator_api_key_id IS NOT NULL)
         )
 );
 
@@ -698,22 +674,33 @@ BEGIN
         WHERE x.account_id=kairos_security.identity() FOR UPDATE OF l;
     RETURN FOUND OR EXISTS(SELECT 1 FROM public.accounts a WHERE a.id=kairos_security.identity() AND a.tenant_role='ADMIN');
 END $$;
-CREATE FUNCTION public.api_key_authentication(version_id uuid, at_time timestamptz)
-RETURNS TABLE(secret_hash varchar,tenant_id uuid,integration_id uuid,api_key_id uuid,api_key_version_id uuid,scopes text[],location_ids uuid[])
+CREATE FUNCTION public.api_key_authentication(key_id uuid, at_time timestamptz)
+RETURNS TABLE(secret_hash varchar,tenant_id uuid,integration_id uuid,api_key_id uuid,last_used_at timestamptz,scopes text[],location_ids uuid[])
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
-    SELECT v.secret_hash,k.tenant_id,k.integration_id,k.id,v.id,
+    SELECT k.secret_hash,k.tenant_id,k.integration_id,k.id,k.last_used_at,
         ARRAY(SELECT s.scope::text FROM public.api_key_scopes s WHERE s.api_key_id=k.id ORDER BY s.scope),
         ARRAY(SELECT g.location_id FROM public.api_key_location_access g JOIN public.locations l ON l.id=g.location_id
             WHERE g.api_key_id=k.id AND l.status='ENABLED' ORDER BY g.location_id)
-    FROM public.api_key_versions v JOIN public.api_keys k ON k.id=v.api_key_id
-    JOIN public.external_integrations i ON i.id=k.integration_id
-    WHERE v.id=version_id AND v.retired_at IS NULL AND (v.valid_until IS NULL OR at_time<v.valid_until)
-        AND k.revoked_at IS NULL AND (k.expires_at IS NULL OR at_time<k.expires_at) AND i.status='ENABLED'
+    FROM public.api_keys k JOIN public.external_integrations i ON i.id=k.integration_id
+    WHERE k.id=key_id AND k.deleted_at IS NULL AND (k.expires_at IS NULL OR at_time<k.expires_at) AND i.status='ENABLED'
 $$;
-CREATE FUNCTION public.valid_integration(version_id uuid,key_id uuid,integration_id uuid,tenant_id uuid,scopes text[],location_ids uuid[],at_time timestamptz) RETURNS boolean
+-- Usage is recorded at most once per interval so authenticated requests rarely write.
+CREATE FUNCTION public.record_api_key_use(key_id uuid, at_time timestamptz, stale_at timestamptz) RETURNS boolean
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
+BEGIN
+    IF kairos_security.setting('scope') NOT IN ('integration','integration-command')
+        OR kairos_security.identity() IS DISTINCT FROM key_id THEN
+        RAISE EXCEPTION 'API Key usage requires its own integration context' USING ERRCODE='42501';
+    END IF;
+    UPDATE public.api_keys k SET last_used_at=at_time
+        WHERE k.id=key_id AND k.deleted_at IS NULL AND at_time>=k.created_at
+            AND (k.last_used_at IS NULL OR k.last_used_at<=stale_at);
+    RETURN FOUND;
+END $$;
+CREATE FUNCTION public.valid_integration(key_id uuid,integration_id uuid,tenant_id uuid,scopes text[],location_ids uuid[],at_time timestamptz) RETURNS boolean
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
-    SELECT EXISTS(SELECT 1 FROM public.api_key_authentication(version_id,at_time) p
-        WHERE p.api_key_id=key_id AND p.integration_id=valid_integration.integration_id AND p.tenant_id=valid_integration.tenant_id
+    SELECT EXISTS(SELECT 1 FROM public.api_key_authentication(key_id,at_time) p
+        WHERE p.api_key_id=valid_integration.key_id AND p.integration_id=valid_integration.integration_id AND p.tenant_id=valid_integration.tenant_id
         AND p.scopes @> valid_integration.scopes AND valid_integration.scopes @> p.scopes
         AND p.location_ids @> valid_integration.location_ids AND valid_integration.location_ids @> p.location_ids)
 $$;
@@ -796,7 +783,7 @@ CREATE FUNCTION kairos_security.key_access(key_id uuid) RETURNS boolean
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
     SELECT EXISTS(SELECT 1 FROM public.api_keys k WHERE k.id=key_id AND (
         kairos_security.staff_tenant(k.tenant_id,true) OR (kairos_security.setting('scope') IN ('integration','integration-command')
-        AND EXISTS(SELECT 1 FROM public.api_key_versions v WHERE v.id=kairos_security.identity() AND v.api_key_id=k.id))))
+        AND k.id=kairos_security.identity())))
 $$;
 CREATE FUNCTION kairos_security.push_delivery_access(delivery uuid, subscription uuid, order_id uuid, event uuid) RETURNS boolean
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
@@ -860,8 +847,8 @@ $$;
 CREATE FUNCTION kairos_security.integration_access(integration uuid,tenant uuid) RETURNS boolean
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
     SELECT kairos_security.staff_tenant(tenant,true)
-        OR (kairos_security.setting('scope') IN ('integration','integration-command') AND EXISTS(SELECT 1 FROM public.api_key_versions v
-            JOIN public.api_keys k ON k.id=v.api_key_id WHERE v.id=kairos_security.identity() AND k.integration_id=integration))
+        OR (kairos_security.setting('scope') IN ('integration','integration-command') AND EXISTS(SELECT 1 FROM public.api_keys k
+            WHERE k.id=kairos_security.identity() AND k.integration_id=integration))
         OR EXISTS(SELECT 1 FROM public.webhook_subscriptions s WHERE s.integration_id=integration
             AND kairos_security.webhook_subscription(s.id))
 $$;
@@ -924,11 +911,6 @@ CREATE POLICY scoped_select ON api_key_scopes FOR SELECT USING (kairos_security.
 CREATE POLICY scoped_insert ON api_key_scopes FOR INSERT WITH CHECK (EXISTS(SELECT 1 FROM api_keys k WHERE k.id=api_key_id AND kairos_security.staff_tenant(k.tenant_id,true)));
 CREATE POLICY scoped_update ON api_key_scopes FOR UPDATE USING (EXISTS(SELECT 1 FROM api_keys k WHERE k.id=api_key_id AND kairos_security.staff_tenant(k.tenant_id,true))) WITH CHECK (EXISTS(SELECT 1 FROM api_keys k WHERE k.id=api_key_id AND kairos_security.staff_tenant(k.tenant_id,true)));
 CREATE POLICY scoped_delete ON api_key_scopes FOR DELETE USING (EXISTS(SELECT 1 FROM api_keys k WHERE k.id=api_key_id AND kairos_security.staff_tenant(k.tenant_id,true)));
-ALTER TABLE api_key_versions ENABLE ROW LEVEL SECURITY;
-CREATE POLICY scoped_select ON api_key_versions FOR SELECT USING (EXISTS(SELECT 1 FROM api_keys k WHERE k.id=api_key_id AND kairos_security.staff_tenant(k.tenant_id,true)) OR (kairos_security.setting('scope') IN ('integration','integration-command') AND id=kairos_security.identity()));
-CREATE POLICY scoped_insert ON api_key_versions FOR INSERT WITH CHECK (EXISTS(SELECT 1 FROM api_keys k WHERE k.id=api_key_id AND kairos_security.staff_tenant(k.tenant_id,true)));
-CREATE POLICY scoped_update ON api_key_versions FOR UPDATE USING (EXISTS(SELECT 1 FROM api_keys k WHERE k.id=api_key_id AND kairos_security.staff_tenant(k.tenant_id,true))) WITH CHECK (EXISTS(SELECT 1 FROM api_keys k WHERE k.id=api_key_id AND kairos_security.staff_tenant(k.tenant_id,true)));
-CREATE POLICY scoped_delete ON api_key_versions FOR DELETE USING (EXISTS(SELECT 1 FROM api_keys k WHERE k.id=api_key_id AND kairos_security.staff_tenant(k.tenant_id,true)));
 ALTER TABLE api_key_location_access ENABLE ROW LEVEL SECURITY;
 CREATE POLICY scoped_select ON api_key_location_access FOR SELECT USING (kairos_security.key_access(api_key_id));
 CREATE POLICY scoped_insert ON api_key_location_access FOR INSERT WITH CHECK (EXISTS(SELECT 1 FROM api_keys k WHERE k.id=api_key_id AND kairos_security.staff_tenant(k.tenant_id,true)));
@@ -1148,8 +1130,7 @@ CREATE TRIGGER stable_ownership BEFORE UPDATE ON accounts FOR EACH ROW EXECUTE F
 CREATE TRIGGER stable_ownership BEFORE UPDATE ON location_assignments FOR EACH ROW EXECUTE FUNCTION kairos_security.stable_ownership('account_id','location_id','tenant_id','role');
 CREATE TRIGGER stable_ownership BEFORE UPDATE ON account_invitations FOR EACH ROW EXECUTE FUNCTION kairos_security.stable_ownership('id','tenant_id','location_id','issued_by_account_id','assignment_role','token_hash');
 CREATE TRIGGER stable_ownership BEFORE UPDATE ON external_integrations FOR EACH ROW EXECUTE FUNCTION kairos_security.stable_ownership('id','tenant_id');
-CREATE TRIGGER stable_ownership BEFORE UPDATE ON api_keys FOR EACH ROW EXECUTE FUNCTION kairos_security.stable_ownership('id','tenant_id','integration_id');
-CREATE TRIGGER stable_ownership BEFORE UPDATE ON api_key_versions FOR EACH ROW EXECUTE FUNCTION kairos_security.stable_ownership('id','api_key_id','secret_hash');
+CREATE TRIGGER stable_ownership BEFORE UPDATE ON api_keys FOR EACH ROW EXECUTE FUNCTION kairos_security.stable_ownership('id','tenant_id','integration_id','secret_hash');
 CREATE TRIGGER stable_ownership BEFORE UPDATE ON api_key_location_access FOR EACH ROW EXECUTE FUNCTION kairos_security.stable_ownership('api_key_id','location_id','tenant_id');
 CREATE TRIGGER stable_ownership BEFORE UPDATE ON webhook_subscriptions FOR EACH ROW EXECUTE FUNCTION kairos_security.stable_ownership('id','tenant_id','integration_id');
 CREATE TRIGGER stable_ownership BEFORE UPDATE ON webhook_subscription_location_access FOR EACH ROW EXECUTE FUNCTION kairos_security.stable_ownership('subscription_id','location_id','tenant_id');
@@ -1192,7 +1173,7 @@ REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA kairos_security FROM PUBLIC;
 REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA public FROM PUBLIC;
 GRANT USAGE ON SCHEMA public,kairos_security TO "${runtimeUser}";
 GRANT SELECT,INSERT,UPDATE,DELETE ON tenants,locations,accounts,location_assignments,account_invitations,
-    external_integrations,api_keys,api_key_scopes,api_key_versions,api_key_location_access,
+    external_integrations,api_keys,api_key_scopes,api_key_location_access,
     webhook_subscriptions,webhook_subscription_location_access,webhook_subscription_event_types,webhook_signing_secret_versions,
     orders,order_history,order_outbox_events,webhook_deliveries,webhook_delivery_signing_versions,
     customer_push_subscriptions,customer_push_enrollments,customer_push_deliveries,
@@ -1200,7 +1181,8 @@ GRANT SELECT,INSERT,UPDATE,DELETE ON tenants,locations,accounts,location_assignm
 GRANT USAGE ON SEQUENCE order_history_id_seq TO "${runtimeUser}";
 GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA kairos_security TO "${runtimeUser}";
 GRANT EXECUTE ON FUNCTION public.valid_staff(uuid,uuid,text),public.lock_staff_location(),public.lock_account_location(uuid),
-    public.api_key_authentication(uuid,timestamptz),public.valid_integration(uuid,uuid,uuid,uuid,text[],uuid[],timestamptz),
+    public.api_key_authentication(uuid,timestamptz),public.record_api_key_use(uuid,timestamptz,timestamptz),
+    public.valid_integration(uuid,uuid,uuid,text[],uuid[],timestamptz),
     public.staff_authentication(text),public.identity_conflict(text,text),public.verify_push_subscription(text),
     public.count_push_enrollments(uuid),public.cancel_push_deliveries(uuid,uuid[],timestamptz),public.next_webhook_fanout(),public.next_push_fanout(),
     public.next_webhook_delivery(timestamptz),public.next_push_delivery(timestamptz),

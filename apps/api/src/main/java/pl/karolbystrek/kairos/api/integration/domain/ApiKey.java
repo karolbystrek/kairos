@@ -59,20 +59,29 @@ public class ApiKey {
     @Getter(AccessLevel.NONE)
     private List<ApiKeyLocationAccess> locationAccess = new ArrayList<>();
 
+    @Column(name = "secret_hash", nullable = false, unique = true, length = 64, updatable = false)
+    private String secretHash;
+
     @Column(name = "expires_at")
     private Instant expiresAt;
 
-    @Column(name = "revoked_at")
-    private Instant revokedAt;
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
+
+    // Written only by authentication, so staff updates never overwrite a newer value.
+    @Column(name = "last_used_at", insertable = false, updatable = false)
+    private Instant lastUsedAt;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
     public static ApiKey issue(
+            @NonNull UUID id,
             @NonNull ExternalIntegration integration,
             @NonNull ManagedIntegrationName name,
             @NonNull Set<ApiKeyScope> scopes,
             @NonNull Set<UUID> locationIds,
+            @NonNull String secretHash,
             Instant expiresAt,
             @NonNull Instant now
     ) {
@@ -87,12 +96,13 @@ public class ApiKey {
         }
 
         var apiKey = new ApiKey();
-        apiKey.id = UUID.randomUUID();
+        apiKey.id = id;
         apiKey.integration = integration;
         apiKey.tenantId = integration.getTenantId();
         apiKey.name = name.value();
         apiKey.normalizedName = name.normalizedValue();
         apiKey.scopes.addAll(ApiKeyScope.normalize(scopes));
+        apiKey.secretHash = secretHash;
         apiKey.expiresAt = expiresAt;
         apiKey.createdAt = now;
         locationIds.forEach(locationId -> apiKey.locationAccess.add(
@@ -119,32 +129,20 @@ public class ApiKey {
         return scopes.stream().anyMatch(scope -> scope.grants(required));
     }
 
-    public boolean isRevoked() {
-        return revokedAt != null;
+    public boolean isDeleted() {
+        return deletedAt != null;
     }
 
-    public boolean isExpiredAt(@NonNull Instant now) {
-        return expiresAt != null && !expiresAt.isAfter(now);
-    }
-
-    public boolean canIssueVersionAt(@NonNull Instant now) {
-        return !isRevoked() && !isExpiredAt(now) && !integration.isArchived();
-    }
-
-    public boolean canAuthenticateAt(@NonNull Instant now) {
-        return canIssueVersionAt(now) && integration.isEnabled();
-    }
-
-    public void revoke(@NonNull Instant now) {
-        if (revokedAt == null) {
-            revokedAt = now;
+    public void delete(@NonNull Instant now) {
+        if (deletedAt == null) {
+            deletedAt = now;
         }
     }
 
     public boolean removeLocationAccess(@NonNull UUID locationId, @NonNull Instant now) {
         var removed = locationAccess.removeIf(access -> access.getLocationId().equals(locationId));
         if (removed && locationAccess.isEmpty()) {
-            revoke(now);
+            delete(now);
         }
         return removed;
     }

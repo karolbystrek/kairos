@@ -6,10 +6,10 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -59,12 +59,12 @@ class ApiKeyController {
                 .body(IssuedApiKeyResponse.from(issued));
     }
 
-    @PutMapping("/{apiKeyId}/revocation")
-    ApiKeyResponse revoke(
+    @DeleteMapping("/{apiKeyId}")
+    ResponseEntity<Void> delete(
             @AuthenticationPrincipal StaffPrincipal principal,
             @PathVariable UUID apiKeyId
     ) {
-        var apiKey = apiKeyService.revoke(principal, apiKeyId);
-        return ApiKeyResponse.from(apiKey);
+        apiKeyService.delete(principal, apiKeyId);
+        return ResponseEntity.noContent().build();
     }
 }

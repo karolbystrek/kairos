@@ -68,6 +68,6 @@ unambiguous historical attribution. They cannot authenticate or be restored.
 
 Archiving a location permanently removes it from API Key location grants and
 webhook subscription location selections. An API Key left without any location
-grant is revoked, and a webhook subscription left without any location
+grant is deleted, and a webhook subscription left without any location
 selection is archived. Multi-location configurations retain their other
 location relationships and lifecycle state.

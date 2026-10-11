@@ -208,8 +208,8 @@ their distinct domain-specific state machines.
 Administrative actions that remove access, stop delivery, invalidate a credential,
 retire an active secret version, or delete a resource require deliberate hold
 confirmation before the request is sent. This includes disabling Locations,
-Accounts, Integrations and Webhook Subscriptions; revoking Account Invitations
-and API Keys; retiring overlapping webhook secrets; and deleting managed
+Accounts, Integrations and Webhook Subscriptions; revoking Account Invitations;
+deleting API Keys; retiring overlapping webhook secrets; and deleting managed
 resources. The action stays within the existing detail popup or inline section,
 with consequence text identifying the affected resource. It never opens a second
 confirmation popup. Order cancellation and logout retain their existing focused

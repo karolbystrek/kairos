@@ -5,20 +5,27 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import pl.karolbystrek.kairos.api.integration.application.exception.IntegrationAccessDeniedException;
 import pl.karolbystrek.kairos.api.integration.application.exception.IntegrationConflictException;
+import pl.karolbystrek.kairos.api.integration.application.exception.IntegrationNotFoundException;
 import pl.karolbystrek.kairos.api.integration.domain.ExternalIntegrationStatus;
 import pl.karolbystrek.kairos.api.integration.testsupport.IntegrationTestFixture;
 import pl.karolbystrek.kairos.api.integration.testsupport.MutableTestClock;
 import pl.karolbystrek.kairos.api.integration.testsupport.MutableTestClockConfiguration;
+import pl.karolbystrek.kairos.api.persistence.infrastructure.DatabaseAccessContext;
 import pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase;
 import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
 
+import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Set;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -38,6 +45,15 @@ class ExternalIntegrationManagementIntegrationTests
     private ApiKeyAuthenticationService authenticationService;
 
     private final JdbcTemplate jdbcTemplate = PostgresTestDatabase.ownerDatabase();
+
+    @Autowired
+    private JdbcTemplate runtimeDatabase;
+
+    @Autowired
+    private DatabaseAccessContext databaseAccess;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     @Autowired
     private MutableTestClock clock;
@@ -82,7 +98,7 @@ class ExternalIntegrationManagementIntegrationTests
     }
 
     @Test
-    void issuesHashesRotatesAndRevokesApiKeyCredentials() {
+    void issuesHashesAndDeletesApiKeyCredentials() {
         var integration = integrationService.create(
                 tenant.administrator(),
                 "Kitchen POS"
@@ -103,43 +119,24 @@ class ExternalIntegrationManagementIntegrationTests
                         tenant.firstLocationId(),
                         tenant.secondLocationId()
                 );
+        assertThat(issued.secret()).startsWith("kairos_key_v1." + issued.apiKey().id() + ".");
         assertThat(jdbcTemplate.queryForObject(
-                "SELECT secret_hash FROM api_key_versions WHERE id = ?",
+                "SELECT secret_hash FROM api_keys WHERE id = ?",
                 String.class,
-                issued.version().id()
-        )).isNotEqualTo(issued.secret());
-
-        var initialPrincipal = authenticationService.authenticate(issued.secret());
-        assertThat(initialPrincipal.integrationId()).isEqualTo(integration.id());
-        assertThat(initialPrincipal.apiKeyId()).isEqualTo(issued.apiKey().id());
-        assertThat(initialPrincipal.apiKeyVersionId()).isEqualTo(issued.version().id());
-
-        clock.advance(Duration.ofMinutes(5));
-        var rotated = apiKeyService.rotate(
-                tenant.administrator(),
                 issued.apiKey().id()
-        );
-        var versions = apiKeyService.listVersions(
-                tenant.administrator(),
-                issued.apiKey().id()
-        );
+        )).hasSize(64).isNotEqualTo(issued.secret());
+        assertThat(issued.toString()).doesNotContain(issued.secret());
 
-        assertThat(authenticationService.authenticate(issued.secret()).apiKeyVersionId())
-                .isEqualTo(issued.version().id());
-        assertThat(authenticationService.authenticate(rotated.secret()).apiKeyVersionId())
-                .isEqualTo(rotated.version().id());
-        assertThat(versions)
-                .filteredOn(version -> version.id().equals(issued.version().id()))
-                .singleElement()
-                .satisfies(version -> assertThat(version.validUntil())
-                        .isEqualTo(clock.instant().plus(Duration.ofHours(24))));
+        var principal = authenticationService.authenticate(issued.secret());
+        assertThat(principal.integrationId()).isEqualTo(integration.id());
+        assertThat(principal.apiKeyId()).isEqualTo(issued.apiKey().id());
 
         integrationService.changeStatus(
                 tenant.administrator(),
                 integration.id(),
                 ExternalIntegrationStatus.DISABLED
         );
-        assertThatThrownBy(() -> authenticationService.authenticate(rotated.secret()))
+        assertThatThrownBy(() -> authenticationService.authenticate(issued.secret()))
                 .isInstanceOf(BadCredentialsException.class);
 
         integrationService.changeStatus(
@@ -147,12 +144,101 @@ class ExternalIntegrationManagementIntegrationTests
                 integration.id(),
                 ExternalIntegrationStatus.ENABLED
         );
-        assertThat(authenticationService.authenticate(rotated.secret()).apiKeyId())
+        assertThat(authenticationService.authenticate(issued.secret()).apiKeyId())
                 .isEqualTo(issued.apiKey().id());
 
-        apiKeyService.revoke(tenant.administrator(), issued.apiKey().id());
-        assertThatThrownBy(() -> authenticationService.authenticate(rotated.secret()))
+        apiKeyService.delete(tenant.administrator(), issued.apiKey().id());
+        assertThatThrownBy(() -> authenticationService.authenticate(issued.secret()))
                 .isInstanceOf(BadCredentialsException.class);
+        assertThat(apiKeyService.list(tenant.administrator(), integration.id())).isEmpty();
+        assertThatThrownBy(() -> apiKeyService.delete(tenant.administrator(), issued.apiKey().id()))
+                .isInstanceOf(IntegrationNotFoundException.class);
+
+        var replacement = apiKeyService.issue(
+                tenant.administrator(),
+                integration.id(),
+                "primary KEY",
+                Set.of("orders:read"),
+                Set.of(tenant.firstLocationId()),
+                null
+        );
+        assertThat(apiKeyService.list(tenant.administrator(), integration.id()))
+                .extracting(view -> view.id())
+                .containsExactly(replacement.apiKey().id());
+    }
+
+    @Test
+    void recordsLastUseAtMostOncePerRefreshInterval() {
+        var integration = integrationService.create(
+                tenant.administrator(),
+                "Bar POS"
+        );
+        var issued = apiKeyService.issue(
+                tenant.administrator(),
+                integration.id(),
+                "Bar key",
+                Set.of("orders:read"),
+                Set.of(tenant.firstLocationId()),
+                null
+        );
+        assertThat(issued.apiKey().lastUsedAt()).isNull();
+
+        var firstUse = clock.instant();
+        authenticationService.authenticate(issued.secret());
+        assertThat(lastUsedAt(integration.id())).isEqualTo(firstUse);
+
+        clock.advance(Duration.ofMinutes(30));
+        authenticationService.authenticate(issued.secret());
+        assertThat(lastUsedAt(integration.id())).isEqualTo(firstUse);
+
+        clock.advance(Duration.ofMinutes(30));
+        authenticationService.authenticate(issued.secret());
+        assertThat(lastUsedAt(integration.id())).isEqualTo(clock.instant());
+    }
+
+    @Test
+    void recordsUsageOnlyForTheBoundApiKey() {
+        var integration = integrationService.create(
+                tenant.administrator(),
+                "Terrace POS"
+        );
+        var first = apiKeyService.issue(
+                tenant.administrator(),
+                integration.id(),
+                "First key",
+                Set.of("orders:read"),
+                Set.of(tenant.firstLocationId()),
+                null
+        );
+        var second = apiKeyService.issue(
+                tenant.administrator(),
+                integration.id(),
+                "Second key",
+                Set.of("orders:read"),
+                Set.of(tenant.firstLocationId()),
+                null
+        );
+        var now = Timestamp.from(clock.instant());
+
+        assertThatThrownBy(() -> runtimeDatabase.queryForObject(
+                "SELECT public.record_api_key_use(?, ?, ?)",
+                Boolean.class,
+                first.apiKey().id(),
+                now,
+                now
+        )).isInstanceOf(DataAccessException.class);
+
+        var principal = authenticationService.authenticate(first.secret());
+        assertThatThrownBy(() -> new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            databaseAccess.integration(principal);
+            runtimeDatabase.queryForObject(
+                    "SELECT public.record_api_key_use(?, ?, ?)",
+                    Boolean.class,
+                    second.apiKey().id(),
+                    now,
+                    now
+            );
+        })).isInstanceOf(DataAccessException.class);
     }
 
     @Test
@@ -175,9 +261,9 @@ class ExternalIntegrationManagementIntegrationTests
         clock.advance(Duration.ofHours(2));
         assertThatThrownBy(() -> authenticationService.authenticate(issued.secret()))
                 .isInstanceOf(BadCredentialsException.class);
-        assertThatThrownBy(() -> apiKeyService.rotate(
-                tenant.administrator(),
-                issued.apiKey().id()
-        )).isInstanceOf(IntegrationConflictException.class);
+    }
+
+    private Instant lastUsedAt(UUID integrationId) {
+        return apiKeyService.list(tenant.administrator(), integrationId).getFirst().lastUsedAt();
     }
 }
