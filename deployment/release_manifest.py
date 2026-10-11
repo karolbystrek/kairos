@@ -1,4 +1,5 @@
 """Assemble a release from Docker inspections of all three published images."""
+import gzip
 import json
 from pathlib import Path
 import re
@@ -46,10 +47,16 @@ def assemble(revision, inspections, output):
     output.mkdir(parents=True, exist_ok=False)
     manifest = output / "release.json"
     manifest.write_text(json.dumps({"revision": revision, "images": images}, indent=2) + "\n")
-    with tarfile.open(output / "release.tar.gz", "w:gz") as archive:
-        archive.add(manifest, arcname="release.json")
-        for name in RUNTIME_FILES:
-            archive.add(root / name, arcname=name, recursive=False)
+    with (output / "release.tar.gz").open("wb") as compressed:
+        with gzip.GzipFile(fileobj=compressed, mode="wb", filename="", mtime=0) as stream:
+            with tarfile.open(fileobj=stream, mode="w") as archive:
+                for name in ("release.json", *RUNTIME_FILES):
+                    path = manifest if name == "release.json" else root / name
+                    info = tarfile.TarInfo(name)
+                    info.size = path.stat().st_size
+                    info.mode = 0o755 if name.endswith(".sh") else 0o644
+                    with path.open("rb") as contents:
+                        archive.addfile(info, contents)
 
 
 if __name__ == "__main__":

@@ -27,8 +27,12 @@ gh workflow run deploy.yml --ref main -f revision=<commit-sha>
 Without that input, deployment selects the latest `main` commit when the run
 resolves the release. A selected commit must belong to `main` history and have a
 successful CI run with an unexpired `release-manifest` artifact. Selection fails
-before requesting approval if no eligible release exists; wait for CI, or rebuild
-the selected release if its artifact expired. The selected full revision stays
+before requesting approval if no eligible release exists; wait for CI, or rerun
+CI for the selected revision if its artifact expired. Publication reuses existing
+immutable registry images and regenerates a byte-identical bundle from the same
+image digests and runtime contents. Rebuilding images with changed digests or
+changing runtime files creates different content and cannot replace an existing
+host release under that revision; publish those changes under a new revision. The selected full revision stays
 fixed even if `main` advances while approval is pending.
 
 Review the selected CI run, full revision, all three digests, launch blockers and
