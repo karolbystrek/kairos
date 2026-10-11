@@ -77,78 +77,80 @@ export function CustomerPwaProvider({
   const synchronizing = useRef<Promise<void> | null>(null);
   const dismissMessage = useCallback(() => setMessage(null), []);
 
-  const synchronize = useCallback(async () => {
-    if (requiresNotificationInstallation()) {
-      setState("installation-required");
-      setMessage(null);
+  const synchronize = useCallback(async (explicitEnable = false) => {
+    if (changingNotifications.current && !explicitEnable) return;
+    if (synchronizing.current) return synchronizing.current;
+    const operation = (async () => {
+      if (requiresNotificationInstallation()) {
+        setState("installation-required");
+        setMessage(null);
 
-      return;
-    }
-    if (!supportsWebPush()) {
-      setState("unsupported");
-      setMessage(null);
-
-      return;
-    }
-    if (process.env.NODE_ENV !== "production") {
-      setState("unsupported");
-      setMessage(null);
-
-      return;
-    }
-    if (Notification.permission === "denied") {
-      try {
-        await updateNotificationMetadata({
-          notificationsEnabled: false,
-          enrolledTrackingReferences: [],
-        });
-      } catch {
-        // The blocked-permission guidance remains useful without IndexedDB.
+        return;
       }
-      setState("blocked");
-      setMessage(
-        "Powiadomienia są zablokowane. Włącz je w ustawieniach przeglądarki lub urządzenia.",
-      );
+      if (!supportsWebPush()) {
+        setState("unsupported");
+        setMessage(null);
 
-      return;
-    }
-    const metadata = await readNotificationMetadata();
+        return;
+      }
+      if (process.env.NODE_ENV !== "production") {
+        setState("unsupported");
+        setMessage(null);
 
-    if (metadata.notificationsEnabled === false) {
-      setState("disabled");
-      setMessage(null);
+        return;
+      }
+      if (Notification.permission === "denied") {
+        try {
+          await updateNotificationMetadata({
+            notificationsEnabled: false,
+            enrolledTrackingReferences: [],
+          });
+        } catch {
+          // The blocked-permission guidance remains useful without IndexedDB.
+        }
+        setState("blocked");
+        setMessage(
+          "Powiadomienia są zablokowane. Włącz je w ustawieniach przeglądarki lub urządzenia.",
+        );
 
-      return;
-    }
-    if (Notification.permission !== "granted") {
-      setState("disabled");
-      setMessage(null);
+        return;
+      }
+      const metadata = await readNotificationMetadata();
 
-      return;
-    }
-    if (metadata.notificationsEnabled !== true) {
-      setState("disabled");
-      setMessage(null);
+      if (metadata.notificationsEnabled === false) {
+        setState("disabled");
+        setMessage(null);
 
-      return;
-    }
-    if (synchronizing.current) {
-      return synchronizing.current;
-    }
-    const operation = synchronizeGrantedSubscription();
+        return;
+      }
+      if (Notification.permission !== "granted") {
+        setState("disabled");
+        setMessage(null);
 
-    synchronizing.current = operation;
-    try {
-      await operation;
+        return;
+      }
+      if (metadata.notificationsEnabled !== true) {
+        setState("disabled");
+        setMessage(null);
+
+        return;
+      }
+      await synchronizeGrantedSubscription();
       setState("enabled");
       setMessage(null);
       setGuideOpen(false);
-    } catch (error) {
-      setState("error");
-      setMessage(notificationErrorMessage(error));
-    } finally {
-      synchronizing.current = null;
-    }
+    })()
+      .catch((error) => {
+        setState("error");
+        setMessage(notificationErrorMessage(error));
+      })
+      .finally(() => {
+        synchronizing.current = null;
+      });
+
+    synchronizing.current = operation;
+
+    return operation;
   }, []);
 
   useEffect(() => {
@@ -240,8 +242,9 @@ export function CustomerPwaProvider({
         return;
       }
       setPendingAction("enabling");
+      await synchronizing.current?.catch(() => {});
       await updateNotificationMetadata({ notificationsEnabled: true });
-      await synchronize();
+      await synchronize(true);
     } catch {
       setState("error");
       setMessage(
@@ -268,6 +271,7 @@ export function CustomerPwaProvider({
     changingNotifications.current = true;
     setPendingAction("disabling");
     try {
+      await synchronizing.current?.catch(() => {});
       const registration = await navigator.serviceWorker.ready;
       const subscription = await registration.pushManager.getSubscription();
 
