@@ -12,12 +12,11 @@ import {
   Spinner,
   TextField,
 } from "@heroui/react";
-import { Ban, History, KeyRound, Plus, RefreshCw } from "lucide-react";
+import { Plus, Trash2 as TrashIcon } from "lucide-react";
 import { useState } from "react";
-import useSWR, { useSWRConfig } from "swr";
+import useSWR from "swr";
 
 import { HoldToConfirmButton } from "@/components/hold-to-confirm-button";
-import { PanelPopup } from "@/components/panel-popup";
 import { FormTextField } from "@/components/form-controls";
 import {
   formatIntegrationDateTime,
@@ -25,25 +24,25 @@ import {
   shouldRetryIntegrationRequest,
 } from "@/components/integrations/integration-ui";
 import {
+  deleteApiKey,
   issueApiKey,
   listApiKeys,
-  listApiKeyVersions,
-  revokeApiKey,
-  rotateApiKey,
   type ApiKey,
 } from "@/src/api/api-keys";
-import { staffApiKeysKey, staffApiKeyVersionsKey } from "@/src/api/cache-keys";
-
-function replaceApiKey(keys: ApiKey[] | undefined, updated: ApiKey): ApiKey[] {
-  return (keys ?? [updated]).map((key) =>
-    key.id === updated.id ? updated : key,
-  );
-}
+import { ApiError } from "@/src/api/api-fetch";
+import { staffApiKeysKey } from "@/src/api/cache-keys";
 
 function apiKeyAccessLabel(apiKey: ApiKey): string {
   return apiKey.scopes.includes("orders:write")
     ? "Odczyt i zapis zamówień"
     : "Odczyt zamówień";
+}
+
+function isExpired(apiKey: ApiKey): boolean {
+  return (
+    apiKey.expiresAt !== null &&
+    new Date(apiKey.expiresAt).getTime() <= Date.now()
+  );
 }
 
 export function ApiKeyManagement({
@@ -57,7 +56,6 @@ export function ApiKeyManagement({
   locations: Location[];
   onSecretIssued: (secret: PendingOneTimeSecret) => void;
 }) {
-  const { mutate: mutateCache } = useSWRConfig();
   const enabledLocations = locations.filter(
     (location) => location.status === "ENABLED",
   );
@@ -65,8 +63,7 @@ export function ApiKeyManagement({
   const [accessMode, setAccessMode] = useState<"READ" | "WRITE">("READ");
   const [selectedLocationIds, setSelectedLocationIds] = useState<string[]>([]);
   const [expiration, setExpiration] = useState("");
-  const [selectedApiKeyId, setSelectedApiKeyId] = useState<string>();
-  const [apiKeyToRevoke, setApiKeyToRevoke] = useState<ApiKey>();
+  const [apiKeyToDelete, setApiKeyToDelete] = useState<ApiKey>();
   const [pendingAction, setPendingAction] = useState<string>();
   const [actionError, setActionError] = useState<unknown>();
 
@@ -80,23 +77,6 @@ export function ApiKeyManagement({
     errorRetryCount: 3,
     shouldRetryOnError: shouldRetryIntegrationRequest,
   });
-
-  const selectedApiKey = apiKeys.find((key) => key.id === selectedApiKeyId);
-  const versionsCacheKey = selectedApiKey
-    ? staffApiKeyVersionsKey(accountId, selectedApiKey.id)
-    : null;
-  const {
-    data: versions = [],
-    error: versionsError,
-    isLoading: areVersionsLoading,
-  } = useSWR(
-    versionsCacheKey,
-    () => listApiKeyVersions(selectedApiKey?.id ?? ""),
-    {
-      errorRetryCount: 3,
-      shouldRetryOnError: shouldRetryIntegrationRequest,
-    },
-  );
 
   const error = apiKeysError ?? actionError;
 
@@ -137,11 +117,6 @@ export function ApiKeyManagement({
         ],
         { revalidate: false },
       );
-      await mutateCache(
-        staffApiKeyVersionsKey(accountId, result.apiKey.id),
-        [result.version],
-        { revalidate: false },
-      );
       setName("");
       setAccessMode("READ");
       setSelectedLocationIds([]);
@@ -153,70 +128,33 @@ export function ApiKeyManagement({
     }
   }
 
-  async function revoke(apiKey: ApiKey): Promise<boolean> {
+  async function remove(apiKey: ApiKey): Promise<boolean> {
     if (pendingAction) return false;
 
     setActionError(undefined);
-    setPendingAction(`revoke-${apiKey.id}`);
+    setPendingAction(`delete-${apiKey.id}`);
 
     try {
-      const revoked = await revokeApiKey(apiKey.id);
-
-      await mutateApiKeys((current) => replaceApiKey(current, revoked), {
-        revalidate: false,
-      });
+      await deleteApiKey(apiKey.id);
+      await mutateApiKeys(
+        (current) => (current ?? []).filter((key) => key.id !== apiKey.id),
+        { revalidate: false },
+      );
 
       return true;
     } catch (caught) {
+      // A key deleted elsewhere is already gone; drop it instead of showing an error.
+      if (caught instanceof ApiError && caught.status === 404) {
+        await mutateApiKeys(
+          (current) => (current ?? []).filter((key) => key.id !== apiKey.id),
+          { revalidate: false },
+        );
+
+        return true;
+      }
       setActionError(caught);
 
       return false;
-    } finally {
-      setPendingAction(undefined);
-    }
-  }
-
-  async function rotate(apiKey: ApiKey) {
-    if (pendingAction) return;
-
-    setActionError(undefined);
-    setPendingAction(`rotate-${apiKey.id}`);
-
-    try {
-      const result = await rotateApiKey(apiKey.id);
-      const versionKey = staffApiKeyVersionsKey(accountId, apiKey.id);
-
-      onSecretIssued({
-        title: `Nowy sekret klucza API: ${apiKey.name}`,
-        description:
-          "Zaktualizuj teraz system zewnętrzny. Poprzedni klucz przestanie działać za 24 godziny.",
-        value: result.secret,
-        afterConfirmed: () => {
-          void listApiKeyVersions(apiKey.id)
-            .then((freshVersions) =>
-              mutateCache(versionKey, freshVersions, { revalidate: false }),
-            )
-            .catch(() => undefined);
-        },
-      });
-      await mutateCache(
-        versionKey,
-        (current: unknown) => [
-          result.version,
-          ...(Array.isArray(current)
-            ? current.filter(
-                (version) =>
-                  typeof version !== "object" ||
-                  version === null ||
-                  !("id" in version) ||
-                  version.id !== result.version.id,
-              )
-            : []),
-        ],
-        { revalidate: false },
-      );
-    } catch (caught) {
-      setActionError(caught);
     } finally {
       setPendingAction(undefined);
     }
@@ -350,12 +288,12 @@ export function ApiKeyManagement({
                   <h4 className="font-semibold">{apiKey.name}</h4>
                   <span
                     className={
-                      apiKey.revokedAt
+                      isExpired(apiKey)
                         ? "text-sm text-danger"
                         : "text-sm font-medium text-accent"
                     }
                   >
-                    {apiKey.revokedAt ? "Unieważniony" : "Aktywny"}
+                    {isExpired(apiKey) ? "Wygasł" : "Aktywny"}
                   </span>
                 </div>
 
@@ -387,79 +325,55 @@ export function ApiKeyManagement({
                       ? `Wygasa ${formatIntegrationDateTime(apiKey.expiresAt)}`
                       : "Nie wygasa"}
                   </p>
-                  {apiKey.revokedAt && (
-                    <p>
-                      Unieważniono {formatIntegrationDateTime(apiKey.revokedAt)}
-                    </p>
-                  )}
+                  <p>
+                    {apiKey.lastUsedAt
+                      ? `Ostatnio użyty ${formatIntegrationDateTime(apiKey.lastUsedAt)}`
+                      : "Nie był jeszcze użyty"}
+                  </p>
                 </div>
 
                 <div className="flex flex-wrap gap-3">
                   <Button
-                    variant="secondary"
-                    onPress={() => setSelectedApiKeyId(apiKey.id)}
-                  >
-                    <History size={18} />
-                    Wersje
-                  </Button>
-                  <Button
-                    isDisabled={
-                      Boolean(pendingAction) || Boolean(apiKey.revokedAt)
-                    }
-                    isPending={pendingAction === `rotate-${apiKey.id}`}
-                    variant="secondary"
-                    onPress={() => rotate(apiKey)}
-                  >
-                    <RefreshCw size={18} />
-                    Zmień sekret
-                  </Button>
-                  <Button
-                    isDisabled={
-                      Boolean(pendingAction) || Boolean(apiKey.revokedAt)
-                    }
-                    isPending={pendingAction === `revoke-${apiKey.id}`}
+                    isDisabled={Boolean(pendingAction)}
+                    isPending={pendingAction === `delete-${apiKey.id}`}
                     variant="danger"
                     onPress={() => {
-                      if (!pendingAction) setApiKeyToRevoke(apiKey);
+                      if (!pendingAction) setApiKeyToDelete(apiKey);
                     }}
                   >
-                    <KeyRound size={18} />
-                    Unieważnij
+                    <TrashIcon size={18} />
+                    Usuń
                   </Button>
                 </div>
-                {apiKeyToRevoke && apiKeyToRevoke.id === apiKey.id && (
+                {apiKeyToDelete && apiKeyToDelete.id === apiKey.id && (
                   <section
-                    aria-label={`Unieważnienie klucza ${apiKeyToRevoke.name}`}
+                    aria-label={`Usunięcie klucza ${apiKeyToDelete.name}`}
                     className="flex flex-col gap-3"
                   >
                     <p className="text-sm text-muted">
-                      Wszystkie wersje sekretu klucza {apiKeyToRevoke.name}{" "}
-                      natychmiast przestaną działać. Tej operacji nie można
-                      cofnąć.
+                      Klucz {apiKeyToDelete.name} natychmiast przestanie
+                      działać. Tej operacji nie można cofnąć.
                     </p>
                     <div className="confirmation-actions">
                       <HoldToConfirmButton
-                        key={apiKeyToRevoke.id}
-                        isDisabled={
-                          Boolean(pendingAction) ||
-                          Boolean(apiKeyToRevoke.revokedAt)
-                        }
+                        key={apiKeyToDelete.id}
+                        isDisabled={Boolean(pendingAction)}
                         isPending={
-                          pendingAction === `revoke-${apiKeyToRevoke.id}`
+                          pendingAction === `delete-${apiKeyToDelete.id}`
                         }
                         onConfirm={async () => {
-                          if (await revoke(apiKeyToRevoke))
-                            setApiKeyToRevoke(undefined);
+                          if (await remove(apiKeyToDelete))
+                            setApiKeyToDelete(undefined);
                         }}
                       >
-                        <Ban size={18} />
-                        Przytrzymaj, aby unieważnić klucz
+                        <TrashIcon size={18} />
+                        Przytrzymaj, aby usunąć klucz
                       </HoldToConfirmButton>
                       <Button
-                        aria-label="Anuluj unieważnienie klucza"
+                        aria-label="Anuluj usunięcie klucza"
                         isDisabled={Boolean(pendingAction)}
                         variant="tertiary"
-                        onPress={() => setApiKeyToRevoke(undefined)}
+                        onPress={() => setApiKeyToDelete(undefined)}
                       >
                         Anuluj
                       </Button>
@@ -471,67 +385,6 @@ export function ApiKeyManagement({
           </div>
         )}
       </section>
-
-      <PanelPopup
-        isOpen={Boolean(selectedApiKey)}
-        size="md"
-        onOpenChange={(open) => {
-          if (!open) setSelectedApiKeyId(undefined);
-        }}
-      >
-        <PanelPopup.Header>
-          <PanelPopup.Heading>
-            {selectedApiKey?.name} — wersje
-          </PanelPopup.Heading>
-        </PanelPopup.Header>
-        <PanelPopup.Body className="flex flex-col gap-4">
-          {versionsError ? (
-            <Alert status="danger">
-              <Alert.Indicator />
-              <Alert.Content>
-                <Alert.Title>Wersje są niedostępne</Alert.Title>
-                <Alert.Description>
-                  {getIntegrationErrorMessage(versionsError)}
-                </Alert.Description>
-              </Alert.Content>
-            </Alert>
-          ) : areVersionsLoading ? (
-            <div className="flex min-h-32 items-center justify-center">
-              <Spinner aria-label="Wczytywanie wersji klucza API" />
-            </div>
-          ) : versions.length === 0 ? (
-            <p className="text-muted">Brak wersji.</p>
-          ) : (
-            <div className="border-t border-separator">
-              {versions.map((version) => (
-                <div
-                  key={version.id}
-                  className="flex flex-wrap items-center justify-between gap-3 border-b border-separator py-3"
-                >
-                  <p className="text-sm text-muted">
-                    Utworzono {formatIntegrationDateTime(version.issuedAt)}
-                  </p>
-                  <span
-                    className={
-                      version.retiredAt
-                        ? "text-sm secondary-text"
-                        : "text-sm font-medium text-accent"
-                    }
-                  >
-                    {version.retiredAt
-                      ? "Wycofana"
-                      : version.validUntil
-                        ? `Ważna do ${formatIntegrationDateTime(
-                            version.validUntil,
-                          )}`
-                        : "Aktualna"}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </PanelPopup.Body>
-      </PanelPopup>
     </div>
   );
 }

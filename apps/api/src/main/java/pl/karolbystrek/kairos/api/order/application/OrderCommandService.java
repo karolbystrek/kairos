@@ -102,8 +102,7 @@ public class OrderCommandService {
                     status,
                     now,
                     initiator.initiatorId(),
-                    initiator.apiKeyId(),
-                    initiator.apiKeyVersionId()
+                    initiator.apiKeyId()
             );
             case SYSTEM -> OrderHistory.recordBySystem(order, status, now);
         };

@@ -4,15 +4,18 @@ import pl.karolbystrek.kairos.api.integration.application.model.IssuedApiKeyView
 
 public record IssuedApiKeyResponse(
         ApiKeyResponse apiKey,
-        ApiKeyVersionResponse version,
         String secret
 ) {
 
     public static IssuedApiKeyResponse from(IssuedApiKeyView issued) {
         return new IssuedApiKeyResponse(
                 ApiKeyResponse.from(issued.apiKey()),
-                ApiKeyVersionResponse.from(issued.version()),
                 issued.secret()
         );
+    }
+
+    @Override
+    public String toString() {
+        return "IssuedApiKeyResponse[apiKey=" + apiKey + ", secret=[REDACTED]]";
     }
 }

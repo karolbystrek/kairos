@@ -12,7 +12,6 @@ public record ApiKeyPrincipal(
         @NonNull UUID tenantId,
         @NonNull UUID integrationId,
         @NonNull UUID apiKeyId,
-        @NonNull UUID apiKeyVersionId,
         @NonNull Set<ApiKeyScope> scopes,
         @NonNull Set<UUID> locationIds
 ) implements Principal {
@@ -24,7 +23,7 @@ public record ApiKeyPrincipal(
 
     @Override
     public String getName() {
-        return apiKeyVersionId.toString();
+        return apiKeyId.toString();
     }
 
     public boolean grants(ApiKeyScope required) {

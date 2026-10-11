@@ -221,7 +221,7 @@
 ### Integration and delivery invariants
 
 * A valid transition from either the staff panel or an External Integration produces the same persisted state, history record, customer event, and transactional outbox event.
-* Integration, API Key, API Key Version, webhook subscription, and signing-secret lifecycle changes preserve one-time secret handling and historical audit attribution.
+* Integration, API Key, webhook subscription, and signing-secret lifecycle changes preserve one-time secret handling and historical audit attribution.
 * Exact idempotent creation replays and same-state status commands create no duplicate order, history, outbox, or customer event.
 * Webhook delivery failure cannot roll back or corrupt the committed order transition and is retained as a terminal dead-letter record.
 * The REST and webhook contracts remain language-agnostic.

@@ -8,18 +8,13 @@ import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
 import pl.karolbystrek.kairos.api.integration.application.exception.IntegrationConflictException;
 import pl.karolbystrek.kairos.api.integration.application.exception.IntegrationNotFoundException;
 import pl.karolbystrek.kairos.api.integration.application.exception.InvalidIntegrationRequestException;
-import pl.karolbystrek.kairos.api.integration.application.model.ApiKeyVersionView;
 import pl.karolbystrek.kairos.api.integration.application.model.ApiKeyView;
-import pl.karolbystrek.kairos.api.integration.application.model.IssuedApiKeyVersionView;
 import pl.karolbystrek.kairos.api.integration.application.model.IssuedApiKeyView;
 import pl.karolbystrek.kairos.api.integration.domain.ApiKey;
 import pl.karolbystrek.kairos.api.integration.domain.ApiKeyScope;
-import pl.karolbystrek.kairos.api.integration.domain.ApiKeyVersion;
 import pl.karolbystrek.kairos.api.integration.domain.ExternalIntegration;
 import pl.karolbystrek.kairos.api.integration.domain.ManagedIntegrationName;
-import pl.karolbystrek.kairos.api.integration.infrastructure.config.ExternalIntegrationProperties;
 import pl.karolbystrek.kairos.api.integration.infrastructure.persistence.ApiKeyRepository;
-import pl.karolbystrek.kairos.api.integration.infrastructure.persistence.ApiKeyVersionRepository;
 import pl.karolbystrek.kairos.api.integration.infrastructure.persistence.ExternalIntegrationRepository;
 import pl.karolbystrek.kairos.api.location.infrastructure.persistence.LocationRepository;
 
@@ -35,19 +30,17 @@ import java.util.UUID;
 public class ApiKeyManagementService {
 
     private final ApiKeyRepository apiKeyRepository;
-    private final ApiKeyVersionRepository versionRepository;
     private final ExternalIntegrationRepository integrationRepository;
     private final LocationRepository locationRepository;
     private final IntegrationAdministrationAccessService administrationAccessService;
     private final ApiKeyCredentialService credentialService;
-    private final ExternalIntegrationProperties properties;
     private final Clock clock;
 
     @Transactional(readOnly = true)
     public List<ApiKeyView> list(StaffPrincipal principal, UUID integrationId) {
         var access = administrationAccessService.requireAdministrator(principal);
         requireManageableIntegration(integrationId, access.tenantId());
-        return apiKeyRepository.findAllByIntegration_IdAndTenantIdOrderByCreatedAtAsc(
+        return apiKeyRepository.findAllByIntegration_IdAndTenantIdAndDeletedAtIsNullOrderByCreatedAtAsc(
                         integrationId,
                         access.tenantId()
                 ).stream()
@@ -71,89 +64,43 @@ public class ApiKeyManagementService {
         var locations = validateLocations(locationIds, access.tenantId());
         var now = clock.instant();
 
-        if (apiKeyRepository.existsByIntegration_IdAndNormalizedName(
+        if (apiKeyRepository.existsByIntegration_IdAndNormalizedNameAndDeletedAtIsNull(
                 integrationId,
                 name.normalizedValue()
         )) {
             throw new IntegrationConflictException("An API Key with this name already exists");
         }
 
+        var credential = credentialService.issue();
         final ApiKey apiKey;
         try {
-            apiKey = ApiKey.issue(integration, name, scopes, locations, expiresAt, now);
+            apiKey = ApiKey.issue(
+                    credential.apiKeyId(),
+                    integration,
+                    name,
+                    scopes,
+                    locations,
+                    credential.hash(),
+                    expiresAt,
+                    now
+            );
         } catch (IllegalArgumentException | IllegalStateException exception) {
             throw new InvalidIntegrationRequestException(exception.getMessage(), exception);
         }
-        var credential = credentialService.issue();
-        var version = ApiKeyVersion.issue(credential.versionId(), apiKey, credential.hash(), now);
 
         try {
             var savedApiKey = apiKeyRepository.saveAndFlush(apiKey);
-            var savedVersion = versionRepository.saveAndFlush(version);
-            return new IssuedApiKeyView(
-                    ApiKeyView.from(savedApiKey),
-                    ApiKeyVersionView.from(savedVersion),
-                    credential.value()
-            );
+            return new IssuedApiKeyView(ApiKeyView.from(savedApiKey), credential.value());
         } catch (DataIntegrityViolationException exception) {
             throw new IntegrationConflictException("The API Key could not be issued", exception);
         }
     }
 
     @Transactional
-    public ApiKeyView revoke(StaffPrincipal principal, UUID apiKeyId) {
+    public void delete(StaffPrincipal principal, UUID apiKeyId) {
         var access = administrationAccessService.requireAdministratorForUpdate(principal);
         var apiKey = requireManageableKeyForUpdate(apiKeyId, access.tenantId());
-        apiKey.revoke(clock.instant());
-        return ApiKeyView.from(apiKey);
-    }
-
-    @Transactional(readOnly = true)
-    public List<ApiKeyVersionView> listVersions(StaffPrincipal principal, UUID apiKeyId) {
-        var access = administrationAccessService.requireAdministrator(principal);
-        requireManageableKey(apiKeyId, access.tenantId());
-        return versionRepository.findAllByApiKey_IdOrderByIssuedAtDesc(apiKeyId).stream()
-                .map(ApiKeyVersionView::from)
-                .toList();
-    }
-
-    @Transactional
-    public IssuedApiKeyVersionView rotate(StaffPrincipal principal, UUID apiKeyId) {
-        var access = administrationAccessService.requireAdministratorForUpdate(principal);
-        var apiKey = requireManageableKeyForUpdate(apiKeyId, access.tenantId());
-        var now = clock.instant();
-        if (!apiKey.canIssueVersionAt(now)) {
-            throw new IntegrationConflictException("The API Key cannot issue another version");
-        }
-
-        var versions = versionRepository.findAllForUpdateByApiKey_IdOrderByIssuedAtDesc(apiKeyId);
-        var current = versions.stream()
-                .filter(ApiKeyVersion::isCurrent)
-                .findFirst()
-                .orElseThrow(() -> new IntegrationConflictException(
-                        "The API Key does not have a current version"
-                ));
-        versions.stream()
-                .filter(version -> version != current && version.getRetiredAt() == null)
-                .forEach(version -> version.retire(now));
-        current.beginGracePeriod(now.plus(properties.apiKeyRotationGrace()));
-
-        try {
-            var credential = credentialService.issue();
-            var replacement = ApiKeyVersion.issue(
-                    credential.versionId(),
-                    apiKey,
-                    credential.hash(),
-                    now
-            );
-            var savedVersion = versionRepository.saveAndFlush(replacement);
-            return new IssuedApiKeyVersionView(
-                    ApiKeyVersionView.from(savedVersion),
-                    credential.value()
-            );
-        } catch (DataIntegrityViolationException exception) {
-            throw new IntegrationConflictException("The API Key version could not be rotated", exception);
-        }
+        apiKey.delete(clock.instant());
     }
 
     private ExternalIntegration requireManageableIntegration(UUID integrationId, UUID tenantId) {
@@ -184,34 +131,24 @@ public class ApiKeyManagementService {
         return integration;
     }
 
-    private ApiKey requireManageableKey(UUID apiKeyId, UUID tenantId) {
-        if (apiKeyId == null) {
-            throw new InvalidIntegrationRequestException("API Key ID is required");
-        }
-        var apiKey = apiKeyRepository.findByIdAndTenantId(apiKeyId, tenantId)
-                .orElseThrow(() -> new IntegrationNotFoundException("API Key was not found"));
-        if (apiKey.getIntegration().isArchived()) {
-            throw new IntegrationNotFoundException("API Key was not found");
-        }
-        return apiKey;
-    }
-
     private ApiKey requireManageableKeyForUpdate(UUID apiKeyId, UUID tenantId) {
         if (apiKeyId == null) {
             throw new InvalidIntegrationRequestException("API Key ID is required");
         }
-        var reference = apiKeyRepository.findByIdAndTenantId(apiKeyId, tenantId)
+        // Resolve the owner without loading the key, so the locked read below sees concurrent deletes.
+        var integrationId = apiKeyRepository.findIntegrationIdByIdAndTenantId(apiKeyId, tenantId)
                 .orElseThrow(() -> new IntegrationNotFoundException("API Key was not found"));
-        var integration = integrationRepository.findForUpdateByIdAndTenantId(
-                        reference.getIntegrationId(),
-                        tenantId
-                )
+        var integration = integrationRepository.findForUpdateByIdAndTenantId(integrationId, tenantId)
                 .orElseThrow(() -> new IntegrationNotFoundException("API Key was not found"));
         if (integration.isArchived()) {
             throw new IntegrationNotFoundException("API Key was not found");
         }
-        return apiKeyRepository.findForUpdateByIdAndTenantId(apiKeyId, tenantId)
+        var apiKey = apiKeyRepository.findForUpdateByIdAndTenantId(apiKeyId, tenantId)
                 .orElseThrow(() -> new IntegrationNotFoundException("API Key was not found"));
+        if (apiKey.isDeleted()) {
+            throw new IntegrationNotFoundException("API Key was not found");
+        }
+        return apiKey;
     }
 
     private Set<UUID> validateLocations(Set<UUID> locationIds, UUID tenantId) {

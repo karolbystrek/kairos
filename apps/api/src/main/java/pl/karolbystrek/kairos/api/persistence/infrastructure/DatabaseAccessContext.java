@@ -54,13 +54,13 @@ public class DatabaseAccessContext {
     private void integration(ApiKeyPrincipal principal, String scope) {
         requireTransaction();
         if (principal == null || !Boolean.TRUE.equals(database.queryForObject(
-                "SELECT public.valid_integration(?, ?, ?, ?, ?::text[], ?::uuid[], ?)", Boolean.class,
-                principal.apiKeyVersionId(), principal.apiKeyId(), principal.integrationId(), principal.tenantId(),
+                "SELECT public.valid_integration(?, ?, ?, ?::text[], ?::uuid[], ?)", Boolean.class,
+                principal.apiKeyId(), principal.integrationId(), principal.tenantId(),
                 principal.scopes().stream().map(Enum::name).sorted().collect(Collectors.joining(",", "{", "}")),
                 principal.locationIds().stream().map(UUID::toString).sorted().collect(Collectors.joining(",", "{", "}")), Timestamp.from(clock.instant())))) {
             throw new IntegrationAccessDeniedException("The API Key is not eligible");
         }
-        bind(scope, principal.apiKeyVersionId().toString(), "", "");
+        bind(scope, principal.apiKeyId().toString(), "", "");
     }
 
     public void registration(UUID tenantId, UUID accountId) {

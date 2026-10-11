@@ -33,7 +33,7 @@ public class DatabaseIsolationVerifier implements ApplicationRunner {
                 AND NOT EXISTS(SELECT 1 FROM (VALUES
                     ('tenants','arw'),('locations','arw'),('accounts','arw'),('location_assignments','arw'),
                     ('account_invitations','arw'),('external_integrations','arw'),('api_keys','arw'),
-                    ('api_key_scopes','adrw'),('api_key_versions','adrw'),('api_key_location_access','adrw'),
+                    ('api_key_scopes','adrw'),('api_key_location_access','adrw'),
                     ('webhook_subscriptions','arw'),('webhook_subscription_location_access','adrw'),
                     ('webhook_subscription_event_types','adrw'),('webhook_signing_secret_versions','adrw'),
                     ('orders','arw'),('order_history','ar'),('order_outbox_events','arw'),
@@ -43,11 +43,11 @@ public class DatabaseIsolationVerifier implements ApplicationRunner {
                     SELECT string_agg(p.polcmd::text,'' ORDER BY p.polcmd::text) FROM pg_policy p
                         WHERE p.polrelid=to_regclass('public.' || expected.table_name)))
                 AND (SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public'
-                    AND p.proname IN ('valid_staff','lock_staff_location','lock_account_location','api_key_authentication','valid_integration','staff_authentication','identity_conflict',
+                    AND p.proname IN ('valid_staff','lock_staff_location','lock_account_location','api_key_authentication','record_api_key_use','valid_integration','staff_authentication','identity_conflict',
                         'verify_push_subscription',
                         'count_push_enrollments','cancel_push_deliveries','next_webhook_fanout','next_push_fanout','next_webhook_delivery','next_push_delivery',
                         'next_expired_push_subscription','next_dormant_push_subscription','next_terminal_push_delivery',
-                        'next_purgeable_account','next_purgeable_location','next_finished_invitation','purge_retained','valid_worker'))=22
+                        'next_purgeable_account','next_purgeable_location','next_finished_invitation','purge_retained','valid_worker'))=23
                 AND NOT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
                     WHERE n.nspname IN ('kairos_security','public') AND p.prosecdef
                     AND (p.proowner=r.oid OR NOT has_function_privilege(current_user,p.oid,'EXECUTE')

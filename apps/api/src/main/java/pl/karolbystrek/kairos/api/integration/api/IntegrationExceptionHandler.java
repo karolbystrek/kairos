@@ -19,8 +19,7 @@ import pl.karolbystrek.kairos.api.integration.application.exception.InvalidInteg
 @Order(Ordered.HIGHEST_PRECEDENCE)
 @RestControllerAdvice(basePackageClasses = {
         ExternalIntegrationController.class,
-        ApiKeyController.class,
-        ApiKeyVersionController.class
+        ApiKeyController.class
 })
 class IntegrationExceptionHandler {
 

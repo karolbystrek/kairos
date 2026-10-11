@@ -251,8 +251,7 @@ public class ExternalOrderService {
     private static OrderInitiator integrationInitiator(ApiKeyPrincipal principal) {
         return OrderInitiator.integration(
                 principal.integrationId(),
-                principal.apiKeyId(),
-                principal.apiKeyVersionId()
+                principal.apiKeyId()
         );
     }
 

@@ -8,18 +8,18 @@ import java.time.Duration;
 
 @Validated
 @ConfigurationProperties("kairos.external-integrations")
-public record ExternalIntegrationProperties(Duration apiKeyRotationGrace) {
+public record ExternalIntegrationProperties(Duration apiKeyUsageRefresh) {
 
-    private static final Duration DEFAULT_API_KEY_ROTATION_GRACE = Duration.ofHours(24);
+    private static final Duration DEFAULT_API_KEY_USAGE_REFRESH = Duration.ofHours(1);
 
     public ExternalIntegrationProperties {
-        apiKeyRotationGrace = apiKeyRotationGrace == null
-                ? DEFAULT_API_KEY_ROTATION_GRACE
-                : apiKeyRotationGrace;
+        apiKeyUsageRefresh = apiKeyUsageRefresh == null
+                ? DEFAULT_API_KEY_USAGE_REFRESH
+                : apiKeyUsageRefresh;
     }
 
-    @AssertTrue(message = "API Key rotation grace must be positive")
-    public boolean isApiKeyRotationGracePositive() {
-        return apiKeyRotationGrace != null && apiKeyRotationGrace.isPositive();
+    @AssertTrue(message = "API Key usage refresh must be positive")
+    public boolean isApiKeyUsageRefreshPositive() {
+        return apiKeyUsageRefresh != null && apiKeyUsageRefresh.isPositive();
     }
 }

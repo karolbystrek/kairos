@@ -14,21 +14,30 @@ distinct credential model. Tenant administrators can create, rename, disable,
 re-enable, and archive integrations after signing in. Tenant registration
 creates no integration, API Key, subscription, or secret.
 
-An integration may independently own API Keys and webhook subscriptions. Each
-stable, named API Key has immutable scopes, access to one or more current tenant
-locations, and an optional immutable expiration. `orders:write` includes
-`orders:read`. Keys can be revoked immediately and irreversibly. Rotation
-creates a new secret version while the immediately preceding version remains
-valid for a configured 24-hour grace period. The full high-entropy
-secret is revealed once and only a non-reversible hash is stored. One-time
-secret presentation keeps the copy control beside the secret, temporarily
-replaces it with a completion mark after copying, and uses a right-aligned
-**Confirm** action to leave the locked state. API Key version history opens in
-a focused modal rather than expanding inside integration configuration.
+An integration may independently own API Keys and webhook subscriptions. API
+Key management deliberately follows the create-and-delete model of GitHub
+personal access tokens. Each named API Key has exactly one secret, immutable
+scopes, access to one or more current tenant locations, and an optional
+immutable expiration. `orders:write` includes `orders:read`. There is no manual
+rotation, secret versioning, grace period, or enable/disable switch for a key;
+an administrator replaces a key by creating a new one and deleting the old one.
+Deleting a key is immediate and irreversible: it stops authenticating and
+disappears from management, while its record is retained so order history keeps
+identifying it, and its name becomes available again. An integration's own
+enable/disable switch still stops all of its keys and webhooks at once.
+
+The full high-entropy secret is revealed once and only a non-reversible hash is
+stored. One-time secret presentation keeps the copy control beside the secret,
+temporarily replaces it with a completion mark after copying, and uses a
+right-aligned **Confirm** action to leave the locked state. Each key shows when
+it was last used for an authenticated request, or that it has not been used
+yet. The time is refreshed at most once per configured interval (one hour by
+default) per key, so it is approximate and authentication rarely writes to the
+database.
 
 An API Key's location grants cannot be edited through API Key management.
 Irreversible Location Delete is the sole cascade that removes an archived
-location from an existing key; a key left without a location is revoked.
+location from an existing key; a key left without a location is deleted.
 
 The versioned external order API supports cursor-paginated listing, direct
 lookup, idempotent creation, and idempotent desired-state updates. Authorization

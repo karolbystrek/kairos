@@ -4,7 +4,11 @@ import lombok.NonNull;
 
 public record IssuedApiKeyView(
         @NonNull ApiKeyView apiKey,
-        @NonNull ApiKeyVersionView version,
         @NonNull String secret
 ) {
+
+    @Override
+    public String toString() {
+        return "IssuedApiKeyView[apiKey=" + apiKey + ", secret=[REDACTED]]";
+    }
 }

@@ -197,9 +197,9 @@ class LocationServiceIntegrationTests extends RedisListenerIsolatedIntegrationTe
             Integer.class,
             target.id()
         )).isZero();
-        assertThat(value("api_keys", "revoked_at", integration.singleLocationKeyId()))
+        assertThat(value("api_keys", "deleted_at", integration.singleLocationKeyId()))
             .isNotNull();
-        assertThat(value("api_keys", "revoked_at", integration.multiLocationKeyId()))
+        assertThat(value("api_keys", "deleted_at", integration.multiLocationKeyId()))
             .isNull();
         assertThat(value("webhook_subscriptions", "status", integration.singleLocationSubscriptionId()))
             .isEqualTo("ARCHIVED");
@@ -457,14 +457,15 @@ class LocationServiceIntegrationTests extends RedisListenerIsolatedIntegrationTe
         jdbcTemplate.update(
             """
             INSERT INTO api_keys (
-                id, integration_id, tenant_id, name, normalized_name, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?)
+                id, integration_id, tenant_id, name, normalized_name, secret_hash, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
             id,
             integrationId,
             tenantId,
             name,
             normalizedName,
+            "%064x".formatted(id.getMostSignificantBits() & Long.MAX_VALUE),
             Timestamp.from(Instant.now())
         );
         jdbcTemplate.update(

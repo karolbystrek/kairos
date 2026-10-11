@@ -14,7 +14,7 @@ public record ApiKeyResponse(
         List<String> scopes,
         List<UUID> locationIds,
         Instant expiresAt,
-        Instant revokedAt,
+        Instant lastUsedAt,
         Instant createdAt
 ) {
 
@@ -27,7 +27,7 @@ public record ApiKeyResponse(
                 apiKey.scopes(),
                 apiKey.locationIds(),
                 apiKey.expiresAt(),
-                apiKey.revokedAt(),
+                apiKey.lastUsedAt(),
                 apiKey.createdAt()
         );
     }

@@ -5,8 +5,13 @@ import lombok.NonNull;
 import java.util.UUID;
 
 public record IssuedApiKeyCredential(
-        @NonNull UUID versionId,
+        @NonNull UUID apiKeyId,
         @NonNull String value,
         @NonNull String hash
 ) {
+
+    @Override
+    public String toString() {
+        return "IssuedApiKeyCredential[apiKeyId=" + apiKeyId + ", value=[REDACTED], hash=[REDACTED]]";
+    }
 }

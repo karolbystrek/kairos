@@ -60,7 +60,6 @@ public class SecurityConfig {
         source.registerCorsConfiguration("/orders/**", panelConfiguration);
         source.registerCorsConfiguration("/external-integrations/**", panelConfiguration);
         source.registerCorsConfiguration("/api-keys/**", panelConfiguration);
-        source.registerCorsConfiguration("/api-key-versions/**", panelConfiguration);
         source.registerCorsConfiguration("/webhook-subscriptions/**", panelConfiguration);
         source.registerCorsConfiguration("/webhook-signing-secrets/**", panelConfiguration);
         return source;
@@ -157,7 +156,6 @@ public class SecurityConfig {
                                 "/orders/v1/**",
                                 "/external-integrations/v1/**",
                                 "/api-keys/v1/**",
-                                "/api-key-versions/v1/**",
                                 "/webhook-subscriptions/v1/**",
                                 "/webhook-signing-secrets/v1/**"
                         ).hasRole("TENANT_ACCOUNT")

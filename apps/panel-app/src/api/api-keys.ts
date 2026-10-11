@@ -1,17 +1,9 @@
 import { z } from "zod";
 
-import { request } from "./api-fetch";
+import { apiFetch, request } from "./api-fetch";
 import { managedIntegrationNameSchema } from "./integrations";
 
 export const apiKeyScopeSchema = z.enum(["orders:read", "orders:write"]);
-
-export const apiKeyVersionSchema = z.object({
-  id: z.uuid(),
-  apiKeyId: z.uuid(),
-  issuedAt: z.iso.datetime({ offset: true }),
-  validUntil: z.iso.datetime({ offset: true }).nullable(),
-  retiredAt: z.iso.datetime({ offset: true }).nullable(),
-});
 
 export const apiKeySchema = z.object({
   id: z.uuid(),
@@ -21,12 +13,11 @@ export const apiKeySchema = z.object({
   scopes: z.array(apiKeyScopeSchema),
   locationIds: z.array(z.uuid()),
   expiresAt: z.iso.datetime({ offset: true }).nullable(),
-  revokedAt: z.iso.datetime({ offset: true }).nullable(),
+  lastUsedAt: z.iso.datetime({ offset: true }).nullable(),
   createdAt: z.iso.datetime({ offset: true }),
 });
 
 const apiKeysSchema = z.array(apiKeySchema);
-const apiKeyVersionsSchema = z.array(apiKeyVersionSchema);
 
 const issueApiKeyInputSchema = z.object({
   name: managedIntegrationNameSchema,
@@ -37,21 +28,13 @@ const issueApiKeyInputSchema = z.object({
 
 const issuedApiKeySchema = z.object({
   apiKey: apiKeySchema,
-  version: apiKeyVersionSchema,
-  secret: z.string().min(1),
-});
-
-const issuedApiKeyVersionSchema = z.object({
-  version: apiKeyVersionSchema,
   secret: z.string().min(1),
 });
 
 export type ApiKeyScope = z.infer<typeof apiKeyScopeSchema>;
-export type ApiKeyVersion = z.infer<typeof apiKeyVersionSchema>;
 export type ApiKey = z.infer<typeof apiKeySchema>;
 export type IssueApiKeyInput = z.input<typeof issueApiKeyInputSchema>;
 export type IssuedApiKey = z.infer<typeof issuedApiKeySchema>;
-export type IssuedApiKeyVersion = z.infer<typeof issuedApiKeyVersionSchema>;
 
 export function listApiKeys(integrationId: string): Promise<ApiKey[]> {
   const search = new URLSearchParams({ integrationId });
@@ -72,22 +55,8 @@ export function issueApiKey(
   });
 }
 
-export function revokeApiKey(apiKeyId: string): Promise<ApiKey> {
-  return request(`/api/api-keys/v1/${apiKeyId}/revocation`, apiKeySchema, {
-    method: "PUT",
-  });
-}
-
-export function listApiKeyVersions(apiKeyId: string): Promise<ApiKeyVersion[]> {
-  const search = new URLSearchParams({ apiKeyId });
-
-  return request(`/api/api-key-versions/v1?${search}`, apiKeyVersionsSchema);
-}
-
-export function rotateApiKey(apiKeyId: string): Promise<IssuedApiKeyVersion> {
-  return request("/api/api-key-versions/v1", issuedApiKeyVersionSchema, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ apiKeyId }),
+export async function deleteApiKey(apiKeyId: string): Promise<void> {
+  await apiFetch(`/api/api-keys/v1/${apiKeyId}`, {
+    method: "DELETE",
   });
 }
