@@ -72,6 +72,13 @@ short name. Its stable application ID and scope cover the complete customer
 origin. The scanner default page uses the ordinary root start URL. An order page
 exposes an order-aware manifest with the same stable identity and a start URL that enters
 through the root route with only the tracking reference required for bootstrap.
+The manifest asks supporting browsers to reuse an open installed window for
+in-scope links (`launch_handler` `navigate-existing`). iOS and iPadOS never open
+the Home Screen app from links, so a QR code scanned with the Camera app always
+opens Safari; Android opens it in the app only when installed as a full Chrome
+app and the camera hands the link to the system. On Apple mobile devices, the
+installed scanner default page and the installation guide therefore tell
+customers to scan later orders inside Kairos.
 
 An installation initiated from an order page opens that order on the first
 installed launch while retaining one stable Kairos application identity and
