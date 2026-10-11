@@ -41,6 +41,47 @@ CREATE UNIQUE INDEX locations_tenant_live_name_key ON locations (tenant_id, norm
 
 CREATE INDEX locations_tenant_status_idx ON locations (tenant_id, status, normalized_name, id);
 
+CREATE TABLE menus
+(
+    id              UUID PRIMARY KEY,
+    tenant_id       UUID                     NOT NULL REFERENCES tenants (id),
+    name            VARCHAR(120)             NOT NULL,
+    normalized_name VARCHAR(240)             NOT NULL,
+    created_at      TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at      TIMESTAMP WITH TIME ZONE NOT NULL,
+    CONSTRAINT menus_name_not_blank_check CHECK (TRIM(name) <> ''),
+    CONSTRAINT menus_name_stripped_check CHECK (name = TRIM(name)),
+    CONSTRAINT menus_updated_at_check CHECK (updated_at >= created_at),
+    CONSTRAINT menus_id_tenant_key UNIQUE (id, tenant_id),
+    CONSTRAINT menus_tenant_name_key UNIQUE (tenant_id, normalized_name)
+);
+
+CREATE TABLE menu_items
+(
+    menu_id  UUID        NOT NULL REFERENCES menus (id) ON DELETE CASCADE,
+    position INTEGER     NOT NULL,
+    name     VARCHAR(60) NOT NULL,
+    PRIMARY KEY (menu_id, position),
+    CONSTRAINT menu_items_position_check CHECK (position >= 0),
+    CONSTRAINT menu_items_name_not_blank_check CHECK (TRIM(name) <> ''),
+    CONSTRAINT menu_items_name_stripped_check CHECK (name = TRIM(name))
+);
+
+-- A location uses at most one tenant menu; a menu in use cannot be deleted.
+CREATE TABLE location_menus
+(
+    location_id UUID PRIMARY KEY,
+    tenant_id   UUID                     NOT NULL,
+    menu_id     UUID                     NOT NULL,
+    updated_at  TIMESTAMP WITH TIME ZONE NOT NULL,
+    CONSTRAINT location_menus_location_fk FOREIGN KEY (location_id, tenant_id)
+        REFERENCES locations (id, tenant_id) ON DELETE CASCADE,
+    CONSTRAINT location_menus_menu_fk FOREIGN KEY (menu_id, tenant_id)
+        REFERENCES menus (id, tenant_id)
+);
+
+CREATE INDEX location_menus_menu_idx ON location_menus (menu_id);
+
 CREATE TABLE external_integrations
 (
     id              UUID PRIMARY KEY,
@@ -357,7 +398,7 @@ CREATE TABLE orders
     id                           UUID PRIMARY KEY,
     location_id                  UUID                     NOT NULL REFERENCES locations (id),
     tracking_reference           UUID                     NOT NULL UNIQUE,
-    label                        VARCHAR(32)              NOT NULL,
+    label                        VARCHAR(200)             NOT NULL,
     status                       VARCHAR(32)              NOT NULL,
     external_integration_id      UUID REFERENCES external_integrations (id),
     external_idempotency_key     VARCHAR(255),
@@ -876,6 +917,21 @@ ALTER TABLE locations ENABLE ROW LEVEL SECURITY;
 CREATE POLICY scoped_select ON locations FOR SELECT USING (kairos_security.invitation_access(location=>id) OR kairos_security.staff_location(id) OR kairos_security.integration_location(id,false) OR EXISTS(SELECT 1 FROM orders o WHERE o.location_id=locations.id AND kairos_security.order_access(o.id,false,true)));
 CREATE POLICY scoped_insert ON locations FOR INSERT WITH CHECK (kairos_security.staff_tenant(tenant_id,true));
 CREATE POLICY scoped_update ON locations FOR UPDATE USING (kairos_security.invitation_access(location=>id) OR kairos_security.staff_location(id) OR kairos_security.integration_location(id,false) OR EXISTS(SELECT 1 FROM orders o WHERE o.location_id=locations.id AND kairos_security.order_access(o.id,false,true))) WITH CHECK (kairos_security.staff_tenant(tenant_id,true));
+ALTER TABLE menus ENABLE ROW LEVEL SECURITY;
+CREATE POLICY scoped_select ON menus FOR SELECT USING (kairos_security.staff_tenant(tenant_id));
+CREATE POLICY scoped_insert ON menus FOR INSERT WITH CHECK (kairos_security.staff_tenant(tenant_id,true));
+CREATE POLICY scoped_update ON menus FOR UPDATE USING (kairos_security.staff_tenant(tenant_id,true)) WITH CHECK (kairos_security.staff_tenant(tenant_id,true));
+CREATE POLICY scoped_delete ON menus FOR DELETE USING (kairos_security.staff_tenant(tenant_id,true));
+ALTER TABLE menu_items ENABLE ROW LEVEL SECURITY;
+CREATE POLICY scoped_select ON menu_items FOR SELECT USING (EXISTS(SELECT 1 FROM menus m WHERE m.id=menu_id AND kairos_security.staff_tenant(m.tenant_id)));
+CREATE POLICY scoped_insert ON menu_items FOR INSERT WITH CHECK (EXISTS(SELECT 1 FROM menus m WHERE m.id=menu_id AND kairos_security.staff_tenant(m.tenant_id,true)));
+CREATE POLICY scoped_update ON menu_items FOR UPDATE USING (EXISTS(SELECT 1 FROM menus m WHERE m.id=menu_id AND kairos_security.staff_tenant(m.tenant_id,true))) WITH CHECK (EXISTS(SELECT 1 FROM menus m WHERE m.id=menu_id AND kairos_security.staff_tenant(m.tenant_id,true)));
+CREATE POLICY scoped_delete ON menu_items FOR DELETE USING (EXISTS(SELECT 1 FROM menus m WHERE m.id=menu_id AND kairos_security.staff_tenant(m.tenant_id,true)));
+ALTER TABLE location_menus ENABLE ROW LEVEL SECURITY;
+CREATE POLICY scoped_select ON location_menus FOR SELECT USING (kairos_security.staff_location(location_id));
+CREATE POLICY scoped_insert ON location_menus FOR INSERT WITH CHECK (kairos_security.staff_location(location_id,true));
+CREATE POLICY scoped_update ON location_menus FOR UPDATE USING (kairos_security.staff_location(location_id,true)) WITH CHECK (kairos_security.staff_location(location_id,true));
+CREATE POLICY scoped_delete ON location_menus FOR DELETE USING (kairos_security.staff_location(location_id,true));
 ALTER TABLE accounts ENABLE ROW LEVEL SECURITY;
 CREATE POLICY scoped_select ON accounts FOR SELECT USING (kairos_security.account_access(id,tenant_id)
     OR kairos_security.new_account(id,tenant_id) OR kairos_security.invitation_access(tenant=>tenant_id,issuer=>id));
@@ -1092,6 +1148,7 @@ BEGIN
         DELETE FROM public.account_invitations i WHERE i.location_id=resource;
         DELETE FROM public.api_key_location_access g WHERE g.location_id=resource;
         DELETE FROM public.webhook_subscription_location_access g WHERE g.location_id=resource;
+        DELETE FROM public.location_menus x WHERE x.location_id=resource;
         DELETE FROM public.locations l WHERE l.id=resource;
     ELSE
         DELETE FROM public.account_invitations i WHERE i.id=resource;
@@ -1126,6 +1183,9 @@ BEGIN
     RETURN NEW;
 END $$;
 CREATE TRIGGER stable_ownership BEFORE UPDATE ON locations FOR EACH ROW EXECUTE FUNCTION kairos_security.stable_ownership('id','tenant_id');
+CREATE TRIGGER stable_ownership BEFORE UPDATE ON menus FOR EACH ROW EXECUTE FUNCTION kairos_security.stable_ownership('id','tenant_id');
+CREATE TRIGGER stable_ownership BEFORE UPDATE ON menu_items FOR EACH ROW EXECUTE FUNCTION kairos_security.stable_ownership('menu_id');
+CREATE TRIGGER stable_ownership BEFORE UPDATE ON location_menus FOR EACH ROW EXECUTE FUNCTION kairos_security.stable_ownership('location_id','tenant_id');
 CREATE TRIGGER stable_ownership BEFORE UPDATE ON accounts FOR EACH ROW EXECUTE FUNCTION kairos_security.stable_ownership('id','tenant_id','provider_subject','email','tenant_role');
 CREATE TRIGGER stable_ownership BEFORE UPDATE ON location_assignments FOR EACH ROW EXECUTE FUNCTION kairos_security.stable_ownership('account_id','location_id','tenant_id','role');
 CREATE TRIGGER stable_ownership BEFORE UPDATE ON account_invitations FOR EACH ROW EXECUTE FUNCTION kairos_security.stable_ownership('id','tenant_id','location_id','issued_by_account_id','assignment_role','token_hash');
@@ -1172,7 +1232,7 @@ REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM PUBLIC;
 REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA kairos_security FROM PUBLIC;
 REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA public FROM PUBLIC;
 GRANT USAGE ON SCHEMA public,kairos_security TO "${runtimeUser}";
-GRANT SELECT,INSERT,UPDATE,DELETE ON tenants,locations,accounts,location_assignments,account_invitations,
+GRANT SELECT,INSERT,UPDATE,DELETE ON tenants,locations,menus,menu_items,location_menus,accounts,location_assignments,account_invitations,
     external_integrations,api_keys,api_key_scopes,api_key_location_access,
     webhook_subscriptions,webhook_subscription_location_access,webhook_subscription_event_types,webhook_signing_secret_versions,
     orders,order_history,order_outbox_events,webhook_deliveries,webhook_delivery_signing_versions,

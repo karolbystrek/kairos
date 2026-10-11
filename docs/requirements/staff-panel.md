@@ -21,7 +21,10 @@ The staff panel must:
 * show only locations and orders accessible to the account;
 * allow tenant administrators to switch between locations or view an aggregate queue;
 * create labeled orders for an accessible location and display their customer QR codes;
-* offer automatic labels by default and allow a custom label before creation;
+* offer automatic labels by default and allow a custom label or items from the
+  location's active [menu](menus.md) before creation;
+* allow tenant administrators to manage tenant menus and choose each location's
+  active menu, and location managers to choose their own location's menu;
 * display and refresh only active order queues by location;
 * allow only valid order transitions permitted by the account's role;
 * allow tenant administrators to issue account invitations for location
@@ -59,7 +62,7 @@ capabilities must not compete with frequent order creation, QR presentation,
 or valid order transitions merely because they are available to the signed-in
 account.
 
-Orders, Locations, Accounts, and Integrations use one adaptive tab-style
+Orders, Locations, Menu, Accounts, and Integrations use one adaptive tab-style
 navigation system: a centered rounded segmented control on tablet and desktop and bottom
 navigation on narrow mobile layouts. Only authorized destinations are present.
 An administrator with no non-archived location first sees the required
@@ -96,10 +99,14 @@ icon-and-text creation action at the start of the active workspace. Its focused
 sheet contains one optional label field whose
 placeholder communicates the automatic default; leaving it empty requests an
 automatic label and entering text requests a custom label, without a separate
-mode selector. Successful creation continues directly into a large,
+mode selector. When the location has an active menu, the sheet also lists its
+items; tapping an item selects it with quantity 1, tapping it again removes
+it, and add and remove controls change the quantity, with a preview of the
+resulting label;
+choosing any item disables the custom label field. Successful creation continues directly into a large,
 dismissible customer QR sheet; explicitly requesting an existing order's QR
 uses the same presentation. The underlying queue remains visible to preserve
-context. The Orders, Locations, Accounts, and Integrations creation actions
+context. The Orders, Locations, Menu, Accounts, and Integrations creation actions
 share one 44-pixel control height, an icon with Polish text, an accessible name
 and a pointer tooltip above the workspace content on every layout. Repeated Orders, Locations, Accounts and
 Integrations titles are visually hidden; the selected navigation tab identifies

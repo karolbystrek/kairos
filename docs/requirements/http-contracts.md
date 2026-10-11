@@ -154,10 +154,16 @@ POST   /api/external/orders/v1
 PUT    /api/external/orders/v1/{orderId}/status
 ```
 
+Tenant menus use `/api/menus/v1` with list, create, `PUT /{menuId}` and
+`DELETE /{menuId}`; a location's active menu is read and replaced with `GET`
+and `PUT /api/locations/v1/{locationId}/menu`; the request carries a nullable
+`menuId` and the response a nullable `menu`. See [menus](menus.md).
+
 Staff order listing accepts an optional `locationId` and active `status`.
 External listing accepts an opaque cursor plus optional authorized
 `locationId` and `status`. Order creation carries `locationId` and an optional
-custom label in its validated body. External creation additionally requires
+custom label in its validated body; staff creation may instead carry `items`,
+each with a menu-item `name` and `quantity`. External creation additionally requires
 `Idempotency-Key`. Desired-state updates use idempotent `PUT`; a same-state
 request returns the unchanged representation without another history, customer
 event, or outbox event.

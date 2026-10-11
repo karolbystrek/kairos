@@ -48,7 +48,12 @@ class OrderController {
             @AuthenticationPrincipal StaffPrincipal principal,
             @Valid @RequestBody CreateOrderRequest request
     ) {
-        var order = orderService.createOrder(principal, request.locationId(), request.label());
+        var order = orderService.createOrder(
+                principal,
+                request.locationId(),
+                request.label(),
+                request.itemSelections()
+        );
         return StaffOrderResponse.from(order);
     }
 
