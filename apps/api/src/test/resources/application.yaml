@@ -46,6 +46,11 @@ kairos:
       delivery-poll-delay: 500ms
       initial-delay: 24h
     destination-policy: LOCAL_DEVELOPMENT
+  retention:
+    grace-period: 30d
+    batch-size: 10
+    purge-delay: 1h
+    purge-initial-delay: 24h
   customer-notifications:
     vapid:
       public-key-location: "classpath:keys/test-vapid-public.pem"

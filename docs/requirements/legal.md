@@ -90,11 +90,18 @@ them. The trade-off is that customers who close the app never see it.
 - Push subscriptions are removed 30 days after their last enrollment or on
   opt-out; delivery rows are kept for 7–30 days (see
   [resilience](resilience.md)).
-- Orders, accounts (including archived accounts' reserved emails) and security
-  events are kept until the end of the test period. The notices commit to
-  deleting all data within 30 days after the test period ends, or within 30
-  days of a restaurant's deletion request (Regulamin § 5 and § 8). Panel
-  Account/Location Delete only archives, so both are manual operator actions.
+- Account and Location Delete block access immediately. Thirty days later the
+  [retention purge](resilience.md#retention-purge) deletes the account with its
+  ZITADEL identity and invitations, or the location with its orders and push
+  data. Until then an archived account's email stays reserved.
+- Security events: invitations are deleted 30 days after they end, staff
+  sessions expire after 30 idle days, and production logs rotate at three
+  10 MB files per service.
+- Other orders and accounts are kept until the end of the test period. The
+  notices commit to deleting all data within 30 days after the test period
+  ends, or within 30 days of a restaurant's deletion request (Regulamin § 5 and
+  § 8); deleting a whole restaurant or an administrator account is a manual
+  operator action.
 - No backups are taken; the Regulamin states that data may be lost.
 
 ## Launch blockers
@@ -102,16 +109,16 @@ them. The trade-off is that customers who close the app never see it.
 - Replace the placeholders in `apps/*/src/legal/operator.ts`: correspondence
   address, effective date and test-period end date.
 - Have a lawyer review the three documents and the open questions below.
-- Delete all data within 30 days after the test period ends, and a
-  restaurant's data within 30 days of its request, as promised.
+- Delete all data within 30 days after the test period ends, and a whole
+  restaurant's data within 30 days of its request, as promised (manual).
 
 ## Open questions for legal review
 
 - Whether the operator is a joint or independent controller for push
   subscriptions, since one browser subscription can span orders from several
   restaurants.
-- Whether retaining archived accounts' emails until the end of the test period
-  meets the storage-limitation principle.
+- Whether ZITADEL's event store, which keeps events of deleted users, needs
+  its own retention limit.
 - Whether a browser-only terms checkbox is sufficient evidence of acceptance,
   or acceptance should be recorded server-side.
 - Confirm the cited PKE provisions (art. 398 and art. 399 ust. 3) against

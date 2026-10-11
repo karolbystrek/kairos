@@ -5,6 +5,7 @@
 - [Resilience and consistency](#resilience-and-consistency)
 - [Contents](#contents)
 - [8. Resilience and Consistency](#8-resilience-and-consistency)
+  - [Retention purge](#retention-purge)
 
 ## 8. Resilience and Consistency
 
@@ -32,4 +33,25 @@
   30 days. Unenrolled dormant subscriptions are removed after 30 days by
   default.
 * An order remains associated with its original location for its entire lifecycle and history.
-* Terminal orders remain readable to the holder of the tracking reference according to the configured retention policy but cannot re-enter an active lifecycle.
+* Terminal orders remain readable to the holder of the tracking reference until the [retention purge](#retention-purge) of an archived location, but cannot re-enter an active lifecycle.
+
+### Retention purge
+
+* An hourly worker erases deleted data after a grace period of 30 days by
+  default (`kairos.retention.grace-period`). An archived account is removed with
+  its ZITADEL identity, assignment and the invitations it issued or redeemed.
+  The identity is deleted first; a missing identity counts as deleted, and a
+  provider failure defers the account to a later cycle.
+* An archived location is removed once no account is assigned to it, together
+  with its orders, order history, outbox events, webhook and push deliveries,
+  push enrollments, invitations and remaining integration selections.
+* Finished invitations are deleted 30 days after revocation or expiry.
+* Each item is discovered with `FOR UPDATE SKIP LOCKED` and erased in its own
+  transaction by a guarded `SECURITY DEFINER` function, so row policies stay
+  closed to deletion.
+* Deleting a whole tenant or an administrator account remains a manual request.
+* Security events: staff sessions expire after 30 idle days and Spring Session
+  removes expired rows. Production container logs, which hold IP addresses and
+  security events, rotate at three 10 MB files per service
+  (`compose.deployment.yaml`). ZITADEL keeps its own event store, including
+  events of deleted users, under its own retention behaviour.

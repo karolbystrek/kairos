@@ -68,6 +68,11 @@ kairos:
     destination-policy: "${WEBHOOK_DESTINATION_POLICY:PUBLIC_HTTPS}"
   review-invitations:
     delay: "${REVIEW_INVITATION_DELAY:30m}"
+  retention:
+    grace-period: 30d
+    batch-size: 50
+    purge-delay: 1h
+    purge-initial-delay: 10m
   customer-notifications:
     vapid:
       public-key-location: "file:/run/secrets/vapid-public.pem"

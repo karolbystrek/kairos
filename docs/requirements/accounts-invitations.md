@@ -106,11 +106,14 @@ increment.
 Deleting a manageable member Account is an irreversible archival operation,
 not physical row deletion. It removes the account from ordinary management,
 invalidates earlier authentication and revokes every pending
-invitation it issued, and retains its stable identity, provider subject, email,
-and historical attribution. Archived email addresses remain reserved,
-and an archived account cannot authenticate, be enabled, or be restored. Delete
-may transition an enabled or disabled account directly to archived and applies
-all shutdown effects atomically.
+invitation it issued, and retains its stable identity, provider subject and
+email for the [retention grace period](resilience.md#retention-purge). During
+that period the email address remains reserved, and an archived account cannot
+authenticate, be enabled, or be restored. Delete may transition an enabled or
+disabled account directly to archived and applies all shutdown effects
+atomically. After the grace period the account, its provider identity, its
+assignment and the invitations it issued or redeemed are deleted; order history
+keeps only the account's random ID as attribution.
 
 Account Delete uses the same authorization boundary as account status
 management. A tenant administrator may delete a manageable member account in
