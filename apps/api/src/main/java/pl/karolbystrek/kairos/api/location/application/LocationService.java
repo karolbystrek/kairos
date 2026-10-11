@@ -27,6 +27,7 @@ import pl.karolbystrek.kairos.api.location.domain.Location;
 import pl.karolbystrek.kairos.api.location.domain.LocationStatus;
 import pl.karolbystrek.kairos.api.location.domain.ManagedLocationName;
 import pl.karolbystrek.kairos.api.location.infrastructure.persistence.LocationRepository;
+import pl.karolbystrek.kairos.api.menu.infrastructure.persistence.LocationMenuRepository;
 import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
 import pl.karolbystrek.kairos.api.order.infrastructure.persistence.CustomerOrderRepository;
 import pl.karolbystrek.kairos.api.tenant.infrastructure.persistence.TenantRepository;
@@ -56,6 +57,7 @@ public class LocationService {
     private final ApiKeyRepository apiKeyRepository;
     private final WebhookSubscriptionRepository subscriptionRepository;
     private final WebhookSubscriptionLocationAccessRepository subscriptionLocationRepository;
+    private final LocationMenuRepository locationMenuRepository;
     private final Clock clock;
 
     @Transactional(readOnly = true)
@@ -245,6 +247,7 @@ public class LocationService {
             AccountInvitationRevocationReason.LOCATION_ARCHIVED
         );
         removeIntegrationSelections(location, now);
+        locationMenuRepository.findById(location.getId()).ifPresent(locationMenuRepository::delete);
         location.archive(now);
         accountRepository.flush();
         locationRepository.flush();

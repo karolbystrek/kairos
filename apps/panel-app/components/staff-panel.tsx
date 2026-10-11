@@ -16,6 +16,7 @@ import {
   ClipboardList as OrdersIcon,
   UserRound as AccountIcon,
   MapPin as LocationsIcon,
+  UtensilsCrossed as MenuIcon,
   Users as TeamIcon,
   Workflow as IntegrationIcon,
   X as CloseIcon,
@@ -34,6 +35,7 @@ import { AuthFormLayout } from "@/components/auth-form-layout";
 import { IntegrationManagement } from "@/components/integration-management";
 import { LocationCreationModal } from "@/components/location-creation-modal";
 import { LocationManagement } from "@/components/location-management";
+import { MenuManagement } from "@/components/menu-management";
 import { PasswordChangeDialog } from "@/components/password-change-dialog";
 import { PanelAppearanceMenu } from "@/components/panel-appearance-menu";
 import { subscribeToAuthenticationRequired } from "@/src/api/auth-state";
@@ -268,7 +270,8 @@ export function StaffPanel({
   );
   const hasNoLocations = locations?.length === 0;
   const workspace =
-    hasNoLocations && ["accounts", "integrations"].includes(selectedWorkspace)
+    hasNoLocations &&
+    ["menus", "accounts", "integrations"].includes(selectedWorkspace)
       ? "orders"
       : selectedWorkspace;
 
@@ -390,6 +393,10 @@ export function StaffPanel({
   const canManageIntegrations = account.capabilities.includes(
     "MANAGE_EXTERNAL_INTEGRATIONS",
   );
+  const canManageMenus = account.capabilities.includes("MANAGE_MENUS");
+  const canChooseLocationMenu = account.capabilities.includes(
+    "CHOOSE_LOCATION_MENU",
+  );
 
   if (canManageLocations && !locations) {
     return locationsError ? (
@@ -457,7 +464,10 @@ export function StaffPanel({
         </Alert>
       )}
 
-      {canManageAccounts || canManageLocations || canManageIntegrations ? (
+      {canManageAccounts ||
+      canManageLocations ||
+      canManageIntegrations ||
+      canChooseLocationMenu ? (
         <Tabs
           selectedKey={workspace}
           onSelectionChange={(key) => setSelectedWorkspace(String(key))}
@@ -481,6 +491,15 @@ export function StaffPanel({
                     <span className="tab-motion-content">
                       <LocationsIcon size={18} />
                       <span>Lokale</span>
+                    </span>
+                    <Tabs.Indicator />
+                  </Tabs.Tab>
+                )}
+                {canChooseLocationMenu && (
+                  <Tabs.Tab id="menus" isDisabled={hasNoLocations}>
+                    <span className="tab-motion-content">
+                      <MenuIcon size={18} />
+                      <span>Menu</span>
                     </span>
                     <Tabs.Indicator />
                   </Tabs.Tab>
@@ -530,6 +549,15 @@ export function StaffPanel({
                   setRequestedOrderLocationId(locationId);
                   setSelectedWorkspace("orders");
                 }}
+              />
+            </Tabs.Panel>
+          )}
+          {canChooseLocationMenu && (
+            <Tabs.Panel className="pt-6" id="menus">
+              <MenuManagement
+                key={`menus-${account.accountId}`}
+                accountId={account.accountId}
+                canManageMenus={canManageMenus}
               />
             </Tabs.Panel>
           )}

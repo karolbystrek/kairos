@@ -151,6 +151,7 @@ public class SecurityConfig {
                         ).authenticated()
                         .requestMatchers(
                                 "/locations/v1/**",
+                                "/menus/v1/**",
                                 "/accounts/v1/**",
                                 "/account-invitations/v1/**",
                                 "/orders/v1/**",

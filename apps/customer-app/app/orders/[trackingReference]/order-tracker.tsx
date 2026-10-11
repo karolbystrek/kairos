@@ -309,7 +309,7 @@ export function OrderTracker({
         aria-live="polite"
         className="flex flex-1 flex-col items-center justify-center py-12 text-center sm:py-16"
       >
-        <p className="text-sm secondary-text">
+        <p className="max-w-md break-words text-sm secondary-text">
           Zamówienie {displayedOrder.label}
         </p>
         <h1 className="status-title mt-4 max-w-[14ch]">

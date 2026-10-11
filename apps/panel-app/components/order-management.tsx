@@ -17,12 +17,22 @@ import { PanelPopup } from "@/components/panel-popup";
 import { FormSelect, FormTextField } from "@/components/form-controls";
 import { PanelCard } from "@/components/panel-card";
 import { LocationCreationModal } from "@/components/location-creation-modal";
+import {
+  OrderItemPicker,
+  type ItemQuantities,
+} from "@/components/order-item-picker";
 import { ApiError } from "@/src/api/api-fetch";
-import { staffCachePrefix, staffLocationsKey } from "@/src/api/cache-keys";
+import {
+  staffCachePrefix,
+  staffLocationMenuKey,
+  staffLocationsKey,
+} from "@/src/api/cache-keys";
 import { listLocations, type Location } from "@/src/api/locations";
+import { getLocationMenu } from "@/src/api/menus";
 import {
   createOrder as createOrderRequest,
   createOrderInputSchema,
+  describeOrderItems,
   listOrders,
   updateOrderStatus,
   type CreateOrderInput,
@@ -326,6 +336,8 @@ export function OrderManagement({
   const [cancelOrder, setCancelOrder] = useState<StaffOrder>();
   const [customLabel, setCustomLabel] = useState("");
   const [customLabelError, setCustomLabelError] = useState<string>();
+  const [itemsError, setItemsError] = useState<string>();
+  const [itemQuantities, setItemQuantities] = useState<ItemQuantities>({});
 
   const {
     data: locations = [],
@@ -382,6 +394,21 @@ export function OrderManagement({
     throwOnError: false,
   });
 
+  const {
+    data: createMenu,
+    error: createMenuError,
+    mutate: mutateCreateMenu,
+  } = useSWR(
+    isCreateOpen && createLocationId
+      ? staffLocationMenuKey(accountId, createLocationId)
+      : null,
+    ([, , , menuLocationId]) => getLocationMenu(menuLocationId),
+    { errorRetryCount: 3, shouldRetryOnError },
+  );
+  const selectedItems = (createMenu?.items ?? [])
+    .filter((item) => itemQuantities[item])
+    .map((item) => ({ name: item, quantity: itemQuantities[item] }));
+
   const ordersByStatus = useMemo(
     () => ({
       IN_PREPARATION: orders.filter(
@@ -405,6 +432,7 @@ export function OrderManagement({
       return;
     }
     resetCreateOrder();
+    setItemQuantities({});
     setCreateLocationId(locationId ?? enabledLocations[0]?.id);
     setIsCreateOpen(true);
   }
@@ -413,24 +441,36 @@ export function OrderManagement({
     event.preventDefault();
     if (!createLocationId || isCreatingOrder) return;
 
-    const input = customLabel.trim()
-      ? ({ mode: "CUSTOM", label: customLabel } as const)
-      : ({ mode: "AUTO" } as const);
+    const input =
+      selectedItems.length > 0
+        ? ({ mode: "ITEMS", items: selectedItems } as const)
+        : customLabel.trim()
+          ? ({ mode: "CUSTOM", label: customLabel } as const)
+          : ({ mode: "AUTO" } as const);
     const validation = createOrderInputSchema.safeParse(input);
 
     if (!validation.success) {
-      setCustomLabelError(validation.error.issues[0]?.message);
+      const message = validation.error.issues[0]?.message;
+
+      if (input.mode === "ITEMS") setItemsError(message);
+      else setCustomLabelError(message);
 
       return;
     }
 
     setCustomLabelError(undefined);
+    setItemsError(undefined);
     const order = await triggerCreateOrder({
       locationId: createLocationId,
       input: validation.data,
     });
 
-    if (!order) return;
+    if (!order) {
+      // A rejected selection usually means the menu changed; show its current items.
+      if (input.mode === "ITEMS") void mutateCreateMenu();
+
+      return;
+    }
 
     await mutateOrders(
       (current) => [
@@ -440,6 +480,7 @@ export function OrderManagement({
       { revalidate: false },
     );
     setCustomLabel("");
+    setItemQuantities({});
     setIsCreateOpen(false);
     setQrOrder(order);
     void mutateOrders(undefined, { throwOnError: false });
@@ -631,12 +672,45 @@ export function OrderManagement({
                 locations={enabledLocations}
                 selectedId={createLocationId}
                 showAll={false}
-                onChange={setCreateLocationId}
+                onChange={(nextLocationId) => {
+                  setCreateLocationId(nextLocationId);
+                  setItemQuantities({});
+                  setItemsError(undefined);
+                  setCustomLabelError(undefined);
+                }}
               />
+            )}
+            {createMenu && (
+              <OrderItemPicker
+                isDisabled={isCreatingOrder}
+                menu={createMenu}
+                quantities={itemQuantities}
+                onChange={(quantities) => {
+                  setItemQuantities(quantities);
+                  setItemsError(undefined);
+                }}
+              />
+            )}
+            {createMenuError && (
+              <p className="text-sm text-danger" role="alert">
+                Nie udało się wczytać menu lokalu. Możesz utworzyć zamówienie z
+                etykietą.
+              </p>
+            )}
+            {itemsError && (
+              <p className="text-sm text-danger" role="alert">
+                {itemsError}
+              </p>
+            )}
+            {selectedItems.length > 0 && (
+              <p className="break-words text-sm">
+                <span className="secondary-text">Etykieta: numer · </span>
+                {describeOrderItems(selectedItems)}
+              </p>
             )}
             <FormTextField
               fullWidth
-              isDisabled={isCreatingOrder}
+              isDisabled={isCreatingOrder || selectedItems.length > 0}
               isInvalid={Boolean(customLabelError)}
               label="Etykieta zamówienia (opcjonalnie)"
               maxLength={32}
@@ -684,7 +758,7 @@ export function OrderManagement({
         }}
       >
         <PanelPopup.Header className="justify-center px-16 pb-2">
-          <PanelPopup.Heading className="text-center text-lg font-medium tracking-normal secondary-text">
+          <PanelPopup.Heading className="break-words text-center text-lg font-medium tracking-normal secondary-text">
             {qrOrder?.label}
           </PanelPopup.Heading>
         </PanelPopup.Header>
