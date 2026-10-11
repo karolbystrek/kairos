@@ -599,7 +599,6 @@ CREATE INDEX webhook_delivery_signing_version_idx
 
 CREATE TABLE customer_push_deliveries
 (
-    kind VARCHAR(32) NOT NULL DEFAULT 'ORDER_STATUS' CHECK (kind IN ('ORDER_STATUS', 'REVIEW')),
     id                   UUID PRIMARY KEY,
     outbox_event_id      UUID                     NOT NULL REFERENCES order_outbox_events (id),
     subscription_id      UUID REFERENCES customer_push_subscriptions (id) ON DELETE SET NULL,
@@ -618,7 +617,7 @@ CREATE TABLE customer_push_deliveries
     outcome              VARCHAR(64),
     diagnostic           VARCHAR(1024),
     CONSTRAINT customer_push_deliveries_event_subscription_key
-        UNIQUE (outbox_event_id, subscription_id, kind),
+        UNIQUE (outbox_event_id, subscription_id),
     CONSTRAINT customer_push_deliveries_status_check CHECK (
         status IN (
             'PENDING',
@@ -1086,7 +1085,7 @@ CREATE TRIGGER stable_ownership BEFORE UPDATE ON order_outbox_events FOR EACH RO
 CREATE TRIGGER stable_ownership BEFORE UPDATE ON webhook_deliveries FOR EACH ROW EXECUTE FUNCTION kairos_security.stable_ownership('id','outbox_event_id','subscription_id','destination_url','payload');
 CREATE TRIGGER stable_ownership BEFORE UPDATE ON customer_push_subscriptions FOR EACH ROW EXECUTE FUNCTION kairos_security.stable_ownership('id','endpoint_hash','p256dh_key');
 CREATE TRIGGER stable_ownership BEFORE UPDATE ON customer_push_enrollments FOR EACH ROW EXECUTE FUNCTION kairos_security.stable_ownership('id','subscription_id','order_id');
-CREATE TRIGGER stable_ownership BEFORE UPDATE ON customer_push_deliveries FOR EACH ROW EXECUTE FUNCTION kairos_security.stable_ownership('id','outbox_event_id','order_id','kind');
+CREATE TRIGGER stable_ownership BEFORE UPDATE ON customer_push_deliveries FOR EACH ROW EXECUTE FUNCTION kairos_security.stable_ownership('id','outbox_event_id','order_id');
 
 CREATE FUNCTION kairos_security.consistent_relationships() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$

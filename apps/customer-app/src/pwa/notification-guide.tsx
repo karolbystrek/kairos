@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, Modal, Tooltip } from "@heroui/react";
+import { Button, Link, Modal, Tooltip } from "@heroui/react";
 import { Bell, Share, SquarePlus, X } from "lucide-react";
 
 import { useCustomerNotifications } from "@/src/pwa/notification-provider";
@@ -38,6 +38,17 @@ export function NotificationGuide() {
                   : "Włączyć powiadomienia?"}
               </Modal.Heading>
             </Modal.Header>
+            {!installationRequired && (
+              <Modal.Body>
+                <p className="text-sm text-muted">
+                  Powiadomimy Cię tylko o zmianie statusu zamówienia. Możesz je
+                  wyłączyć w dowolnej chwili.{" "}
+                  <Link className="text-sm" href="/prywatnosc">
+                    Prywatność
+                  </Link>
+                </p>
+              </Modal.Body>
+            )}
             {installationRequired && (
               <Modal.Body>
                 <ol className="notification-installation-steps">

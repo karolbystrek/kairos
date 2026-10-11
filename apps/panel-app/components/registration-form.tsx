@@ -2,7 +2,15 @@
 
 import { LogOut, UserPlus } from "lucide-react";
 import { useSyncExternalStore, useState, type FormEvent } from "react";
-import { Alert, Button, Link } from "@heroui/react";
+import {
+  Alert,
+  Button,
+  Checkbox,
+  Description,
+  FieldError,
+  Label,
+  Link,
+} from "@heroui/react";
 import useSWR from "swr";
 import { ZodError } from "zod";
 
@@ -19,6 +27,8 @@ import {
 } from "@/src/api/account-invitations";
 import { ApiError } from "@/src/api/api-fetch";
 import { getCurrentAccount, logout } from "@/src/api/authentication";
+
+const termsError = "Zaakceptuj Regulamin, aby utworzyć konto.";
 
 const registrationErrorMessages = new Map([
   ["Email is required.", "Podaj adres e-mail."],
@@ -65,6 +75,7 @@ export function RegistrationForm({ invited = false }: { invited?: boolean }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
@@ -114,10 +125,15 @@ export function RegistrationForm({ invited = false }: { invited?: boolean }) {
     };
 
     setFieldErrors({});
-    setPending(true);
     setMessage("");
+    setPending(true);
     try {
       registrationInputSchema.parse(input);
+      if (!termsAccepted) {
+        setFieldErrors({ terms: termsError });
+
+        return;
+      }
       invited
         ? await redeemAccountInvitation({ ...input, token: token ?? "" })
         : await registerTenant(input);
@@ -144,6 +160,7 @@ export function RegistrationForm({ invited = false }: { invited?: boolean }) {
 
           errors[field] ??= issue.message;
         }
+        if (!termsAccepted) errors.terms = termsError;
         setFieldErrors(errors);
       } else if (error instanceof ApiError && error.problem?.fieldErrors) {
         setFieldErrors(
@@ -276,6 +293,37 @@ export function RegistrationForm({ invited = false }: { invited?: boolean }) {
               }));
             }}
           />
+          <Checkbox
+            isRequired
+            className="mb-4"
+            isDisabled={pending}
+            isInvalid={Boolean(fieldErrors.terms)}
+            isSelected={termsAccepted}
+            name="termsAccepted"
+            onChange={(selected) => {
+              setTermsAccepted(selected);
+              setFieldErrors((current) => ({ ...current, terms: "" }));
+            }}
+          >
+            <Checkbox.Content>
+              <Checkbox.Control>
+                <Checkbox.Indicator />
+              </Checkbox.Control>
+              <Label>Akceptuję Regulamin Kairos</Label>
+            </Checkbox.Content>
+            <Description>
+              Przeczytaj{" "}
+              <Link href="/regulamin" target="_blank">
+                Regulamin
+              </Link>{" "}
+              i{" "}
+              <Link href="/polityka-prywatnosci" target="_blank">
+                Politykę prywatności
+              </Link>
+              .
+            </Description>
+            {fieldErrors.terms && <FieldError>{fieldErrors.terms}</FieldError>}
+          </Checkbox>
           <Button
             isDisabled={
               checkingAccount ||

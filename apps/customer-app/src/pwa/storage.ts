@@ -730,13 +730,10 @@ function isNotificationMetadata(value: unknown): value is NotificationMetadata {
   return typeof value === "object" && value !== null;
 }
 
-const reviewRecordSchema = z
-  .object({
-    trackingReference: z.uuid(),
-    consumed: z.boolean(),
-    notified: z.boolean(),
-  })
-  .strict();
+const reviewRecordSchema = z.object({
+  trackingReference: z.uuid(),
+  consumed: z.boolean(),
+});
 
 async function rememberReviewInTransaction(
   transaction: IDBTransaction,
@@ -747,8 +744,7 @@ async function rememberReviewInTransaction(
     await requestResult(store.get(trackingReference)),
   );
 
-  if (!current.success)
-    store.put({ trackingReference, consumed: false, notified: false });
+  if (!current.success) store.put({ trackingReference, consumed: false });
 }
 
 function notifyReviewStorageChange() {
@@ -811,35 +807,8 @@ export async function consumeReviewInvitation(
 
     transaction
       .objectStore(REVIEW_STORE)
-      .put({ trackingReference, consumed: true, notified: true });
+      .put({ trackingReference, consumed: true });
     await transactionComplete(transaction);
   });
   notifyReviewStorageChange();
-}
-
-export async function applyReviewPush(
-  trackingReference: string,
-): Promise<boolean> {
-  if (!z.uuid().safeParse(trackingReference).success) return false;
-
-  return withDatabase(async (database) => {
-    const transaction = database.transaction(
-      [REVIEW_STORE, METADATA_STORE],
-      "readwrite",
-    );
-    const metadata = await readMetadataFromTransaction(transaction);
-    const store = transaction.objectStore(REVIEW_STORE);
-    const current = reviewRecordSchema.safeParse(
-      await requestResult(store.get(trackingReference)),
-    );
-    const shouldDisplay =
-      metadata.notificationsEnabled === true &&
-      !(current.success && (current.data.consumed || current.data.notified));
-
-    if (shouldDisplay)
-      store.put({ trackingReference, consumed: false, notified: true });
-    await transactionComplete(transaction);
-
-    return shouldDisplay;
-  });
 }

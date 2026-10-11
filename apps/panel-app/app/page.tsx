@@ -47,14 +47,30 @@ export default function Welcome() {
         </Link>
       </section>
 
-      <footer className="secondary-text flex flex-wrap items-center justify-center gap-x-2 gap-y-1 py-6 text-sm">
-        <span>Masz pytania?</span>
-        <Link
-          className="secondary-text min-h-11 break-all"
-          href="mailto:karbystrek@gmail.com"
+      <footer className="secondary-text flex flex-col items-center gap-1 py-6 text-sm">
+        <p className="flex flex-wrap items-center justify-center gap-x-2">
+          <span>Masz pytania?</span>
+          <Link
+            className="secondary-text min-h-11 break-all"
+            href="mailto:karbystrek@gmail.com"
+          >
+            karbystrek@gmail.com
+          </Link>
+        </p>
+        <nav
+          aria-label="Informacje prawne"
+          className="flex flex-wrap items-center justify-center gap-x-4"
         >
-          karbystrek@gmail.com
-        </Link>
+          <Link className="secondary-text min-h-11" href="/regulamin">
+            Regulamin
+          </Link>
+          <Link
+            className="secondary-text min-h-11"
+            href="/polityka-prywatnosci"
+          >
+            Polityka prywatności
+          </Link>
+        </nav>
       </footer>
     </div>
   );

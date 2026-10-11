@@ -41,6 +41,7 @@ Do not skip an applicable requirement because it lives in another file.
 | [Resilience and consistency](requirements/resilience.md) | Transactions, idempotency, delivery retry, freshness and retention |
 | [Verification and acceptance criteria](requirements/acceptance.md) | Selecting product, security, browser and deployment acceptance |
 | [Current delivery status and roadmap](requirements/delivery-status.md) | All work: implemented scope, outstanding launch gates and deferred work |
+| [Legal readiness](requirements/legal.md) | Terms, privacy notices, consent, data inventory, retention and real-user legal gates |
 
 ## Common dependencies
 
