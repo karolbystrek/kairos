@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { serwist } from "@serwist/next/config";
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
@@ -10,7 +12,7 @@ export default serwist({
   additionalPrecacheEntries: [
     {
       url: "/~offline",
-      revision: "kairos-offline-shell-v1",
+      revision: readFileSync(".next/BUILD_ID", "utf8").trim(),
     },
   ],
   precachePrerendered: false,
