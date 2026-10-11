@@ -30,6 +30,7 @@ Do not skip an applicable requirement because it lives in another file.
 | [External Integration API and webhooks](requirements/external-integrations.md) | Integration credentials, external orders and webhook delivery |
 | [Staff authentication and browser sessions](requirements/staff-authentication.md) | Registration, onboarding, login, sessions, CSRF and provider validation |
 | [Location lifecycle and cascades](requirements/locations.md) | Location disable, enable and irreversible Delete |
+| [Menus and menu-item order labels](requirements/menus.md) | Tenant menus, active location menus and menu items in order labels |
 | [Accounts and invitations](requirements/accounts-invitations.md) | Member provisioning, invitation redemption, account management and access |
 | [Provider setup and registration consistency](requirements/provider.md) | ZITADEL provisioning, service credentials and registration cleanup |
 | [Customer, integration and tenant access](requirements/access-isolation.md) | Any authorization, tenant isolation, RLS or customer capability change |

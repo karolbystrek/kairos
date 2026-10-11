@@ -16,8 +16,8 @@ class CreateOrderRequestValidationTests {
 
     @Test
     void acceptsAnOmittedLabelAndNormalizesValidCustomText() {
-        var automatic = new CreateOrderRequest(LOCATION_ID, null);
-        var custom = new CreateOrderRequest(LOCATION_ID, "  Stół 7  ");
+        var automatic = new CreateOrderRequest(LOCATION_ID, null, null);
+        var custom = new CreateOrderRequest(LOCATION_ID, "  Stół 7  ", null);
 
         assertThat(validator.validate(automatic)).isEmpty();
         assertThat(validator.validate(custom)).isEmpty();
@@ -26,12 +26,12 @@ class CreateOrderRequestValidationTests {
 
     @Test
     void rejectsBlankMultilineControlAndOverLengthLabels() {
-        assertThat(validator.validate(new CreateOrderRequest(LOCATION_ID, "   "))).isNotEmpty();
-        assertThat(validator.validate(new CreateOrderRequest(LOCATION_ID, "Line 1\nLine 2"))).isNotEmpty();
-        assertThat(validator.validate(new CreateOrderRequest(LOCATION_ID, "Line 1\u2028Line 2"))).isNotEmpty();
-        assertThat(validator.validate(new CreateOrderRequest(LOCATION_ID, "Line 1\u2029Line 2"))).isNotEmpty();
-        assertThat(validator.validate(new CreateOrderRequest(LOCATION_ID, "Table\u00007"))).isNotEmpty();
-        assertThat(validator.validate(new CreateOrderRequest(LOCATION_ID, "x".repeat(33)))).isNotEmpty();
+        assertThat(validator.validate(new CreateOrderRequest(LOCATION_ID, "   ", null))).isNotEmpty();
+        assertThat(validator.validate(new CreateOrderRequest(LOCATION_ID, "Line 1\nLine 2", null))).isNotEmpty();
+        assertThat(validator.validate(new CreateOrderRequest(LOCATION_ID, "Line 1\u2028Line 2", null))).isNotEmpty();
+        assertThat(validator.validate(new CreateOrderRequest(LOCATION_ID, "Line 1\u2029Line 2", null))).isNotEmpty();
+        assertThat(validator.validate(new CreateOrderRequest(LOCATION_ID, "Table\u00007", null))).isNotEmpty();
+        assertThat(validator.validate(new CreateOrderRequest(LOCATION_ID, "x".repeat(33), null))).isNotEmpty();
     }
 
     @Test
@@ -39,6 +39,6 @@ class CreateOrderRequestValidationTests {
         var label = "x".repeat(31) + "🍜";
 
         assertThat(label).hasSize(33);
-        assertThat(validator.validate(new CreateOrderRequest(LOCATION_ID, label))).isEmpty();
+        assertThat(validator.validate(new CreateOrderRequest(LOCATION_ID, label, null))).isEmpty();
     }
 }

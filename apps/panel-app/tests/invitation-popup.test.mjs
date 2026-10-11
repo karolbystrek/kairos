@@ -42,7 +42,7 @@ function workspace(kind = "account-management", collections = {}) {
     }) };
     if (name === "@/src/api/cache-keys") return {
       staffCachePrefix: "staff", staffLocationsKey: () => "locations", staffAccountsKey: () => "accounts",
-      staffInvitationsKey: () => "invitations",
+      staffInvitationsKey: () => "invitations", staffLocationMenuKey: () => "location-menu",
     };
     if (name === "@/src/api/account-invitations") return {
       createAccountInvitation(input) { requests.push(input); return new Promise(resolve => { complete = resolve; }); },

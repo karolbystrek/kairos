@@ -36,6 +36,7 @@ export function createKairosManifest(startUrl: string): MetadataRoute.Manifest {
     start_url: startUrl,
     scope: "/",
     display: "standalone",
+    launch_handler: { client_mode: ["navigate-existing", "auto"] },
     background_color: PWA_THEME_COLOR,
     theme_color: PWA_THEME_COLOR,
     icons,

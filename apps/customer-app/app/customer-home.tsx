@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 
 import { CustomerToolbar } from "@/components/customer-toolbar";
 import { resolveCustomerLaunchHref } from "@/src/pwa/launch-destination";
+import { isAppleMobile } from "@/src/pwa/notification-onboarding";
 import { consumeInstallationBootstrap } from "@/src/pwa/recently-tracked-orders";
 import { readLastStableDestination } from "@/src/pwa/storage";
 
@@ -28,6 +29,7 @@ export function CustomerHome({
 }) {
   const router = useRouter();
   const [isReady, setIsReady] = useState(false);
+  const [showScanInAppHint, setShowScanInAppHint] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -51,6 +53,9 @@ export function CustomerHome({
       if (installationTrackingReference) {
         router.replace("/");
       }
+      setShowScanInAppHint(
+        isStandaloneDisplayMode() && isAppleMobile(navigator),
+      );
       setIsReady(true);
     });
 
@@ -77,6 +82,11 @@ export function CustomerHome({
           <Spinner aria-label="Otwieranie Kairos" />
         )}
       </div>
+      {isReady && showScanInAppHint && (
+        <p className="absolute bottom-12 left-1/2 w-full max-w-xs -translate-x-1/2 text-center text-sm text-muted">
+          Kolejne zamówienia skanuj w tej aplikacji.
+        </p>
+      )}
       <Link
         className="absolute bottom-0 left-1/2 min-h-11 -translate-x-1/2 text-sm text-muted"
         href="/prywatnosc"

@@ -26,6 +26,8 @@ import java.util.UUID;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class CustomerOrder {
 
+    public static final int MAXIMUM_LABEL_LENGTH = 200;
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
@@ -37,7 +39,7 @@ public class CustomerOrder {
     @Column(name = "tracking_reference", nullable = false, unique = true)
     private UUID trackingReference;
 
-    @Column(nullable = false, length = 32)
+    @Column(nullable = false, length = MAXIMUM_LABEL_LENGTH)
     private String label;
 
     @Enumerated(EnumType.STRING)

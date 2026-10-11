@@ -80,6 +80,9 @@ export function NotificationGuide() {
                     </div>
                   </li>
                 </ol>
+                <p className="text-sm text-muted">
+                  Kolejne zamówienia skanuj w aplikacji Kairos.
+                </p>
               </Modal.Body>
             )}
             <Modal.Footer>
