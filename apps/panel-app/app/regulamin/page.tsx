@@ -112,8 +112,9 @@ export default function TermsPage() {
         <li>
           Restauracja może w każdej chwili zakończyć korzystanie z Kairos,
           pisząc na adres e-mail Usługodawcy z prośbą o usunięcie jej danych.
-          Usunięcie Kont i lokali w panelu blokuje do nich dostęp, ale nie usuwa
-          wszystkich danych.
+          Usunięcie Konta lub lokalu w panelu od razu blokuje do niego dostęp, a
+          po 30 dniach Kairos trwale usuwa jego dane, w tym zamówienia
+          usuniętego lokalu.
         </li>
         <li>
           Usługodawca może zakończyć świadczenie usług z końcem Okresu testowego

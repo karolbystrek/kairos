@@ -1043,10 +1043,84 @@ BEGIN
     IF selected IS NOT NULL THEN PERFORM set_config('kairos.selected','PUSH_CLEANUP:' || selected::text,true); END IF;
     RETURN selected;
 END $$;
+-- Retention discovery exposes only what the purge needs: the provider subject must be deleted before the account row.
+-- Skipped ids are accounts deferred earlier in the same cycle, so one stuck identity cannot block the queue.
+CREATE FUNCTION public.next_purgeable_account(cutoff timestamptz,skipped text) RETURNS TABLE(account_id uuid,provider_subject varchar)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE selected uuid; subject varchar;
+BEGIN
+    SELECT a.id,a.provider_subject INTO selected,subject FROM public.accounts a WHERE a.status='ARCHIVED' AND a.archived_at<cutoff
+        AND NOT a.id::text=ANY(string_to_array(skipped,',')) ORDER BY a.archived_at,a.id LIMIT 1 FOR UPDATE SKIP LOCKED;
+    IF selected IS NOT NULL THEN
+        PERFORM set_config('kairos.selected','ACCOUNT_PURGE:' || selected::text,true);
+        RETURN QUERY SELECT selected,subject;
+    END IF;
+END $$;
+-- Assigned accounts are purged first, so a location still holding assignments waits for the next cycle.
+CREATE FUNCTION public.next_purgeable_location(cutoff timestamptz) RETURNS uuid
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE selected uuid;
+BEGIN
+    SELECT l.id INTO selected FROM public.locations l WHERE l.status='ARCHIVED' AND l.archived_at<cutoff
+        AND NOT EXISTS(SELECT 1 FROM public.location_assignments x WHERE x.location_id=l.id) ORDER BY l.archived_at,l.id LIMIT 1 FOR UPDATE SKIP LOCKED;
+    IF selected IS NOT NULL THEN PERFORM set_config('kairos.selected','LOCATION_PURGE:' || selected::text,true); END IF;
+    RETURN selected;
+END $$;
+CREATE FUNCTION public.next_finished_invitation(cutoff timestamptz) RETURNS uuid
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE selected uuid;
+BEGIN
+    SELECT i.id INTO selected FROM public.account_invitations i WHERE (i.state='REVOKED' AND i.revoked_at<cutoff) OR (i.state='PENDING' AND i.expires_at<cutoff) ORDER BY i.updated_at,i.id LIMIT 1 FOR UPDATE SKIP LOCKED;
+    IF selected IS NOT NULL THEN PERFORM set_config('kairos.selected','INVITATION_PURGE:' || selected::text,true); END IF;
+    RETURN selected;
+END $$;
+-- Purges span tables whose policies stay closed to deletion; only the bound, discovered identity is erased.
+CREATE FUNCTION public.purge_retained(operation text,resource uuid) RETURNS boolean
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
+BEGIN
+    IF operation NOT IN ('ACCOUNT_PURGE','LOCATION_PURGE','INVITATION_PURGE') OR NOT kairos_security.worker(operation,resource)
+        OR kairos_security.setting('selected')<>operation || ':' || resource::text THEN
+        RAISE EXCEPTION 'Retention purge capability required' USING ERRCODE='42501';
+    END IF;
+    -- Settings are only defence in depth; the target itself must still be deleted data before anything is erased.
+    IF operation='ACCOUNT_PURGE' THEN
+        PERFORM 1 FROM public.accounts a WHERE a.id=resource AND a.status='ARCHIVED' FOR UPDATE;
+    ELSIF operation='LOCATION_PURGE' THEN
+        PERFORM 1 FROM public.locations l WHERE l.id=resource AND l.status='ARCHIVED' FOR UPDATE;
+    ELSE
+        PERFORM 1 FROM public.account_invitations i WHERE i.id=resource
+            AND (i.state='REVOKED' OR (i.state='PENDING' AND i.expires_at<CURRENT_TIMESTAMP)) FOR UPDATE;
+    END IF;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Only deleted data can be purged' USING ERRCODE='42501';
+    END IF;
+    IF operation='ACCOUNT_PURGE' THEN
+        DELETE FROM public.account_invitations i WHERE i.issued_by_account_id=resource OR i.redeemed_account_id=resource;
+        DELETE FROM public.location_assignments x WHERE x.account_id=resource;
+        DELETE FROM public.accounts a WHERE a.id=resource;
+    ELSIF operation='LOCATION_PURGE' THEN
+        DELETE FROM public.webhook_delivery_signing_versions v USING public.webhook_deliveries d,public.order_outbox_events e
+            WHERE v.delivery_id=d.id AND d.outbox_event_id=e.id AND e.location_id=resource;
+        DELETE FROM public.webhook_deliveries d USING public.order_outbox_events e WHERE d.outbox_event_id=e.id AND e.location_id=resource;
+        DELETE FROM public.customer_push_deliveries d USING public.orders o WHERE d.order_id=o.id AND o.location_id=resource;
+        DELETE FROM public.customer_push_enrollments x USING public.orders o WHERE x.order_id=o.id AND o.location_id=resource;
+        DELETE FROM public.order_outbox_events e WHERE e.location_id=resource;
+        DELETE FROM public.order_history h USING public.orders o WHERE h.order_id=o.id AND o.location_id=resource;
+        DELETE FROM public.orders o WHERE o.location_id=resource;
+        DELETE FROM public.account_invitations i WHERE i.location_id=resource;
+        DELETE FROM public.api_key_location_access g WHERE g.location_id=resource;
+        DELETE FROM public.webhook_subscription_location_access g WHERE g.location_id=resource;
+        DELETE FROM public.locations l WHERE l.id=resource;
+    ELSE
+        DELETE FROM public.account_invitations i WHERE i.id=resource;
+    END IF;
+    RETURN true;
+END $$;
 CREATE FUNCTION public.valid_worker(operation text,resource uuid,token uuid) RETURNS boolean
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
 BEGIN
-    IF operation IN ('WEBHOOK_FANOUT','PUSH_FANOUT','WEBHOOK_CLAIM','PUSH_CLAIM','SUBSCRIPTION_RETIRE','PUSH_CLEANUP') THEN
+    IF operation IN ('WEBHOOK_FANOUT','PUSH_FANOUT','WEBHOOK_CLAIM','PUSH_CLAIM','SUBSCRIPTION_RETIRE','PUSH_CLEANUP',
+        'ACCOUNT_PURGE','LOCATION_PURGE','INVITATION_PURGE') THEN
         RETURN kairos_security.setting('selected')=operation || ':' || resource::text;
     ELSIF operation='WEBHOOK_COMPLETE' THEN
         PERFORM 1 FROM public.webhook_deliveries d WHERE d.id=resource AND d.status='PROCESSING' AND d.claim_token=token FOR UPDATE;
@@ -1131,5 +1205,7 @@ GRANT EXECUTE ON FUNCTION public.valid_staff(uuid,uuid,text),public.lock_staff_l
     public.count_push_enrollments(uuid),public.cancel_push_deliveries(uuid,uuid[],timestamptz),public.next_webhook_fanout(),public.next_push_fanout(),
     public.next_webhook_delivery(timestamptz),public.next_push_delivery(timestamptz),
     public.next_expired_push_subscription(timestamptz),public.next_dormant_push_subscription(timestamptz),
-    public.next_terminal_push_delivery(timestamptz,timestamptz),public.valid_worker(text,uuid,uuid) TO "${runtimeUser}";
+    public.next_terminal_push_delivery(timestamptz,timestamptz),public.next_purgeable_account(timestamptz,text),
+    public.next_purgeable_location(timestamptz),public.next_finished_invitation(timestamptz),public.purge_retained(text,uuid),
+    public.valid_worker(text,uuid,uuid) TO "${runtimeUser}";
 COMMENT ON SCHEMA kairos_security IS 'kairos-rls-v1';

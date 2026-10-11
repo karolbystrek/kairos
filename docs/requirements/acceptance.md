@@ -143,8 +143,8 @@
   email is rejected before provider provisioning and rechecked atomically.
   Details identify the fixed role and location, creator, creation time, and expiry. Its icon-and-text Revoke action
   requires inline hold confirmation, and terminal invitations leave the collection while their
-  secret-free metadata is retained indefinitely for audit without a history UI
-  in the current development scope.
+  secret-free metadata is retained for 30 days after they end without a
+  history UI.
 * Redemption requires the issuer to remain enabled and authorized. A signed-in
   browser and the API both require explicit sign-out before redemption, while
   verified completion creates the browser session and opens the assigned

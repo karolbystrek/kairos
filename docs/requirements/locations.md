@@ -48,11 +48,13 @@ location is disabled remains stored but cannot perform location-scoped work or
 receive new deliveries until that location is re-enabled.
 
 Deleting a location archives it internally rather than physically removing its
-identity or historical records. It also archives every non-archived assigned
+identity or historical records at once. It also archives every non-archived assigned
 member account, invalidates earlier authentication and revokes pending invitations, and removes those accounts from
 the ordinary Accounts collection. Completed and canceled orders retain their
 location association and remain anonymously readable through their existing
-customer tracking references after location disablement or archival.
+customer tracking references after location disablement or archival, until the
+[retention purge](resilience.md#retention-purge) deletes the archived location
+with its orders and every record derived from them.
 
 Only a disabled location can be deleted, and at least one other non-archived
 location must remain in the same tenant. Archived locations and other tenants'

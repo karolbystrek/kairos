@@ -97,8 +97,13 @@ export default function PrivacyNoticePage() {
         </li>
         <li>Historię wysyłki powiadomień usuwamy po 7–30 dniach.</li>
         <li>
-          Zamówienia przechowujemy do końca okresu testowego; wszystkie dane
-          zostaną usunięte w ciągu 30 dni po jego zakończeniu.
+          Logi serwera z adresem IP są nadpisywane po osiągnięciu limitu
+          rozmiaru.
+        </li>
+        <li>
+          Zamówienia lokalu usuniętego przez restaurację usuwamy po 30 dniach.
+          Pozostałe zamówienia przechowujemy do końca okresu testowego;
+          wszystkie dane zostaną usunięte w ciągu 30 dni po jego zakończeniu.
         </li>
       </ul>
 

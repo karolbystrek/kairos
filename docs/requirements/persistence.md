@@ -19,7 +19,7 @@ The database schema must include tables covering the following concepts. Names a
 * **Accounts:** stable UUID, normalized globally unique email, unique immutable
   ZITADEL provider subject, optional authentication cutoff, tenant ownership,
   tenant role, enabled/disabled/archived status, and audit timestamps. Archived
-  email and provider identities remain reserved. Provider subject is required.
+  email and provider identities remain reserved until the retention purge. Provider subject is required.
 * **Browser sessions:** standard Spring Session JDBC identity, creation/access
   timestamps, rolling inactivity expiry, Account principal index and server-only
   provider session attributes. No custom refresh-session table.
@@ -33,10 +33,10 @@ The database schema must include tables covering the following concepts. Names a
   persisted as a fourth lifecycle state. An invitation fixes its recipient email
   but contains no password and is not itself an account or a reservation of a
   globally unique Account email. Multiple pending
-  invitations may share a target location and role. Terminal metadata is
-  retained indefinitely in the current development scope without a
-  recoverable bearer secret; a deliberate security-event retention policy
-  must replace that default.
+  invitations may share a target location and role. Revoked invitations are
+  deleted 30 days after revocation and pending ones 30 days after expiry; a
+  redeemed invitation is deleted with its issuing or redeeming account, or with
+  its location (see [retention purge](resilience.md#retention-purge)).
 * **Location assignments:** relationship between a non-admin tenant Account and its
   accessible location, including a manager or operator role. The assignment has
   no independent lifecycle status; effective access requires both its Account

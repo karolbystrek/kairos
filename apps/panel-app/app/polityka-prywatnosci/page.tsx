@@ -98,10 +98,14 @@ export default function PrivacyPolicyPage() {
 
       <h2>Jak długo przechowujemy dane</h2>
       <p>
-        Dane konta przechowujemy przez czas korzystania z Kairos. Po usunięciu
-        konta jego adres e-mail pozostaje zablokowany przed ponownym użyciem do
-        końca Okresu testowego. Dane sesji wygasają po wylogowaniu lub braku
-        aktywności. Wszystkie dane zostaną usunięte w ciągu 30 dni po
+        Dane konta przechowujemy przez czas korzystania z Kairos. Usunięcie
+        konta od razu blokuje logowanie, a po 30 dniach trwale usuwamy konto,
+        jego dane w usłudze logowania i związane z nim zaproszenia. Do tego
+        czasu adres e-mail pozostaje zablokowany przed ponownym użyciem.
+        Zaproszenia usuwamy 30 dni po ich wygaśnięciu lub odwołaniu. Sesja
+        wygasa po wylogowaniu lub 30 dniach braku aktywności. Logi serwera z
+        adresami IP i zdarzeniami bezpieczeństwa są nadpisywane po osiągnięciu
+        limitu rozmiaru. Pozostałe dane zostaną usunięte w ciągu 30 dni po
         zakończeniu Okresu testowego.
       </p>
 
