@@ -2,11 +2,13 @@ import type { Metadata } from "next";
 
 import { LegalDocument } from "@/components/legal-document";
 import { legalOperator } from "@/src/legal/operator";
+import { publicPageMetadata } from "@/src/seo/metadata";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = publicPageMetadata({
   title: "Prywatność",
   description: "Jakie dane przetwarza Kairos, gdy śledzisz zamówienie.",
-};
+  path: "/prywatnosc",
+});
 
 export default function PrivacyNoticePage() {
   return (

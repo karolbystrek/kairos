@@ -1,6 +1,19 @@
+import type { Metadata } from "next";
+
 import { CustomerHome } from "./customer-home";
 
+import { siteConfig } from "@/config/site";
 import { INSTALL_ORDER_QUERY_PARAMETER } from "@/src/pwa/manifest";
+import { publicPageMetadata } from "@/src/seo/metadata";
+
+export const metadata: Metadata = {
+  ...publicPageMetadata({
+    title: siteConfig.name,
+    description: siteConfig.description,
+    path: "/",
+  }),
+  title: { absolute: siteConfig.name },
+};
 
 export default async function Home({
   searchParams,

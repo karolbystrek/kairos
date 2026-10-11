@@ -4,14 +4,24 @@ import { Metadata, Viewport } from "next";
 import { Providers } from "./providers";
 
 import { siteConfig } from "@/config/site";
+import { customerAppUrl } from "@/src/config/customer-app-url";
 import { PWA_THEME_COLOR } from "@/src/pwa/manifest";
+import { SHARED_OPEN_GRAPH } from "@/src/seo/metadata";
 
 export const metadata: Metadata = {
+  metadataBase: customerAppUrl,
+  applicationName: "Kairos",
   title: {
     default: siteConfig.name,
     template: `%s - ${siteConfig.name}`,
   },
   description: siteConfig.description,
+  openGraph: {
+    ...SHARED_OPEN_GRAPH,
+    title: siteConfig.name,
+    description: siteConfig.description,
+  },
+  twitter: { card: "summary_large_image" },
   icons: {
     icon: "/favicon.ico",
     apple: [

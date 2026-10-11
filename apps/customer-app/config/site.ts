@@ -1,4 +1,5 @@
 export const siteConfig = {
   name: "Kairos — śledzenie zamówień",
-  description: "Śledź zamówienie w restauracji z Kairos.",
+  description:
+    "Zeskanuj kod QR i śledź status zamówienia w restauracji bez zakładania konta i pobierania aplikacji.",
 };

@@ -10,7 +10,11 @@ const apiOrigin = new URL(apiBaseUrl).origin;
 const nextConfig = {
   output: "standalone",
   async headers() {
+    const notIndexed = [{ key: "X-Robots-Tag", value: "noindex, nofollow" }];
+
     return [
+      { source: "/orders/:path*", headers: notIndexed },
+      { source: "/manifests/:path*", headers: notIndexed },
       {
         source: "/sw.js",
         headers: [
