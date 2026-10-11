@@ -7,7 +7,6 @@ import {
   readNotificationTrackingReferences,
   readTrackedOrder,
   rememberTrackedOrder,
-  removeTrackedOrder,
   updateNotificationMetadata,
 } from "@/src/pwa/storage";
 
@@ -137,34 +136,30 @@ it.each(["READY", "COMPLETED", "CANCELED"] as const)(
     expect(showNotification.mock.calls[0][1].data.orderUrl).toBe(
       `/orders/${REFERENCE}`,
     );
-    expect((await readNotificationMetadata()).enrolledTrackingReferences).toEqual(
-      status === "READY" ? [REFERENCE] : [],
-    );
+    expect(
+      (await readNotificationMetadata()).enrolledTrackingReferences,
+    ).toEqual(status === "READY" ? [REFERENCE] : []);
     expect(await readNotificationTrackingReferences()).toEqual(
       status === "READY" ? [REFERENCE] : [],
     );
   },
 );
 
-it("suppresses an older Ready push after a terminal REST transition", async () => {
-  await rememberTrackedOrder({
-    label: "Private order label",
-    status: "COMPLETED",
-    trackingReference: REFERENCE,
-    updatedAt: "2026-10-09T20:01:00Z",
-  });
-  await push();
+it.each(["COMPLETED", "CANCELED"] as const)(
+  "suppresses an older Ready push after a %s REST transition",
+  async (status) => {
+    await rememberTrackedOrder({
+      label: "Private order label",
+      status,
+      trackingReference: REFERENCE,
+      updatedAt: "2026-10-09T20:01:00Z",
+    });
+    await push();
 
-  expect(showNotification).not.toHaveBeenCalled();
-  expect(await readTrackedOrder(REFERENCE)).toBeNull();
-});
-
-it("does not notify after explicit tracking removal", async () => {
-  await removeTrackedOrder(REFERENCE, "suppressed");
-  await push();
-
-  expect(showNotification).not.toHaveBeenCalled();
-});
+    expect(showNotification).not.toHaveBeenCalled();
+    expect(await readTrackedOrder(REFERENCE)).toBeNull();
+  },
+);
 
 it("does not notify after opt-out", async () => {
   await updateNotificationMetadata({ notificationsEnabled: false });

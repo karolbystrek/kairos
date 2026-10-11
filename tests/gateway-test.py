@@ -68,7 +68,8 @@ def main():
                 assert set(config['networks']) == {'gateway', 'data'}
                 assert config['networks']['data']['internal']
                 tls = next(v for v in nginx['volumes'] if v['target'] == '/run/secrets/tls')
-                assert tls['read_only'] and not tls['bind']['create_host_path']
+                # Compose v2 JSON omits false bind options; explicit true must still fail.
+                assert tls['read_only'] and not tls['bind'].get('create_host_path', False)
                 if mode == 'deployment':
                     assert tls['source'] == str(work)
                 trust = work / 'cloudflare-real-ip.conf'

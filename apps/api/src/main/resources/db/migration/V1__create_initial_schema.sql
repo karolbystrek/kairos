@@ -798,7 +798,8 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
     SELECT EXISTS(SELECT 1 FROM public.orders o JOIN public.locations l ON l.id=o.location_id WHERE o.id=order_access.order_id
         AND (kairos_security.staff_location(l.id) OR kairos_security.integration_location(l.id,writing)
         OR (NOT writing AND customer AND kairos_security.setting('scope') IN ('tracking','push')
-            AND kairos_security.includes('references',o.tracking_reference) AND l.status='ENABLED')
+            AND kairos_security.includes('references',o.tracking_reference)
+            AND (l.status='ENABLED' OR o.status IN ('COMPLETED','CANCELED')))
         OR (NOT writing AND EXISTS(SELECT 1 FROM public.order_outbox_events e WHERE e.order_id=o.id AND kairos_security.event_access(e.id)))))
 $$;
 CREATE FUNCTION kairos_security.subscription_access(subscription uuid) RETURNS boolean
@@ -1077,7 +1078,7 @@ CREATE FUNCTION public.next_terminal_push_delivery(successful_cutoff timestamptz
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE selected uuid;
 BEGIN
-    SELECT id INTO selected FROM public.customer_push_deliveries WHERE (status='ACCEPTED' AND completed_at<successful_cutoff) OR (status IN ('DEAD_LETTERED','EXPIRED','SUPERSEDED','CANCELED') AND completed_at<failed_cutoff) ORDER BY completed_at,id LIMIT 1 FOR UPDATE SKIP LOCKED;
+    SELECT id INTO selected FROM public.customer_push_deliveries WHERE (status IN ('ACCEPTED','SUPERSEDED','CANCELED') AND completed_at<successful_cutoff) OR (status IN ('DEAD_LETTERED','EXPIRED') AND completed_at<failed_cutoff) ORDER BY completed_at,id LIMIT 1 FOR UPDATE SKIP LOCKED;
     IF selected IS NOT NULL THEN PERFORM set_config('kairos.selected','PUSH_CLEANUP:' || selected::text,true); END IF;
     RETURN selected;
 END $$;

@@ -3,10 +3,11 @@ import json
 import os
 from pathlib import Path
 import subprocess
-import tarfile
 import tempfile
 import unittest
+from unittest.mock import patch
 
+import release_manifest
 from release_manifest import RUNTIME_FILES
 
 SCRIPT = Path(__file__).with_name('upload_release.py')
@@ -67,22 +68,38 @@ else:
                     'GITHUB_STEP_SUMMARY': str(self.root / 'summary')}
 
     def bundle(self):
-        (self.artifact / 'release.json').write_text(json.dumps(self.manifest))
-        with tarfile.open(self.artifact / 'release.tar.gz', 'w:gz') as archive:
-            archive.add(self.artifact / 'release.json', arcname='release.json')
-            for name in RUNTIME_FILES:
-                path = self.root / 'source' / name
-                path.parent.mkdir(parents=True, exist_ok=True)
+        source = self.root / 'source'
+        inspections = self.root / 'inspections'
+        inspections.mkdir(exist_ok=True)
+        for service, digest in self.manifest['images'].items():
+            (inspections / f'{service}.json').write_text(json.dumps([{
+                'Os': 'linux', 'Architecture': 'amd64', 'RepoDigests': [digest],
+                'Config': {'Labels': {'org.opencontainers.image.revision': REVISION}},
+            }]))
+        for name in RUNTIME_FILES:
+            path = source / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            if not path.exists():
                 path.write_text('echo "$@" > "$(dirname "$1")/invoked"\nexit "${FAIL_DEPLOY:-0}"\n'
                                 if name == 'deployment/deploy.sh' else '# fixture\n')
-                archive.add(path, arcname=name)
+        import shutil
+        shutil.rmtree(self.artifact)
+        with patch.object(release_manifest, '__file__', str(source / 'deployment/release_manifest.py')):
+            release_manifest.assemble(REVISION, inspections, self.artifact)
 
     def run_upload(self):
         return subprocess.run(['python3', str(SCRIPT), str(self.artifact), REVISION],
                               env=self.env, capture_output=True, text=True)
 
     def test_complete_release_and_retry(self):
+        original_archive = (self.artifact / 'release.tar.gz').read_bytes()
         for _ in range(2):
+            for path in (self.root / 'source').rglob('*'):
+                if path.is_file():
+                    os.utime(path, (1234567890, 1234567890))
+                    path.chmod(0o600)
+            self.bundle()
+            self.assertEqual((self.artifact / 'release.tar.gz').read_bytes(), original_archive)
             result = self.run_upload()
             self.assertEqual(result.returncode, 0, result.stderr)
         release = self.remote / 'releases' / REVISION
@@ -125,6 +142,16 @@ else:
         self.assertFalse((self.remote / 'releases' / 'invoked').exists())
         self.assertEqual(list((self.remote / 'releases').glob('.incoming-*')), [])
 
+    def test_changed_runtime_retry_preserves_existing_release(self):
+        self.assertEqual(self.run_upload().returncode, 0)
+        original = (self.remote / 'releases' / REVISION / 'compose.yaml').read_bytes()
+        (self.remote / 'releases' / 'invoked').unlink()
+        (self.root / 'source' / 'compose.yaml').write_text('# changed fixture\n')
+        self.bundle()
+        self.assertNotEqual(self.run_upload().returncode, 0)
+        self.assertEqual((self.remote / 'releases' / REVISION / 'compose.yaml').read_bytes(), original)
+        self.assertFalse((self.remote / 'releases' / 'invoked').exists())
+
     def test_manifest_outside_archive_must_match(self):
         self.manifest['images']['api'] = 'ghcr.io/karolbystrek/kairos/api@sha256:' + 'c' * 64
         (self.artifact / 'release.json').write_text(json.dumps(self.manifest))
@@ -142,7 +169,7 @@ else:
                 self.assertNotEqual(self.run_upload().returncode, 0)
                 self.env[key] = previous
         self.manifest['revision'] = 'c' * 40
-        self.bundle()
+        (self.artifact / 'release.json').write_text(json.dumps(self.manifest))
         self.assertNotEqual(self.run_upload().returncode, 0)
         self.assertFalse((self.root / 'calls').exists())
 

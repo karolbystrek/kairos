@@ -66,15 +66,18 @@ public class PushDestinationPolicy {
             var asciiHost = parsed.getHost().contains(":")
                     ? parsed.getHost()
                     : IDN.toASCII(parsed.getHost(), IDN.USE_STD3_ASCII_RULES);
-            return new URI(
+            var authority = new URI(
                     parsed.getScheme(),
                     parsed.getUserInfo(),
                     asciiHost,
                     parsed.getPort(),
-                    parsed.getPath(),
-                    parsed.getQuery(),
-                    parsed.getFragment()
+                    null,
+                    null,
+                    null
             );
+            return new URI(authority.toString() + parsed.getRawPath()
+                    + (parsed.getRawQuery() == null ? "" : "?" + parsed.getRawQuery())
+                    + (parsed.getRawFragment() == null ? "" : "#" + parsed.getRawFragment()));
         } catch (IllegalArgumentException | URISyntaxException exception) {
             throw new InvalidCustomerPushSubscriptionException(
                     "Push endpoint is not a valid URL",

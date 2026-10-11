@@ -41,6 +41,7 @@ import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.List;
@@ -217,6 +218,56 @@ class CustomerPushSubscriptionIntegrationTests extends RedisListenerIsolatedInte
                 .isNotEqualTo(Base64.getUrlDecoder().decode(input.auth()));
         assertThat(count("customer_push_subscriptions")).isEqualTo(1);
         assertThat(count("customer_push_enrollments")).isEqualTo(1);
+    }
+
+    @Test
+    void preservesEncodedEndpointCapabilityAcrossEnrollmentAndRemoval() {
+        var order = createOrder();
+        var original = newSubscription();
+        var input = new CustomerPushSubscriptionInput(
+                original.endpoint() + "/a%2Fb?token=x%26role%3Dadmin%25",
+                original.p256dh(), original.auth(), null);
+        endpointHashes.add(sha256(input.endpoint()));
+        subscriptionService.reconcile(input, List.of(order.trackingReference()));
+        assertThat(subscriptionCount(input)).isOne();
+        orderService.updateStatus(tenant.administrator(), order.id(), OrderStatus.READY);
+        while (fanoutService.fanOutAvailable() > 0) { }
+        assertThat(claimService.claimAvailable()).singleElement()
+                .satisfies(delivery -> assertThat(delivery.endpoint()).isEqualTo(input.endpoint()));
+        var replacement = newSubscription();
+        subscriptionService.replace(input, replacement, List.of(order.trackingReference()));
+        assertThat(subscriptionCount(input)).isZero();
+        assertThat(subscriptionCount(replacement)).isOne();
+        subscriptionService.disable(replacement);
+        assertThat(count("customer_push_enrollments")).isZero();
+    }
+
+    @Test
+    void rejectsMalformedOutOfRangeAndOffCurveKeysBeforePersistingEnrollments() {
+        var order = createOrder();
+        var valid = newSubscription();
+        var offCurve = new byte[65];
+        offCurve[0] = 0x04;
+        offCurve[32] = 1;
+        offCurve[64] = 1;
+        var outOfRange = offCurve.clone();
+        Arrays.fill(outOfRange, 1, 33, (byte) 0xff);
+        var outOfRangeY = offCurve.clone();
+        Arrays.fill(outOfRangeY, 33, 65, (byte) 0xff);
+        var compressedPrefix = offCurve.clone();
+        compressedPrefix[0] = 0x03;
+        for (var key : List.of(offCurve, outOfRange, outOfRangeY, compressedPrefix, new byte[64])) {
+            var invalid = new CustomerPushSubscriptionInput(valid.endpoint(), base64Url(key), valid.auth(), null);
+            assertThatThrownBy(() -> subscriptionService.reconcile(invalid, List.of(order.trackingReference())))
+                    .isInstanceOf(InvalidCustomerPushSubscriptionException.class);
+            assertThat(count("customer_push_subscriptions")).isZero();
+            assertThat(count("customer_push_enrollments")).isZero();
+        }
+        subscriptionService.reconcile(valid, List.of(order.trackingReference()));
+        assertThat(count("customer_push_subscriptions")).isOne();
+        assertThat(count("customer_push_enrollments")).isOne();
+        subscriptionService.disable(valid);
+        assertThat(count("customer_push_subscriptions")).isZero();
     }
 
     @Test
@@ -447,6 +498,38 @@ class CustomerPushSubscriptionIntegrationTests extends RedisListenerIsolatedInte
         assertThat(cleanupService.clean()).isEqualTo(1);
         assertThat(jdbcTemplate.queryForList("SELECT status FROM customer_push_deliveries", String.class))
                 .containsExactly("PENDING");
+        assertThat(claimService.claimAvailable()).hasSize(1);
+        assertThat(cleanupService.clean()).isZero();
+        assertThat(jdbcTemplate.queryForList("SELECT status FROM customer_push_deliveries", String.class))
+                .containsExactly("PROCESSING");
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = CustomerPushDeliveryStatus.class,
+            names = {"ACCEPTED", "SUPERSEDED", "CANCELED", "EXPIRED", "DEAD_LETTERED"})
+    void cleanupUsesTheDocumentedTerminalRetentionBoundary(CustomerPushDeliveryStatus status) {
+        var order = createOrder();
+        subscriptionService.reconcile(newSubscription(), List.of(order.trackingReference()));
+        orderService.updateStatus(tenant.administrator(), order.id(), OrderStatus.READY);
+        while (fanoutService.fanOutAvailable() > 0) { }
+        var completedAt = clock.instant();
+        jdbcTemplate.update("""
+                UPDATE customer_push_deliveries SET status = ?, payload = NULL,
+                    completed_at = ? WHERE order_id = ?
+                """, status.name(), Timestamp.from(completedAt), order.id());
+        clock.advance(Duration.ofDays(7));
+        assertThat(cleanupService.clean()).isZero();
+        clock.advance(Duration.ofSeconds(1));
+        var successful = List.of(CustomerPushDeliveryStatus.ACCEPTED,
+                CustomerPushDeliveryStatus.SUPERSEDED, CustomerPushDeliveryStatus.CANCELED).contains(status);
+        assertThat(cleanupService.clean()).isEqualTo(successful ? 1 : 0);
+        if (!successful) {
+            clock.setInstant(completedAt.plus(Duration.ofDays(30)));
+            assertThat(cleanupService.clean()).isZero();
+            clock.advance(Duration.ofSeconds(1));
+            assertThat(cleanupService.clean()).isOne();
+        }
+        assertThat(count("customer_push_deliveries")).isZero();
     }
 
     private static StringRedisTemplate stringRedisTemplate() {

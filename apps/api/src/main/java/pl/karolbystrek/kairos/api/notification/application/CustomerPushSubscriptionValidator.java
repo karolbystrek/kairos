@@ -16,6 +16,7 @@ import java.security.MessageDigest;
 import java.security.spec.ECGenParameterSpec;
 import java.security.spec.ECParameterSpec;
 import java.security.spec.ECPoint;
+import java.security.spec.ECFieldFp;
 import java.security.spec.ECPublicKeySpec;
 import java.util.Arrays;
 import java.util.Base64;
@@ -79,6 +80,14 @@ class CustomerPushSubscriptionValidator {
                     1 + coordinateBytes,
                     encoded.length
             ));
+            var curve = specification.getCurve();
+            var prime = ((ECFieldFp) curve.getField()).getP();
+            if (x.compareTo(prime) >= 0 || y.compareTo(prime) >= 0
+                    || !y.multiply(y).mod(prime).equals(
+                    x.multiply(x).multiply(x).add(curve.getA().multiply(x))
+                            .add(curve.getB()).mod(prime))) {
+                throw invalid("Push subscription p256dh is not a valid P-256 public key");
+            }
             KeyFactory.getInstance("EC").generatePublic(
                     new ECPublicKeySpec(new ECPoint(x, y), specification)
             );

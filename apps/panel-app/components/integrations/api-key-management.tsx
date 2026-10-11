@@ -1,6 +1,6 @@
 import type { FormEvent } from "react";
 import type { Location } from "@/src/api/locations";
-import type { PendingOneTimeSecret } from "./one-time-secret";
+import type { PendingOneTimeSecret, SecretOperation } from "./one-time-secret";
 
 import {
   Alert,
@@ -50,11 +50,13 @@ export function ApiKeyManagement({
   integrationId,
   locations,
   onSecretIssued,
+  secretOperation,
 }: {
   accountId: string;
   integrationId: string;
   locations: Location[];
   onSecretIssued: (secret: PendingOneTimeSecret) => void;
+  secretOperation: SecretOperation;
 }) {
   const enabledLocations = locations.filter(
     (location) => location.status === "ENABLED",
@@ -90,7 +92,7 @@ export function ApiKeyManagement({
 
   async function issue(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (pendingAction) return;
+    if (pendingAction || !secretOperation.start()) return;
 
     setActionError(undefined);
     setPendingAction("issue");
@@ -125,6 +127,7 @@ export function ApiKeyManagement({
       setActionError(caught);
     } finally {
       setPendingAction(undefined);
+      secretOperation.finish();
     }
   }
 
@@ -260,7 +263,9 @@ export function ApiKeyManagement({
 
           <Button
             className="self-start"
-            isDisabled={enabledLocations.length === 0}
+            isDisabled={
+              enabledLocations.length === 0 || secretOperation.isPending
+            }
             isPending={pendingAction === "issue"}
             type="submit"
           >

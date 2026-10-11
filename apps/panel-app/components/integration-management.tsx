@@ -1,7 +1,10 @@
 import type { FormEvent } from "react";
 import type { Location } from "@/src/api/locations";
 import type { ExternalIntegration } from "@/src/api/integrations";
-import type { PendingOneTimeSecret } from "./integrations/one-time-secret";
+import type {
+  PendingOneTimeSecret,
+  SecretOperation,
+} from "./integrations/one-time-secret";
 
 import { Alert, Button, Spinner, Tabs, Tooltip } from "@heroui/react";
 import {
@@ -11,7 +14,7 @@ import {
   Plus as PlusIcon,
   Trash2 as TrashIcon,
 } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import useSWR from "swr";
 
 import { HoldToConfirmButton } from "@/components/hold-to-confirm-button";
@@ -42,6 +45,7 @@ function IntegrationDetails({
   locations,
   onDeleted,
   onSecretIssued,
+  secretOperation,
   onUpdated,
 }: {
   integration: ExternalIntegration;
@@ -49,6 +53,7 @@ function IntegrationDetails({
   locations: Location[];
   onDeleted: (integrationId: string) => Promise<void>;
   onSecretIssued: (secret: PendingOneTimeSecret) => void;
+  secretOperation: SecretOperation;
   onUpdated: (integration: ExternalIntegration) => Promise<void>;
 }) {
   const [name, setName] = useState(integration.name);
@@ -266,6 +271,7 @@ function IntegrationDetails({
             accountId={accountId}
             integrationId={integration.id}
             locations={locations}
+            secretOperation={secretOperation}
             onSecretIssued={onSecretIssued}
           />
         </Tabs.Panel>
@@ -274,6 +280,7 @@ function IntegrationDetails({
             accountId={accountId}
             integrationId={integration.id}
             locations={locations}
+            secretOperation={secretOperation}
             onSecretIssued={onSecretIssued}
           />
         </Tabs.Panel>
@@ -287,6 +294,11 @@ export function IntegrationManagement({ accountId }: { accountId: string }) {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedIntegrationId, setSelectedIntegrationId] = useState<string>();
   const [pendingSecret, setPendingSecret] = useState<PendingOneTimeSecret>();
+  const secretOperationOwner = useRef<"pending" | "issued" | undefined>(
+    undefined,
+  );
+  const [isSecretOperationPending, setIsSecretOperationPending] =
+    useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<unknown>();
 
@@ -315,6 +327,28 @@ export function IntegrationManagement({ accountId }: { accountId: string }) {
     (location) => location.status === "ENABLED",
   );
   const error = integrationsError ?? locationsError ?? createError;
+
+  const secretOperation: SecretOperation = {
+    isPending: isSecretOperationPending,
+    start() {
+      if (secretOperationOwner.current) return false;
+      secretOperationOwner.current = "pending";
+      setIsSecretOperationPending(true);
+
+      return true;
+    },
+    finish() {
+      if (secretOperationOwner.current === "pending") {
+        secretOperationOwner.current = undefined;
+      }
+      setIsSecretOperationPending(false);
+    },
+  };
+
+  function secretIssued(secret: PendingOneTimeSecret) {
+    secretOperationOwner.current = "issued";
+    setPendingSecret((current) => current ?? secret);
+  }
 
   function openCreate() {
     setCreateError(undefined);
@@ -378,6 +412,9 @@ export function IntegrationManagement({ accountId }: { accountId: string }) {
         onConfirmed={() => {
           pendingSecret.afterConfirmed?.();
           setPendingSecret(undefined);
+          secretOperationOwner.current = isSecretOperationPending
+            ? "pending"
+            : undefined;
         }}
       />
     );
@@ -464,8 +501,9 @@ export function IntegrationManagement({ accountId }: { accountId: string }) {
                   accountId={accountId}
                   integration={selectedIntegration}
                   locations={locations}
+                  secretOperation={secretOperation}
                   onDeleted={removeIntegration}
-                  onSecretIssued={setPendingSecret}
+                  onSecretIssued={secretIssued}
                   onUpdated={updateIntegration}
                 />
               </PanelPopup.Body>

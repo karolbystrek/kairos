@@ -58,6 +58,7 @@ public class SecurityConfig {
         source.registerCorsConfiguration("/account-invitation-previews/**", panelConfiguration);
         source.registerCorsConfiguration("/account-invitation-redemptions/**", panelConfiguration);
         source.registerCorsConfiguration("/orders/**", panelConfiguration);
+        source.registerCorsConfiguration("/menus/**", panelConfiguration);
         source.registerCorsConfiguration("/external-integrations/**", panelConfiguration);
         source.registerCorsConfiguration("/api-keys/**", panelConfiguration);
         source.registerCorsConfiguration("/webhook-subscriptions/**", panelConfiguration);

@@ -1,6 +1,11 @@
 package pl.karolbystrek.kairos.api.location.application;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import pl.karolbystrek.kairos.api.order.application.OrderService;
+import pl.karolbystrek.kairos.api.retention.application.RetentionPurgeService;
+import pl.karolbystrek.kairos.api.order.application.exception.ResourceNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -35,7 +40,37 @@ class LocationServiceIntegrationTests extends RedisListenerIsolatedIntegrationTe
     @Autowired
     private LocationService locationService;
 
+    @Autowired
+    private OrderService orderService;
+
+    @Autowired
+    private RetentionPurgeService purgeService;
+
     private final JdbcTemplate jdbcTemplate = PostgresTestDatabase.ownerDatabase();
+
+    @ParameterizedTest
+    @ValueSource(strings = {"COMPLETED", "CANCELED"})
+    void terminalTrackingSurvivesLocationDisablementAndArchival(String status) {
+        var tenantId = insertTenant();
+        var administrator = insertAccount(tenantId, TenantRole.ADMIN, AccountStatus.ENABLED);
+        var target = locationService.create(administrator, "Terminal tracking");
+        locationService.create(administrator, "Retained location");
+        var orderId = insertOrder(target.id(), status);
+        var reference = jdbcTemplate.queryForObject(
+                "SELECT tracking_reference FROM orders WHERE id = ?", UUID.class, orderId);
+
+        locationService.updateStatus(administrator, target.id(), LocationStatus.DISABLED);
+        assertThat(orderService.findTrackedOrder(reference).status().name()).isEqualTo(status);
+        locationService.delete(administrator, target.id());
+        assertThat(orderService.findTrackedOrder(reference).status().name()).isEqualTo(status);
+        jdbcTemplate.update("UPDATE locations SET archived_at = ? WHERE id = ?",
+                Timestamp.from(Instant.now().minus(31, ChronoUnit.DAYS)), target.id());
+        purgeService.purge();
+        assertThatThrownBy(() -> orderService.findTrackedOrder(reference))
+                .isInstanceOf(ResourceNotFoundException.class);
+        assertThatThrownBy(() -> orderService.findTrackedOrder(UUID.randomUUID()))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
 
     @Test
     void configuresReviewsOnlyForTheOwningAdministratorAndRejectsUnsafeLinks() {
