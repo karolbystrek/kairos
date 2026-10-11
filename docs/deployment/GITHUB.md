@@ -31,8 +31,10 @@ Check plan/repository visibility supports required reviewers; if unavailable,
 record it as a release blocker. Administrator bypass remains allowed under the
 owner-approved policy. See [GitHub Environment protection](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments).
 
-Set non-secret **repository** variables `NEXT_PUBLIC_API_BASE_URL` and
-`NEXT_PUBLIC_CUSTOMER_APP_URL` to the production values using `gh variable set`.
+Set non-secret **repository** variables `NEXT_PUBLIC_API_BASE_URL`,
+`NEXT_PUBLIC_CUSTOMER_APP_URL` and `NEXT_PUBLIC_PANEL_APP_URL` to the production
+values using `gh variable set`. `NEXT_PUBLIC_PANEL_APP_URL` must equal the
+runtime `PANEL_APP_URL`; the panel uses it for canonical and link-preview URLs.
 Validation/publication jobs run before the Environment gate and cannot read
 Environment variables. Frontend URLs are compiled into images; changing these
 variables requires a new source revision/build, because existing revision tags

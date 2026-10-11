@@ -4,13 +4,23 @@ import type { Metadata, Viewport } from "next";
 import { Providers } from "./providers";
 
 import { siteConfig } from "@/config/site";
+import { panelAppUrl } from "@/src/config/public-environment";
+import { SHARED_OPEN_GRAPH } from "@/src/seo/metadata";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(panelAppUrl),
+  applicationName: "Kairos",
   title: {
     default: siteConfig.name,
     template: `%s - ${siteConfig.name}`,
   },
   description: siteConfig.description,
+  openGraph: {
+    ...SHARED_OPEN_GRAPH,
+    title: siteConfig.name,
+    description: siteConfig.description,
+  },
+  twitter: { card: "summary_large_image" },
   icons: {
     icon: "/favicon.ico",
   },

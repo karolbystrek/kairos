@@ -3,11 +3,13 @@ import type { Metadata } from "next";
 import { LegalDocument } from "@/components/legal-document";
 import { customerAppUrl } from "@/src/config/public-environment";
 import { legalOperator } from "@/src/legal/operator";
+import { publicPageMetadata } from "@/src/seo/metadata";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = publicPageMetadata({
   title: "Polityka prywatności",
   description: "Jak Kairos przetwarza dane osobowe użytkowników panelu.",
-};
+  path: "/polityka-prywatnosci",
+});
 
 export default function PrivacyPolicyPage() {
   return (

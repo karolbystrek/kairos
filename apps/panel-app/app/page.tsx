@@ -4,11 +4,18 @@ import { Link } from "@heroui/react";
 import { buttonVariants } from "@heroui/styles";
 
 import { LandingSessionRedirect } from "@/components/landing-session-redirect";
+import { publicPageMetadata } from "@/src/seo/metadata";
+
+const TITLE = "Kairos — Wirtualne pagery dla restauracji";
 
 export const metadata: Metadata = {
-  title: { absolute: "Kairos — Wirtualne pagery dla restauracji" },
-  description:
-    "Klienci skanują kod QR i śledzą swoje zamówienia. Zarządzaj kolejką w restauracji bez fizycznych pagerów i pobierania aplikacji.",
+  ...publicPageMetadata({
+    title: TITLE,
+    description:
+      "Klienci skanują kod QR i śledzą swoje zamówienia. Zarządzaj kolejką w restauracji bez fizycznych pagerów i pobierania aplikacji.",
+    path: "/",
+  }),
+  title: { absolute: TITLE },
 };
 
 export default function Welcome() {

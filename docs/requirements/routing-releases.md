@@ -52,8 +52,8 @@ requests go directly to the dedicated API origin through the gateway.
 GitHub Actions validates pull requests and `main` with frontend lint, type checks,
 configured tests and production Docker builds, and the complete Maven `verify`
 lifecycle followed by the API Docker build. Frontend
-validation requires the non-secret `NEXT_PUBLIC_API_BASE_URL` and
-`NEXT_PUBLIC_CUSTOMER_APP_URL` inputs.
+validation requires the non-secret `NEXT_PUBLIC_API_BASE_URL`,
+`NEXT_PUBLIC_CUSTOMER_APP_URL` and `NEXT_PUBLIC_PANEL_APP_URL` inputs.
 
 Main pushes and manual dispatches on `main` publish all three application images
 only after those checks pass; pull requests never publish. Existing full-revision

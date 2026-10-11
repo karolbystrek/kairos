@@ -18,3 +18,8 @@ export const customerAppUrl = requiredEnvironmentVariable(
   "NEXT_PUBLIC_CUSTOMER_APP_URL",
   process.env.NEXT_PUBLIC_CUSTOMER_APP_URL,
 );
+
+export const panelAppUrl = requiredEnvironmentVariable(
+  "NEXT_PUBLIC_PANEL_APP_URL",
+  process.env.NEXT_PUBLIC_PANEL_APP_URL,
+);

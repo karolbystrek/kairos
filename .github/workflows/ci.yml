@@ -26,6 +26,7 @@ jobs:
       NEXT_TELEMETRY_DISABLED: "1"
       NEXT_PUBLIC_API_BASE_URL: ${{ vars.NEXT_PUBLIC_API_BASE_URL }}
       NEXT_PUBLIC_CUSTOMER_APP_URL: ${{ vars.NEXT_PUBLIC_CUSTOMER_APP_URL }}
+      NEXT_PUBLIC_PANEL_APP_URL: ${{ vars.NEXT_PUBLIC_PANEL_APP_URL }}
     defaults:
       run:
         working-directory: apps/${{ matrix.app }}
@@ -52,8 +53,13 @@ jobs:
             invalid=true
           fi
 
-          if [[ "${{ matrix.app }}" == "panel-app" && -z "${NEXT_PUBLIC_CUSTOMER_APP_URL}" ]]; then
+          if [[ -z "${NEXT_PUBLIC_CUSTOMER_APP_URL}" ]]; then
             echo "::error::Set the NEXT_PUBLIC_CUSTOMER_APP_URL repository variable."
+            invalid=true
+          fi
+
+          if [[ "${{ matrix.app }}" == "panel-app" && -z "${NEXT_PUBLIC_PANEL_APP_URL}" ]]; then
+            echo "::error::Set the NEXT_PUBLIC_PANEL_APP_URL repository variable."
             invalid=true
           fi
 
@@ -90,6 +96,7 @@ jobs:
           build-args: |
             NEXT_PUBLIC_API_BASE_URL=${{ vars.NEXT_PUBLIC_API_BASE_URL }}
             NEXT_PUBLIC_CUSTOMER_APP_URL=${{ vars.NEXT_PUBLIC_CUSTOMER_APP_URL }}
+            NEXT_PUBLIC_PANEL_APP_URL=${{ vars.NEXT_PUBLIC_PANEL_APP_URL }}
             NEXT_TELEMETRY_DISABLED=1
           cache-from: type=gha,scope=${{ matrix.app }}
           cache-to: type=gha,mode=max,scope=${{ matrix.app }}

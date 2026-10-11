@@ -11,6 +11,7 @@
 - [Controls, typography and accessibility](#controls-typography-and-accessibility)
 - [Navigation, cards and interaction](#navigation-cards-and-interaction)
 - [Frontend state and API ownership](#frontend-state-and-api-ownership)
+- [Search indexing and link previews](#search-indexing-and-link-previews)
 - [2.2 Backend](#22-backend)
 - [2.3 API contracts](#23-api-contracts)
 
@@ -226,6 +227,10 @@ define handwritten inline SVG icon components.
 HeroUI is the component library for both applications. Zod validates frontend-owned form input and server-sent event payloads. Native `fetch` is the HTTP transport inside small handwritten REST request modules. SWR manages REST-backed client state in both frontends where caching, request deduplication, mutations, focus revalidation, or reconnect revalidation applies. React effects are reserved for synchronization with external systems rather than routine REST request orchestration.
 
 The Spring API retains domain authority. Frontend controls and redirects provide user experience, while the backend enforces authorization.
+
+#### Search indexing and link previews
+
+Only public service information is indexable: the panel landing page, terms and privacy policy, and the customer home and privacy notice. Each has a canonical URL, Polish Open Graph metadata and a build-time preview image, and appears in its application's sitemap. Order pages, order manifests, scanning, the offline fallback, login, registration and the dashboard carry `noindex, nofollow`; order pages and manifests also send `X-Robots-Tag`. `robots.txt` does not block private paths, so crawlers can read their noindex rules. Order-page titles and previews are generic and never include the tracking reference, order label or status. Absolute URLs come from the build-time `NEXT_PUBLIC_CUSTOMER_APP_URL` and `NEXT_PUBLIC_PANEL_APP_URL` origins. Structured data and ranking work are out of scope.
 
 ### 2.2 Backend
 
