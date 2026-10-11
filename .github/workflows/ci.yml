@@ -186,7 +186,7 @@ jobs:
   release-checks:
     name: Release checks
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
@@ -200,6 +200,20 @@ jobs:
         run: |
           ansible-playbook -i deployment/inventory.example.ini deployment/bootstrap.yml --syntax-check
           sh tests/bootstrap-test.sh
+
+      - name: Verify gateway and setup prerequisites
+        run: |
+          docker info > /dev/null
+          docker compose version
+          openssl version
+          docker pull nginx:1.28-alpine
+
+      - name: Test gateway and secret preservation
+        run: |
+          python3 tests/gateway-test.py
+          sh tests/setup-test.sh
+          sh tests/reset-test.sh
+          python3 tests/zitadel-bootstrap-test.py
 
       - name: Test manifest
         run: python3 -m unittest discover -s deployment -p 'test_*.py' -v
