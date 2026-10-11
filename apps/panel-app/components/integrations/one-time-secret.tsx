@@ -2,6 +2,12 @@ import { Alert, Button, Input, Label, TextField, Tooltip } from "@heroui/react";
 import { Check as CheckIcon, Copy as CopyIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
+export type SecretOperation = {
+  isPending: boolean;
+  start: () => boolean;
+  finish: () => void;
+};
+
 export type PendingOneTimeSecret = {
   title: string;
   description: string;

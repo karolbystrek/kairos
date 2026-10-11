@@ -1,6 +1,6 @@
 import type { FormEvent } from "react";
 import type { Location } from "@/src/api/locations";
-import type { PendingOneTimeSecret } from "./one-time-secret";
+import type { PendingOneTimeSecret, SecretOperation } from "./one-time-secret";
 import type {
   WebhookEventType,
   WebhookSubscription,
@@ -247,11 +247,13 @@ export function WebhookSubscriptionManagement({
   integrationId,
   locations,
   onSecretIssued,
+  secretOperation,
 }: {
   accountId: string;
   integrationId: string;
   locations: Location[];
   onSecretIssued: (secret: PendingOneTimeSecret) => void;
+  secretOperation: SecretOperation;
 }) {
   const enabledLocations = locations.filter(
     (location) => location.status === "ENABLED",
@@ -288,7 +290,7 @@ export function WebhookSubscriptionManagement({
 
   async function create(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (pendingAction) return;
+    if (pendingAction || !secretOperation.start()) return;
 
     setActionError(undefined);
     setPendingAction("create");
@@ -321,6 +323,7 @@ export function WebhookSubscriptionManagement({
       setActionError(caught);
     } finally {
       setPendingAction(undefined);
+      secretOperation.finish();
     }
   }
 
@@ -406,7 +409,7 @@ export function WebhookSubscriptionManagement({
   }
 
   async function rotate(subscription: WebhookSubscription) {
-    if (pendingAction) return;
+    if (pendingAction || !secretOperation.start()) return;
 
     setActionError(undefined);
     setPendingAction(`rotate-${subscription.id}`);
@@ -444,6 +447,7 @@ export function WebhookSubscriptionManagement({
       setActionError(caught);
     } finally {
       setPendingAction(undefined);
+      secretOperation.finish();
     }
   }
 
@@ -558,7 +562,9 @@ export function WebhookSubscriptionManagement({
           />
           <Button
             className="self-start"
-            isDisabled={enabledLocations.length === 0}
+            isDisabled={
+              enabledLocations.length === 0 || secretOperation.isPending
+            }
             isPending={pendingAction === "create"}
             type="submit"
           >
@@ -676,6 +682,7 @@ export function WebhookSubscriptionManagement({
                     </Tooltip.Content>
                   </Tooltip>
                   <Button
+                    isDisabled={secretOperation.isPending}
                     isPending={pendingAction === `rotate-${subscription.id}`}
                     variant="secondary"
                     onPress={() => rotate(subscription)}
