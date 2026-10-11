@@ -133,6 +133,23 @@ class RetentionPurgeIntegrationTests extends RedisListenerIsolatedIntegrationTes
     }
 
     @Test
+    void purgeFunctionRefusesUnexpiredInvitationsEvenWithForgedWorkerSettings() {
+        var invitation = insertInvitation(tenant.firstLocationId(), tenant.administrator().accountId(),
+                "PENDING", Instant.now(), null);
+        var identity = invitation.toString();
+
+        assertThatThrownBy(() -> new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            runtimeJdbc.queryForMap("""
+                    SELECT set_config('kairos.scope', 'INVITATION_PURGE', true), set_config('kairos.identity', ?, true),
+                           set_config('kairos.selected', 'INVITATION_PURGE:' || ?, true)
+                    """, identity, identity);
+            runtimeJdbc.queryForObject("SELECT public.purge_retained('INVITATION_PURGE', ?::uuid)", Boolean.class, identity);
+        })).rootCause().hasMessageContaining("Only deleted data can be purged");
+
+        assertThat(count("SELECT count(*) FROM account_invitations WHERE id = ?", invitation)).isOne();
+    }
+
+    @Test
     void purgesArchivedLocationWithItsOrdersWithoutTouchingOtherLocations() {
         var otherTenant = new IntegrationTestFixture(jdbcTemplate).createTenant();
         var archivedOrder = orderService.createOrder(tenant.administrator(), tenant.secondLocationId(), null);

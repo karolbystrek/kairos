@@ -1088,7 +1088,8 @@ BEGIN
     ELSIF operation='LOCATION_PURGE' THEN
         PERFORM 1 FROM public.locations l WHERE l.id=resource AND l.status='ARCHIVED' FOR UPDATE;
     ELSE
-        PERFORM 1 FROM public.account_invitations i WHERE i.id=resource AND i.state IN ('PENDING','REVOKED') FOR UPDATE;
+        PERFORM 1 FROM public.account_invitations i WHERE i.id=resource
+            AND (i.state='REVOKED' OR (i.state='PENDING' AND i.expires_at<CURRENT_TIMESTAMP)) FOR UPDATE;
     END IF;
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Only deleted data can be purged' USING ERRCODE='42501';
