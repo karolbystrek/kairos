@@ -6,10 +6,10 @@ import ts from "typescript";
 
 const require = createRequire(import.meta.url);
 
-async function submitRegistration({ invited = false, fails = false } = {}) {
+async function submitRegistration({ invited = false, fails = false, termsAccepted = true } = {}) {
   const redirects = [];
   const requests = [];
-  const values = ["owner@example.com", "long-password", "long-password"];
+  const values = ["owner@example.com", "long-password", "long-password", termsAccepted];
   let cursor = 0;
   const exports = {};
   const source = ts.transpileModule(
@@ -78,4 +78,12 @@ test("invited registration fixes the email from the invitation instead of editab
   assert.equal(email.value, "invited@example.com");
   assert.equal(email.isReadOnly, true);
   assert.equal(view.requests[0].input.email, "invited@example.com");
+});
+
+test("registration requires accepting the terms before creating an account", async () => {
+  for (const invited of [false, true]) {
+    const view = await submitRegistration({ invited, termsAccepted: false });
+    assert.deepEqual(view.requests, []);
+    assert.deepEqual(view.redirects, []);
+  }
 });

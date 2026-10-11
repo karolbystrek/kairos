@@ -6,7 +6,6 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 
 import pl.karolbystrek.kairos.api.notification.domain.CustomerPushDelivery;
-import pl.karolbystrek.kairos.api.notification.domain.CustomerPushKind;
 import pl.karolbystrek.kairos.api.notification.domain.CustomerPushDeliveryStatus;
 
 import java.time.Instant;
@@ -19,7 +18,7 @@ import java.util.UUID;
 public interface CustomerPushDeliveryRepository
         extends JpaRepository<CustomerPushDelivery, UUID> {
 
-    boolean existsByOutboxEventIdAndSubscriptionIdAndKind(UUID outboxEventId, UUID subscriptionId, CustomerPushKind kind);
+    boolean existsByOutboxEventIdAndSubscriptionId(UUID outboxEventId, UUID subscriptionId);
 
     List<CustomerPushDelivery> findAllBySubscriptionIdAndOrderIdAndStatus(
             UUID subscriptionId,

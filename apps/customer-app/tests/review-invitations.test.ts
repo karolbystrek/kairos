@@ -3,7 +3,6 @@ import "fake-indexeddb/auto";
 import { beforeEach, expect, it } from "vitest";
 
 import {
-  applyReviewPush,
   consumeReviewInvitation,
   readReviewReferences,
   rememberReviewReference,
@@ -38,16 +37,12 @@ it("preserves review recovery after completion cleanup without changing the curr
   expect(await readLastStableDestination()).toEqual({ kind: "home" });
 });
 
-it("deduplicates review pushes and suppresses them after dismissal or notification opt-out", async () => {
-  await updateNotificationMetadata({ notificationsEnabled: true });
-  expect(await applyReviewPush(reference)).toBe(true);
-  expect(await applyReviewPush(reference)).toBe(false);
+it("keeps a dismissed invitation hidden after the order is remembered again", async () => {
+  await rememberReviewReference(reference);
+  expect(await readReviewReferences()).toContain(reference);
   await consumeReviewInvitation(reference);
   await rememberReviewReference(reference);
   expect(await readReviewReferences()).not.toContain(reference);
-  expect(await applyReviewPush(reference)).toBe(false);
-  await updateNotificationMetadata({ notificationsEnabled: false });
-  expect(await applyReviewPush(eventId)).toBe(false);
 });
 
 it("recovers completion through REST on return and keeps invitations hidden until due", async () => {

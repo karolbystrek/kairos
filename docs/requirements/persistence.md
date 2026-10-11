@@ -114,5 +114,5 @@ separately authorized operator actions.
 Locations retain an optional Google review link and its configuration identity.
 Completion captures the due time and configuration identity on the order; later
 configuration changes/disablement invalidate outstanding follow-ups without
-keeping terminal notification enrollments. Completion and review deliveries have
-separate kinds, stable notification identities and transport topics.
+keeping terminal notification enrollments. Review invitations create no push
+deliveries.

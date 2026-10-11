@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, Spinner } from "@heroui/react";
+import { Button, Link, Spinner } from "@heroui/react";
 import { QrCode } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -77,6 +77,12 @@ export function CustomerHome({
           <Spinner aria-label="Otwieranie Kairos" />
         )}
       </div>
+      <Link
+        className="absolute bottom-0 left-1/2 min-h-11 -translate-x-1/2 text-sm text-muted"
+        href="/prywatnosc"
+      >
+        Prywatność
+      </Link>
     </section>
   );
 }

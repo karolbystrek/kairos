@@ -6,7 +6,6 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 import pl.karolbystrek.kairos.api.notification.application.model.ClaimedCustomerPushDelivery;
-import pl.karolbystrek.kairos.api.notification.domain.CustomerPushKind;
 import pl.karolbystrek.kairos.api.notification.infrastructure.config.CustomerNotificationProperties;
 import pl.karolbystrek.kairos.api.notification.infrastructure.persistence.CustomerPushDeliveryRepository;
 import pl.karolbystrek.kairos.api.notification.infrastructure.persistence.CustomerPushSubscriptionRepository;
@@ -72,8 +71,7 @@ public class CustomerPushDeliveryClaimService {
         }
         var event = outboxRepository.findById(delivery.getOutboxEventId()).orElse(null);
         var order = orderRepository.findById(delivery.getOrderId()).orElse(null);
-        if (event == null || order == null || order.getStatus() != event.getStatus()
-                || (delivery.getKind() == CustomerPushKind.REVIEW && !order.isReviewEligible())) {
+        if (event == null || order == null || order.getStatus() != event.getStatus()) {
             delivery.retry(
                     claimToken,
                     now,
@@ -147,7 +145,7 @@ public class CustomerPushDeliveryClaimService {
                     delivery.getId(),
                     claimToken,
                     subscription.getId(),
-                    delivery.getKind() == CustomerPushKind.REVIEW ? delivery.getId() : event.getId(),
+                    event.getId(),
                     endpoint,
                     subscription.getP256dhKey(),
                     authSecret,

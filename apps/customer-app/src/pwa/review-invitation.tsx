@@ -9,10 +9,7 @@ import {
   readInvitations,
   selectReviewInvitation,
 } from "@/src/pwa/review-invitations";
-import {
-  consumeReviewInvitation,
-  rememberReviewReference,
-} from "@/src/pwa/storage";
+import { consumeReviewInvitation } from "@/src/pwa/storage";
 
 function subscribeConnectivity(changed: () => void) {
   window.addEventListener("online", changed);
@@ -56,9 +53,6 @@ export function ReviewInvitation() {
   const current = selectReviewInvitation(data, consumed, online && !error);
 
   useEffect(() => {
-    const reference = new URL(window.location.href).searchParams.get("review");
-
-    if (reference) void rememberReviewReference(reference).catch(() => {});
     const changed = () => {
       void mutate();
     };
@@ -70,13 +64,11 @@ export function ReviewInvitation() {
     window.addEventListener("offline", offline);
     window.addEventListener("kairos-reviews-changed", changed);
     window.addEventListener("online", changed);
-    navigator.serviceWorker?.addEventListener("message", changed);
 
     return () => {
       window.removeEventListener("offline", offline);
       window.removeEventListener("kairos-reviews-changed", changed);
       window.removeEventListener("online", changed);
-      navigator.serviceWorker?.removeEventListener("message", changed);
     };
   }, [mutate]);
 

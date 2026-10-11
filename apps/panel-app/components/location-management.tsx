@@ -468,7 +468,8 @@ export function LocationManagement({
                     onChange={setEditReviewUrl}
                   />
                   <p className="secondary-text">
-                    Zaproszenie do opinii wysyłamy raz, po odebraniu zamówienia.
+                    Zaproszenie do opinii pokazujemy klientowi raz w aplikacji,
+                    po odebraniu zamówienia, bez powiadomienia push.
                   </p>
                   <Button
                     className="self-start"
