@@ -36,11 +36,44 @@ export const customOrderLabelSchema = z
     "Użyj jednej linii tekstu.",
   );
 
+export const maximumOrderLabelLength = 200;
+// Reserves room for the automatic daily number and separator the API prepends.
+const automaticPrefixReserve = Array.from("9999 · ").length;
+
+export const orderItemSchema = z.object({
+  name: z.string().min(1),
+  quantity: z.number().int().min(1).max(99),
+});
+
+export type OrderItem = z.infer<typeof orderItemSchema>;
+
+// Mirrors the API label format so staff can preview and size their selection.
+export function describeOrderItems(items: OrderItem[]): string {
+  return items
+    .map((item) =>
+      item.quantity === 1 ? item.name : `${item.quantity}× ${item.name}`,
+    )
+    .join(", ");
+}
+
 export const createOrderInputSchema = z.discriminatedUnion("mode", [
   z.object({ mode: z.literal("AUTO") }),
   z.object({
     mode: z.literal("CUSTOM"),
     label: customOrderLabelSchema,
+  }),
+  z.object({
+    mode: z.literal("ITEMS"),
+    items: z
+      .array(orderItemSchema)
+      .min(1)
+      .refine(
+        (items) =>
+          Array.from(describeOrderItems(items)).length +
+            automaticPrefixReserve <=
+          maximumOrderLabelLength,
+        "Wybrane pozycje nie zmieszczą się w etykiecie. Wybierz mniej pozycji.",
+      ),
   }),
 ]);
 
@@ -72,7 +105,11 @@ export function createOrder(
 ): Promise<StaffOrder> {
   const parsedInput = createOrderInputSchema.parse(input);
   const body =
-    parsedInput.mode === "CUSTOM" ? { label: parsedInput.label } : {};
+    parsedInput.mode === "CUSTOM"
+      ? { label: parsedInput.label }
+      : parsedInput.mode === "ITEMS"
+        ? { items: parsedInput.items }
+        : {};
 
   return request("/api/orders/v1", staffOrderSchema, {
     method: "POST",

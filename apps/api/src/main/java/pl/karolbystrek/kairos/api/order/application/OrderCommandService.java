@@ -7,6 +7,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import pl.karolbystrek.kairos.api.location.domain.Location;
 import pl.karolbystrek.kairos.api.notification.infrastructure.config.ReviewInvitationProperties;
+import pl.karolbystrek.kairos.api.order.application.exception.InvalidOrderRequestException;
 import pl.karolbystrek.kairos.api.order.application.model.ExternalOrderCreation;
 import pl.karolbystrek.kairos.api.order.application.model.OrderInitiator;
 import pl.karolbystrek.kairos.api.order.application.model.OrderStatusChangedEvent;
@@ -43,6 +44,32 @@ public class OrderCommandService {
         var label = customLabel == null
                 ? Long.toString(nextAutomaticLabelNumber(location.getId(), now))
                 : customLabel;
+        return persist(location, label, initiator, externalCreation, now);
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public CustomerOrder createWithItems(
+            Location location,
+            String itemSummary,
+            OrderInitiator initiator,
+            Instant now
+    ) {
+        var label = nextAutomaticLabelNumber(location.getId(), now) + " · " + itemSummary;
+        if (label.codePointCount(0, label.length()) > CustomerOrder.MAXIMUM_LABEL_LENGTH) {
+            throw new InvalidOrderRequestException(
+                    "The selected menu items do not fit in an order label; choose fewer items"
+            );
+        }
+        return persist(location, label, initiator, null, now);
+    }
+
+    private CustomerOrder persist(
+            Location location,
+            String label,
+            OrderInitiator initiator,
+            ExternalOrderCreation externalCreation,
+            Instant now
+    ) {
         var order = externalCreation == null
                 ? CustomerOrder.create(location, label, now)
                 : CustomerOrder.createByIntegration(

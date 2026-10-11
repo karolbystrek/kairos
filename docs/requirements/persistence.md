@@ -48,6 +48,7 @@ The database schema must include tables covering the following concepts. Names a
 * **Orders:** public tracking identity, owning location, immutable customer-visible text label, current state, and lifecycle timestamps. Tenant ownership is derived through the location.
 * **Order history:** order association, resulting state, acceptance time, and the initiator category and identity when known; records are append-only and have an unambiguous order. Initiator categories distinguish users, external integrations, and system actions without coupling history to one authentication mechanism.
 * **Automatic order-label allocation:** when a custom label is omitted, the concurrency-safe decimal label is one greater than the count of all orders created for the location during the current UTC date. Custom-labeled orders advance this daily ordinal. No separate numbering date, numeric value, label source, or allocation state is stored on the order; the allocated text is persisted only in its label.
+* **Menus:** tenant association, normalized name, ordered item names and the optional active menu of each location; see [menus](menus.md#menu-storage-and-access).
 * **External Integrations:** tenant association, normalized name, and enabled, disabled, or archived lifecycle state.
 * **API Keys:** immutable scopes, expiration, hashed one-time secret material and
   location grants on the named key, except for the removal of an archived
@@ -77,7 +78,7 @@ The consolidated initial migration requires a normalized email for every
 account; local development data is recreated manually when applying that
 initial schema change.
 
-Order labels are trimmed, single-line text with a maximum of 32 characters. Automatic labeling is requested by omitting the custom label and uses the order's one-based creation ordinal among all orders at its location during the current UTC date. A provided blank label is invalid. Labels preserve casing, may contain ordinary Unicode text, and are not unique; staff remain responsible for avoiding ambiguous duplicates. Labels cannot be edited after order creation.
+Order labels are trimmed, single-line text with a maximum of 200 characters; custom labels supplied by staff or External Integrations remain limited to 32 characters, and longer labels arise only from [menu-item selections](menus.md#ordering-from-a-menu). Automatic labeling is requested by omitting the custom label and uses the order's one-based creation ordinal among all orders at its location during the current UTC date. A provided blank label is invalid. Labels preserve casing, may contain ordinary Unicode text, and are not unique; staff remain responsible for avoiding ambiguous duplicates. Labels cannot be edited after order creation.
 
 Ownership columns and related order/location/tenant, event/order and webhook
 recipient/signing-version relationships are constrained consistently. Location

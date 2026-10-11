@@ -39,6 +39,8 @@ The current walking vertical slice is implemented for local development:
   and archived lifecycle state, atomic Account and invitation cascades,
   integration-grant cleanup, zero-enabled-location Orders recovery, and
   disabled-interval webhook fan-out boundaries;
+* administrator-managed tenant Menus, manager- or administrator-chosen active
+  location menus, and menu-item selections stored in order labels;
 * enabled, disabled, and archived member Accounts with statusless retained
   Location Assignments, nondisclosing authentication eligibility, and
   irreversible Account Delete;
