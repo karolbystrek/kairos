@@ -10,30 +10,26 @@ Use [the production runbook](RUNBOOK.md) for prerequisites and the sequence.
 
 ## 5. First install and later releases
 
-CI validates main pushes and publishes a complete `release-manifest` artifact;
-it does not request production approval or deploy. After provisioning and
-authorization, start the separate deployment workflow from `main`:
+CI validates main pushes and builds all three application images without
+publishing to GHCR or requesting production approval. Main CI image artifacts
+are retained for 30 days. After provisioning and authorization, start the
+separate deployment workflow from `main`:
 
 ```bash
 gh workflow run deploy.yml --ref main
 ```
 
-The optional `revision` input accepts a 7–40-character hexadecimal commit SHA:
-
-```bash
-gh workflow run deploy.yml --ref main -f revision=<commit-sha>
-```
-
-Without that input, deployment selects the latest `main` commit when the run
-resolves the release. A selected commit must belong to `main` history and have a
-successful CI run with an unexpired `release-manifest` artifact. Selection fails
-before requesting approval if no eligible release exists; wait for CI, or rerun
-CI for the selected revision if its artifact expired. Publication reuses existing
-immutable registry images and regenerates a byte-identical bundle from the same
-image digests and runtime contents. Rebuilding images with changed digests or
-changing runtime files creates different content and cannot replace an existing
-host release under that revision; publish those changes under a new revision. The selected full revision stays
-fixed even if `main` advances while approval is pending.
+Deployment always uses the latest `main` revision captured when the workflow
+is dispatched; there is no revision input. Its `Publish release` job locates a
+successful main CI run for that exact revision with all three unexpired image
+artifacts, publishes those exact images, and creates the `release-manifest`
+artifact. Missing or expired images fail publication before production approval;
+finish or rerun CI for the revision, then retry deployment. Publication reuses
+existing immutable registry images and regenerates a byte-identical bundle from
+the same image digests and runtime contents. Rebuilding images with changed
+digests or changing runtime files cannot replace an existing host release under
+that revision; use a new revision. The deployment revision stays fixed even if
+`main` advances while approval is pending.
 
 Review the selected CI run, full revision, all three digests, launch blockers and
 maintenance window before approving `Deploy production`. Retain both workflow
