@@ -1,5 +1,6 @@
 package pl.karolbystrek.kairos.api.retention.application;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -23,6 +24,7 @@ import java.util.UUID;
 @Slf4j
 public class RetentionPurgeService {
 
+    private final MeterRegistry meters;
     private final WorkerDiscoveryRepository workerDiscoveryRepository;
     private final DatabaseAccessContext databaseAccessContext;
     private final ZitadelClient identityProvider;
@@ -46,6 +48,7 @@ public class RetentionPurgeService {
                 identityProvider.deleteUser(account.providerSubject());
             } catch (ResponseStatusException exception) {
                 if (exception.getStatusCode().value() != 404) {
+                    meters.counter("kairos.worker.failures", "worker", "retention").increment();
                     log.warn("Deferred purge of account {}: identity provider returned {}",
                             account.id(), exception.getStatusCode().value());
                     deferredAccounts.add(account.id());
@@ -85,6 +88,7 @@ public class RetentionPurgeService {
             try {
                 result = transactionTemplate.execute(purgeNext);
             } catch (RuntimeException exception) {
+                meters.counter("kairos.worker.failures", "worker", "retention").increment();
                 // A failing item stops only its own batch; the other kinds still run this cycle.
                 log.error("Retention purge of {} failed", kind, exception);
                 break;

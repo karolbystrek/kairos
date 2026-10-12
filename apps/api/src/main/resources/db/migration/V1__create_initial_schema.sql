@@ -1342,6 +1342,30 @@ BEGIN
     RETURN true;
 END $$;
 
+CREATE FUNCTION public.operational_backlog()
+RETURNS TABLE(worker text, pending_count bigint, oldest_age_seconds double precision)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
+    SELECT 'analytics'::text, count(*),
+        COALESCE(GREATEST(0, extract(epoch FROM (current_timestamp - min(occurred_at)))), 0)::double precision
+    FROM public.order_measurements
+    UNION ALL
+    SELECT 'webhook_fanout', count(*),
+        COALESCE(GREATEST(0, extract(epoch FROM (current_timestamp - min(occurred_at)))), 0)::double precision
+    FROM public.order_outbox_events WHERE webhook_fanout_completed_at IS NULL
+    UNION ALL
+    SELECT 'push_fanout', count(*),
+        COALESCE(GREATEST(0, extract(epoch FROM (current_timestamp - min(occurred_at)))), 0)::double precision
+    FROM public.order_outbox_events WHERE push_fanout_completed_at IS NULL
+    UNION ALL
+    SELECT 'webhook_delivery', count(*),
+        COALESCE(GREATEST(0, extract(epoch FROM (current_timestamp - min(created_at)))), 0)::double precision
+    FROM public.webhook_deliveries WHERE status IN ('PENDING','PROCESSING')
+    UNION ALL
+    SELECT 'push_delivery', count(*),
+        COALESCE(GREATEST(0, extract(epoch FROM (current_timestamp - min(created_at)))), 0)::double precision
+    FROM public.customer_push_deliveries WHERE status IN ('PENDING','PROCESSING');
+$$;
+
 REVOKE ALL ON ALL TABLES IN SCHEMA public FROM PUBLIC;
 REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM PUBLIC;
 REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA kairos_security FROM PUBLIC;
@@ -1355,7 +1379,7 @@ GRANT SELECT,INSERT,UPDATE,DELETE ON tenants,locations,menus,menu_items,location
     spring_session,spring_session_attributes TO "${runtimeUser}";
 GRANT USAGE ON SEQUENCE order_history_id_seq TO "${runtimeUser}";
 GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA kairos_security TO "${runtimeUser}";
-GRANT EXECUTE ON FUNCTION public.valid_staff(uuid,uuid,text),public.lock_staff_location(),public.lock_account_location(uuid),
+GRANT EXECUTE ON FUNCTION public.operational_backlog(),public.valid_staff(uuid,uuid,text),public.lock_staff_location(),public.lock_account_location(uuid),
     public.api_key_authentication(uuid,timestamptz),public.record_api_key_use(uuid,timestamptz,timestamptz),
     public.valid_integration(uuid,uuid,uuid,text[],uuid[],timestamptz),
     public.staff_authentication(text),public.identity_conflict(text,text),public.verify_push_subscription(text),

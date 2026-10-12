@@ -110,6 +110,10 @@ Draft Polish terms, privacy notices and their in-app entry points are in place;
 the remaining [legal readiness gates](legal.md#launch-blockers) must close
 before real users.
 
+Operational instrumentation and a dedicated, secret-file-authenticated Prometheus
+export are implemented; see [operational metrics](operational-metrics.md). No
+collector is connected or operational history retained by this increment.
+
 ### Outstanding security and acceptance
 
 Outstanding security and acceptance work:

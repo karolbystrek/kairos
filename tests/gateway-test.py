@@ -117,8 +117,14 @@ def main():
                 for path in ('/api', '/api/orders/v1'):
                     assert request(path, 'customer.kairos.localhost')[0] == 404
                     assert request(path, 'panel.kairos.localhost')[0] == 404
-                for path in ('/', '/health', '/actuator/health', '/api/actuator', '/api/actuator/health'):
+                for path in ('/', '/health', '/actuator/health', '/api/actuator', '/api/actuator/health',
+                             '/api/actuator/env', '/api/actuator/prometheus/extra'):
                     assert request(path)[0] == 404, path
+                status, body, headers = request('/api/actuator/prometheus')
+                assert status == 200 and body.startswith('8080|'), 'metrics route did not reach API'
+                assert headers['Cache-Control'] == 'no-store'
+                for host in ('customer.kairos.localhost', 'panel.kairos.localhost'):
+                    assert request('/api/actuator/prometheus', host)[0] == 404
                 try:
                     request('/', 'unknown.invalid')
                     raise AssertionError('unknown host accepted')

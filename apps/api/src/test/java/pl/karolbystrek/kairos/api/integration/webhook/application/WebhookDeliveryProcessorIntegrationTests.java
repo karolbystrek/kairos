@@ -1,6 +1,7 @@
 package pl.karolbystrek.kairos.api.integration.webhook.application;
 
 import com.sun.net.httpserver.HttpServer;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -48,6 +49,9 @@ class WebhookDeliveryProcessorIntegrationTests
 
     @Autowired
     private OrderService orderService;
+
+    @Autowired
+    private MeterRegistry meters;
 
     private final JdbcTemplate jdbcTemplate = PostgresTestDatabase.ownerDatabase();
 
@@ -110,7 +114,11 @@ class WebhookDeliveryProcessorIntegrationTests
                 jdbcTemplate.update("UPDATE webhook_signing_secret_versions SET encrypted_secret = ? WHERE subscription_id = ?", encryptedSecret, issued.subscription().id());
             }
 
+            var failures = meters.counter("kairos.delivery.attempts", "channel", "webhook", "outcome", "failed");
+            var before = failures.count();
             deliveryProcessor.process(claimed);
+            assertThat(failures.count()).isEqualTo(before + 1);
+
 
             assertThat(jdbcTemplate.queryForObject("SELECT status FROM webhook_deliveries WHERE id = ?", String.class, claimed.id())).isEqualTo("DEAD_LETTERED");
             if (corruptSigningMaterial) {
@@ -128,6 +136,10 @@ class WebhookDeliveryProcessorIntegrationTests
                 assertThat(jdbcTemplate.queryForObject("SELECT error_type FROM webhook_deliveries WHERE id = ?", String.class, claimed.id())).isEqualTo("NON_2XX_RESPONSE");
                 assertThat(jdbcTemplate.queryForObject("SELECT response_body FROM webhook_deliveries WHERE id = ?", String.class, claimed.id())).isEqualTo("recipient failed");
             }
+            deliveryProcessor.process(claimed);
+            assertThat(failures.count()).isEqualTo(before + 1);
+            assertThat(meters.get("kairos.delivery.attempts").tags("channel", "webhook", "outcome", "stale")
+                    .counter().count()).isGreaterThanOrEqualTo(1);
             assertThat(claimService.claimAvailable()).isEmpty();
             assertThat(jdbcTemplate.queryForObject(
                     "SELECT status FROM orders WHERE id = ?",

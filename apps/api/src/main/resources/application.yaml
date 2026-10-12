@@ -44,7 +44,18 @@ server:
   servlet:
     context-path: /api
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  metrics:
+    enable:
+      http.client.requests: false
+
 kairos:
+  monitoring:
+    token-location: "${KAIROS_MONITORING_TOKEN_LOCATION:file:/run/secrets/metrics-token}"
   origins:
     customer: "${NEXT_PUBLIC_CUSTOMER_APP_URL}"
     panel: "${PANEL_APP_URL}"

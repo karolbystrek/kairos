@@ -23,7 +23,8 @@ requests go directly to the dedicated API origin through the gateway.
   External Integration APIs and internal management endpoints have no browser
   CORS policy. Next.js services render frontend concerns only.
 * NGINX rejects unknown hosts, keeps frontend and API path spaces separate, and
-  exposes Actuator only to container-internal health checks. The API hostname
+  forwards only the dedicated bearer-protected Prometheus Actuator resource;
+  other management resources stay limited to container-internal health checks. The API hostname
   forwards `/api/`; frontend hostnames reject that namespace.
 * NGINX and applications share the gateway network. Only the API also joins the
   internal data network containing PostgreSQL and Redis.
