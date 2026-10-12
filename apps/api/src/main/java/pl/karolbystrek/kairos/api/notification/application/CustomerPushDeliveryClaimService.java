@@ -1,5 +1,6 @@
 package pl.karolbystrek.kairos.api.notification.application;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -30,6 +31,7 @@ public class CustomerPushDeliveryClaimService {
     private static final String ENDPOINT_PURPOSE = "endpoint";
     private static final String AUTH_SECRET_PURPOSE = "auth-secret";
 
+    private final MeterRegistry meters;
     private final CustomerPushDeliveryRepository deliveryRepository;
     private final CustomerPushSubscriptionRepository subscriptionRepository;
     private final CustomerOrderRepository orderRepository;
@@ -153,6 +155,7 @@ public class CustomerPushDeliveryClaimService {
                     delivery.getDeadlineAt()
             ));
         } catch (RuntimeException exception) {
+            meters.counter("kairos.worker.failures", "worker", "push_delivery").increment();
             delivery.deadLetter(
                     claimToken,
                     now,

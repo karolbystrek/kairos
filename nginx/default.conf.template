@@ -132,6 +132,12 @@ server {
 
     ${KAIROS_NGINX_TLS_CONFIGURATION}
 
+    # Only this management resource reaches its dedicated API authentication chain.
+    location = /api/actuator/prometheus {
+        proxy_pass http://kairos_api;
+        add_header Cache-Control "no-store" always;
+    }
+
     location = /api/actuator {
         return 404;
     }

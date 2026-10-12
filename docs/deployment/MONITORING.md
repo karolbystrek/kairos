@@ -11,6 +11,9 @@
 - [Response and maintenance](#response-and-maintenance)
 - [Activation status](#activation-status)
 
+Application metrics use a separate [protected API export](OPERATIONAL_METRICS.md).
+Its collector deployment is deferred; native alarms below remain independent.
+
 Use AWS-provided instance metrics for the disposable development VPS, following
 the [operations policy](../requirements/routing-releases.md#development-operations-policy).
 No host installation, monitoring agent, custom script or additional service is

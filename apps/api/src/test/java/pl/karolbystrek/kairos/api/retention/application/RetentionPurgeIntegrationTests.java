@@ -1,5 +1,6 @@
 package pl.karolbystrek.kairos.api.retention.application;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatchers;
@@ -30,6 +31,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @SpringBootTest
 @Import(MutableTestClockConfiguration.class)
 class RetentionPurgeIntegrationTests extends RedisListenerIsolatedIntegrationTest {
+
+    @Autowired
+    private MeterRegistry meters;
 
     private static final Instant ARCHIVED_AT = Instant.parse("2026-07-26T12:00:00Z");
 
@@ -71,6 +75,9 @@ class RetentionPurgeIntegrationTests extends RedisListenerIsolatedIntegrationTes
         assertThat(count("SELECT count(*) FROM accounts WHERE id = ?", accountId)).isOne();
         Mockito.verify(identityProvider, Mockito.never()).deleteUser(ArgumentMatchers.anyString());
 
+        var failures = meters.counter("kairos.worker.failures", "worker", "retention");
+        var before = failures.count();
+
         // A provider outage defers the purge; the account must not lose its row while its identity survives.
         clock.setInstant(ARCHIVED_AT.plus(Duration.ofDays(31)));
         Mockito.doThrow(new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE))
@@ -78,10 +85,13 @@ class RetentionPurgeIntegrationTests extends RedisListenerIsolatedIntegrationTes
         purgeService.purge();
         assertThat(count("SELECT count(*) FROM accounts WHERE id = ?", accountId)).isOne();
 
+        assertThat(failures.count()).isEqualTo(before + 1);
+
         // An identity already missing at the provider counts as deleted.
         Mockito.doThrow(new ResponseStatusException(HttpStatus.NOT_FOUND))
                 .when(identityProvider).deleteUser(subject);
         purgeService.purge();
+        assertThat(failures.count()).isEqualTo(before + 1);
         assertThat(count("SELECT count(*) FROM accounts WHERE id = ?", accountId)).isZero();
         assertThat(count("SELECT count(*) FROM location_assignments WHERE account_id = ?", accountId)).isZero();
         assertThat(count("SELECT count(*) FROM account_invitations WHERE issued_by_account_id = ?", accountId)).isZero();
