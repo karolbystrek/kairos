@@ -53,13 +53,16 @@ electronic service.
 | Session and CSRF cookies, IP, security events | Staff | Sign-in and abuse protection | Art. 6(1)(b)/(f) |
 | Tracking reference, order label, status | Customers | Order tracking (restaurant's purpose) | Processor |
 | Encrypted push subscription and enrollments | Customers who opt in | Status notifications | Processor |
+| Anonymous tenant/location/hour order counts and duration summaries | No user identities | Restaurant business measurements | Engineering data inventory; legal review remains required |
 | IP addresses in gateway traffic | Everyone | Delivery and protection | Art. 6(1)(f) / processor |
 
 Recipients: AWS Lightsail in `eu-central-1` (hosting) and Cloudflare (proxy,
 possible US transfer under the EU-US Data Privacy Framework or SCCs). Browser
 push services carry encrypted payloads selected by the customer's browser.
-ZITADEL is self-hosted on the same VM. There is no analytics, advertising,
-profiling or automated decision-making, and no email is sent.
+ZITADEL is self-hosted on the same VM. Server-side [anonymous order
+analytics](order-analytics.md) contain business counts and durations without user,
+order or tracking identities. They collect no browser/device activity. There is
+no advertising, profiling or automated decision-making, and no email is sent.
 
 ## Cookies and device storage
 
@@ -74,7 +77,7 @@ qualifies:
 
 Push notifications are opt-in through the in-app prompt and browser
 permission, and can be withdrawn with the bell control or browser settings.
-Any future analytics or review metrics must be reassessed before collection
+Any future browser analytics or review metrics must be reassessed before collection
 starts and must not run before consent where consent is required.
 
 ## Google review invitations
@@ -97,6 +100,7 @@ them. The trade-off is that customers who close the app never see it.
 - Security events: invitations are deleted 30 days after they end, staff
   sessions expire after 30 idle days, and production logs rotate at three
   10 MB files per service.
+- Anonymous business aggregates and pending inputs survive location purge; aggregates are retained indefinitely until permanent tenant deletion erases both. The test-period deletion commitment still applies to the tenant.
 - Other orders and accounts are kept until the end of the test period. The
   notices commit to deleting all data within 30 days after the test period
   ends, or within 30 days of a restaurant's deletion request (Regulamin § 5 and

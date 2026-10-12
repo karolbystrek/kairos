@@ -550,6 +550,39 @@ CREATE TABLE order_outbox_events
         )
 );
 
+-- Self-contained inputs and aggregates deliberately outlive location/order purge.
+CREATE TABLE order_measurements (
+    id uuid PRIMARY KEY,
+    tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    location_id uuid NOT NULL,
+    status varchar(32) NOT NULL CHECK (status IN ('IN_PREPARATION','READY','COMPLETED','CANCELED')),
+    occurred_at timestamptz NOT NULL,
+    duration_ms bigint CHECK (duration_ms IS NULL OR (duration_ms >= 0 AND status IN ('READY','COMPLETED')))
+);
+CREATE INDEX order_measurements_pending_idx ON order_measurements(tenant_id,occurred_at,id);
+CREATE TABLE order_hourly_analytics (
+    tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    location_id uuid NOT NULL,
+    hour timestamptz NOT NULL CHECK (hour = date_trunc('hour',hour AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'),
+    status varchar(32) NOT NULL CHECK (status IN ('IN_PREPARATION','READY','COMPLETED','CANCELED')),
+    bucket_version smallint NOT NULL CHECK (bucket_version = 1),
+    transition_count bigint NOT NULL CHECK (transition_count > 0),
+    duration_count bigint NOT NULL CHECK (duration_count >= 0 AND duration_count <= transition_count),
+    total_duration_ms bigint NOT NULL CHECK (total_duration_ms >= 0),
+    bucket_0 bigint NOT NULL CHECK (bucket_0 >= 0),
+    bucket_1 bigint NOT NULL CHECK (bucket_1 >= 0),
+    bucket_2 bigint NOT NULL CHECK (bucket_2 >= 0),
+    bucket_3 bigint NOT NULL CHECK (bucket_3 >= 0),
+    bucket_4 bigint NOT NULL CHECK (bucket_4 >= 0),
+    bucket_5 bigint NOT NULL CHECK (bucket_5 >= 0),
+    bucket_6 bigint NOT NULL CHECK (bucket_6 >= 0),
+    bucket_7 bigint NOT NULL CHECK (bucket_7 >= 0),
+    PRIMARY KEY(tenant_id,location_id,hour,status,bucket_version),
+    CHECK (duration_count = bucket_0+bucket_1+bucket_2+bucket_3+bucket_4+bucket_5+bucket_6+bucket_7),
+    CHECK (status IN ('READY','COMPLETED') OR (duration_count=0 AND total_duration_ms=0)),
+    CHECK (duration_count > 0 OR total_duration_ms=0)
+);
+
 CREATE INDEX order_outbox_webhook_available_idx
     ON order_outbox_events (webhook_fanout_completed_at, occurred_at, id);
 
@@ -784,6 +817,12 @@ $$;
 CREATE FUNCTION kairos_security.worker(operation text, id uuid) RETURNS boolean
 LANGUAGE sql STABLE SET search_path=pg_catalog AS $$
     SELECT kairos_security.setting('scope')=operation AND kairos_security.identity()=id
+$$;
+CREATE FUNCTION kairos_security.analytics_hour(tenant uuid,location uuid,at_hour timestamptz,state varchar,version smallint) RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
+    SELECT version=1 AND EXISTS(SELECT 1 FROM public.order_measurements m
+        WHERE kairos_security.worker('ANALYTICS',m.id) AND m.tenant_id=tenant AND m.location_id=location
+            AND m.status=state AND date_trunc('hour',m.occurred_at AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'=at_hour)
 $$;
 CREATE FUNCTION kairos_security.event_access(event uuid) RETURNS boolean
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
@@ -1025,6 +1064,32 @@ CREATE POLICY scoped_insert ON customer_push_deliveries FOR INSERT WITH CHECK (k
 CREATE POLICY scoped_update ON customer_push_deliveries FOR UPDATE USING (kairos_security.push_delivery_access(id,subscription_id,order_id,outbox_event_id)) WITH CHECK (kairos_security.push_delivery_access(id,subscription_id,order_id,outbox_event_id));
 CREATE POLICY scoped_delete ON customer_push_deliveries FOR DELETE USING (kairos_security.worker('PUSH_CLEANUP',id));
 
+ALTER TABLE order_measurements ENABLE ROW LEVEL SECURITY;
+CREATE POLICY scoped_select ON order_measurements FOR SELECT USING (kairos_security.worker('ANALYTICS',id));
+CREATE POLICY scoped_insert ON order_measurements FOR INSERT WITH CHECK (
+    EXISTS(SELECT 1 FROM locations l WHERE l.id=location_id AND l.tenant_id=order_measurements.tenant_id)
+    AND (kairos_security.staff_location(location_id) OR kairos_security.integration_location(location_id,true)));
+CREATE POLICY scoped_delete ON order_measurements FOR DELETE USING (kairos_security.worker('ANALYTICS',id));
+ALTER TABLE order_hourly_analytics ENABLE ROW LEVEL SECURITY;
+CREATE POLICY scoped_select ON order_hourly_analytics FOR SELECT USING (kairos_security.analytics_hour(tenant_id,location_id,hour,status,bucket_version));
+CREATE POLICY scoped_insert ON order_hourly_analytics FOR INSERT WITH CHECK (kairos_security.analytics_hour(tenant_id,location_id,hour,status,bucket_version));
+CREATE POLICY scoped_update ON order_hourly_analytics FOR UPDATE USING (kairos_security.analytics_hour(tenant_id,location_id,hour,status,bucket_version)) WITH CHECK (kairos_security.analytics_hour(tenant_id,location_id,hour,status,bucket_version));
+
+-- Lock tenant before input: permanent deletion takes the same order and cannot recreate aggregates.
+CREATE FUNCTION public.next_order_measurement() RETURNS uuid
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE selected_tenant uuid; selected uuid;
+BEGIN
+    SELECT t.id INTO selected_tenant FROM public.tenants t
+        WHERE EXISTS(SELECT 1 FROM public.order_measurements m WHERE m.tenant_id=t.id)
+        ORDER BY t.id LIMIT 1 FOR KEY SHARE OF t SKIP LOCKED;
+    IF selected_tenant IS NULL THEN RETURN NULL; END IF;
+    SELECT m.id INTO selected FROM public.order_measurements m WHERE m.tenant_id=selected_tenant
+        ORDER BY m.occurred_at,m.id LIMIT 1 FOR UPDATE SKIP LOCKED;
+    IF selected IS NOT NULL THEN PERFORM set_config('kairos.selected','ANALYTICS:' || selected::text,true); END IF;
+    RETURN selected;
+END $$;
+
 -- Discovery locks one identity; the same transaction must bind and process it.
 CREATE FUNCTION public.next_webhook_fanout() RETURNS uuid
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
@@ -1159,7 +1224,7 @@ END $$;
 CREATE FUNCTION public.valid_worker(operation text,resource uuid,token uuid) RETURNS boolean
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
 BEGIN
-    IF operation IN ('WEBHOOK_FANOUT','PUSH_FANOUT','WEBHOOK_CLAIM','PUSH_CLAIM','SUBSCRIPTION_RETIRE','PUSH_CLEANUP',
+    IF operation IN ('ANALYTICS','WEBHOOK_FANOUT','PUSH_FANOUT','WEBHOOK_CLAIM','PUSH_CLAIM','SUBSCRIPTION_RETIRE','PUSH_CLEANUP',
         'ACCOUNT_PURGE','LOCATION_PURGE','INVITATION_PURGE') THEN
         RETURN kairos_security.setting('selected')=operation || ':' || resource::text;
     ELSIF operation='WEBHOOK_COMPLETE' THEN
@@ -1236,7 +1301,7 @@ GRANT USAGE ON SCHEMA public,kairos_security TO "${runtimeUser}";
 GRANT SELECT,INSERT,UPDATE,DELETE ON tenants,locations,menus,menu_items,location_menus,accounts,location_assignments,account_invitations,
     external_integrations,api_keys,api_key_scopes,api_key_location_access,
     webhook_subscriptions,webhook_subscription_location_access,webhook_subscription_event_types,webhook_signing_secret_versions,
-    orders,order_history,order_outbox_events,webhook_deliveries,webhook_delivery_signing_versions,
+    order_measurements,order_hourly_analytics,orders,order_history,order_outbox_events,webhook_deliveries,webhook_delivery_signing_versions,
     customer_push_subscriptions,customer_push_enrollments,customer_push_deliveries,
     spring_session,spring_session_attributes TO "${runtimeUser}";
 GRANT USAGE ON SEQUENCE order_history_id_seq TO "${runtimeUser}";
@@ -1250,5 +1315,5 @@ GRANT EXECUTE ON FUNCTION public.valid_staff(uuid,uuid,text),public.lock_staff_l
     public.next_expired_push_subscription(timestamptz),public.next_dormant_push_subscription(timestamptz),
     public.next_terminal_push_delivery(timestamptz,timestamptz),public.next_purgeable_account(timestamptz,text),
     public.next_purgeable_location(timestamptz),public.next_finished_invitation(timestamptz),public.purge_retained(text,uuid),
-    public.valid_worker(text,uuid,uuid) TO "${runtimeUser}";
+    public.next_order_measurement(),public.valid_worker(text,uuid,uuid) TO "${runtimeUser}";
 COMMENT ON SCHEMA kairos_security IS 'kairos-rls-v1';

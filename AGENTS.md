@@ -50,9 +50,8 @@ never requires a separate issue or branch.
 For major tasks whose implementation spans multiple modules or services, run a
 read-only review-focused subagent after implementation and before finalizing
 the work. Do not spawn a review subagent for simple changes or documentation-only
-tasks. The reviewer must use both `ponytail:ponytail-review` and
-`superpowers:requesting-code-review`. Address actionable findings and rerun
-affected checks before handing the work to the user.
+tasks. The reviewer must use `ponytail:ponytail-review`. Address actionable
+findings and rerun affected checks before handing the work to the user.
 
 Do not run full test suites locally unless the user explicitly requests them.
 Use focused checks for the affected scope; rely on PR CI for full-suite coverage.

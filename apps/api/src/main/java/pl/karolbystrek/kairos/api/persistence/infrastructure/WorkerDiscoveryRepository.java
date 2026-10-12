@@ -19,6 +19,11 @@ public class WorkerDiscoveryRepository {
     private final EntityManager entityManager;
 
     // Discovery locks must remain on the same Hibernate transaction as scope binding and entity work.
+    public UUID nextOrderMeasurement() {
+        return (UUID) entityManager.createNativeQuery("SELECT public.next_order_measurement()", UUID.class)
+                .getSingleResult();
+    }
+
     public UUID nextPushFanout() {
         return (UUID) entityManager.createNativeQuery("SELECT public.next_push_fanout()", UUID.class)
                 .getSingleResult();

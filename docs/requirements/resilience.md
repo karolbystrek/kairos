@@ -11,7 +11,7 @@
 
 * Order transitions and their history are committed atomically.
 * Concurrent commands for the same order are serialized before validating and persisting a transition, preventing stale state decisions without duplicating an application-managed version value.
-* Order transitions and required outbox events are committed atomically.
+* Order transitions, required outbox events and anonymous measurement inputs are committed atomically. Analytics merge/consumption is retry-safe and independent of retained orders; see [anonymous order analytics](order-analytics.md).
 * SSE or Redis event loss does not prevent later REST recovery.
 * Redis unavailability must not corrupt PostgreSQL state; event delivery may be delayed and recovered according to operational policy.
 * A known webhook delivery outcome is attempted once and stored as success or a terminal dead-letter result; v1 has no policy retry or `Retry-After` handling.
@@ -45,6 +45,7 @@
 * An archived location is removed once no account is assigned to it, together
   with its orders, order history, outbox events, webhook and push deliveries,
   push enrollments, invitations and remaining integration selections.
+* Anonymous order aggregates and self-contained pending inputs survive location purge; permanent tenant deletion erases both.
 * Finished invitations are deleted 30 days after revocation or expiry.
 * Each item is discovered with `FOR UPDATE SKIP LOCKED` and erased in its own
   transaction by a guarded `SECURITY DEFINER` function, so row policies stay
