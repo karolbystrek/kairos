@@ -10,7 +10,9 @@
 
 ### 4.2 Customer access
 
-Customer order tracking is anonymous. QR codes use high-entropy, unguessable order references and expose only the minimum customer-facing order information. Possession of a tracking reference grants read-only access to that order and never authorizes staff operations or access to tenant data.
+Customer order tracking is anonymous. QR codes use high-entropy, unguessable order references and expose only the minimum customer-facing order information. Possession of a tracking reference grants customer-facing reads and eligible
+review-action ingestion for that order; it never authorizes order mutations,
+staff operations or tenant data access. See [usage analytics](usage-analytics.md).
 
 Customer notification enrollment is also anonymous and treats the complete
 browser push subscription capability as its credential: endpoint, P-256 client
@@ -68,7 +70,9 @@ API Keys cannot administer integrations or subscriptions. Order writes require
 `ORDERS_WRITE`, while reads require `ORDERS_READ`, with the existing write-command
 response contract retained for write-only keys.
 
-Anonymous tracking grants exact-reference order reads without history or DML.
+Anonymous tracking grants exact-reference order reads without history or order
+DML. A narrow eligible-review operation increments anonymous usage aggregates
+without granting direct aggregate access.
 Push mutation requires complete cryptographic capability verification before
 binding subscription IDs; replacement binds only the immutable union of verified
 old/new capabilities. Registration and invitation redemption use ordinary

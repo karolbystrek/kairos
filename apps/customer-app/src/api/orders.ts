@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { customerMutation } from "@/src/api/customer-notifications";
 import { apiUrl } from "@/src/api/api-url";
 import { orderStatusSchema } from "@/src/orders/order-status";
 
@@ -59,4 +60,15 @@ export async function getTrackedOrder(
   }
 
   return customerOrderSchema.parse(await response.json());
+}
+
+export function recordReviewAction(
+  trackingReference: string,
+  event: "review_link_clicked" | "review_prompt_dismissed",
+) {
+  void customerMutation(
+    `/api/tracked-orders/v1/${encodeURIComponent(trackingReference)}/review-actions`,
+    "POST",
+    { event },
+  ).catch(() => {});
 }

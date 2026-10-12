@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import QRCode from "qrcode";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 import useSWRMutation from "swr/mutation";
 
@@ -40,6 +40,7 @@ import {
   type StaffOrder,
 } from "@/src/api/orders";
 import { customerAppUrl } from "@/src/config/public-environment";
+import { recordPanelAction } from "@/src/api/usage-analytics";
 
 const tenantOrderScope = "tenant";
 
@@ -316,12 +317,14 @@ function OrderCard({
 
 export function OrderManagement({
   accountId,
+  isActive = true,
   canManageLocations,
   canViewTenantOrders,
   onRequestedLocationApplied,
   requestedLocationId,
 }: {
   accountId: string;
+  isActive?: boolean;
   canManageLocations: boolean;
   canViewTenantOrders: boolean;
   onRequestedLocationApplied?: () => void;
@@ -360,6 +363,19 @@ export function OrderManagement({
     : canViewTenantOrders
       ? undefined
       : enabledLocations[0]?.id;
+  const queueWasOpened = useRef(false);
+
+  useEffect(() => {
+    if (!isActive) {
+      queueWasOpened.current = false;
+
+      return;
+    }
+    if (areLocationsLoading || locationsError || queueWasOpened.current) return;
+    queueWasOpened.current = true;
+    recordPanelAction("queue_opened", locationId);
+  }, [isActive, areLocationsLoading, locationsError, locationId]);
+
   const currentOrdersKey =
     enabledLocations.length > 0
       ? ordersKey(accountId, locationId ?? tenantOrderScope)
@@ -426,6 +442,13 @@ export function OrderManagement({
     locationsError ?? ordersError ?? createOrderError ?? updateOrderError;
 
   function openCreate() {
+    if (!isCreateOpen)
+      recordPanelAction(
+        "order_creation_form_opened",
+        isCreatingOrder
+          ? createLocationId
+          : (locationId ?? enabledLocations[0]?.id),
+      );
     if (isCreatingOrder) {
       setIsCreateOpen(true);
 

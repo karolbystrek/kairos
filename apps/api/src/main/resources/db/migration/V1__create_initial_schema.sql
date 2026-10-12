@@ -1293,6 +1293,55 @@ CREATE TRIGGER consistent_relationships BEFORE INSERT OR UPDATE ON orders FOR EA
 CREATE TRIGGER consistent_relationships BEFORE INSERT OR UPDATE ON webhook_deliveries FOR EACH ROW EXECUTE FUNCTION kairos_security.consistent_relationships();
 CREATE TRIGGER consistent_relationships BEFORE INSERT OR UPDATE ON webhook_delivery_signing_versions FOR EACH ROW EXECUTE FUNCTION kairos_security.consistent_relationships();
 
+CREATE TABLE usage_hourly_analytics (
+    tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    location_id uuid,
+    hour timestamptz NOT NULL,
+    event varchar(40) NOT NULL CHECK (event IN ('queue_opened','menu_editor_opened','integration_settings_opened',
+        'order_creation_form_opened','review_link_clicked','review_prompt_dismissed')),
+    action_count bigint NOT NULL CHECK (action_count > 0),
+    UNIQUE NULLS NOT DISTINCT (tenant_id,location_id,hour,event),
+    CHECK (hour=date_trunc('hour',hour AT TIME ZONE 'UTC') AT TIME ZONE 'UTC')
+);
+ALTER TABLE usage_hourly_analytics ENABLE ROW LEVEL SECURITY;
+CREATE POLICY scoped_select ON usage_hourly_analytics FOR SELECT USING (false);
+CREATE POLICY scoped_insert ON usage_hourly_analytics FOR INSERT WITH CHECK (false);
+CREATE POLICY scoped_update ON usage_hourly_analytics FOR UPDATE USING (false) WITH CHECK (false);
+
+CREATE FUNCTION public.record_usage_action(target_tenant uuid,target_location uuid,action text,at_time timestamptz)
+RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
+BEGIN
+    -- Lock tenant before writing so permanent deletion cannot recreate anonymous counts.
+    PERFORM 1 FROM public.tenants WHERE id=target_tenant FOR KEY SHARE;
+    IF NOT FOUND THEN RETURN false; END IF;
+    IF action IN ('queue_opened','order_creation_form_opened','menu_editor_opened','integration_settings_opened') THEN
+        IF NOT kairos_security.staff_tenant(target_tenant) THEN RETURN false; END IF;
+        IF target_location IS NOT NULL AND NOT EXISTS(SELECT 1 FROM public.locations l
+            WHERE l.id=target_location AND l.tenant_id=target_tenant AND l.status='ENABLED'
+            AND kairos_security.staff_location(l.id)) THEN RETURN false; END IF;
+        IF action='order_creation_form_opened' AND target_location IS NULL THEN RETURN false; END IF;
+        IF action IN ('menu_editor_opened','integration_settings_opened') AND target_location IS NOT NULL THEN RETURN false; END IF;
+        IF action='integration_settings_opened' AND NOT kairos_security.staff_tenant(target_tenant,true) THEN RETURN false; END IF;
+        IF action='menu_editor_opened' AND NOT kairos_security.staff_tenant(target_tenant,true)
+            AND NOT EXISTS(SELECT 1 FROM public.location_assignments x
+                WHERE x.account_id=kairos_security.identity() AND x.role='MANAGER'
+                AND kairos_security.staff_location(x.location_id,true)) THEN RETURN false; END IF;
+    ELSIF action IN ('review_link_clicked','review_prompt_dismissed') THEN
+        IF kairos_security.setting('scope')<>'tracking' OR NOT EXISTS(
+            SELECT 1 FROM public.orders o JOIN public.locations l ON l.id=o.location_id
+            WHERE l.tenant_id=target_tenant AND l.id=target_location
+            AND kairos_security.includes('references',o.tracking_reference)
+            AND o.status='COMPLETED' AND o.review_due_at<=at_time
+            AND l.status='ENABLED' AND l.google_review_url IS NOT NULL
+            AND o.review_configuration_id=l.review_configuration_id) THEN RETURN false; END IF;
+    ELSE RETURN false;
+    END IF;
+    INSERT INTO public.usage_hourly_analytics(tenant_id,location_id,hour,event,action_count)
+        VALUES(target_tenant,target_location,date_trunc('hour',at_time AT TIME ZONE 'UTC') AT TIME ZONE 'UTC',action,1)
+        ON CONFLICT(tenant_id,location_id,hour,event) DO UPDATE SET action_count=public.usage_hourly_analytics.action_count+1;
+    RETURN true;
+END $$;
+
 REVOKE ALL ON ALL TABLES IN SCHEMA public FROM PUBLIC;
 REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM PUBLIC;
 REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA kairos_security FROM PUBLIC;
@@ -1301,7 +1350,7 @@ GRANT USAGE ON SCHEMA public,kairos_security TO "${runtimeUser}";
 GRANT SELECT,INSERT,UPDATE,DELETE ON tenants,locations,menus,menu_items,location_menus,accounts,location_assignments,account_invitations,
     external_integrations,api_keys,api_key_scopes,api_key_location_access,
     webhook_subscriptions,webhook_subscription_location_access,webhook_subscription_event_types,webhook_signing_secret_versions,
-    order_measurements,order_hourly_analytics,orders,order_history,order_outbox_events,webhook_deliveries,webhook_delivery_signing_versions,
+    order_measurements,order_hourly_analytics,usage_hourly_analytics,orders,order_history,order_outbox_events,webhook_deliveries,webhook_delivery_signing_versions,
     customer_push_subscriptions,customer_push_enrollments,customer_push_deliveries,
     spring_session,spring_session_attributes TO "${runtimeUser}";
 GRANT USAGE ON SEQUENCE order_history_id_seq TO "${runtimeUser}";
@@ -1315,5 +1364,5 @@ GRANT EXECUTE ON FUNCTION public.valid_staff(uuid,uuid,text),public.lock_staff_l
     public.next_expired_push_subscription(timestamptz),public.next_dormant_push_subscription(timestamptz),
     public.next_terminal_push_delivery(timestamptz,timestamptz),public.next_purgeable_account(timestamptz,text),
     public.next_purgeable_location(timestamptz),public.next_finished_invitation(timestamptz),public.purge_retained(text,uuid),
-    public.next_order_measurement(),public.valid_worker(text,uuid,uuid) TO "${runtimeUser}";
+    public.record_usage_action(uuid,uuid,text,timestamptz),public.next_order_measurement(),public.valid_worker(text,uuid,uuid) TO "${runtimeUser}";
 COMMENT ON SCHEMA kairos_security IS 'kairos-rls-v1';

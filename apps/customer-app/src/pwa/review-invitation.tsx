@@ -2,7 +2,7 @@
 
 import { Button, Modal } from "@heroui/react";
 import { Star, X } from "lucide-react";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import useSWR from "swr";
 
 import {
@@ -10,6 +10,7 @@ import {
   selectReviewInvitation,
 } from "@/src/pwa/review-invitations";
 import { consumeReviewInvitation } from "@/src/pwa/storage";
+import { recordReviewAction } from "@/src/api/orders";
 
 function subscribeConnectivity(changed: () => void) {
   window.addEventListener("online", changed);
@@ -27,6 +28,7 @@ export function ReviewInvitation() {
     () => navigator.onLine,
     () => false,
   );
+  const consumedActions = useRef(new Set<string>());
   const [consumed, setConsumed] = useState<Set<string>>(() => new Set());
   const {
     data = [],
@@ -72,8 +74,11 @@ export function ReviewInvitation() {
     };
   }, [mutate]);
 
-  function dismiss() {
-    if (!current) return;
+  function consume(event: "review_link_clicked" | "review_prompt_dismissed") {
+    if (!current || consumedActions.current.has(current.trackingReference))
+      return;
+    consumedActions.current.add(current.trackingReference);
+    recordReviewAction(current.trackingReference, event);
     setConsumed(
       (previous) =>
         new Set([...Array.from(previous), current.trackingReference]),
@@ -87,7 +92,7 @@ export function ReviewInvitation() {
     <Modal
       isOpen={Boolean(current)}
       onOpenChange={(open) => {
-        if (!open) dismiss();
+        if (!open) consume("review_prompt_dismissed");
       }}
     >
       <Modal.Backdrop isDismissable className="notification-guide-backdrop">
@@ -109,7 +114,7 @@ export function ReviewInvitation() {
               <Button
                 aria-label="Zamknij"
                 variant="secondary"
-                onPress={dismiss}
+                onPress={() => consume("review_prompt_dismissed")}
               >
                 Zamknij
               </Button>
@@ -121,7 +126,7 @@ export function ReviewInvitation() {
                       "_blank",
                       "noopener,noreferrer",
                     );
-                  dismiss();
+                  consume("review_link_clicked");
                 }}
               >
                 <Star aria-hidden="true" size={18} />

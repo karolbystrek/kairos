@@ -14,6 +14,7 @@ function panel(screen = "dashboard") {
   let failure;
   let expireSession;
   const requests = [];
+  const actions = [];
   const cacheClears = [];
   const redirects = [];
   const ui = Object.fromEntries(["Alert", "AlertDialog", "Button", "Dropdown", "Link", "Spinner", "Tabs", "Tooltip"].map(name => [name, new Proxy(function () {}, {
@@ -54,6 +55,7 @@ function panel(screen = "dashboard") {
       async login() { return { accountId: "staff", capabilities: [] }; },
       async logout(everywhere) { requests.push(everywhere); return !failure; },
     };
+    if (name === "@/src/api/usage-analytics") return { recordPanelAction: event => actions.push(event) };
     if (name === "@/src/api/api-fetch") return { ApiError };
     if (name === "@/src/api/auth-state") return { subscribeToAuthenticationRequired(callback) { expireSession = callback; return () => {}; } };
     if (name === "@/src/api/cache-keys") return { currentAccountKey: ["authentication", "current-account"], staffLocationsKey: () => [], isStaffCacheKey: () => true };
@@ -78,7 +80,8 @@ function panel(screen = "dashboard") {
     return result.props;
   }
   return {
-    requests, cacheClears, redirects, render, ApiError,
+    requests, actions, cacheClears, redirects, render, ApiError,
+    workspace: key => find(node => node.type === ui.Tabs).onSelectionChange(key),
     session(value, error, isLoading = false) { account = value; accountError = error; loading = isLoading; },
     signIn: () => find(node => node.type?.name === "SignedOutPanel").onSignIn({ email: "staff@example.com", password: "password" }),
     expire: () => expireSession(),
@@ -178,4 +181,17 @@ test("expired authentication closes account dialogs before a later sign-in", () 
   view.expire();
   view.session({ accountId: "staff", capabilities: [] });
   assert.equal(view.dialog().isOpen, false);
+});
+
+
+test("workspace entries count once without counting rerenders or the selected tab", () => {
+  const view = panel();
+  view.session({ accountId: "staff", capabilities: ["MANAGE_LOCATIONS", "MANAGE_MENUS", "MANAGE_INTEGRATIONS", "CHOOSE_LOCATION_MENU"] });
+  view.workspace("menus");
+  view.render();
+  view.workspace("menus");
+  view.workspace("integrations");
+  view.workspace("orders");
+  view.workspace("menus");
+  assert.deepEqual(view.actions, ["menu_editor_opened", "integration_settings_opened", "menu_editor_opened"]);
 });

@@ -58,6 +58,7 @@ public class SecurityConfig {
         source.registerCorsConfiguration("/account-invitation-previews/**", panelConfiguration);
         source.registerCorsConfiguration("/account-invitation-redemptions/**", panelConfiguration);
         source.registerCorsConfiguration("/orders/**", panelConfiguration);
+        source.registerCorsConfiguration("/usage-analytics/**", panelConfiguration);
         source.registerCorsConfiguration("/menus/**", panelConfiguration);
         source.registerCorsConfiguration("/external-integrations/**", panelConfiguration);
         source.registerCorsConfiguration("/api-keys/**", panelConfiguration);
@@ -133,6 +134,7 @@ public class SecurityConfig {
                                 "/actuator/health/**"
                         ).permitAll()
                         .requestMatchers(HttpMethod.POST,
+                                "/tracked-orders/v1/*/review-actions",
                                 "/auth/v1/login",
                                 "/auth/v1/logout",
                                 "/tenant-registrations/v1",
@@ -155,6 +157,7 @@ public class SecurityConfig {
                                 "/menus/v1/**",
                                 "/accounts/v1/**",
                                 "/account-invitations/v1/**",
+                                "/usage-analytics/v1/**",
                                 "/orders/v1/**",
                                 "/external-integrations/v1/**",
                                 "/api-keys/v1/**",

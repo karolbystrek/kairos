@@ -86,14 +86,10 @@ export async function reconcilePushSubscription(
   subscription: SerializedPushSubscription,
   trackingReferences: string[],
 ): Promise<void> {
-  await notificationMutation(
-    "/api/customer-notifications/v1/subscription",
-    "PUT",
-    {
-      subscription,
-      trackingReferences,
-    },
-  );
+  await customerMutation("/api/customer-notifications/v1/subscription", "PUT", {
+    subscription,
+    trackingReferences,
+  });
 }
 
 export async function replacePushSubscription(
@@ -101,7 +97,7 @@ export async function replacePushSubscription(
   currentSubscription: SerializedPushSubscription,
   trackingReferences: string[],
 ): Promise<void> {
-  await notificationMutation(
+  await customerMutation(
     "/api/customer-notifications/v1/subscription-replacement",
     "POST",
     {
@@ -115,7 +111,7 @@ export async function replacePushSubscription(
 export async function disablePushSubscription(
   subscription: SerializedPushSubscription,
 ): Promise<void> {
-  await notificationMutation(
+  await customerMutation(
     "/api/customer-notifications/v1/subscription",
     "DELETE",
     subscription,
@@ -158,7 +154,7 @@ function resetCsrfToken(): void {
   csrfToken = undefined;
 }
 
-async function notificationMutation(
+export async function customerMutation(
   url: string,
   method: "DELETE" | "POST" | "PUT",
   body: unknown,

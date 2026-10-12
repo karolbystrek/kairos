@@ -13,6 +13,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -154,6 +155,32 @@ class SecurityFilterChainIntegrationTests extends RedisListenerIsolatedIntegrati
                 .andExpect(jsonPath("$.code").value(
                         "INVALID_CUSTOMER_PUSH_SUBSCRIPTION"
                 ));
+    }
+
+    @Test
+    void protectsUsageWritesAndBoundsAnonymousReviewPayloadsWithoutContentLength() throws Exception {
+        var reference = UUID.randomUUID();
+        var reviewPath = "/tracked-orders/v1/" + reference + "/review-actions";
+        mockMvc.perform(apiPost(reviewPath).secure(true).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"event\":\"review_link_clicked\"}"))
+                .andExpect(status().isForbidden());
+        var bootstrap = mockMvc.perform(apiGet("/auth/v1/csrf").secure(true)).andReturn();
+        var csrf = bootstrap.getResponse().getCookie(CSRF_COOKIE);
+        mockMvc.perform(apiPost("/usage-analytics/v1/actions").secure(true).cookie(csrf)
+                .header(CSRF_HEADER, csrf.getValue()).contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(apiPost(reviewPath).secure(true).cookie(csrf).header(CSRF_HEADER, csrf.getValue())
+                .contentType(MediaType.APPLICATION_JSON).content(" ".repeat(8193))
+                .with(request -> { request.removeHeader("Content-Length"); request.addHeader("Transfer-Encoding", "chunked"); return request; }))
+                .andExpect(status().isPayloadTooLarge());
+        for (var request = 0; request < 59; request++) {
+            mockMvc.perform(apiPost(reviewPath).secure(true).cookie(csrf).header(CSRF_HEADER, csrf.getValue())
+                    .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                    .andExpect(status().isBadRequest());
+        }
+        mockMvc.perform(apiPost(reviewPath).secure(true).cookie(csrf).header(CSRF_HEADER, csrf.getValue())
+                .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isTooManyRequests());
     }
 
     @Test

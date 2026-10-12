@@ -53,6 +53,7 @@ import {
   isStaffCacheKey,
   staffLocationsKey,
 } from "@/src/api/cache-keys";
+import { recordPanelAction } from "@/src/api/usage-analytics";
 
 const logoutKey = ["authentication", "logout"] as const;
 
@@ -470,7 +471,15 @@ export function StaffPanel({
       canChooseLocationMenu ? (
         <Tabs
           selectedKey={workspace}
-          onSelectionChange={(key) => setSelectedWorkspace(String(key))}
+          onSelectionChange={(key) => {
+            const next = String(key);
+
+            if (next === workspace) return;
+            if (next === "menus") recordPanelAction("menu_editor_opened");
+            if (next === "integrations")
+              recordPanelAction("integration_settings_opened");
+            setSelectedWorkspace(next);
+          }}
         >
           <div className="panel-workspace-controls">
             <div aria-hidden="true" className="panel-workspace-spacer" />
@@ -534,6 +543,7 @@ export function StaffPanel({
               canViewTenantOrders={account.capabilities.includes(
                 "VIEW_TENANT_ORDERS",
               )}
+              isActive={workspace === "orders"}
               requestedLocationId={requestedOrderLocationId}
               onRequestedLocationApplied={() =>
                 setRequestedOrderLocationId(undefined)

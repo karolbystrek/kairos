@@ -17,6 +17,7 @@ function workspace(kind = "account-management", collections = {}) {
     if (name === "react") return {
       useEffect() {},
       useMemo: compute => compute(),
+      useRef(initial) { const index = cursor++; return state[index] ??= { current: initial }; },
       useState(initial) {
         const index = cursor++;
         if (!(index in state)) state[index] = typeof initial === "function" ? initial() : initial;
@@ -57,6 +58,7 @@ function workspace(kind = "account-management", collections = {}) {
       new Function("require", "exports", inputSource)(require, inputExports);
       return inputExports;
     }
+    if (name === "@/src/api/usage-analytics") return { recordPanelAction() {} };
     if (name === "@/src/api/api-fetch") return { ApiError: class ApiError extends Error {} };
     if (name.startsWith("@/")) return new Proxy({}, { get: (_, key) => String(key) });
     return require(name);

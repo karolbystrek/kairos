@@ -217,7 +217,8 @@ appears when a customer returns after the delay or keeps the app open until it
 elapses. The prompt uses neutral wording
 and offers Review on Google and Dismiss; opening Google or dismissal consumes
 the invitation in that browser context. No satisfaction filtering, incentives,
-positive-rating requests or review metrics are included. See
+positive-rating requests are included. Best-effort review-link clicks and explicit
+dismissals follow [usage analytics](usage-analytics.md). See
 [Google's contribution policy](https://support.google.com/business/answer/7400114).
 
 Active snapshots, live streams and ordinary enrollments still end normally.

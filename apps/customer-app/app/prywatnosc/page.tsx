@@ -50,8 +50,11 @@ export default function PrivacyNoticePage() {
         </li>
       </ul>
       <p>
-        Kairos nie korzysta z narzędzi analitycznych ani reklamowych i nie
-        śledzi Cię na innych stronach.
+        Kairos zlicza zdarzenia zamówień oraz kliknięcia linku do opinii i
+        wyraźne zamknięcia zaproszeń. Statystyki przechowujemy łącznie dla
+        restauracji, lokalu i godziny, bez identyfikatorów klientów, zamówień,
+        urządzeń ani adresów IP. Nie korzystamy z narzędzi reklamowych i nie
+        śledzimy Cię na innych stronach.
       </p>
 
       <h2>Co zapisujemy na Twoim urządzeniu</h2>
@@ -98,6 +101,10 @@ export default function PrivacyNoticePage() {
           albo od razu po wyłączeniu powiadomień.
         </li>
         <li>Historię wysyłki powiadomień usuwamy po 7–30 dniach.</li>
+        <li>
+          Zbiorcze statystyki zachowujemy do trwałego usunięcia danych
+          restauracji, również po usunięciu lokalu.
+        </li>
         <li>
           Logi serwera z adresem IP są nadpisywane po osiągnięciu limitu
           rozmiaru.

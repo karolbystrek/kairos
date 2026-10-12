@@ -40,6 +40,8 @@ PUT    /api/orders/v1/{orderId}/status
 
 GET    /api/tracked-orders/v1/{trackingReference}
 GET    /api/tracked-orders/v1/{trackingReference}/events
+POST   /api/tracked-orders/v1/{trackingReference}/review-actions
+POST   /api/usage-analytics/v1/actions
 
 GET    /api/customer-notifications/v1/configuration
 PUT    /api/customer-notifications/v1/subscription
@@ -171,7 +173,9 @@ event, or outbox event.
 Tracked-order representations include nullable `reviewInvitation` with `dueAt`,
 `locationName`, and `googleReviewUrl` only while completion remains eligible.
 Possession of the ordinary tracking reference grants this read-only follow-up;
-no customer identity or staff access is introduced.
+no customer identity or staff access is introduced. An eligible due invitation
+also permits the bounded review action write described in
+[usage analytics](usage-analytics.md); it does not permit order mutations.
 
 #### Container runtime and environment
 
