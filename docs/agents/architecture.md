@@ -38,3 +38,7 @@
 - Keep authentication credentials unavailable to JavaScript; browser sessions
   use secure HttpOnly cookies, with provider credentials confined to the API.
 - Keep production migrations free of environment-specific seed data.
+- A change adding a required (blank) key to `deployment/production.env.example`
+  must also map it in the `deploy.yml` deploy step and tell the user to set it in
+  the GitHub `production` Environment before merging; see
+  [configuration](../deployment/CONFIGURATION.md).

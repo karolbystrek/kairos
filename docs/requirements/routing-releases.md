@@ -197,9 +197,11 @@ removes temporary setup inputs even on failure. Bootstrap never creates or
 changes `production.env`. The GitHub `production` Environment owns production
 configuration: each deployment writes `/srv/kairos/production.env` atomically
 (mode `0600`) from repository-owned `deployment/production.env.example` plus
-Environment secrets/variables. Template defaults need no GitHub value; blank
-template settings are required, and a missing, duplicated (secret and variable)
-or unsafe value fails before SSH, naming keys only. Values reach the host only
+Environment secrets/variables that the deploy step names explicitly (never
+`toJSON(secrets)`). Template defaults need no GitHub value; blank template
+settings are required, and a change adding one must also add its Environment
+value and deploy-step mapping. A missing or unsafe value fails before SSH,
+naming keys only. Values reach the host only
 over the deploy job's SSH connection, never images, bundles or artifacts; image
 build/publish jobs have no Environment access. The local `.env.example` remains
 unchanged.
