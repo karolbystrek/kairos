@@ -2,6 +2,8 @@
 import json
 import os
 from pathlib import Path
+import re
+import stat
 import subprocess
 import tempfile
 import unittest
@@ -12,6 +14,8 @@ from release_manifest import RUNTIME_FILES
 
 SCRIPT = Path(__file__).with_name('upload_release.py')
 REVISION = 'a' * 40
+REQUIRED = sorted(set(re.findall(r'^([A-Z0-9_]+)=$', SCRIPT.with_name('production.env.example').read_text(), re.M))
+                  - {'KAIROS_IMAGE_REGISTRY', 'KAIROS_RELEASE_VERSION'})
 
 
 class UploadTests(unittest.TestCase):
@@ -66,6 +70,10 @@ else:
                     'DEPLOY_USER': 'deployer', 'DEPLOY_SSH_KEY': 'private-key',
                     'DEPLOY_KNOWN_HOSTS': 'verified-host-key\n',
                     'GITHUB_STEP_SUMMARY': str(self.root / 'summary')}
+        self.secrets = {key: f'secret-{key}' for key in REQUIRED if key != 'VAPID_SUBJECT'}
+        self.secrets |= {'POSTGRES_PASSWORD': 'p$HOME"x', 'DEPLOY_SSH_KEY': 'private-key',
+                         'github_token': 'token'}
+        self.variables = {'VAPID_SUBJECT': 'mailto:ops@example.com', 'REVIEW_INVITATION_DELAY': '5m'}
 
     def bundle(self):
         source = self.root / 'source'
@@ -88,6 +96,8 @@ else:
             release_manifest.assemble(REVISION, inspections, self.artifact)
 
     def run_upload(self):
+        self.env['PRODUCTION_SECRETS'] = json.dumps(self.secrets)
+        self.env['PRODUCTION_VARIABLES'] = json.dumps(self.variables)
         return subprocess.run(['python3', str(SCRIPT), str(self.artifact), REVISION],
                               env=self.env, capture_output=True, text=True)
 
@@ -110,6 +120,18 @@ else:
         self.assertIn(self.manifest['images']['api'], (self.root / 'summary').read_text())
         calls = [json.loads(line) for line in (self.root / 'calls').read_text().splitlines()]
         self.assertTrue(all(not Path(call[call.index('-i') + 1]).exists() for call in calls))
+        self.assertNotIn('p$HOME', (self.root / 'calls').read_text())
+        configuration = self.remote / 'production.env'
+        self.assertEqual(stat.S_IMODE(configuration.stat().st_mode), 0o600)
+        values = dict(line.split('=', 1) for line in configuration.read_text().splitlines()
+                      if line and not line.startswith('#'))
+        self.assertEqual(values['POSTGRES_PASSWORD'], "'p$HOME\"x'")
+        self.assertEqual(values['VAPID_SUBJECT'], "'mailto:ops@example.com'")
+        self.assertEqual(values['REVIEW_INVITATION_DELAY'], "'5m'")
+        self.assertEqual(values['COMPOSE_FILE'], 'compose.yaml:compose.deployment.yaml')
+        self.assertEqual(values['KAIROS_RELEASE_VERSION'], '')
+        self.assertNotIn('DEPLOY_SSH_KEY', values)
+        self.assertEqual(list(self.remote.glob('.production.env.*')), [])
 
     def test_failed_transfer_does_not_activate(self):
         self.env['FAIL_TRANSFER'] = '1'
@@ -171,6 +193,21 @@ else:
         self.manifest['revision'] = 'c' * 40
         (self.artifact / 'release.json').write_text(json.dumps(self.manifest))
         self.assertNotEqual(self.run_upload().returncode, 0)
+        self.assertFalse((self.root / 'calls').exists())
+
+    def test_invalid_production_configuration_never_connects(self):
+        cases = {'POSTGRES_PASSWORD': lambda: self.secrets.pop('POSTGRES_PASSWORD'),
+                 'REDIS_PASSWORD': lambda: self.variables.update(REDIS_PASSWORD='both'),
+                 'RESEND_API_KEY': lambda: self.secrets.update(RESEND_API_KEY="it's")}
+        for key, change in cases.items():
+            with self.subTest(key=key):
+                secrets, variables = dict(self.secrets), dict(self.variables)
+                change()
+                result = self.run_upload()
+                self.secrets, self.variables = secrets, variables
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(key, result.stderr)
+                self.assertNotIn('secret-', result.stderr)
         self.assertFalse((self.root / 'calls').exists())
 
 

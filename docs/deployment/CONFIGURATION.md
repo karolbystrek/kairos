@@ -12,22 +12,36 @@ Use [the production runbook](RUNBOOK.md) for prerequisites and the sequence.
 ## 2. Prepare persistent configuration and keys
 
 Use the verified VM bootstrap described in [BOOTSTRAP.md](BOOTSTRAP.md) to
-prepare application keys and `/srv/kairos/production.env.example`. Bootstrap
-uses the repository-owned `deployment/production.env.example`, which includes
-production hostnames and safe hosted defaults but no passwords. Reruns refresh
-that example, preserve existing `production.env` bytes and validate/reuse keys.
+prepare application keys. Production configuration is owned by the GitHub
+`production` Environment, never edited on the host. Every deployment writes
+`/srv/kairos/production.env` (mode `0600`, replaced atomically) from the
+committed `deployment/production.env.example` plus that Environment's values:
 
-Follow the administrator SSH and copy/edit commands in that guide to prepare
-`/srv/kairos/production.env` with mode `0600`. Never overwrite an existing
-production file just to adopt new defaults; reconcile public settings while
-preserving credentials. `.env.example` remains the local configuration inventory.
-Do not source environment files as shell scripts or print resolved Compose
-configuration into tickets/logs.
+- The template lists every production setting. A setting with a template
+  default needs no GitHub value; a GitHub value overrides the default.
+- Every blank template setting except `KAIROS_IMAGE_REGISTRY` and
+  `KAIROS_RELEASE_VERSION` is required. Store sensitive values as Environment
+  secrets and public ones as variables; a key set as both fails the deployment.
+- Repository-level variables are also visible, so `NEXT_PUBLIC_API_BASE_URL`
+  and `NEXT_PUBLIC_CUSTOMER_APP_URL` used for image builds also override the
+  template origins.
+- Missing values, or values containing `'` or a newline, fail deployment before
+  any SSH connection, naming keys only. Values are written single-quoted, so `$`
+  is literal.
+- A new setting needs only a template line and, without a default, a GitHub
+  value; the workflow is unchanged. Values reach the host only over the deploy
+  job's SSH connection, never images, release bundles or artifacts.
+
+Set the required values with `gh secret set NAME --env production --repo
+karolbystrek/kairos` (it prompts for the value) or `gh variable set`.
+`.env.example` remains the local configuration inventory. Do not source
+environment files as shell scripts or print resolved Compose configuration into
+tickets/logs.
 
 Setup generates the stable ZITADEL master key, webhook, push and email encryption keys,
 and matching P-256 VAPID pair. Do not use `--replace-keys` to make startup pass.
-Never discard the master key while retaining ZITADEL's database. Keep a protected copy of runtime configuration, application keys and TLS material
-outside the VPS for a fresh rebuild. Database backups are deferred under the
+Never discard the master key while retaining ZITADEL's database. Keep a protected copy of application keys and TLS material
+outside the VPS for a fresh rebuild; runtime configuration already lives in GitHub. Database backups are deferred under the
 [development operations policy](../requirements/routing-releases.md#development-operations-policy).
 
 | Variables | Production value or responsibility |
@@ -52,10 +66,12 @@ outside the VPS for a fresh rebuild. Database backups are deferred under the
 | `NGINX_ENVSUBST_FILTER` | Keep `^KAIROS_`; hosted overlay supplies TLS and trusted-proxy settings |
 
 Generate database, Redis and provider passwords with a password manager or
-`openssl rand -hex 32`, storing output directly in protected configuration.
-Changing passwords in the environment does not rotate existing PostgreSQL roles
-or an already initialized provider administrator. Coordinate credential changes
-with their owning service; never reinitialize databases to apply them.
+`openssl rand -hex 32`, storing output directly in GitHub secrets.
+Database passwords and `ZITADEL_FIRSTINSTANCE_*` values apply only when their
+database is first initialized. Changing them in GitHub later does not rotate
+existing PostgreSQL roles or the provider administrator, and the next deployment
+then fails authentication. Coordinate credential changes with their owning
+service as separate maintenance; never reinitialize databases to apply them.
 
 Database role separation and transaction-local RLS are implemented in the
 repository. Follow [PostgreSQL roles and initialization](DATABASE.md) for fresh
@@ -77,7 +93,7 @@ a live resource and requires explicit approval for its scope.
 2. In the Resend domain settings, disable open and click tracking. Kairos sends
    no tracking options, so this setting is what keeps tracking off.
 3. Create an API key with **Sending access** restricted to that domain. Set it
-   as `RESEND_API_KEY` in `/srv/kairos/production.env` together with
+   as the `RESEND_API_KEY` production Environment secret; the template keeps
    `EMAIL_DELIVERY_MODE=RESEND`. Never commit, print or paste the key. Deployment
    fails before changing containers when it is missing.
 4. Allow outbound HTTPS from the host to `api.resend.com:443`. Lightsail permits

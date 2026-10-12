@@ -50,6 +50,9 @@ files or secure prompts, never literal secret arguments or repository-level copi
 | `DEPLOY_SSH_KEY` | Matching private SSH key authorized for that account |
 | `DEPLOY_KNOWN_HOSTS` | Independently verified OpenSSH host-key entries |
 
+The same Environment also holds runtime configuration that deployment writes to
+the host; see [configuration](CONFIGURATION.md) for required keys.
+
 Do not reuse the GitHub publication token as host GHCR credentials. Before the
 first authorized release, inspect the successful main CI run and manually start
 [the deployment workflow](RELEASES.md). Its publication job consumes

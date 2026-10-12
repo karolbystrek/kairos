@@ -17,8 +17,8 @@
 administration credentials. Configure two additional credential pairs in the
 normal VPS `production.env`: `KAIROS_DB_OWNER_USER`/`KAIROS_DB_OWNER_PASSWORD`
 for Flyway, and `KAIROS_DB_RUNTIME_USER`/`KAIROS_DB_RUNTIME_PASSWORD` for Spring's
-datasource. The VPS bootstrap publishes their non-secret defaults in
-`production.env.example`; the operator supplies passwords before deployment.
+datasource. `deployment/production.env.example` holds their non-secret defaults;
+the operator supplies passwords as GitHub `production` Environment secrets.
 Role names must differ from each other and from the initial administrator.
 They are lowercase SQL identifiers starting with a letter, at most 63 characters.
 
