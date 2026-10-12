@@ -24,6 +24,9 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.function.Supplier;
 
 @Component
@@ -49,7 +52,21 @@ public class ZitadelClient {
     // Package-private constructor keeps HTTP contract tests independent of credentials.
     ZitadelClient(RestClient client, Clock clock) { this.client = client; this.clock = clock; }
 
+    public record PendingUser(String id, String code) {
+        @Override public String toString() { return "PendingUser[redacted]"; }
+    }
+    public record UserEmail(String id, String email, boolean verified) {}
+
     public String createUser(String email, String password) {
+        return required(create(email, password), "id");
+    }
+
+    public PendingUser createUnverifiedUser(String email, String password) {
+        var result = create(email, password);
+        return new PendingUser(required(result, "id"), required(result, "emailCode"));
+    }
+
+    private JsonNode create(String email, String password) {
         var org = call(() -> client.get().uri("/management/v1/orgs/me").retrieve().body(JsonNode.class));
         var organization = required(org, "org", "id");
         var result = call(() -> client.post().uri("/v2/users/new").contentType(MediaType.APPLICATION_JSON)
@@ -58,7 +75,7 @@ public class ZitadelClient {
                 "email", Map.of("email", email, "returnCode", Map.of()),
                 "password", Map.of("password", password, "changeRequired", false))))
             .retrieve().body(JsonNode.class));
-        return required(result, "id");
+        return result;
     }
 
     public ProviderSession signIn(String email, String password) {
@@ -106,6 +123,55 @@ public class ZitadelClient {
             var expiry = session.path("expirationDate").asText();
             return expiry.isBlank() || Instant.parse(expiry).isAfter(clock.instant());
         } catch (RuntimeException exception) { throw unavailable(); }
+    }
+
+    public Optional<UserEmail> findByEmail(String email) {
+        var result = call(() -> client.post().uri("/v2/users").contentType(MediaType.APPLICATION_JSON)
+            .body(Map.of("query", Map.of("limit", 2), "queries", List.of(Map.of("emailQuery",
+                Map.of("emailAddress", email, "method", "TEXT_QUERY_METHOD_EQUALS_IGNORE_CASE")))))
+            .retrieve().body(JsonNode.class));
+        if (result == null || !result.path("result").isArray()) throw unavailable();
+        if (result.path("result").isEmpty()) return Optional.empty();
+        if (result.path("result").size() != 1) throw unavailable();
+        return Optional.of(userEmail(result.path("result").get(0)));
+    }
+
+    public UserEmail userEmail(String subject) {
+        var result = call(() -> client.get().uri("/v2/users/{id}", subject).retrieve().body(JsonNode.class));
+        if (result == null) throw unavailable();
+        return userEmail(result.path("user"));
+    }
+
+    private static UserEmail userEmail(JsonNode user) {
+        var email = user.path("human").path("email");
+        return new UserEmail(required(user, "userId"), required(email, "email"), email.path("isVerified").asBoolean());
+    }
+
+    public String resendEmailCode(String subject) {
+        var result = call(() -> client.post().uri("/v2/users/{id}/email/resend", subject)
+            .contentType(MediaType.APPLICATION_JSON).body(Map.of("returnCode", Map.of()))
+            .retrieve().body(JsonNode.class));
+        return required(result, "verificationCode");
+    }
+
+    public void verifyEmail(String subject, String code) {
+        try {
+            call(() -> client.post().uri("/v2/users/{id}/email/verify", subject)
+                .contentType(MediaType.APPLICATION_JSON).body(Map.of("verificationCode", code))
+                .retrieve().toBodilessEntity());
+        } catch (ResponseStatusException exception) {
+            // Auth or throttling failures are provider outages, not a wrong code.
+            if (Set.of(400, 404, 412).contains(exception.getStatusCode().value()))
+                throw new RegistrationValidationException(HttpStatus.BAD_REQUEST, "code",
+                    "The code is incorrect or expired. Check it or request a new code.");
+            throw exception;
+        }
+    }
+
+    public void markEmailVerified(String subject, String email) {
+        call(() -> client.patch().uri("/v2/users/{id}", subject).contentType(MediaType.APPLICATION_JSON)
+            .body(Map.of("human", Map.of("email", Map.of("email", email, "isVerified", true))))
+            .retrieve().toBodilessEntity());
     }
 
     public void changePassword(String subject, String current, String replacement) {

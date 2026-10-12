@@ -54,6 +54,10 @@ management:
       http.client.requests: false
 
 kairos:
+  email:
+    mode: ${EMAIL_DELIVERY_MODE:RESEND}
+    api-key: ${RESEND_API_KEY:}
+    encryption-key-location: ${EMAIL_ENCRYPTION_KEY_LOCATION:file:/run/secrets/email-encryption.bin}
   monitoring:
     token-location: "${KAIROS_MONITORING_TOKEN_LOCATION:file:/run/secrets/metrics-token}"
   origins:

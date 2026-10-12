@@ -61,7 +61,7 @@
 * Staff order-list operations return only `IN_PREPARATION` and `READY` orders.
 ### Authentication, accounts and locations
 
-* Backend-mediated ZITADEL password authentication, immediate registration,
+* Backend-mediated ZITADEL password authentication, email-verified registration,
   durable/rolling sessions, provider outage/revocation, current local access,
   password change, local/global logout and cookie/CSRF behavior are covered by
   provider-isolated and HTTP contract tests. Live provider acceptance is separate.
@@ -69,7 +69,11 @@
   confirmation with errors attached to the correct fields before provider
   provisioning. Local/provider identity conflicts have an Email field error;
   known provider password failures have a safe Password field error.
-* Successful public registration creates the tenant, administrator and browser
+* Public registration creates no tenant or administrator before a correct
+  6-digit email code. Resending observes a 60-second cooldown, incorrect codes
+  permit five attempts and provider expiry is enforced. Unverified sign-in
+  resumes the code step; abandoned identities without Accounts can be replaced.
+* Successful public email confirmation creates the tenant, administrator and browser
   session without creating a location. The main panel requires first-location
   creation, survives reload and later sign-in with onboarding incomplete,
   prevents dismissal, retains failed input, and opens the new location's Orders
@@ -81,7 +85,7 @@
   remain behind required onboarding until a location exists, and are available
   when all locations are disabled without the invitation warning container.
 * Username, local password hashes, custom refresh sessions, Platform Operator,
-  verification staging and Tenant Registration Invitations are absent from the
+  Tenant Registration Invitations are absent from the
   initial schema and runtime. Existing local data needs no migration.
 * Authorized account listing returns only manageable member accounts in the
   current tenant and, for a manager, only operators assigned to that manager's

@@ -23,7 +23,7 @@ preserving credentials. `.env.example` remains the local configuration inventory
 Do not source environment files as shell scripts or print resolved Compose
 configuration into tickets/logs.
 
-Setup generates the stable ZITADEL master key, webhook and push encryption keys,
+Setup generates the stable ZITADEL master key, webhook, push and email encryption keys,
 and matching P-256 VAPID pair. Do not use `--replace-keys` to make startup pass.
 Never discard the master key while retaining ZITADEL's database. Keep a protected copy of runtime configuration, application keys and TLS material
 outside the VPS for a fresh rebuild. Database backups are deferred under the
@@ -41,6 +41,7 @@ outside the VPS for a fresh rebuild. Database backups are deferred under the
 | `KAIROS_CUSTOMER_APP_HOST`, `KAIROS_PANEL_APP_HOST`, `KAIROS_API_HOST` | Hostnames only; chosen customer, panel and API names |
 | `KAIROS_APPLICATION_SECRETS_DIRECTORY`, `KAIROS_TLS_DIRECTORY` | `/srv/kairos/secrets`, `/srv/kairos/tls` |
 | `WEBHOOK_DESTINATION_POLICY`, `PUSH_DESTINATION_POLICY` | Both `PUBLIC_HTTPS`; never carry the local webhook relaxation into production |
+| `EMAIL_DELIVERY_MODE`, `RESEND_API_KEY` | Hosted mode `RESEND` and a Resend sending key; the API refuses production startup without it. Local/test mode `LOG` sends no mail and logs no message secrets. |
 | `VAPID_SUBJECT` | Operator-owned `mailto:` contact or public HTTPS contact URL |
 | `ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD` | Strong administrator password, not the example's local default |
 | `ZITADEL_FIRSTINSTANCE_ORG_MACHINE_PAT_EXPIRATIONDATE` | Deliberate bootstrap credential expiry with renewal scheduled before it |
@@ -61,3 +62,15 @@ startup and the disposable development schema policy. The operator will recreate
 the VPS database for this revision; ordinary deployment never resets volumes or
 repairs an old checksum. Live runtime
 isolation and application acceptance remain required before public launch.
+
+Transactional mail uses `Kairos <no-reply@kairos.karolbystrek.pl>` through Resend,
+with English content and open/click tracking disabled. Bootstrap generates the
+dedicated 32-byte `/srv/kairos/secrets/email-encryption.bin`, mounted read-only
+at `/run/secrets/email-encryption.bin`. Never print codes or pending contents.
+
+For a host prepared before this key existed, bootstrap refuses the partial set.
+With separate live-resource approval, add only the missing key using
+`openssl rand -out /srv/kairos/secrets/email-encryption.bin 32`, then apply the
+existing secrets owner and mode `0400` before rerunning bootstrap. Preserve all
+existing keys; never use `--replace-keys` to add this file. Installing this key
+and the Resend credential on the production host requires explicit approval.

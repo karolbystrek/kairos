@@ -42,8 +42,10 @@ public class AuthenticationSessionService implements AccountSessionRevoker {
         var session = request.getSession(false);
         if (session == null) return;
         var identity = (ZitadelClient.ProviderSession) session.getAttribute(IDENTITY);
+        var pending = (RegistrationVerificationService.Pending) session.getAttribute("kairos.pendingRegistration");
         session.invalidate();
         if (identity != null) provider.terminate(identity);
+        else if (pending != null) provider.terminate(pending.identity());
     }
 
     @Override

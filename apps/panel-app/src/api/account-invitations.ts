@@ -3,7 +3,7 @@ import { z } from "zod";
 import { passwordInputSchema, requiredEmailInputSchema } from "./account-input";
 import { assignmentRoleSchema } from "./accounts";
 import { apiFetch, request } from "./api-fetch";
-import { authenticationResultSchema } from "./authentication";
+import { currentAccountSchema } from "./authentication";
 
 const invitationSchema = z.object({
   id: z.uuid(),
@@ -101,7 +101,7 @@ export function redeemAccountInvitation(
 
   return request(
     "/api/account-invitation-redemptions/v1",
-    authenticationResultSchema,
+    currentAccountSchema,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },

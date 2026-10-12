@@ -31,7 +31,7 @@ public class StaffSessionFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         var path = request.getRequestURI().substring(request.getContextPath().length());
-        return path.startsWith("/tracked-orders/") || path.startsWith("/customer-notifications/")
+        return path.startsWith("/auth/v1/verification") || path.startsWith("/tracked-orders/") || path.startsWith("/customer-notifications/")
             || path.startsWith("/external/") || path.startsWith("/actuator/")
             || List.of("/auth/v1/csrf", "/auth/v1/login", "/auth/v1/logout", "/tenant-registrations/v1",
                 "/account-invitation-redemptions/v1", "/account-invitation-previews/v1").contains(path);

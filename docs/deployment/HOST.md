@@ -64,7 +64,7 @@ chmod 0700 /srv/kairos /srv/kairos/releases /srv/kairos/tls
 | Path | Purpose and access |
 | --- | --- |
 | `/srv/kairos/production.env` | Persistent runtime configuration, mode `0600` |
-| `/srv/kairos/secrets/` | Five application key files; directory `0700`, files `0400` |
+| `/srv/kairos/secrets/` | Six application key files; directory `0700`, files `0400` |
 | `/srv/kairos/tls/tls.crt`, `tls.key` | Origin certificate `0644`, private key `0600`; directory `0700` |
 | `/srv/kairos/releases/<revision>/` | Disposable exact-revision bundle, private to deployment account |
 | `/srv/kairos/deploy.lock` | Host-wide deployment lock |

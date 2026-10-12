@@ -46,9 +46,22 @@ policy, update the visible password guidance to match.
 ## Sessions and account flows
 
 Users register and log in on the Kairos panel with email/password. Registration
-immediately creates a tenant/admin or consumes a fixed manually shared member
-invitation. Emails stay unverified; verification codes are discarded rather than
-mailed. Email verification, password recovery, social login and MFA are deferred.
+sends a 6-digit provider verification code before creating a tenant/admin.
+Confirming ownership opens the existing first-location onboarding flow. Codes
+use the provider expiry, permit five wrong attempts and can be resent after
+60 seconds. Unverified sign-in without an Account resumes this step; a new
+registration can replace an abandoned unverified identity without an Account.
+Member registration consumes a fixed invitation. Password recovery, social
+login and MFA remain deferred.
+
+Kairos sends English mail through Resend from
+`Kairos <no-reply@kairos.karolbystrek.pl>` with no Reply-To or open/click tracking.
+ZITADEL needs no SMTP configuration. Set `RESEND_API_KEY` in protected production
+configuration and preserve the bootstrap-generated `email-encryption.bin`.
+Production refuses startup without the API key; local/test mode logs delivery
+metadata without codes or message bodies and sends no email. See
+[configuration](deployment/CONFIGURATION.md) and
+[key maintenance](deployment/MAINTENANCE.md).
 Signed-in users can change a password using the current password; this signs out
 all sessions and requires a new login.
 

@@ -44,11 +44,20 @@ services:
     logging: *deployment-logging
 
   api:
+    environment:
+      EMAIL_DELIVERY_MODE: RESEND
+      RESEND_API_KEY: ${RESEND_API_KEY:?Set RESEND_API_KEY for production email delivery}
     image: ${KAIROS_IMAGE_REGISTRY:?Set KAIROS_IMAGE_REGISTRY}/api:${KAIROS_RELEASE_VERSION:?Set KAIROS_RELEASE_VERSION}
     mem_limit: 1g
     cpus: 1.50
     logging: *deployment-logging
     volumes:
+      - type: bind
+        source: ${KAIROS_APPLICATION_SECRETS_DIRECTORY:?Set KAIROS_APPLICATION_SECRETS_DIRECTORY}/email-encryption.bin
+        target: /run/secrets/email-encryption.bin
+        read_only: true
+        bind:
+          create_host_path: false
       - type: bind
         source: ${KAIROS_APPLICATION_SECRETS_DIRECTORY:?Set KAIROS_APPLICATION_SECRETS_DIRECTORY}/webhook-encryption.bin
         target: /run/secrets/webhook-encryption.bin

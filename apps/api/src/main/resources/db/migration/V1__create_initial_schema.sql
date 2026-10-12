@@ -1392,6 +1392,79 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
     FROM public.customer_push_deliveries WHERE status IN ('PENDING','PROCESSING');
 $$;
 
+-- Email payloads include recipients and bearer secrets; only ciphertext survives while queued.
+CREATE TABLE email_deliveries (
+    id uuid PRIMARY KEY,
+    owner_scope text NOT NULL,
+    owner_identity text NOT NULL,
+    tenant_id uuid,
+    location_id uuid,
+    state text NOT NULL DEFAULT 'QUEUED' CHECK (state IN ('QUEUED','SENT','FAILED')),
+    encrypted_payload bytea,
+    payload_nonce bytea,
+    created_at timestamptz NOT NULL,
+    first_attempt_at timestamptz,
+    next_attempt_at timestamptz NOT NULL,
+    attempt_count integer NOT NULL DEFAULT 0 CHECK (attempt_count>=0),
+    claim_token uuid,
+    claim_until timestamptz,
+    completed_at timestamptz,
+    CONSTRAINT email_payload_lifecycle CHECK (
+        (state='QUEUED' AND encrypted_payload IS NOT NULL AND octet_length(payload_nonce)=12 AND completed_at IS NULL)
+        OR (state IN ('SENT','FAILED') AND encrypted_payload IS NULL AND payload_nonce IS NULL AND completed_at IS NOT NULL)),
+    CONSTRAINT email_owner CHECK ((owner_scope='staff' AND tenant_id IS NOT NULL)
+        OR (owner_scope='verification' AND tenant_id IS NULL AND location_id IS NULL)),
+    CONSTRAINT email_location_tenant_fk FOREIGN KEY (location_id,tenant_id) REFERENCES locations(id,tenant_id) ON DELETE CASCADE
+);
+CREATE INDEX email_deliveries_available_idx ON email_deliveries(next_attempt_at,created_at,id) WHERE state='QUEUED';
+CREATE FUNCTION kairos_security.email_access(owner_scope text,owner_identity text,tenant uuid,location uuid) RETURNS boolean
+LANGUAGE sql STABLE SET search_path=pg_catalog AS $$
+    SELECT (owner_scope='verification' AND kairos_security.setting('scope')='verification'
+        AND kairos_security.setting('identity')=owner_identity)
+        OR (owner_scope='staff' AND (kairos_security.staff_tenant(tenant,true)
+            OR kairos_security.staff_location(location,true)))
+$$;
+ALTER TABLE email_deliveries ENABLE ROW LEVEL SECURITY;
+CREATE POLICY scoped_select ON email_deliveries FOR SELECT USING (kairos_security.email_access(owner_scope,owner_identity,tenant_id,location_id));
+CREATE POLICY scoped_insert ON email_deliveries FOR INSERT WITH CHECK (
+    owner_scope=kairos_security.setting('scope') AND owner_identity=kairos_security.setting('identity')
+    AND kairos_security.email_access(owner_scope,owner_identity,tenant_id,location_id));
+CREATE POLICY scoped_update ON email_deliveries FOR UPDATE USING (kairos_security.email_access(owner_scope,owner_identity,tenant_id,location_id))
+    WITH CHECK (kairos_security.email_access(owner_scope,owner_identity,tenant_id,location_id));
+CREATE TRIGGER stable_ownership BEFORE UPDATE ON email_deliveries FOR EACH ROW EXECUTE FUNCTION kairos_security.stable_ownership('id','owner_scope','owner_identity','tenant_id','location_id');
+
+CREATE FUNCTION public.claim_email_delivery(at_time timestamptz,token uuid)
+RETURNS TABLE(id uuid,encrypted_payload bytea,payload_nonce bytea,attempt_count integer,first_attempt_at timestamptz)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE selected uuid;
+BEGIN
+    SELECT d.id INTO selected FROM public.email_deliveries d
+        WHERE d.state='QUEUED' AND d.next_attempt_at<=at_time AND (d.claim_until IS NULL OR d.claim_until<=at_time)
+        ORDER BY d.created_at,d.id LIMIT 1 FOR UPDATE SKIP LOCKED;
+    IF selected IS NULL THEN RETURN; END IF;
+    -- Never cross Resend's 24-hour idempotency retention after an ambiguous attempt.
+    IF EXISTS(SELECT 1 FROM public.email_deliveries d WHERE d.id=selected AND d.first_attempt_at+interval '23 hours'<=at_time) THEN
+        UPDATE public.email_deliveries d SET state='FAILED',encrypted_payload=NULL,payload_nonce=NULL,
+            completed_at=at_time,claim_token=NULL,claim_until=NULL WHERE d.id=selected;
+        RETURN;
+    END IF;
+    UPDATE public.email_deliveries d SET claim_token=token,claim_until=at_time+interval '30 seconds',
+        first_attempt_at=COALESCE(d.first_attempt_at,at_time),attempt_count=d.attempt_count+1 WHERE d.id=selected;
+    RETURN QUERY SELECT d.id,d.encrypted_payload,d.payload_nonce,d.attempt_count,d.first_attempt_at
+        FROM public.email_deliveries d WHERE d.id=selected;
+END $$;
+CREATE FUNCTION public.complete_email_delivery(delivery uuid,token uuid,result text,at_time timestamptz,retry_at timestamptz) RETURNS boolean
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
+BEGIN
+    IF result NOT IN ('SENT','FAILED','QUEUED') THEN RAISE EXCEPTION 'Invalid email result'; END IF;
+    UPDATE public.email_deliveries d SET state=result,claim_token=NULL,claim_until=NULL,
+        next_attempt_at=COALESCE(retry_at,at_time),completed_at=CASE WHEN result='QUEUED' THEN NULL ELSE at_time END,
+        encrypted_payload=CASE WHEN result='QUEUED' THEN d.encrypted_payload ELSE NULL END,
+        payload_nonce=CASE WHEN result='QUEUED' THEN d.payload_nonce ELSE NULL END
+        WHERE d.id=delivery AND d.state='QUEUED' AND d.claim_token=token;
+    RETURN FOUND;
+END $$;
+
 REVOKE ALL ON ALL TABLES IN SCHEMA public FROM PUBLIC;
 REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM PUBLIC;
 REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA kairos_security FROM PUBLIC;
@@ -1401,7 +1474,7 @@ GRANT SELECT,INSERT,UPDATE,DELETE ON tenants,locations,menus,menu_items,location
     external_integrations,api_keys,api_key_scopes,api_key_location_access,
     webhook_subscriptions,webhook_subscription_location_access,webhook_subscription_event_types,webhook_signing_secret_versions,
     order_measurements,order_hourly_analytics,usage_hourly_analytics,platform_administrators,orders,order_history,order_outbox_events,webhook_deliveries,webhook_delivery_signing_versions,
-    customer_push_subscriptions,customer_push_enrollments,customer_push_deliveries,
+    customer_push_subscriptions,customer_push_enrollments,customer_push_deliveries,email_deliveries,
     spring_session,spring_session_attributes TO "${runtimeUser}";
 GRANT SELECT ON order_hourly_reports TO "${runtimeUser}";
 GRANT USAGE ON SEQUENCE order_history_id_seq TO "${runtimeUser}";
@@ -1417,3 +1490,25 @@ GRANT EXECUTE ON FUNCTION public.operational_backlog(),public.valid_staff(uuid,u
     public.next_purgeable_location(timestamptz),public.next_finished_invitation(timestamptz),public.purge_retained(text,uuid),
     public.record_usage_action(uuid,uuid,text,timestamptz),public.next_order_measurement(),public.valid_platform_administrator(uuid),public.valid_worker(text,uuid,uuid) TO "${runtimeUser}";
 COMMENT ON SCHEMA kairos_security IS 'kairos-rls-v1';
+
+GRANT EXECUTE ON FUNCTION public.claim_email_delivery(timestamptz,uuid),public.complete_email_delivery(uuid,uuid,text,timestamptz,timestamptz) TO "${runtimeUser}";
+
+-- Registration state carries no tenant authority or verification secret.
+CREATE TABLE pending_registrations (
+    subject text PRIMARY KEY,
+    email varchar(200) NOT NULL,
+    attempts integer NOT NULL DEFAULT 0 CHECK (attempts BETWEEN 0 AND 5),
+    resend_available_at timestamptz NOT NULL,
+    delivery_id uuid NOT NULL REFERENCES email_deliveries(id)
+);
+ALTER TABLE pending_registrations ENABLE ROW LEVEL SECURITY;
+CREATE POLICY scoped_select ON pending_registrations FOR SELECT USING
+    (kairos_security.setting('scope')='verification' AND subject=kairos_security.setting('identity'));
+CREATE POLICY scoped_insert ON pending_registrations FOR INSERT WITH CHECK
+    (kairos_security.setting('scope')='verification' AND subject=kairos_security.setting('identity'));
+CREATE POLICY scoped_update ON pending_registrations FOR UPDATE USING
+    (kairos_security.setting('scope')='verification' AND subject=kairos_security.setting('identity')) WITH CHECK
+    (kairos_security.setting('scope')='verification' AND subject=kairos_security.setting('identity'));
+CREATE POLICY scoped_delete ON pending_registrations FOR DELETE USING
+    (kairos_security.setting('scope')='verification' AND subject=kairos_security.setting('identity'));
+GRANT SELECT,INSERT,UPDATE,DELETE ON pending_registrations TO "${runtimeUser}";

@@ -130,6 +130,7 @@ public class SecurityConfig {
                         .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
                         .requestMatchers(HttpMethod.GET,
                                 "/auth/v1/csrf",
+                                "/auth/v1/verification",
                                 "/tracked-orders/v1/**",
                                 "/customer-notifications/v1/configuration",
                                 "/actuator/health",
@@ -140,6 +141,8 @@ public class SecurityConfig {
                                 "/auth/v1/login",
                                 "/auth/v1/logout",
                                 "/tenant-registrations/v1",
+                                "/auth/v1/verification",
+                                "/auth/v1/verification/resend",
                                 "/account-invitation-previews/v1",
                                 "/account-invitation-redemptions/v1"
                         ).permitAll()

@@ -7,7 +7,7 @@ import ts from "typescript";
 const require = createRequire(import.meta.url);
 
 // Render the panel's event flow without a browser; UI and request boundaries are stubs.
-function panel(screen = "dashboard") {
+function panel(screen = "dashboard", loginResult) {
   const state = [];
   let cursor = 0;
   let pending = false;
@@ -22,6 +22,7 @@ function panel(screen = "dashboard") {
   })]));
   let account = { accountId: "staff", capabilities: [] };
   let accountError;
+  let verification;
   let loading = false;
   class ApiError extends Error {
     constructor(status) { super(); this.status = status; }
@@ -38,7 +39,7 @@ function panel(screen = "dashboard") {
     };
     if (name === "@heroui/react") return ui;
     if (name === "swr") return {
-      default: () => ({ data: account, error: accountError, isLoading: loading, mutate: async value => {
+      default: key => key?.[1] === "verification" || key === null ? { data: verification, mutate: async value => { verification = value; } } : ({ data: account, error: accountError, isLoading: loading, mutate: async value => {
         cacheClears.push("account");
         account = value;
         accountError = undefined;
@@ -52,7 +53,8 @@ function panel(screen = "dashboard") {
       async trigger(arg) { return mutation(key, { arg }); },
     }) };
     if (name === "@/src/api/authentication") return {
-      async login() { return { accountId: "staff", capabilities: [] }; },
+      pendingVerificationKey: ["authentication", "verification"],
+      async login() { return loginResult ?? { accountId: "staff", capabilities: [] }; },
       async logout(everywhere) { requests.push(everywhere); return !failure; },
     };
     if (name === "@/src/api/usage-analytics") return { recordPanelAction: event => actions.push(event) };
@@ -85,6 +87,7 @@ function panel(screen = "dashboard") {
     tabs: () => elements(render()).filter(node => node.type === "Tabs.Tab").map(node => node.props.id),
     selected: () => find(node => node.type === ui.Tabs).selectedKey,
     session(value, error, isLoading = false) { account = value; accountError = error; loading = isLoading; },
+    verification(value) { verification = value; },
     signIn: () => find(node => node.type?.name === "SignedOutPanel").onSignIn({ email: "staff@example.com", password: "password" }),
     expire: () => expireSession(),
     passwordDialog: () => find(node => node.type === "PasswordChangeDialog"),
@@ -209,4 +212,20 @@ test("analytics tabs follow capabilities and revoked platform access leaves its 
   view.session({ accountId: "staff", capabilities: ["MANAGE_ORDERS", "VIEW_ANALYTICS"] });
   assert.deepEqual(view.tabs(), ["orders", "analytics"]);
   assert.equal(view.selected(), "orders");
+});
+
+test("unverified login stays outside the staff session and displays verification", async () => {
+  const view = panel("login", { verificationRequired: true, email: "staff@example.com", resendAvailableAt: "2026-10-12T12:00:00Z" });
+  view.session(undefined);
+  await view.signIn();
+  assert.equal(view.render().type, "EmailVerification");
+  assert.deepEqual(view.redirects, []);
+  assert.deepEqual(view.cacheClears, []);
+});
+test("login restores a pending verification after reload", () => {
+  const view = panel("login");
+  view.session(undefined, new view.ApiError(401));
+  view.verification({ verificationRequired: true, email: "staff@example.com", resendAvailableAt: "2026-10-12T12:00:00Z" });
+  assert.equal(view.render().type, "EmailVerification");
+  assert.deepEqual(view.redirects, []);
 });

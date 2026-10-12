@@ -19,7 +19,7 @@ The current walking vertical slice is implemented for local development:
   with direct registration/sign-in actions and secondary creator contact,
   plus session-aware navigation to `/dashboard` and `/login`;
 * authenticated, tenant- and location-authorized staff operations;
-* backend-mediated self-hosted ZITADEL email/password authentication, immediate
+* backend-mediated self-hosted ZITADEL email/password authentication, email-verified
   public tenant registration, fixed manually shared manager/operator invitations,
   durable rolling browser sessions, password changes and local/global logout;
 * on-screen customer QR codes and anonymous tracking through REST;
@@ -96,7 +96,7 @@ unavailable; managers/operators join only through fixed Account Invitations.
 
 The implemented administrative-lifecycle increment provides
 tenant-administrator Location management, validates and completes account
-registration before requiring first-location creation in the dashboard,
+registration after email verification before requiring first-location creation in the dashboard,
 protects the last non-archived location from deletion, retains the reusable zero-enabled-location creation flow in
 Orders, standardizes the managed-resource lifecycle vocabulary, adds Account
 archival through Delete, and applies the Location cascades and contracts
@@ -135,7 +135,7 @@ Outstanding security and acceptance work:
 * operate and patch ZITADEL, rotate backend
   service credentials, and
   provide externally managed webhook-secret encryption keys,
-  VAPID signing keys, and push-subscription encryption keys, with documented
+  VAPID signing keys, push-subscription and transactional-email encryption keys, with documented
   rotation procedures, security-event retention, monitoring, and dependency
   patching;
 * complete Android Chrome, iOS/iPadOS Safari, desktop Chrome, and desktop Firefox

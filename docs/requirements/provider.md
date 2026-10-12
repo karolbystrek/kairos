@@ -18,8 +18,8 @@ not restaurant roles. Kairos restaurant tenants do not become provider orgs.
 The provider's supplied Login UI is unnecessary for this custom Session API flow.
 Start with one instance and accept planned maintenance outages; HA is deferred.
 
-`setup.sh` prepares the five application secrets including a stable 32-character
-ZITADEL master key, preserving that key when replacing webhook/push material.
+`setup.sh` prepares the six application secrets including a stable 32-character
+ZITADEL master key, preserving that key when replacing webhook/push/email material.
 The provider needs the same master key for as long as its database is retained.
 New API PATs use ZITADEL's no-expiry sentinel `9999-12-31T23:59:59Z`; the pinned
 v4.19.4 v2 API requires an explicit expiration timestamp. Operators can revoke
@@ -28,15 +28,17 @@ expiration. Provider data, master key and private credential volumes require res
 Backups are deferred for the disposable development VPS under the
 [operations policy](routing-releases.md#development-operations-policy); before
 valuable data is retained, back up provider data and its matching key/credentials.
-No SMTP provider is configured in this increment.
+ZITADEL has no SMTP configuration. Kairos sends provider-returned verification
+codes through its own transactional email delivery worker.
 
 Validate invitation/email availability before provider provisioning. Create and
-password-authenticate the provider identity, then commit the tenant/admin or
-invitation/member transaction locally. First-location creation is a separate
+password-authenticate the provider identity. Administrator registration commits
+the tenant/admin only after email confirmation; invitation registration commits
+its member transaction after invitation validation. First-location creation is a separate
 authenticated transaction after account registration. Recheck invitation eligibility and consume
 it atomically with the Account and assignment. On local failure, terminate the
 new provider session and attempt deletion of only the newly provisioned identity.
-No distributed transaction, queue or retry worker is introduced. A provider
+No distributed transaction is introduced; email uses a durable outbox. A provider
 outage during cleanup can leave an orphan identity requiring operator cleanup;
 never attach an existing identity solely because its email matches.
 

@@ -7,9 +7,11 @@ trap 'rm -rf -- "${test_directory}"' EXIT HUP INT TERM
 cp "${repository_directory}/setup.sh" "${repository_directory}/.env.example" "${test_directory}/"
 
 sh "${test_directory}/setup.sh" --non-interactive --secrets-directory secrets --no-tls > "${test_directory}/output"
-for key_name in zitadel-masterkey webhook-encryption.bin vapid-private.pem vapid-public.pem push-subscription-encryption.bin; do
+for key_name in zitadel-masterkey webhook-encryption.bin email-encryption.bin vapid-private.pem vapid-public.pem push-subscription-encryption.bin; do
     [ -f "${test_directory}/secrets/${key_name}" ]
 done
+[ "$(wc -c < "${test_directory}/secrets/email-encryption.bin" | tr -d ' ')" -eq 32 ]
+cp "${test_directory}/secrets/email-encryption.bin" "${test_directory}/expected-email"
 printf '%s' 'externally-supplied-credential' > "${test_directory}/secrets/external-secret.txt"
 cp "${test_directory}/secrets/external-secret.txt" "${test_directory}/expected-credential"
 cp "${test_directory}/secrets/zitadel-masterkey" "${test_directory}/expected-masterkey"
@@ -30,6 +32,7 @@ sh "${test_directory}/setup.sh" --non-interactive --keep-env --keep-keys --secre
 same_inode "${test_directory}/secrets" 3 || { echo "Setup replaced the secrets directory." >&2; exit 1; }
 same_inode "${test_directory}/secrets/tls" 4 || { echo "Setup replaced the TLS directory." >&2; exit 1; }
 same_inode "${test_directory}/secrets/webhook-encryption.bin" 5 || { echo "Setup replaced a reused key." >&2; exit 1; }
+cmp "${test_directory}/expected-email" "${test_directory}/secrets/email-encryption.bin"
 cmp "${test_directory}/expected-webhook" "${test_directory}/secrets/webhook-encryption.bin"
 sh "${test_directory}/setup.sh" --non-interactive --keep-env --replace-keys --secrets-directory secrets --no-tls > "${test_directory}/output"
 same_inode "${test_directory}/secrets" 3

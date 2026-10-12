@@ -33,6 +33,7 @@ def main():
         env.write_text((ROOT / '.env.example').read_text() + '\n' + '\n'.join([
             'KAIROS_IMAGE_REGISTRY=example.invalid/kairos',
             'KAIROS_RELEASE_VERSION=test',
+            'RESEND_API_KEY=gateway-test-placeholder',
             f'KAIROS_APPLICATION_SECRETS_DIRECTORY={work}',
             f'KAIROS_TLS_DIRECTORY={work}',
         ]) + '\n')
@@ -131,14 +132,17 @@ def main():
                 except (OSError, urllib.error.URLError):
                     pass
                 protected = ['/api/auth/v1/login', '/api/auth/v1/password',
+                             '/api/auth/v1/verification', '/api/auth/v1/verification/resend',
                              '/api/tenant-registrations/v1', '/api/account-invitation-redemptions/v1']
-                statuses = [request(protected[i % 4], client=f'203.0.113.{i + 1}', method='POST')[0] for i in range(9)]
+                statuses = [request(protected[i % len(protected)], client=f'203.0.113.{i + 1}', method='POST')[0] for i in range(9)]
                 assert statuses[:6] == [200] * 6 and statuses[6:] == [429] * 3, (mode, statuses)
                 for path, method in (
                     ('/api/auth/v1/csrf', 'GET'), ('/api/auth/v1/me', 'GET'),
                     ('/api/orders/v1', 'GET'), ('/api/orders/v1', 'POST'),
                     ('/api/auth/v1/login', 'GET'), ('/api/auth/v1/login', 'OPTIONS'),
                     ('/api/auth/v1/logout', 'POST'),
+                    ('/api/auth/v1/verification', 'GET'),
+                    ('/api/auth/v1/verification/resend', 'OPTIONS'),
                     ('/api/account-invitation-previews/v1', 'POST'),
                 ):
                     assert request(path, method=method)[0] == 200, (path, method)

@@ -39,12 +39,20 @@ services:
 
   api:
     environment:
+      SPRING_PROFILES_ACTIVE: local
+      EMAIL_DELIVERY_MODE: LOG
       REVIEW_INVITATION_DELAY: "${REVIEW_INVITATION_DELAY:-1m}"
     build:
       context: ./apps/api
       dockerfile: Dockerfile
       target: runner
     volumes:
+      - type: bind
+        source: ./secrets/email-encryption.bin
+        target: /run/secrets/email-encryption.bin
+        read_only: true
+        bind:
+          create_host_path: false
       - type: bind
         source: ./secrets/webhook-encryption.bin
         target: /run/secrets/webhook-encryption.bin
