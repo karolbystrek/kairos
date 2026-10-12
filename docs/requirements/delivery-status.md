@@ -46,6 +46,7 @@ The current walking vertical slice is implemented for local development:
   irreversible Account Delete;
 * versioned external order commands with idempotent creation and desired-state
   updates;
+* durable anonymous hourly order counts and versioned preparation/collection duration summaries, with transaction-safe collection and scoped background processing;
 * one channel-neutral transactional order outbox with Spring API background
   jobs for independent single-attempt webhook and durable retrying Web Push
   delivery;

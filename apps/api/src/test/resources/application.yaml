@@ -25,6 +25,8 @@ server:
     context-path: /api
 
 kairos:
+  analytics:
+    initial-delay: 24h
   origins:
     customer: "http://localhost:3000"
     panel: "http://localhost:3001"

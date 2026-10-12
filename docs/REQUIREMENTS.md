@@ -25,6 +25,7 @@ Do not skip an applicable requirement because it lives in another file.
 | Topic | When to read |
 | --- | --- |
 | [Purpose, technology and ownership](requirements/overview-technology.md) | All work: scope, stack and ownership; frontend visual conventions |
+| [Anonymous order analytics](requirements/order-analytics.md) | Durable counts/durations, worker processing, deployment boundary and analytics retention |
 | [Order lifecycle and customer application](requirements/orders-customer.md) | Order changes, customer tracking, PWA, offline and notifications |
 | [Staff panel requirements](requirements/staff-panel.md) | Staff queues, navigation, management UI and confirmations |
 | [External Integration API and webhooks](requirements/external-integrations.md) | Integration credentials, external orders and webhook delivery |

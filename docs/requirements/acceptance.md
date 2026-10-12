@@ -224,6 +224,7 @@
 
 * A valid transition from either the staff panel or an External Integration produces the same persisted state, history record, customer event, and transactional outbox event.
 * Integration, API Key, webhook subscription, and signing-secret lifecycle changes preserve one-time secret handling and historical audit attribution.
-* Exact idempotent creation replays and same-state status commands create no duplicate order, history, outbox, or customer event.
+* Exact idempotent creation replays and same-state status commands create no duplicate order, history, outbox, customer event or analytics measurement.
+* Focused PostgreSQL checks verify anonymous analytics rollback/retry, concurrent processing, duration/hour/bucket calculations, collection without backfill, tenant isolation, location-purge survival and permanent tenant-deletion races; see [analytics invariants](order-analytics.md).
 * Webhook delivery failure cannot roll back or corrupt the committed order transition and is retained as a terminal dead-letter record.
 * The REST and webhook contracts remain language-agnostic.
