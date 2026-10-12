@@ -55,13 +55,15 @@ lifecycle followed by the API Docker build. Frontend
 validation requires the non-secret `NEXT_PUBLIC_API_BASE_URL`,
 `NEXT_PUBLIC_CUSTOMER_APP_URL` and `NEXT_PUBLIC_PANEL_APP_URL` inputs.
 
-Main pushes and manual dispatches on `main` publish all three application images
-only after those checks pass; pull requests never publish. Existing full-revision
+CI never publishes images. Manual production deployment dispatches on `main`
+publish all three application images only from successful CI for the dispatch
+revision; pull requests never publish. Existing full-revision
 tags remain unchanged. Every published or reused image is pulled for
 `linux/amd64` and inspected for the matching source-revision label and a
 repository-owned GHCR registry digest. Validation jobs export OCI image archives
-with provenance and upload them with their build digests on main release runs.
-One `Publish release` job copies those exact artifacts to GHCR using Skopeo with
+with provenance and upload them with their build digests on main CI runs,
+retained for 30 days. The deployment workflow's `Publish release` job copies
+those exact artifacts to GHCR using Skopeo with
 all manifests and digest preservation, checks published digests against build
 outputs, captures inspections locally, and verifies all three before uploading
 the `release-manifest` artifact. Publication never rebuilds the images and is
@@ -77,17 +79,15 @@ hosted Compose files, both NGINX configuration files, and the ZITADEL bootstrap
 script, PostgreSQL entrypoint role initialization script,
 exact V1 SQL, and the deployment shell command/Python helper. An explicit file allowlist
 excludes environment files, certificates and private keys. CI ends after
-publication and never requests production approval. The separate `deploy.yml`
-workflow runs only by manual dispatch on `main`. Its optional `revision` input
-accepts a 7–40-character hexadecimal commit SHA; omission selects the latest
-`main` commit when release selection runs. Selection resolves a full revision,
-requires it to be an ancestor of `main`, and locates a successful CI run with an
-unexpired `release-manifest` artifact before the production approval gate.
-Missing or expired releases fail selection without requesting approval. The
-selected revision remains fixed if `main` advances afterward.
+validation and image building and never requests production approval. The separate
+`deploy.yml` workflow runs only by manual dispatch on `main`, with no revision
+input. It uses the latest main revision captured at dispatch and locates a
+successful main CI run for that exact SHA with all three unexpired image
+artifacts. Missing or expired images fail publication before production approval.
+The revision remains fixed if `main` advances afterward.
 
-The production job targets the `production` GitHub Environment, downloads the
-selected CI run's artifact, validates its manifest/archive against the selected
+The production job targets the `production` GitHub Environment, downloads its
+own workflow's release artifact, validates its manifest/archive against the dispatch
 revision, and transfers it over SSH
 with the supplied verified host keys and ephemeral `0700`/`0600` SSH files.
 The four Environment secrets are `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`,
