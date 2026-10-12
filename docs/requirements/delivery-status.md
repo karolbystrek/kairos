@@ -47,6 +47,7 @@ The current walking vertical slice is implemented for local development:
 * versioned external order commands with idempotent creation and desired-state
   updates;
 * durable anonymous hourly order counts and versioned preparation/collection duration summaries, with transaction-safe collection and scoped background processing;
+* approximate anonymous panel opening and customer review click/dismissal counts, with bounded authorized ingestion and hourly aggregation;
 * one channel-neutral transactional order outbox with Spring API background
   jobs for independent single-attempt webhook and durable retrying Web Push
   delivery;
@@ -101,7 +102,8 @@ specified in [location lifecycle](locations.md) and [HTTP contracts](http-contra
 
 Optional per-location Google review invitations now include administrator link
 configuration, configurable completion delay and a closable in-app prompt; no
-review push, reminder schedule or review metrics are sent. Physical-device
+review push or reminder schedule is sent. Best-effort review clicks and explicit
+dismissals follow [usage analytics](usage-analytics.md). Physical-device
 acceptance remains outstanding.
 
 Draft Polish terms, privacy notices and their in-app entry points are in place;

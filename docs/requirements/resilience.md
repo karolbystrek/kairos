@@ -45,7 +45,7 @@
 * An archived location is removed once no account is assigned to it, together
   with its orders, order history, outbox events, webhook and push deliveries,
   push enrollments, invitations and remaining integration selections.
-* Anonymous order aggregates and self-contained pending inputs survive location purge; permanent tenant deletion erases both.
+* Anonymous order and usage aggregates and self-contained business inputs survive location purge; permanent tenant deletion erases them. Usage ingestion and business processing coordinate through tenant locks.
 * Finished invitations are deleted 30 days after revocation or expiry.
 * Each item is discovered with `FOR UPDATE SKIP LOCKED` and erased in its own
   transaction by a guarded `SECURITY DEFINER` function, so row policies stay

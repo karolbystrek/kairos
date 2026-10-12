@@ -61,8 +61,11 @@ export default function PrivacyPolicyPage() {
       </ul>
       <p>
         Podanie adresu e-mail i hasła jest niezbędne do założenia konta. Kairos
-        nie korzysta z narzędzi analitycznych ani reklamowych, nie profiluje
-        Użytkowników i nie podejmuje wobec nich zautomatyzowanych decyzji.
+        zlicza otwarcia kolejki, menu, ustawień integracji i formularza
+        zamówienia. Statystyki przechowujemy łącznie dla restauracji, lokalu
+        (gdy dotyczy) i godziny, bez identyfikatorów kont, sesji, urządzeń ani
+        adresów IP. Nie korzystamy z narzędzi reklamowych, nie profilujemy
+        Użytkowników i nie podejmujemy wobec nich zautomatyzowanych decyzji.
       </p>
 
       <h2>Pliki cookie i pamięć przeglądarki</h2>
@@ -108,7 +111,8 @@ export default function PrivacyPolicyPage() {
         wygasa po wylogowaniu lub 30 dniach braku aktywności. Logi serwera z
         adresami IP i zdarzeniami bezpieczeństwa są nadpisywane po osiągnięciu
         limitu rozmiaru. Pozostałe dane zostaną usunięte w ciągu 30 dni po
-        zakończeniu Okresu testowego.
+        zakończeniu Okresu testowego. Zbiorcze statystyki zachowujemy do
+        trwałego usunięcia danych restauracji, również po usunięciu lokalu.
       </p>
 
       <h2>Twoje prawa</h2>
