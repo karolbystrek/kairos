@@ -45,7 +45,7 @@ class DeployTest(unittest.TestCase):
         self.original_record = self.record.read_bytes()
         self.secrets = self.root / "secrets"
         self.secrets.mkdir()
-        for name in ("webhook-encryption.bin", "vapid-private.pem", "vapid-public.pem",
+        for name in ("webhook-encryption.bin", "email-encryption.bin", "vapid-private.pem", "vapid-public.pem",
                      "push-subscription-encryption.bin", "zitadel-masterkey", "tls.crt", "tls.key"):
             (self.secrets / name).write_text("fixture-private-material")
         origins = {
@@ -66,7 +66,7 @@ class DeployTest(unittest.TestCase):
         }
         self.config["services"]["api"]["volumes"] = [
             {"type": "bind", "source": str(self.secrets / name), "read_only": True}
-            for name in ("webhook-encryption.bin", "vapid-private.pem", "vapid-public.pem",
+            for name in ("webhook-encryption.bin", "email-encryption.bin", "vapid-private.pem", "vapid-public.pem",
                          "push-subscription-encryption.bin")
         ]
         self.config["services"]["zitadel"]["volumes"] = [
@@ -271,6 +271,7 @@ sys.exit(deploy.main(sys.argv[1:]))
     def test_absolute_external_configuration_deploys_with_real_compose_parser(self):
         self.env_file.write_text((ROOT / ".env.example").read_text() + "\n" + "\n".join([
             "WEBHOOK_DESTINATION_POLICY=PUBLIC_HTTPS",
+            "RESEND_API_KEY=fixture-resend-key",
             "KAIROS_APPLICATION_SECRETS_DIRECTORY=" + str(self.secrets),
             "KAIROS_TLS_DIRECTORY=" + str(self.secrets),
         ]) + "\n")
@@ -302,6 +303,7 @@ sys.exit(deploy.main(sys.argv[1:]))
         # the consumer against the actual parser, without contacting a daemon.
         self.env_file.write_text((ROOT / ".env.example").read_text() + "\n" + "\n".join([
             "WEBHOOK_DESTINATION_POLICY=PUBLIC_HTTPS",
+            "RESEND_API_KEY=fixture-resend-key",
             "KAIROS_APPLICATION_SECRETS_DIRECTORY=../secrets",
             "KAIROS_TLS_DIRECTORY=../secrets",
         ]) + "\n")

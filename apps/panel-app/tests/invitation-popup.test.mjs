@@ -11,6 +11,8 @@ function workspace(kind = "account-management", collections = {}) {
   let cursor = 0;
   let pending = false;
   let complete;
+  let creationFailure;
+  class ApiError extends Error { constructor(status) { super(); this.status = status; } }
   const requests = [];
   const exports = {};
   const dependencies = name => {
@@ -26,19 +28,18 @@ function workspace(kind = "account-management", collections = {}) {
     };
     if (name === "@heroui/react") return new Proxy({}, { get: (_, key) => new Proxy(() => {}, { get: (_, part) => `${String(key)}.${String(part)}` }) });
     if (name === "swr") return { useSWRConfig: () => ({ mutate: async () => {} }), default: key => ({
-      data: key === "locations" ? (collections.locations ?? [{ id: "location", status: "ENABLED", name: "Location" }, { id: "other", status: "ENABLED", name: "Other" }]) : (collections[key] ?? []),
+      data: key === "locations" ? (collections.locations ?? [{ id: "location", status: "ENABLED", name: "Location" }, { id: "other", status: "ENABLED", name: "Other" }]) : key === "invitations" ? { items: (collections.invitations ?? []).map(invitation => ({ state: "PENDING", deliveryState: "QUEUED", ...invitation })), page: 0, size: 20, totalElements: collections.totalElements ?? (collections.invitations?.length ?? 0) } : (collections[key] ?? []),
       error: collections.errors?.[key],
       isLoading: collections.loading?.[key] ?? false,
       mutate: async () => { requests.push({ retry: key }); },
     }) };
     if (name === "swr/mutation") return { default: (key, mutation) => ({
       isMutating: ["createInvitationMutation", "createOrderMutation"].includes(mutation.name) && pending,
-      reset() { if (["createInvitationMutation", "createOrderMutation"].includes(mutation.name)) pending = false; },
+      error: mutation.name === "createInvitationMutation" ? creationFailure : undefined,
+      reset() { if (["createInvitationMutation", "createOrderMutation"].includes(mutation.name)) { pending = false; creationFailure = undefined; } },
       async trigger(arg) {
         pending = true;
-        const result = await mutation(key, { arg });
-        pending = false;
-        return result;
+        try { return await mutation(key, { arg }); } catch (error) { creationFailure = error; throw error; } finally { pending = false; }
       },
     }) };
     if (name === "@/src/api/cache-keys") return {
@@ -46,7 +47,9 @@ function workspace(kind = "account-management", collections = {}) {
       staffInvitationsKey: () => "invitations", staffLocationMenuKey: () => "location-menu",
     };
     if (name === "@/src/api/account-invitations") return {
-      createAccountInvitation(input) { requests.push(input); return new Promise(resolve => { complete = resolve; }); },
+      createAccountInvitation(input) { requests.push(input); if (collections.conflict && !input.replaceExisting) throw new ApiError(409); return new Promise(resolve => { complete = resolve; }); },
+      async resendAccountInvitation(id) { requests.push({ resend: id }); return { id: "replacement", email: "invitee@example.com", role: "OPERATOR", locationName: "Location" }; },
+      async revokeAccountInvitation(id) { requests.push({ revoke: id }); return true; },
     };
     if (name === "@/src/api/orders") return {
       createOrderInputSchema: { safeParse: data => ({ success: true, data }) },
@@ -59,7 +62,7 @@ function workspace(kind = "account-management", collections = {}) {
       return inputExports;
     }
     if (name === "@/src/api/usage-analytics") return { recordPanelAction() {} };
-    if (name === "@/src/api/api-fetch") return { ApiError: class ApiError extends Error {} };
+    if (name === "@/src/api/api-fetch") return { ApiError };
     if (name.startsWith("@/")) return new Proxy({}, { get: (_, key) => String(key) });
     return require(name);
   };
@@ -97,7 +100,7 @@ function workspace(kind = "account-management", collections = {}) {
   };
 }
 
-test("dismiss and reopen preserves pending creation and the unacknowledged invitation link", async () => {
+test("dismiss and reopen preserves pending creation and shows queued email without exposing a link", async () => {
   const view = workspace();
   view.open();
   view.email().onChange("invitee@example.com");
@@ -107,15 +110,18 @@ test("dismiss and reopen preserves pending creation and the unacknowledged invit
   void view.submit();
   assert.equal(view.requests.length, 1);
   assert.equal(view.requests[0].email, "invitee@example.com");
+  assert.equal(view.requests[0].replaceExisting, false);
+  assert.equal(view.nodes().find(node => node.props?.label === "Kolejność zaproszeń").props.isDisabled, true);
+  assert.equal(view.nodes().find(node => node.props?.children === "Następna strona zaproszeń").props.isDisabled, true);
   view.popup().onOpenChange(false);
-  view.complete({ id: "invitation", role: "OPERATOR", locationName: "Location", invitationLink: "https://panel.example/invitation#secret" });
+  view.complete({ id: "invitation", email: "invitee@example.com", role: "OPERATOR", locationName: "Location" });
   await submission;
   assert.equal(view.popup().isOpen, true);
-  const link = view.secret().secret.value;
+  assert.equal(view.nodes().some(node => node.type === "OneTimeSecret"), false);
+  assert.ok(view.nodes().some(node => node.props?.children === "Zaproszenie wysłane do kolejki"));
   view.popup().onOpenChange(false);
   view.open();
-  assert.equal(view.secret().secret.value, link);
-  view.secret().onConfirmed();
+  view.nodes().find(node => node.props?.children === "Gotowe").props.onPress();
   assert.equal(view.popup().isOpen, false);
 });
 
@@ -191,7 +197,7 @@ test("dismissed location drafts cannot carry into a newly created location", () 
 });
 
 
-test("invitation creation rejects invalid email with a field error before issuing a link", async () => {
+test("invitation creation rejects invalid email with a field error before requesting email delivery", async () => {
   const view = workspace();
   view.open();
   view.email().onChange("invalid");
@@ -200,4 +206,44 @@ test("invitation creation rejects invalid email with a field error before issuin
   assert.ok(view.email().errorMessage);
   view.email().onChange("invitee@example.com");
   assert.equal(view.email().errorMessage, undefined);
+});
+
+const invitation = { id: "invite", email: "invitee@example.com", role: "OPERATOR", locationName: "Location", issuedByEmail: "owner@example.com", createdAt: "2026-01-01T00:00:00Z", expiresAt: "2099-01-01T00:00:00Z" };
+test("duplicate invitation requires explicit replacement confirmation", async () => {
+  const view = workspace("account-management", { conflict: true });
+  view.open();
+  view.email().onChange("invitee@example.com");
+  await view.submit();
+  assert.equal(view.requests.length, 1);
+  assert.equal(view.email().isDisabled, true);
+  const confirm = view.nodes().find(node => node.type === "HoldToConfirmButton");
+  assert.ok(confirm);
+  const submission = confirm.props.onConfirm();
+  assert.equal(view.requests[1].replaceExisting, true);
+  view.complete({ ...invitation, state: "PENDING", deliveryState: "QUEUED" });
+  await submission;
+});
+test("pending failed delivery can be resent only through confirmation", async () => {
+  const view = workspace("account-management", { invitations: [{ ...invitation, deliveryState: "FAILED" }] });
+  view.nodes().find(node => node.type === "PanelCard").props.onPress();
+  assert.equal(view.requests.length, 0);
+  const confirm = view.nodes().find(node => node.type === "HoldToConfirmButton" && String(node.props.children).includes("wysłać ponownie"));
+  assert.ok(confirm);
+  await confirm.props.onConfirm();
+  assert.deepEqual(view.requests[0], { resend: "invite" });
+});
+for (const state of ["REDEEMED", "REVOKED", "REPLACED", "EXPIRED"]) {
+  test(`${state} invitation remains in history without mutation controls`, () => {
+    const view = workspace("account-management", { invitations: [{ ...invitation, state }] });
+    view.nodes().find(node => node.type === "PanelCard").props.onPress();
+    assert.equal(view.nodes().filter(node => node.type === "HoldToConfirmButton").length, 0);
+  });
+}
+test("invitation history exposes pagination and creation date ordering", () => {
+  const view = workspace("account-management", { invitations: [invitation], totalElements: 21 });
+  const next = view.nodes().find(node => node.props?.children === "Następna strona zaproszeń");
+  assert.equal(next.props.isDisabled, false);
+  const previous = view.nodes().find(node => node.props?.children === "Poprzednia strona zaproszeń");
+  assert.equal(previous.props.isDisabled, true);
+  assert.ok(view.nodes().find(node => node.props?.label === "Kolejność zaproszeń"));
 });

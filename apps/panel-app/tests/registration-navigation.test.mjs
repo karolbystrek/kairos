@@ -6,7 +6,7 @@ import ts from "typescript";
 
 const require = createRequire(import.meta.url);
 
-async function submitRegistration({ invited = false, fails = false, termsAccepted = true } = {}) {
+async function submitRegistration({ invited = false, fails = false, termsAccepted = true, verificationRequired = false } = {}) {
   const redirects = [];
   const requests = [];
   const values = ["owner@example.com", "long-password", "long-password", termsAccepted];
@@ -19,13 +19,14 @@ async function submitRegistration({ invited = false, fails = false, termsAccepte
   async function createAccount(kind, input) {
     requests.push({ kind, input });
     if (fails) throw new Error("Offline");
+    return verificationRequired ? { verificationRequired: true, email: input.email, resendAvailableAt: "2026-10-12T12:00:00Z" } : { accountId: "owner" };
   }
   new Function("require", "exports", "window", source)(name => {
     if (name === "react") return {
       useSyncExternalStore: () => invited ? "invitation-token" : "",
       useState: initial => [cursor < values.length ? values[cursor++] : initial, () => {}],
     };
-    if (name === "swr") return { default: key => ({ data: key?.[0] === "invitation-preview" ? { email: "invited@example.com", locationName: "Restaurant", role: "OPERATOR" } : undefined }) };
+    if (name === "swr") return { default: key => ({ mutate: async () => {}, data: key?.[0] === "invitation-preview" ? { email: "invited@example.com", locationName: "Restaurant", role: "OPERATOR" } : undefined }) };
     if (name === "@/src/api/tenant-registrations") return {
       registrationInputSchema: { parse: input => input },
       registerTenant: input => createAccount("tenant", input),
@@ -86,4 +87,10 @@ test("registration requires accepting the terms before creating an account", asy
     assert.deepEqual(view.requests, []);
     assert.deepEqual(view.redirects, []);
   }
+});
+
+ test("public registration waits for email verification before entering the dashboard", async () => {
+  const view = await submitRegistration({ verificationRequired: true });
+  assert.equal(view.requests[0].kind, "tenant");
+  assert.deepEqual(view.redirects, []);
 });

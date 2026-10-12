@@ -13,8 +13,11 @@ export const staffLocationMenuKey = (accountId: string, locationId: string) =>
 export const staffAccountsKey = (accountId: string) =>
   [staffCachePrefix, accountId, "managed-accounts"] as const;
 
-export const staffInvitationsKey = (accountId: string) =>
-  [staffCachePrefix, accountId, "account-invitations"] as const;
+export const staffInvitationsKey = (
+  accountId: string,
+  page = 0,
+  sort: "asc" | "desc" = "desc",
+) => [staffCachePrefix, accountId, "account-invitations", page, sort] as const;
 
 export const staffIntegrationsKey = (accountId: string) =>
   [staffCachePrefix, accountId, "external-integrations"] as const;

@@ -5,6 +5,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import pl.karolbystrek.kairos.api.account.application.exception.AccountInvitationUnavailableException;
+import pl.karolbystrek.kairos.api.account.application.exception.AccountConflictException;
+import pl.karolbystrek.kairos.api.account.application.exception.StaffAccessDeniedException;
 import pl.karolbystrek.kairos.api.authentication.application.exception.RegistrationValidationException;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
 import pl.karolbystrek.kairos.api.account.domain.TenantRole;
@@ -26,6 +28,7 @@ import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -174,4 +177,80 @@ class AccountInvitationConcurrencyIntegrationTests extends RedisListenerIsolated
             return false;
         }
     }
+    @Test
+    void replacingAndResendingInvitationsInvalidatePreviousLinksAndKeepHistory() {
+        var tenant = new IntegrationTestFixture(jdbcTemplate).createTenant();
+        var email = "replacement-" + UUID.randomUUID() + "@example.com";
+        var first = invitationService.create(tenant.administrator(), tenant.firstLocationId(), AssignmentRole.OPERATOR, email);
+        assertThatThrownBy(() -> invitationService.create(tenant.administrator(), tenant.firstLocationId(), AssignmentRole.OPERATOR, email))
+            .isInstanceOf(AccountConflictException.class);
+        var replacement = invitationService.create(tenant.administrator(), tenant.firstLocationId(), AssignmentRole.OPERATOR, email, true);
+        assertThatThrownBy(() -> invitationService.preview(first.token())).isInstanceOf(AccountInvitationUnavailableException.class);
+        var resent = invitationService.resend(tenant.administrator(), replacement.invitation().id(), true);
+        assertThatThrownBy(() -> invitationService.preview(replacement.token())).isInstanceOf(AccountInvitationUnavailableException.class);
+        assertThat(invitationService.preview(resent.token()).email()).isEqualTo(email);
+        assertThat(invitationService.history(tenant.administrator(), 0, 20, "desc").getContent())
+            .extracting(invitation -> invitation.state().name()).containsExactly("PENDING", "REPLACED", "REPLACED");
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM account_invitations WHERE tenant_id=? AND email=? AND state='PENDING'",
+            Integer.class, tenant.administrator().tenantId(), email)).isEqualTo(1);
+    }
+
+    @Test
+    void managerCannotReplaceHiddenInvitationEvenWhenItHasExpired() {
+        var tenant = new IntegrationTestFixture(jdbcTemplate).createTenant();
+        var email = "hidden-" + UUID.randomUUID() + "@example.com";
+        var previous = invitationService.create(tenant.administrator(), tenant.secondLocationId(), AssignmentRole.OPERATOR, email);
+        for (var expired : List.of(false, true)) {
+            if (expired) {
+                jdbcTemplate.update("UPDATE account_invitations SET created_at=current_timestamp-interval '8 days', updated_at=current_timestamp-interval '8 days', expires_at=current_timestamp-interval '1 day' WHERE id=?",
+                    previous.invitation().id());
+            }
+            assertThatThrownBy(() -> invitationService.create(tenant.manager(), tenant.firstLocationId(), AssignmentRole.OPERATOR, email, true))
+                .isInstanceOf(StaffAccessDeniedException.class);
+            assertThat(jdbcTemplate.queryForObject("SELECT state FROM account_invitations WHERE id=?", String.class,
+                previous.invitation().id())).isEqualTo("PENDING");
+            assertThat(jdbcTemplate.queryForObject("SELECT d.state FROM email_deliveries d JOIN account_invitations i ON i.delivery_id=d.id WHERE i.id=?",
+                String.class, previous.invitation().id())).isEqualTo("QUEUED");
+        }
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM account_invitations WHERE tenant_id=? AND email=?",
+            Integer.class, tenant.tenantId(), email)).isEqualTo(1);
+    }
+
+    @Test
+    void managerHistoryIncludesAdminIssuedOperatorsOnlyAtOwnEnabledLocationAndSupportsPagination() {
+        var tenant = new IntegrationTestFixture(jdbcTemplate).createTenant();
+        var first = invitationService.create(tenant.administrator(), tenant.firstLocationId(), AssignmentRole.OPERATOR,
+            "visible-" + UUID.randomUUID() + "@example.com");
+        invitationService.create(tenant.administrator(), tenant.firstLocationId(), AssignmentRole.MANAGER,
+            "manager-" + UUID.randomUUID() + "@example.com");
+        invitationService.create(tenant.administrator(), tenant.secondLocationId(), AssignmentRole.OPERATOR,
+            "hidden-" + UUID.randomUUID() + "@example.com");
+        var history = invitationService.history(tenant.manager(), 0, 1, "desc");
+        assertThat(history.getTotalElements()).isEqualTo(1);
+        assertThat(history.getContent()).extracting(invitation -> invitation.id()).containsExactly(first.invitation().id());
+        assertThat(history.getContent().getFirst().issuedByEmail()).isEqualTo(first.invitation().issuedByEmail());
+        assertThat(invitationService.history(tenant.administrator(), 1, 1, "asc").getTotalElements()).isEqualTo(3);
+    }
+
+    @Test
+    void concurrentIssuanceHasOnePendingInvitationAndConfirmationIsRequiredForReplacement() throws Exception {
+        var tenant = new IntegrationTestFixture(jdbcTemplate).createTenant();
+        var email = "concurrent-" + UUID.randomUUID() + "@example.com";
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            var start = new CountDownLatch(1);
+            var calls = IntStream.range(0, 2).mapToObj(index -> executor.submit(() -> {
+                start.await();
+                try {
+                    invitationService.create(tenant.administrator(), tenant.firstLocationId(), AssignmentRole.OPERATOR, email);
+                    return "created";
+                } catch (AccountConflictException exception) { return "conflict"; }
+            })).toList();
+            start.countDown();
+            assertThat(List.of(calls.get(0).get(10, TimeUnit.SECONDS), calls.get(1).get(10, TimeUnit.SECONDS)))
+                .containsExactlyInAnyOrder("created", "conflict");
+        }
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM account_invitations WHERE tenant_id=? AND email=? AND state='PENDING'",
+            Integer.class, tenant.tenantId(), email)).isEqualTo(1);
+    }
+
 }

@@ -20,8 +20,21 @@ import pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase;
 import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
 
 import java.util.UUID;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
+import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import pl.karolbystrek.kairos.api.authentication.application.RegistrationVerificationService;
+import java.util.concurrent.atomic.AtomicBoolean;
+import pl.karolbystrek.kairos.api.authentication.infrastructure.zitadel.ZitadelClient.PendingUser;
+import pl.karolbystrek.kairos.api.authentication.infrastructure.zitadel.ZitadelClient.UserEmail;
+import pl.karolbystrek.kairos.api.authentication.application.exception.RegistrationValidationException;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -34,12 +47,19 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
     private final JdbcTemplate database = PostgresTestDatabase.ownerDatabase();
     @Autowired private JdbcTemplate runtimeDatabase;
     @Autowired private AccountInvitationService invitations;
+    @Autowired private RegistrationVerificationService verification;
+    @Autowired private PlatformTransactionManager transactions;
 
     @Test
-    void registrationCreatesTenantAndDurableSecureSessionBeforeFirstLocation() throws Exception {
+    void registrationCreatesNoTenantUntilCodeThenEstablishesDurableSecureSession() throws Exception {
         var email = email();
         configure(email);
-        var result = mvc.perform(csrf(postApi("/tenant-registrations/v1").content(registration(email, null))))
+        var pending = mvc.perform(csrf(postApi("/tenant-registrations/v1").content(registration(email, null))))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.verificationRequired").value(true)).andReturn();
+        assertThat(database.queryForObject("SELECT COUNT(*) FROM accounts WHERE email = ?", Integer.class, email)).isZero();
+        var pendingCookie = pending.getResponse().getCookie("__Host-session");
+        mvc.perform(getApi("/auth/v1/me").cookie(pendingCookie)).andExpect(status().isUnauthorized());
+        var result = mvc.perform(csrf(postApi("/auth/v1/verification").cookie(pendingCookie).content("{\"code\":\"123456\"}")))
             .andExpect(status().isOk()).andExpect(jsonPath("$.tenantRole").value("ADMIN"))
             .andExpect(jsonPath("$.username").doesNotExist())
             .andExpect(jsonPath("$.verificationRequired").doesNotExist())
@@ -60,7 +80,7 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
         mvc.perform(getApi("/auth/v1/me").cookie(cookie)).andExpect(status().isOk())
             .andExpect(cookie().value("__Host-session", cookie.getValue()))
             .andExpect(cookie().maxAge("__Host-session", 30 * 86400));
-        verify(identityProvider).isValid(any());
+        verify(identityProvider, atLeastOnce()).isValid(any());
     }
 
     @Test
@@ -78,7 +98,7 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
             .content(registration(email, null).replace("passwordConfirmation\":\"password-12345", "passwordConfirmation\":\"different"))))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.fieldErrors.passwordConfirmation").value("Passwords must match."));
-        verify(identityProvider, never()).createUser(anyString(), anyString());
+        verify(identityProvider, never()).createUnverifiedUser(anyString(), anyString());
         assertThat(database.queryForObject("SELECT COUNT(*) FROM accounts WHERE email = ?", Integer.class, email)).isZero();
     }
 
@@ -95,7 +115,7 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
     @Test
     void providerEmailConflictIsAttachedToEmailWithoutExposingProviderDetails() throws Exception {
         var email = email();
-        when(identityProvider.createUser(eq(email), anyString()))
+        when(identityProvider.createUnverifiedUser(eq(email), anyString()))
             .thenThrow(new ResponseStatusException(HttpStatus.CONFLICT, "private provider details"));
         mvc.perform(csrf(postApi("/tenant-registrations/v1").content(registration(email, null))))
             .andExpect(status().isConflict())
@@ -185,7 +205,7 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
     void invalidInvitationIsRejectedBeforeProviderCreationAndSignedInRegistrationIsRejected() throws Exception {
         mvc.perform(csrf(postApi("/account-invitation-redemptions/v1").content(registration(email(), "invalid"))))
             .andExpect(status().isNotFound());
-        verify(identityProvider, never()).createUser(anyString(), anyString());
+        verify(identityProvider, never()).createUnverifiedUser(anyString(), anyString());
         var session = register(email());
         mvc.perform(csrf(postApi("/tenant-registrations/v1").cookie(session).content(registration(email(), null))))
             .andExpect(status().isForbidden());
@@ -198,7 +218,9 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
         var invitation = invitations.create(tenant.administrator(), tenant.firstLocationId(), AssignmentRole.MANAGER, email);
         configure(email);
         doAnswer(call -> {
-            invitations.revoke(tenant.administrator(), invitation.invitation().id());
+            var transaction = new TransactionTemplate(transactions);
+            transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+            transaction.executeWithoutResult(status -> invitations.revoke(tenant.administrator(), invitation.invitation().id()));
             return new ProviderSession(UUID.randomUUID().toString(), email);
         }).when(identityProvider).signIn(eq(email), anyString());
         mvc.perform(csrf(postApi("/account-invitation-redemptions/v1").content(registration(email, invitation.token()))))
@@ -208,15 +230,128 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
         assertThat(database.queryForObject("SELECT COUNT(*) FROM accounts WHERE email = ?", Integer.class, email)).isZero();
     }
 
+    @Test
+    void wrongAttemptsPersistAcrossSessionsAndResendHasCooldown() throws Exception {
+        var email = email();
+        configure(email);
+        doThrow(new RegistrationValidationException(
+            HttpStatus.BAD_REQUEST, "code", "Incorrect or expired code"))
+            .when(identityProvider).verifyEmail(email, "000000");
+        var pending = mvc.perform(csrf(postApi("/tenant-registrations/v1").content(registration(email, null))))
+            .andExpect(status().isOk()).andReturn().getResponse().getCookie("__Host-session");
+        mvc.perform(csrf(postApi("/auth/v1/verification/resend").cookie(pending)))
+            .andExpect(status().isTooManyRequests());
+        for (int attempt = 0; attempt < 5; attempt++) {
+            mvc.perform(csrf(postApi("/auth/v1/verification").cookie(pending).content("{\"code\":\"000000\"}")))
+                .andExpect(status().isBadRequest());
+        }
+        var resumed = login(email);
+        mvc.perform(getApi("/auth/v1/verification").cookie(resumed)).andExpect(status().isOk());
+        mvc.perform(csrf(postApi("/auth/v1/verification").cookie(resumed).content("{\"code\":\"123456\"}")))
+            .andExpect(status().isBadRequest());
+        verify(identityProvider, never()).verifyEmail(email, "123456");
+        database.update("UPDATE pending_registrations SET resend_available_at=CURRENT_TIMESTAMP-INTERVAL '1 second' WHERE subject=?", email);
+        mvc.perform(csrf(postApi("/auth/v1/verification/resend").cookie(resumed))).andExpect(status().isOk());
+        mvc.perform(csrf(postApi("/auth/v1/verification").cookie(resumed).content("{\"code\":\"123456\"}")))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.tenantRole").value("ADMIN"));
+    }
+
+    @Test
+    void abandonedUnverifiedIdentityCanBeReplacedButVerifiedIdentityCannot() throws Exception {
+        var email = email();
+        configure(email);
+        when(identityProvider.findByEmail(email)).thenReturn(Optional.of(
+            new UserEmail("old-user", email, false)));
+        mvc.perform(csrf(postApi("/tenant-registrations/v1").content(registration(email, null))))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.verificationRequired").value(true));
+        verify(identityProvider).deleteUser("old-user");
+        var protectedEmail = email();
+        when(identityProvider.findByEmail(protectedEmail)).thenReturn(Optional.of(
+            new UserEmail("verified-user", protectedEmail, true)));
+        mvc.perform(csrf(postApi("/tenant-registrations/v1").content(registration(protectedEmail, null))))
+            .andExpect(status().isConflict());
+        verify(identityProvider, never()).deleteUser("verified-user");
+    }
+
+    @Test
+    void replacementCancelsActualPendingDeliveryAndRemovesOldState() {
+        var email = email();
+        configure(email);
+        verification.register(email, "password-12345");
+        var oldDelivery = database.queryForObject("SELECT delivery_id FROM pending_registrations WHERE subject=?", UUID.class, email);
+        when(identityProvider.findByEmail(email)).thenReturn(Optional.of(new UserEmail(email, email, false)));
+        assertThat(catchThrowable(() -> verification.register(email, "password-12345")))
+            .isInstanceOfSatisfying(ResponseStatusException.class, e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS));
+        verify(identityProvider, never()).deleteUser(email);
+        database.update("UPDATE pending_registrations SET resend_available_at=CURRENT_TIMESTAMP-INTERVAL '1 second' WHERE subject=?", email);
+        when(identityProvider.createUnverifiedUser(eq(email), anyString())).thenReturn(new PendingUser("new-user", "123456"));
+        when(identityProvider.signIn(eq(email), anyString())).thenReturn(new ProviderSession("new-session", "new-user"));
+        verification.register(email, "password-12345");
+        verify(identityProvider).deleteUser(email);
+        assertThat(database.queryForObject("SELECT COUNT(*) FROM pending_registrations WHERE subject=?", Integer.class, email)).isZero();
+        assertThat(database.queryForMap("SELECT state,encrypted_payload,payload_nonce FROM email_deliveries WHERE id=?", oldDelivery))
+            .containsEntry("state", "FAILED").containsEntry("encrypted_payload", null).containsEntry("payload_nonce", null);
+    }
+
+    @Test
+    void concurrentVerificationPreventsReplacementFromDeletingCommittedIdentity() throws Exception {
+        var email = email();
+        configure(email);
+        var pending = verification.register(email, "password-12345");
+        database.update("UPDATE pending_registrations SET resend_available_at=CURRENT_TIMESTAMP-INTERVAL '1 second' WHERE subject=?", email);
+        when(identityProvider.findByEmail(email)).thenReturn(Optional.of(new UserEmail(email, email, false)));
+        var verifying = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        doAnswer(call -> {
+            verifying.countDown();
+            assertThat(release.await(5, TimeUnit.SECONDS)).isTrue();
+            return null;
+        }).when(identityProvider).verifyEmail(email, "123456");
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            var accepted = executor.submit(() -> verification.verify(pending, "123456"));
+            assertThat(verifying.await(5, TimeUnit.SECONDS)).isTrue();
+            var replacement = executor.submit(() -> catchThrowable(
+                () -> verification.register(email, "password-12345")));
+            release.countDown();
+            assertThat(accepted.get(5, TimeUnit.SECONDS)).isNotNull();
+            assertThat(replacement.get(5, TimeUnit.SECONDS)).isInstanceOf(RegistrationValidationException.class);
+        }
+        verify(identityProvider, never()).deleteUser(email);
+        assertThat(database.queryForObject("SELECT COUNT(*) FROM accounts WHERE email=?", Integer.class, email)).isOne();
+    }
+
+    @Test
+    void invitationRegistrationVerifiesOnlyTheIntendedRecipient() throws Exception {
+        var tenant = new IntegrationTestFixture(database).createTenant();
+        var email = email();
+        var invitation = invitations.create(tenant.administrator(), tenant.firstLocationId(), AssignmentRole.OPERATOR, email);
+        mvc.perform(csrf(postApi("/account-invitation-redemptions/v1").content(registration(email(), invitation.token()))))
+            .andExpect(status().isBadRequest());
+        verify(identityProvider, never()).markEmailVerified(anyString(), anyString());
+        configure(email);
+        mvc.perform(csrf(postApi("/account-invitation-redemptions/v1").content(registration(email, invitation.token()))))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.tenantRole").value("MEMBER"))
+            .andExpect(jsonPath("$.verificationRequired").doesNotExist());
+        verify(identityProvider).markEmailVerified(email, email);
+        assertThat(database.queryForObject("SELECT COUNT(*) FROM accounts WHERE email=?", Integer.class, email)).isOne();
+    }
+
     private void configure(String email) {
         when(identityProvider.createUser(eq(email), anyString())).thenReturn(email);
+        when(identityProvider.createUnverifiedUser(eq(email), anyString())).thenReturn(new PendingUser(email, "123456"));
+        var verified = new AtomicBoolean();
+        when(identityProvider.userEmail(email)).thenAnswer(call -> new UserEmail(email, email, verified.get()));
+        doAnswer(call -> { verified.set(true); return null; }).when(identityProvider).verifyEmail(email, "123456");
+        when(identityProvider.resendEmailCode(email)).thenReturn("123456");
         doAnswer(call -> new ProviderSession(UUID.randomUUID().toString(), email))
             .when(identityProvider).signIn(eq(email), anyString());
         doReturn(true).when(identityProvider).isValid(any());
     }
     private Cookie register(String email) throws Exception {
         configure(email);
-        return mvc.perform(csrf(postApi("/tenant-registrations/v1").content(registration(email, null))))
+        var pending = mvc.perform(csrf(postApi("/tenant-registrations/v1").content(registration(email, null))))
+            .andExpect(status().isOk()).andReturn().getResponse().getCookie("__Host-session");
+        return mvc.perform(csrf(postApi("/auth/v1/verification").cookie(pending).content("{\"code\":\"123456\"}")))
             .andExpect(status().isOk()).andReturn().getResponse().getCookie("__Host-session");
     }
     private Cookie login(String email) throws Exception {

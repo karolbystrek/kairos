@@ -7,6 +7,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import pl.karolbystrek.kairos.api.account.application.exception.AccountInvitationNotFoundException;
+import pl.karolbystrek.kairos.api.account.application.exception.AccountConflictException;
+import pl.karolbystrek.kairos.api.email.application.EmailDeliveryService;
+import pl.karolbystrek.kairos.api.config.ApplicationOriginsProperties;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import pl.karolbystrek.kairos.api.account.application.exception.AccountInvitationUnavailableException;
 import pl.karolbystrek.kairos.api.account.application.exception.AccountNotFoundException;
 import pl.karolbystrek.kairos.api.account.application.exception.InvalidAccountRequestException;
@@ -34,7 +41,6 @@ import pl.karolbystrek.kairos.api.persistence.infrastructure.DatabaseAccessConte
 
 import java.time.Clock;
 import java.time.Instant;
-import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
@@ -52,77 +58,99 @@ public class AccountInvitationService {
     private final StaffAccessService staffAccessService;
     private final OneTimeBearerTokenService tokenService;
     private final Clock clock;
+    private final EmailDeliveryService emailDeliveries;
+    private final ApplicationOriginsProperties origins;
+    private final JdbcTemplate database;
 
     @Transactional
-    public CreatedAccountInvitation create(
-        StaffPrincipal actor,
-        UUID locationId,
-        AssignmentRole role,
-        String email
-    ) {
+    public CreatedAccountInvitation create(StaffPrincipal actor, UUID locationId, AssignmentRole role, String email) {
+        return create(actor, locationId, role, email, false);
+    }
+
+    @Transactional
+    public CreatedAccountInvitation create(StaffPrincipal actor, UUID locationId, AssignmentRole role, String email,
+        boolean replaceExisting) {
         var access = staffAccessService.resolveForUpdate(actor);
+        var location = requireTargetLocation(access, locationId, role);
+        var normalizedEmail = email.strip().toLowerCase(Locale.ROOT);
+        var pending = database.queryForMap("SELECT * FROM public.lock_pending_invitation(?,?)",
+            access.tenantId(), normalizedEmail);
+        var previousId = (UUID) pending.get("invitation_id");
+        if (previousId != null) {
+            var previous = invitationRepository.findForUpdateById(previousId)
+                .orElseThrow(() -> new StaffAccessDeniedException("The account cannot replace the existing invitation"));
+            access.requireLocationAccess(previous.getTenantId(), previous.getLocationId());
+            requireManagementPermission(access, previous.getAssignmentRole());
+            if (previous.isExpiredAt(clock.instant())) previous.expire(clock.instant());
+            else {
+                if (!replaceExisting) throw new AccountConflictException("A pending invitation already exists for this email. Confirm replacement to continue.");
+                previous.replace(clock.instant());
+            }
+            emailDeliveries.cancel(previous.getDeliveryId());
+            invitationRepository.flush();
+        }
+        return issue(access, location, role, normalizedEmail, (String) pending.get("administrator_email"));
+    }
+
+    @Transactional
+    public CreatedAccountInvitation resend(StaffPrincipal actor, UUID invitationId, boolean replaceExisting) {
+        var access = staffAccessService.resolveForUpdate(actor);
+        requireInvitationCapability(access);
+        var previous = invitationRepository.findById(invitationId)
+            .orElseThrow(AccountInvitationNotFoundException::new);
+        var location = requireTargetLocation(access, previous.getLocationId(), previous.getAssignmentRole());
+        var pending = database.queryForMap("SELECT * FROM public.lock_pending_invitation(?,?)",
+            access.tenantId(), previous.getEmail());
+        previous = invitationRepository.findForUpdateById(invitationId).orElseThrow(AccountInvitationNotFoundException::new);
+        requireAvailable(previous, clock.instant());
+        if (!invitationId.equals(pending.get("invitation_id"))) throw new AccountConflictException("The invitation was already replaced");
+        if (!replaceExisting) throw new AccountConflictException("Confirm resending to replace the previous invitation link");
+        previous.replace(clock.instant());
+        emailDeliveries.cancel(previous.getDeliveryId());
+        invitationRepository.flush();
+        return issue(access, location, previous.getAssignmentRole(), previous.getEmail(), (String) pending.get("administrator_email"));
+    }
+
+    private StaffLocation requireTargetLocation(StaffAccessContext access, UUID locationId, AssignmentRole role) {
         if (!access.isTenantAdmin()) access.requireLocationAccess(access.tenantId(), locationId);
         var location = locationDirectory.findById(locationId)
             .orElseThrow(() -> new AccountNotFoundException("Location was not found"));
         access.requireLocationAccess(location.tenantId(), location.id());
         requireEnabledLocation(location);
         requireManagementPermission(access, role);
+        return location;
+    }
 
+    private CreatedAccountInvitation issue(StaffAccessContext access, StaffLocation location, AssignmentRole role,
+        String email, String administratorEmail) {
         var issuer = accountRepository.findById(access.accountId())
             .orElseThrow(() -> new StaffAccessDeniedException("The issuing account is not available"));
         var token = tokenService.generate();
-        var invitation = AccountInvitation.issue(
-            access.tenantId(),
-            location.id(),
-            access.accountId(),
-            role,
-            email.strip().toLowerCase(Locale.ROOT),
-            token.hash(),
-            clock.instant()
-        );
+        var invitation = AccountInvitation.issue(access.tenantId(), location.id(), access.accountId(), role, email,
+            token.hash(), clock.instant());
+        var tenant = "restauracji zarządzanej przez " + administratorEmail;
+        var link = origins.panel().replaceAll("/+$", "") + "/account-registration#invitation=" + token.value();
+        var delivery = emailDeliveries.enqueue(email, "Zaproszenie do " + tenant,
+            "Zapraszamy Cię do " + tenant + ".\nLokal: " + location.name() + "\nRola: " + (role == AssignmentRole.MANAGER ? "kierownik" : "pracownik")
+                + "\nZaprasza: " + issuer.getEmail() + "\n\nUtwórz konto: " + link + "\nZaproszenie wygasa po siedmiu dniach.", location.id());
+        invitation.attachDelivery(delivery, issuer.getEmail());
         invitationRepository.saveAndFlush(invitation);
-        log.info(
-            "Account {} issued {} invitation {} for location {}",
-            access.accountId(),
-            role,
-            invitation.getId(),
-            location.id()
-        );
-        return new CreatedAccountInvitation(
-            toView(invitation, location, issuer.getEmail()),
-            token.value()
-        );
+        log.info("Account {} issued {} invitation {} for location {}", access.accountId(), role, invitation.getId(), location.id());
+        return new CreatedAccountInvitation(toView(invitation, location), token.value());
     }
 
     @Transactional(readOnly = true)
-    public List<AccountInvitationView> listPending(StaffPrincipal actor) {
+    public Page<AccountInvitationView> history(StaffPrincipal actor, int page, int size, String direction) {
         var access = staffAccessService.resolve(actor);
         requireInvitationCapability(access);
-        var now = clock.instant();
-        var invitations = access.isTenantAdmin()
-            ? invitationRepository.findAllByTenantIdAndStateAndExpiresAtAfterOrderByCreatedAtDesc(
-                access.tenantId(),
-                AccountInvitationState.PENDING,
-                now
-            )
-            : invitationRepository
-                .findAllByTenantIdAndLocationIdAndAssignmentRoleAndStateAndExpiresAtAfterOrderByCreatedAtDesc(
-                    access.tenantId(),
-                    access.locationId(),
-                    AssignmentRole.OPERATOR,
-                    AccountInvitationState.PENDING,
-                    now
-                );
-        return invitations.stream()
-            .map(invitation -> {
-                var location = requireLocation(invitation);
-                var issuer = accountRepository.findById(invitation.getIssuedByAccountId())
-                    .orElseThrow(() -> new StaffAccessDeniedException(
-                        "The invitation issuer is not available"
-                    ));
-                return toView(invitation, location, issuer.getEmail());
-            })
-            .toList();
+        if (page < 0 || size < 1 || size > 100 || !("asc".equals(direction) || "desc".equals(direction))) {
+            throw new InvalidAccountRequestException("Use a non-negative page, size between 1 and 100, and asc or desc sorting");
+        }
+        var sort = "asc".equals(direction) ? Sort.Direction.ASC : Sort.Direction.DESC;
+        var pageable = PageRequest.of(page, size, Sort.by(sort, "createdAt", "id"));
+        var invitations = access.isTenantAdmin() ? invitationRepository.findAllByTenantId(access.tenantId(), pageable)
+            : invitationRepository.findAllByTenantIdAndLocationIdAndAssignmentRole(access.tenantId(), access.locationId(), AssignmentRole.OPERATOR, pageable);
+        return invitations.map(invitation -> toView(invitation, requireLocation(invitation)));
     }
 
     @Transactional
@@ -137,6 +165,7 @@ public class AccountInvitationService {
         access.requireLocationAccess(invitation.getTenantId(), location.id());
         requireManagementPermission(access, invitation.getAssignmentRole());
         invitation.revoke(AccountInvitationRevocationReason.STAFF_REVOKED, now);
+        emailDeliveries.cancel(invitation.getDeliveryId());
         invitationRepository.flush();
         log.info("Account {} revoked invitation {}", access.accountId(), invitation.getId());
     }
@@ -160,7 +189,10 @@ public class AccountInvitationService {
                 AccountInvitationState.PENDING
             ).stream()
             .filter(invitation -> invitation.isPendingAt(now))
-            .forEach(invitation -> invitation.revoke(reason, now));
+            .forEach(invitation -> {
+                invitation.revoke(reason, now);
+                emailDeliveries.cancel(invitation.getDeliveryId());
+            });
         invitationRepository.flush();
     }
 
@@ -175,11 +207,14 @@ public class AccountInvitationService {
                 AccountInvitationState.PENDING
             ).stream()
             .filter(invitation -> invitation.isPendingAt(now))
-            .forEach(invitation -> invitation.revoke(reason, now));
+            .forEach(invitation -> {
+                invitation.revoke(reason, now);
+                emailDeliveries.cancel(invitation.getDeliveryId());
+            });
         invitationRepository.flush();
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, propagation = Propagation.REQUIRES_NEW)
     public AccountInvitationPreview preview(String presentedToken) {
         var hash = tokenService.hash(presentedToken);
         databaseAccess.invitation(hash, null);
@@ -192,7 +227,7 @@ public class AccountInvitationService {
         return new AccountInvitationPreview(invitation.getEmail(), location.name(), invitation.getAssignmentRole(), invitation.getExpiresAt());
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public StaffPrincipal redeem(String tokenHash, String email, String subject) {
         var accountId = UUID.randomUUID();
         databaseAccess.invitation(tokenHash, accountId);
@@ -214,6 +249,7 @@ public class AccountInvitationService {
             invitation.getTenantId(), invitation.getAssignmentRole(), now));
         invitation.redeem(account.getId(), now);
         invitationRepository.flush();
+        database.queryForObject("SELECT public.cancel_redeemed_invitation_email(?)", Boolean.class, invitation.getId());
         log.info("Account invitation {} redeemed into account {}", invitation.getId(), account.getId());
         return new StaffPrincipal(account.getId(), account.getTenantId(), account.getTenantRole());
     }
@@ -281,10 +317,10 @@ public class AccountInvitationService {
         if (invitation.getState() == AccountInvitationState.REDEEMED) {
             throw unavailable(AccountInvitationUnavailableException.Reason.REDEEMED);
         }
-        if (invitation.getState() == AccountInvitationState.REVOKED) {
+        if (invitation.getState() == AccountInvitationState.REVOKED || invitation.getState() == AccountInvitationState.REPLACED) {
             throw unavailable(AccountInvitationUnavailableException.Reason.REVOKED);
         }
-        if (invitation.isExpiredAt(now)) {
+        if (invitation.getState() == AccountInvitationState.EXPIRED || invitation.isExpiredAt(now)) {
             throw unavailable(AccountInvitationUnavailableException.Reason.EXPIRED);
         }
     }
@@ -295,10 +331,9 @@ public class AccountInvitationService {
         return new AccountInvitationUnavailableException(reason);
     }
 
-    private static AccountInvitationView toView(
+    private AccountInvitationView toView(
         AccountInvitation invitation,
-        StaffLocation location,
-        String issuedByEmail
+        StaffLocation location
     ) {
         return new AccountInvitationView(
             invitation.getId(),
@@ -306,9 +341,12 @@ public class AccountInvitationService {
             invitation.getLocationId(),
             location.name(),
             invitation.getAssignmentRole(),
-            issuedByEmail,
+            invitation.getIssuedByEmail(),
             invitation.getCreatedAt(),
-            invitation.getExpiresAt()
+            invitation.getExpiresAt(),
+            invitation.getState() == AccountInvitationState.PENDING && invitation.isExpiredAt(clock.instant())
+                ? AccountInvitationState.EXPIRED : invitation.getState(),
+            emailDeliveries.state(invitation.getDeliveryId())
         );
     }
 }

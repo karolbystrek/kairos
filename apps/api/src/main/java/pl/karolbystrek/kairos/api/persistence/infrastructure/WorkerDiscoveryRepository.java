@@ -101,4 +101,33 @@ public class WorkerDiscoveryRepository {
 
     public record PurgeableAccount(UUID id, String providerSubject) {
     }
+
+    public AbandonedRegistration nextAbandonedRegistration(Instant cutoff, Collection<String> skipped) {
+        var rows = entityManager.createNativeQuery("SELECT * FROM public.next_abandoned_registration(:cutoff, :skipped)", Object[].class)
+                .setParameter("cutoff", cutoff)
+                .setParameter("skipped", String.join(",", skipped))
+                .getResultList();
+        if (rows.isEmpty()) {
+            return null;
+        }
+        var row = (Object[]) rows.getFirst();
+        return new AbandonedRegistration((String) row[0], (Boolean) row[1]);
+    }
+
+    // Requires the registration discovered in this transaction.
+    public void purgeRegistration(String subject) {
+        entityManager.createNativeQuery("SELECT public.purge_registration(:subject)", Boolean.class)
+                .setParameter("subject", subject)
+                .getSingleResult();
+    }
+
+    public int purgeFinishedEmailDeliveries(Instant cutoff, int batchSize) {
+        return (Integer) entityManager.createNativeQuery("SELECT public.purge_finished_email_deliveries(:cutoff, :batch)", Integer.class)
+                .setParameter("cutoff", cutoff)
+                .setParameter("batch", batchSize)
+                .getSingleResult();
+    }
+
+    public record AbandonedRegistration(String subject, boolean provisioned) {
+    }
 }

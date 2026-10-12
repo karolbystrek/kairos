@@ -79,6 +79,10 @@ public class DatabaseAccessContext {
         bind(scope, principal.apiKeyId().toString(), "", "");
     }
 
+    public void verification(String subject) {
+        bind("verification", subject, "", "");
+    }
+
     public void registration(UUID tenantId, UUID accountId) {
         bind("registration", tenantId.toString(), accountId.toString(), "");
     }

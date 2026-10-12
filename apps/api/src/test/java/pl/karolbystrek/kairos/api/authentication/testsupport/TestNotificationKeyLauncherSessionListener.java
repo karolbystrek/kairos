@@ -10,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.GeneralSecurityException;
 import java.security.KeyPairGenerator;
+import java.security.SecureRandom;
 import java.security.spec.ECGenParameterSpec;
 import java.util.Base64;
 
@@ -21,6 +22,9 @@ public class TestNotificationKeyLauncherSessionListener implements LauncherSessi
             var classpathRoot = getClass().getProtectionDomain().getCodeSource().getLocation().toURI();
             var keyDirectory = Path.of(classpathRoot).resolve("keys");
             Files.createDirectories(keyDirectory);
+            var emailKey = new byte[32];
+            new SecureRandom().nextBytes(emailKey);
+            Files.write(keyDirectory.resolve("test-email-encryption.bin"), emailKey);
             var vapidGenerator = KeyPairGenerator.getInstance("EC");
             vapidGenerator.initialize(new ECGenParameterSpec("secp256r1"));
             var vapidKeyPair = vapidGenerator.generateKeyPair();

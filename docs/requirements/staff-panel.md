@@ -15,8 +15,8 @@
 The staff panel must:
 
 * offer public email/password registration that creates a tenant and its first
-  administrator immediately, then requires first-location creation in the
-  dashboard before the administrator can use the workspace, without email verification;
+  administrator after email verification, then requires first-location creation
+  in the dashboard before the administrator can use the workspace;
 * require an authenticated internal account;
 * show only locations and orders accessible to the account;
 * allow tenant administrators to switch between locations or view an aggregate queue;
@@ -148,16 +148,22 @@ management actions in the shared centered popup, adapted to available mobile
 space. There is no collection search or filtering in this increment.
 
 New member access begins in an invitation popup capturing recipient email,
-fixed location, and manager or operator role. The resulting once-revealed link
-is copied and shared manually. Accounts includes non-archived created accounts
-and manageable pending invitations in one collection. Both card kinds show
-email, role, and location; location and integration cards show name. Card colour
-alone visually communicates enabled, disabled, or pending status. Accessible
-card labels expose status, and the detail popup states it explicitly. Existing
-shared geometry, touch targets, focus and press feedback remain consistent.
+fixed location, and manager or operator role. Kairos emails the resulting link;
+the panel exposes no link or Copy action. Creating for an email with an active
+invitation requires replacement confirmation. Resend also requires confirmation
+and replaces the old invitation with a new token and seven-day expiry. The caller
+must have authority over both old and new targets.
 
-Selecting an invitation opens its recipient, role, location, issuer, creation
-and expiration times, and confirmed Revoke action. Selecting an existing account
+Accounts includes non-archived created accounts and paginated invitation history,
+showing recipient, role, location, creation/expiry and issuer, lifecycle state and
+email delivery state. Terminal invitations remain in history; sorting supports
+newest/oldest first. Managers see only operator invitations for their location;
+administrators see the tenant. Active pending invitations expose Resend even
+when delivery failed; expired entries use the new-invitation form. Details retain
+a confirmed Revoke action. Accessible labels expose status and shared popup
+focus, touch targets and press feedback remain consistent.
+
+Selecting an existing account
 opens its details and permitted status and Delete actions. Disable retains its
 hold confirmation; Delete uses hold confirmation. Both enabled and disabled
 manageable accounts can be deleted.

@@ -3,6 +3,7 @@ package pl.karolbystrek.kairos.api.tenant.application;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 import pl.karolbystrek.kairos.api.account.application.AccountCreationService;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
 import pl.karolbystrek.kairos.api.account.domain.Account;
@@ -20,7 +21,7 @@ public class TenantRegistrationService {
     private final DatabaseAccessContext databaseAccess;
     private final Clock clock;
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public StaffPrincipal register(String email, String subject) {
         var tenant = Tenant.create();
         var account = Account.provisionAdministrator(tenant.getId(), email, subject, clock.instant());

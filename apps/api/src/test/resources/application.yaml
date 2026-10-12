@@ -1,4 +1,6 @@
 spring:
+  profiles:
+    active: test
   session:
     timeout: 30d
     jdbc:
@@ -25,6 +27,12 @@ server:
     context-path: /api
 
 kairos:
+  email:
+    mode: LOG
+    initial-delay: 1h
+    poll-delay: 1h
+    api-key: ""
+    encryption-key-location: "classpath:keys/test-email-encryption.bin"
   analytics:
     initial-delay: 24h
   origins:

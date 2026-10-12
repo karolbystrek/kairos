@@ -170,7 +170,7 @@ systemctl is-active docker
 ```
 
 Run the same full playbook again. Existing packages are not upgraded; production
-configuration and all five application key contents are preserved. Temporary
+configuration and all six application key contents are preserved. Temporary
 setup tasks still report changes because they allocate and remove a private
 workspace; zero changes in the recap is not the acceptance criterion. Invalid
 or partial key sets stop bootstrap rather than being replaced. Public-key
@@ -182,7 +182,10 @@ repository-owned production defaults from `deployment/production.env.example`. B
 not create `/srv/kairos/production.env`. If that file already exists, it is
 preserved byte-for-byte. Reruns refresh only the non-secret example, including
 on hosts previously bootstrapped with local defaults. Keys are stored under `/srv/kairos/secrets` with directory
-mode `0700` and file mode `0400`; release and TLS directories use `0700`.
+mode `0700` and file mode `0400`; release and TLS directories use `0700`. The
+six-key set includes `email-encryption.bin` for pending transactional mail;
+[configuration](CONFIGURATION.md) describes adding this file to an older host
+without replacing its existing keys and installing the required Resend key.
 
 ## Prepare production configuration after bootstrap verification
 
@@ -210,7 +213,10 @@ Fill the six blank passwords (`POSTGRES_PASSWORD`, `KAIROS_DB_OWNER_PASSWORD`,
 `ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD`) with different
 strong values. Set `VAPID_SUBJECT` to your `mailto:` contact and set a deliberate
 `ZITADEL_FIRSTINSTANCE_ORG_MACHINE_PAT_EXPIRATIONDATE` (UTC ISO 8601), with renewal
-scheduled before expiry. Do not leave these fields blank at deployment.
+scheduled before expiry. Set `RESEND_API_KEY` to the domain-restricted sending key
+and keep `EMAIL_DELIVERY_MODE=RESEND`; see
+[transactional email](CONFIGURATION.md#transactional-email-resend). Do not leave
+these fields blank at deployment.
 If `production.env` already exists, edit those settings and reconcile public
 settings against the example; do not overwrite existing credentials with a new
 copy. Hostnames and browser origins must match Cloudflare and the GitHub build

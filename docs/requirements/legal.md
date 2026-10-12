@@ -60,11 +60,14 @@ electronic service.
 Recipients: AWS Lightsail in `eu-central-1` (hosting) and Cloudflare (proxy,
 possible US transfer under the EU-US Data Privacy Framework or SCCs). Browser
 push services carry encrypted payloads selected by the customer's browser.
-ZITADEL is self-hosted on the same VM. Server-side [anonymous order
+ZITADEL is self-hosted on the same VM. Resend processes staff recipient email
+addresses and transactional verification messages; provider terms, retention
+and international-transfer arrangements require legal review before real users. Server-side [anonymous order
 analytics](order-analytics.md) contain business counts and durations without user,
 order or tracking identities. Separate [usage counts](usage-analytics.md) collect predefined browser actions
 without identifying people, sessions or devices in aggregates. There is
-no advertising, profiling or automated decision-making, and no email is sent.
+no advertising, profiling or automated decision-making. Transactional email
+uses no open or click tracking.
 
 ## Cookies and device storage
 
@@ -100,6 +103,9 @@ them. The trade-off is that customers who close the app never see it.
   [retention purge](resilience.md#retention-purge) deletes the account with its
   ZITADEL identity and invitations, or the location with its orders and push
   data. Until then an archived account's email stays reserved.
+- Abandoned registrations, with their unverified ZITADEL identity, are
+  deleted 30 days after the last code; finished email delivery records are
+  deleted 30 days after completion once nothing references them.
 - Security events: invitations are deleted 30 days after they end, staff
   sessions expire after 30 idle days, and production logs rotate at three
   10 MB files per service.

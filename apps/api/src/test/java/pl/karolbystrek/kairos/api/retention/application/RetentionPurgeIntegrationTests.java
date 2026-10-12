@@ -199,23 +199,91 @@ class RetentionPurgeIntegrationTests extends RedisListenerIsolatedIntegrationTes
                 ARCHIVED_AT.minus(Duration.ofDays(40)), ARCHIVED_AT.minus(Duration.ofDays(29)));
         var oldRevoked = insertInvitation(tenant.firstLocationId(), issuer, "REVOKED",
                 ARCHIVED_AT.minus(Duration.ofDays(40)), ARCHIVED_AT.minus(Duration.ofDays(31)));
+        var replaced = insertInvitation(tenant.firstLocationId(), issuer, "REPLACED",
+                ARCHIVED_AT.minus(Duration.ofDays(40)), null);
+        var explicitlyExpired = insertInvitation(tenant.firstLocationId(), issuer, "EXPIRED",
+                ARCHIVED_AT.minus(Duration.ofDays(40)), null);
 
         purgeService.purge();
 
         assertThat(count("SELECT count(*) FROM account_invitations WHERE id = ?", expired)).isZero();
         assertThat(count("SELECT count(*) FROM account_invitations WHERE id = ?", oldRevoked)).isZero();
+        assertThat(count("SELECT count(*) FROM account_invitations WHERE id = ?", replaced)).isZero();
+        assertThat(count("SELECT count(*) FROM account_invitations WHERE id = ?", explicitlyExpired)).isZero();
         assertThat(count("SELECT count(*) FROM account_invitations WHERE id = ?", recentlyRevoked)).isOne();
     }
 
-    private UUID insertInvitation(UUID locationId, UUID issuerId, String state, Instant createdAt, Instant revokedAt) {
+    @Test
+    void purgesAbandonedRegistrationsAndUnreferencedEmailDeliveriesAfterTheGracePeriod() {
+        var provisionedSubject = jdbcTemplate.queryForObject(
+                "SELECT provider_subject FROM accounts WHERE id = ?", String.class, tenant.manager().accountId());
+        var abandoned = insertRegistration("abandoned-subject", ARCHIVED_AT.minus(Duration.ofDays(31)));
+        var provisioned = insertRegistration(provisionedSubject, ARCHIVED_AT.minus(Duration.ofDays(31)));
+        var recent = insertRegistration("recent-subject", ARCHIVED_AT.minus(Duration.ofDays(29)));
+        var invitation = insertInvitation(tenant.firstLocationId(), tenant.administrator().accountId(),
+                "REVOKED", ARCHIVED_AT.minus(Duration.ofDays(40)), ARCHIVED_AT.minus(Duration.ofDays(29)));
+        jdbcTemplate.update("UPDATE email_deliveries SET completed_at = ? WHERE id = ?",
+                Timestamp.from(ARCHIVED_AT.minus(Duration.ofDays(31))), invitation);
+        var orphan = insertDelivery(ARCHIVED_AT.minus(Duration.ofDays(31)));
+
+        purgeService.purge();
+
+        Mockito.verify(identityProvider).deleteUser("abandoned-subject");
+        Mockito.verify(identityProvider, Mockito.never()).deleteUser(provisionedSubject);
+        Mockito.verify(identityProvider, Mockito.never()).deleteUser("recent-subject");
+        assertThat(jdbcTemplate.queryForList("SELECT subject FROM pending_registrations", String.class))
+                .containsExactly("recent-subject");
+        assertThat(count("SELECT count(*) FROM email_deliveries WHERE id = ?", abandoned)).isZero();
+        assertThat(count("SELECT count(*) FROM email_deliveries WHERE id = ?", provisioned)).isZero();
+        assertThat(count("SELECT count(*) FROM email_deliveries WHERE id = ?", orphan)).isZero();
+        assertThat(count("SELECT count(*) FROM email_deliveries WHERE id = ?", recent)).isOne();
+        assertThat(count("SELECT count(*) FROM email_deliveries WHERE id = ?", invitation)).isOne();
+    }
+
+    @Test
+    void registrationPurgeRefusesRecentRegistrationsEvenWithForgedWorkerSettings() {
+        insertRegistration("live-subject", Instant.now());
+
+        assertThatThrownBy(() -> new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            runtimeJdbc.queryForMap("SELECT set_config('kairos.selected', 'REGISTRATION_PURGE:live-subject', true)");
+            runtimeJdbc.queryForObject("SELECT public.purge_registration('live-subject')", Boolean.class);
+        })).rootCause().hasMessageContaining("Only deleted data can be purged");
+
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM pending_registrations", Long.class)).isOne();
+    }
+
+    private UUID insertRegistration(String subject, Instant lastCodeAt) {
+        var delivery = insertDelivery(lastCodeAt);
+        jdbcTemplate.update("""
+                INSERT INTO pending_registrations(subject,email,attempts,resend_available_at,delivery_id)
+                VALUES (?,?,0,?,?)
+                """, subject, subject + "@example.com", Timestamp.from(lastCodeAt), delivery);
+        return delivery;
+    }
+
+    private UUID insertDelivery(Instant completedAt) {
         var id = UUID.randomUUID();
         jdbcTemplate.update("""
+                INSERT INTO email_deliveries(id,owner_scope,owner_identity,state,created_at,next_attempt_at,completed_at)
+                VALUES (?,'verification','subject','SENT',?,?,?)
+                """, id, Timestamp.from(completedAt), Timestamp.from(completedAt), Timestamp.from(completedAt));
+        return id;
+    }
+
+    private UUID insertInvitation(UUID locationId,UUID issuerId, String state, Instant createdAt, Instant revokedAt) {
+        var id = UUID.randomUUID();
+        jdbcTemplate.update("""
+            INSERT INTO email_deliveries(id,owner_scope,owner_identity,tenant_id,location_id,state,created_at,next_attempt_at,completed_at)
+            VALUES (?,'staff',?,?,?,'SENT',current_timestamp,current_timestamp,current_timestamp)
+            """, id, issuerId.toString(), tenant.tenantId(), locationId);
+
+        jdbcTemplate.update("""
                 INSERT INTO account_invitations (
-                    id, tenant_id, location_id, issued_by_account_id, assignment_role, email, token_hash, state,
+                    id, tenant_id, location_id, issued_by_account_id, delivery_id, issued_by_email, assignment_role, email, token_hash, state,
                     revocation_reason, revoked_at, expires_at, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, 'OPERATOR', 'invited@example.com', ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, 'issuer@example.com', 'OPERATOR', 'invited@example.com', ?, ?, ?, ?, ?, ?, ?)
                 """,
-                id, tenant.tenantId(), locationId, issuerId, id.toString().replace("-", "").repeat(2), state,
+                id, tenant.tenantId(), locationId, issuerId, id, id.toString().replace("-", "").repeat(2), state,
                 revokedAt == null ? null : "STAFF_REVOKED", revokedAt == null ? null : Timestamp.from(revokedAt),
                 Timestamp.from(createdAt.plus(Duration.ofDays(7))), Timestamp.from(createdAt),
                 Timestamp.from(revokedAt == null ? createdAt : revokedAt));

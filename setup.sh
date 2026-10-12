@@ -260,6 +260,7 @@ chmod 0700 "${working_directory}"
 key_names="
 zitadel-masterkey
 webhook-encryption.bin
+email-encryption.bin
 vapid-private.pem
 vapid-public.pem
 push-subscription-encryption.bin
@@ -366,6 +367,7 @@ validate_key_set() {
 
     for encryption_key in \
         "${key_directory}/webhook-encryption.bin" \
+        "${key_directory}/email-encryption.bin" \
         "${key_directory}/push-subscription-encryption.bin" \
         "${key_directory}/zitadel-masterkey"; do
         key_size="$(wc -c < "${encryption_key}" | tr -d ' ')" || return 1
@@ -398,7 +400,7 @@ validate_tls_pair() {
 }
 
 key_set_status=absent
-if [ "${existing_key_count}" -eq 5 ]; then
+if [ "${existing_key_count}" -eq 6 ]; then
     if validate_key_set "${secrets_directory}"; then
         key_set_status=valid
     else
@@ -421,7 +423,7 @@ case "${key_action}" in
                 final_key_action=reuse
                 ;;
             partial)
-                fail "Cannot keep a partial application key set (${existing_key_count} of 5 files)."
+                fail "Cannot keep a partial application key set (${existing_key_count} of 6 files)."
                 ;;
             invalid)
                 fail "Cannot keep the existing invalid application key set."
@@ -448,7 +450,7 @@ case "${key_action}" in
                 if [ "${non_interactive}" = true ]; then
                     fail "A partial application key set requires --replace-keys in non-interactive mode."
                 fi
-                prompt_yes_no "Replace the partial application key set (${existing_key_count} of 5 files)?" no
+                prompt_yes_no "Replace the partial application key set (${existing_key_count} of 6 files)?" no
                 [ "${prompt_result}" = yes ] || fail "Setup stopped without replacing the partial application key set."
                 final_key_action=generate
                 ;;
@@ -511,6 +513,7 @@ if [ "${final_key_action}" = generate ]; then
     openssl rand \
         -out "${new_secrets_directory}/webhook-encryption.bin" \
         32
+    openssl rand -out "${new_secrets_directory}/email-encryption.bin" 32
     openssl genpkey \
         -algorithm EC \
         -pkeyopt ec_paramgen_curve:P-256 \

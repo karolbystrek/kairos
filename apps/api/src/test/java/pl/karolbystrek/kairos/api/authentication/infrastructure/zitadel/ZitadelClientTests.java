@@ -82,7 +82,7 @@ class ZitadelClientTests {
     }
 
     @Test
-    void registrationPreservesUnverifiedEmailAndDoesNotSendMail() {
+    void registrationReturnsCodeForKairosDeliveryWithoutProviderMail() {
         server.expect(requestTo("http://zitadel:8080/management/v1/orgs/me"))
             .andRespond(withSuccess("{\"org\":{\"id\":\"org\"}}", MediaType.APPLICATION_JSON));
         server.expect(requestTo("http://zitadel:8080/v2/users/new")).andExpect(method(HttpMethod.POST))
@@ -90,8 +90,8 @@ class ZitadelClientTests {
             .andExpect(jsonPath("$.human.email.isVerified").doesNotExist())
             .andExpect(jsonPath("$.human.password.password").value("password"))
             .andExpect(jsonPath("$.organizationId").value("org"))
-            .andRespond(withSuccess("{\"id\":\"user\",\"emailCode\":\"discard-me\"}", MediaType.APPLICATION_JSON));
-        assertThat(client.createUser("email@example.com", "password")).isEqualTo("user");
+            .andRespond(withSuccess("{\"id\":\"user\",\"emailCode\":\"123456\"}", MediaType.APPLICATION_JSON));
+        assertThat(client.createUnverifiedUser("email@example.com", "password")).isEqualTo(new ZitadelClient.PendingUser("user", "123456"));
         server.verify();
     }
 
@@ -126,6 +126,45 @@ class ZitadelClientTests {
             .andExpect(jsonPath("$.human.password.password.password").value("replacement"))
             .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
         client.changePassword("user", "current", "replacement");
+        server.verify();
+    }
+
+    @Test
+    void verificationAndResendUseReturnedCodesWithoutProviderMail() {
+        server.expect(requestTo("http://zitadel:8080/v2/users/user/email/resend"))
+            .andExpect(method(HttpMethod.POST)).andExpect(content().json("{\"returnCode\":{}}"))
+            .andRespond(withSuccess("{\"verificationCode\":\"123456\"}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo("http://zitadel:8080/v2/users/user/email/verify"))
+            .andExpect(method(HttpMethod.POST)).andExpect(content().json("{\"verificationCode\":\"123456\"}"))
+            .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+        assertThat(client.resendEmailCode("user")).isEqualTo("123456");
+        client.verifyEmail("user", "123456");
+        server.verify();
+    }
+
+    @Test
+    void verificationRejectionIsSafeAndProviderOutageIsRetryable() {
+        server.expect(requestTo("http://zitadel:8080/v2/users/user/email/verify"))
+            .andRespond(withBadRequest().body("private details"));
+        server.expect(requestTo("http://zitadel:8080/v2/users/user/email/verify"))
+            .andRespond(withServerError());
+        assertThatThrownBy(() -> client.verifyEmail("user", "000000"))
+            .isInstanceOfSatisfying(RegistrationValidationException.class, e -> {
+                assertThat(e.getField()).isEqualTo("code");
+                assertThat(e.getReason()).doesNotContain("private");
+            });
+        assertThatThrownBy(() -> client.verifyEmail("user", "000000"))
+            .isInstanceOfSatisfying(ResponseStatusException.class, e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE));
+        server.verify();
+    }
+
+    @Test
+    void invitedEmailIsMarkedVerifiedWithoutProviderMail() {
+        server.expect(requestTo("http://zitadel:8080/v2/users/user"))
+            .andExpect(method(HttpMethod.PATCH))
+            .andExpect(content().json("{\"human\":{\"email\":{\"email\":\"invited@example.com\",\"isVerified\":true}}}"))
+            .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+        client.markEmailVerified("user", "invited@example.com");
         server.verify();
     }
 

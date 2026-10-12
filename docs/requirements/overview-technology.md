@@ -121,9 +121,9 @@ as first-location onboarding explicitly use non-dismissible required mode,
 which hides Close and rejects outside-click, Escape, and close-slot dismissal.
 Dropdowns and selectors retain their native menu behavior rather than using the
 popup shell. HeroUI retains focus management and focus restoration.
-Dismissing invitation creation while its request is pending does not discard
-its once-revealed result: success presents the link, and closing and reopening
-New account retains it until the user explicitly confirms saving it.
+Dismissing invitation creation while its request is pending does not cancel
+accepted email delivery. Success revalidates invitation history; no link or
+once-revealed secret is displayed in the panel.
 
 #### Controls, typography and accessibility
 

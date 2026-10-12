@@ -62,8 +62,9 @@ pulls 900 seconds. The stable project name preserves state; the host lock reject
 concurrent deployments in addition to Actions concurrency. HTTPS probes through
 Cloudflare require `200` from both frontend roots and `/api/auth/v1/csrf` with a
 nonempty application token. The command writes `deployed-release.json` atomically
-only after every check passes. These probes do not prove SSE, RLS, PWA or complete
-authentication acceptance. Record first install, reboot recovery and update
+only after every check passes. These probes do not prove SSE, RLS, PWA, email
+delivery or complete authentication acceptance; verify email with the
+[transactional email check](CONFIGURATION.md#transactional-email-resend). Record first install, reboot recovery and update
 acceptance separately in [the launch work](https://github.com/karolbystrek/kairos/issues/19).
 Docker and containers with `unless-stopped` must recover on reboot; health checks
 alone do not restart unhealthy running processes.

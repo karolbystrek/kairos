@@ -19,9 +19,9 @@ not an incomplete account. Creation requires a valid recipient email, normalized
 with the same rules as Account email, and records it alongside the owning tenant,
 fixed location and assignment role, and issuing account. The invitation fixes
 that email but does not reserve a globally unique Account identity before
-redemption. Anyone who possesses its link can attempt to redeem it for the fixed
-email; possession does not prove ownership of the mailbox. Email sending and
-email verification remain deferred. Redemption displays the email read-only and
+redemption. Kairos emails the link to that mailbox; possession proves access to
+the invited email. Redemption marks that provider email verified without a
+separate code step. Redemption displays the email read-only and
 collects password and confirmation. The API rejects a different normalized email
 before provider provisioning and rechecks the binding during atomic redemption.
 After verified password sign-in it atomically creates an enabled member account
@@ -32,20 +32,22 @@ further administrator approval is required.
 
 An invitation expires exactly seven days after issuance. Opening its
 registration page neither reserves it nor extends that deadline. Multiple
-pending invitations may target the same location and role. The full link is
-returned only when the invitation is created, with a direct Copy action in the
-panel; Kairos does not email it and persists only the SHA-256 hash of a token
-containing 32 cryptographically random bytes encoded as unpadded Base64url. A
-lost link is not recoverable and has no replacement operation. Staff issue
-another invitation through the ordinary creation flow and explicitly revoke
-the old one. The panel link uses
+pending invitations may target the same location and role, but at most one
+active invitation exists per tenant and normalized recipient email. Creation
+and resend enqueue a Polish Resend email with the fresh invitation link,
+role, location and inviter. The subject is **Zaproszenie do restauracji
+zarządzanej przez {administrator email}**; no tenant display name exists. The panel and creation
+response expose no token or Copy link action. The database stores the SHA-256
+hash of a 32-byte random Base64url token; the pending email payload contains the
+recoverable token only in encrypted form and clears it on terminal delivery.
+The emailed link uses
 `/account-registration#invitation=<token>` so the secret is not sent
 in the initial navigation URL, gateway logs, or referrer; the client reads the
 fragment and supplies the token only in the API request body.
 
 Expiration is derived from the authoritative `expiresAt` whenever invitations
 are listed, previewed, or redeemed. PostgreSQL persists only `PENDING`,
-`REDEEMED`, or `REVOKED`; a pending row whose deadline has elapsed is
+`REDEEMED`, `REVOKED`, or `REPLACED`; a pending row whose deadline has elapsed is
 effectively expired and cannot be redeemed. No background worker materializes
 an `EXPIRED` state, and reads do not update the row merely to record the passage
 of time. The exact audit time remains the stored deadline.
@@ -54,8 +56,9 @@ of time. The exact audit time remains the stored deadline.
 
 Pending invitations appear alongside created accounts in the Accounts collection
 and open their own details in the shared popup presentation. Tenant
-administrators may inspect or revoke every pending invitation in their tenant.
-Managers may do the same for operator invitations to their own enabled location
+administrators may inspect the whole tenant history and manage every pending
+invitation in their tenant.
+Managers see and manage only operator invitations to their own enabled location
 regardless of which authorized manager issued them. Redemption
 rechecks that the issuing account is enabled and remains authorized for the
 fixed location and role; losing that authority makes its outstanding
@@ -69,28 +72,31 @@ existing account cannot redeem an invitation to gain another location or role.
 
 ### Invitation cards and synchronization
 
-Account and pending-invitation cards show email, role, and location. A distinct
-pending colour separates invitations from enabled and disabled accounts, without
-visible status text on the card; assistive technology receives the status and
-the detail popup states it explicitly. Selecting an invitation opens its email,
-role, location, issuer, creation time, expiration time, and Revoke action.
-Revocation uses the inline hold confirmation defined in [staff panel requirements](staff-panel.md#lifecycle-vocabulary-and-confirmations), identifying the recipient and target
-because it makes an already shared link unusable. Redeemed, revoked, and expired
-invitations disappear from the collection after revalidation; redeemed accounts
-then appear as created accounts. Terminal metadata remains in PostgreSQL for
-audit but has no history interface in this increment.
+Accounts presents created accounts and a paginated invitation history. History
+shows recipient, role, location, issuer, creation/expiry times, lifecycle state
+and delivery state (`QUEUED`, `SENT`, `FAILED`), including terminal entries.
+Administrators see the tenant; managers see operator invitations for their own
+location. Server sorting supports newest or oldest first and stable ordering.
 
-Invitation loading and failures remain visible in Accounts even when no created
-accounts exist. Failures offer a user-oriented message and Retry without hiding
-successfully loaded entities. Selecting a card moves focus into its popup;
-closing returns focus to the invoking card when it remains available. Every
-action remains operable by touch, pointer, keyboard, and assistive technology.
-Mobile adaptation preserves information and actions without horizontal scrolling.
+Creating for an already invited email requires explicit replacement confirmation
+in the panel. The API returns `409` until replacement is confirmed. Replacement
+requires authority over both the existing invitation and its new target; it
+records the previous entry as `REPLACED`, cancels its queued delivery and creates
+a new invitation with a fresh token and seven-day lifetime atomically. Resend
+uses this same confirmed replacement operation. Only active pending entries
+can be resent, including entries whose delivery failed; expired entries require
+the ordinary new-invitation form. Previous links become unusable.
 
-The collection uses account-scoped SWR state. It revalidates after creation or
-revocation and on focus and reconnect, and determines pending eligibility
-against the server-provided timestamps. This increment adds no live staff event
-stream for invitation changes and no collection search or filters.
+Revoke keeps the inline hold confirmation defined in
+[staff panel requirements](staff-panel.md#lifecycle-vocabulary-and-confirmations).
+It identifies recipient and target and makes the emailed link unusable.
+Loading, errors and Retry remain visible even with no created accounts.
+Popups move focus inside and return it to their invoking control when possible;
+all actions support touch, pointer, keyboard and assistive technology. Mobile
+layouts avoid horizontal scrolling.
+
+Account-scoped SWR revalidates after creation, replacement, resend and revocation,
+and on focus/reconnect. There is no live staff event stream or history search.
 
 ### Account authority and archival
 
@@ -139,6 +145,6 @@ devices. The primary workspace supports administrator location switching and
 aggregate views without depending on tabs.
 
 A non-bypassable gateway must rate-limit login,
-registration, invitation redemption, authenticated password changes, and future
-password recovery. Future email verification will not substitute for throttling.
+registration, invitation redemption, email verification/code resend,
+authenticated password changes, and future password recovery.
 Social login, MFA, and additional administrator invitations remain deferred.

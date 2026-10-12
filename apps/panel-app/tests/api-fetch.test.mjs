@@ -114,9 +114,9 @@ for (const operation of ["login", "logout", "changePassword"]) {
 }
 
 
-test("public registration rejects a short password before making a request", () => {
+test("public registration rejects a short password before making a request", async () => {
   const api = client(() => { throw new Error("Invalid registration must not reach the network"); });
-  assert.throws(() => api.registration.registerTenant({
+  await assert.rejects(api.registration.registerTenant({
     email: "admin@example.com", password: "short", passwordConfirmation: "short",
   }), /12 znaków/i);
 });

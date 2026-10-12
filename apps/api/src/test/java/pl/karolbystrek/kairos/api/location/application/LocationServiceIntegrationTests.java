@@ -382,17 +382,23 @@ class LocationServiceIntegrationTests extends RedisListenerIsolatedIntegrationTe
     private UUID insertInvitation(UUID tenantId, UUID locationId, UUID issuerId) {
         var id = UUID.randomUUID();
         var now = Instant.now();
+        jdbcTemplate.update("""
+            INSERT INTO email_deliveries(id,owner_scope,owner_identity,tenant_id,location_id,state,created_at,next_attempt_at,completed_at)
+            VALUES (?,'staff',?,?,?,'SENT',current_timestamp,current_timestamp,current_timestamp)
+            """, id, issuerId.toString(), tenantId, locationId);
+
         jdbcTemplate.update(
             """
             INSERT INTO account_invitations (
-                id, tenant_id, location_id, issued_by_account_id, assignment_role,
+                id, tenant_id, location_id, issued_by_account_id, delivery_id, issued_by_email, assignment_role,
                 email, token_hash, state, expires_at, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, 'OPERATOR', 'pending@example.com', ?, 'PENDING', ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, 'issuer@example.com', 'OPERATOR', 'pending@example.com', ?, 'PENDING', ?, ?, ?)
             """,
             id,
             tenantId,
             locationId,
             issuerId,
+            id,
             "a".repeat(64),
             Timestamp.from(now.plus(7, ChronoUnit.DAYS)),
             Timestamp.from(now),

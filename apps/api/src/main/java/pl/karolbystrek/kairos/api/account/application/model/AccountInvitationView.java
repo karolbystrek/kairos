@@ -3,6 +3,9 @@ package pl.karolbystrek.kairos.api.account.application.model;
 import lombok.NonNull;
 import pl.karolbystrek.kairos.api.account.domain.assignment.AssignmentRole;
 
+import pl.karolbystrek.kairos.api.account.domain.invitation.AccountInvitationState;
+import pl.karolbystrek.kairos.api.email.domain.EmailDeliveryState;
+
 import java.time.Instant;
 import java.util.UUID;
 
@@ -14,6 +17,8 @@ public record AccountInvitationView(
     @NonNull AssignmentRole role,
     @NonNull String issuedByEmail,
     @NonNull Instant createdAt,
-    @NonNull Instant expiresAt
+    @NonNull Instant expiresAt,
+    @NonNull AccountInvitationState state,
+    @NonNull EmailDeliveryState deliveryState
 ) {
 }

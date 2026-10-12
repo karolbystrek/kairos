@@ -20,14 +20,15 @@ Session API integration. Users enter email/password on the Kairos panel; no
 hosted provider login redirect, browser SDK, social login, or JWT/refresh flow
 is used. Kairos owns tenants, Accounts, memberships and authorization. All
 Accounts belong to one tenant. Username, local password hashes, Platform
-Operator, Tenant Registration Invitations, and verification staging are removed.
+Operator and Tenant Registration Invitations are removed.
 
 #### Registration and first-location onboarding
 
 Public registration collects email, password, and confirmation in one focused
-account form. Submitting it immediately validates and provisions the identity,
-commits one tenant and administrator locally, establishes the browser session,
-and opens the staff workspace at `/dashboard`. Registration does not collect or
+account form. Submitting it validates and provisions an unverified identity, then sends a
+6-digit verification code. No tenant, administrator or tenant authority exists
+until the correct code is confirmed. Confirmation commits the tenant and
+administrator, establishes the browser session and opens `/dashboard`. Registration does not collect or
 create a location.
 The registration form has no step counter, progress bar, Next/Back controls, or
 persistent password-requirement paragraph. Account fields retain submitted values
@@ -54,12 +55,17 @@ saved location collection, with no browser flag or additional persisted
 onboarding status. Reload, subsequent sign-in, and direct dashboard navigation
 repeat the same check. This gate applies only to administrators; invited members
 already have a fixed location and do not create one. A disabled saved location
-counts as completed onboarding. Future email verification can precede the same
-gate; verification itself remains outside the current increment.
+counts as completed onboarding. Email verification precedes this same gate.
 
-Managers/operators register through manually shared member invitations. Email
-verification and forgotten-password recovery remain deferred; provider email
-remains truthfully unverified and registration sends no email. Initial provider
+A new code can be requested after a 60-second cooldown. Codes use the provider
+expiry and allow at most five wrong attempts; expired or incorrect codes show
+safe corrective errors. Signing in with an unverified identity without an
+Account resumes verification. Registering an email held by such an abandoned
+identity replaces it; an existing Account is never replaced.
+
+Managers/operators register through emailed, recipient-bound member invitations.
+Redemption verifies the fixed email without a separate code step. Forgotten-password
+recovery remains deferred. Initial provider
 policy is a minimum of 12 characters without mandatory character classes or
 scheduled password expiry. Registration validates that configured minimum,
 email syntax, confirmation, and the 200-character input bounds at submission

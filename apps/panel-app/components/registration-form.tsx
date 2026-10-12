@@ -14,6 +14,7 @@ import {
 import useSWR from "swr";
 import { ZodError } from "zod";
 
+import { EmailVerification } from "./email-verification";
 import { AuthFormLayout } from "./auth-form-layout";
 
 import { FormTextField } from "@/components/form-controls";
@@ -26,7 +27,12 @@ import {
   redeemAccountInvitation,
 } from "@/src/api/account-invitations";
 import { ApiError } from "@/src/api/api-fetch";
-import { getCurrentAccount, logout } from "@/src/api/authentication";
+import {
+  getCurrentAccount,
+  getPendingVerification,
+  pendingVerificationKey,
+  logout,
+} from "@/src/api/authentication";
 
 const termsError = "Zaakceptuj Regulamin, aby utworzyć konto.";
 
@@ -90,6 +96,17 @@ export function RegistrationForm({ invited = false }: { invited?: boolean }) {
     shouldRetryOnError: false,
   });
 
+  const {
+    data: verification,
+    error: verificationError,
+    isLoading: checkingVerification,
+    mutate: mutateVerification,
+  } = useSWR(
+    !invited && !account && !checkingAccount ? pendingVerificationKey : null,
+    getPendingVerification,
+    { shouldRetryOnError: false },
+  );
+
   async function signOut() {
     setPending(true);
     try {
@@ -134,12 +151,17 @@ export function RegistrationForm({ invited = false }: { invited?: boolean }) {
 
         return;
       }
-      invited
+      const result = invited
         ? await redeemAccountInvitation({ ...input, token: token ?? "" })
         : await registerTenant(input);
 
       setPassword("");
       setConfirmation("");
+      if (result && "verificationRequired" in result) {
+        await mutateVerification(result, { revalidate: false });
+
+        return;
+      }
       if (invited) clearInvitationFragment();
       window.location.assign("/dashboard");
     } catch (error) {
@@ -182,6 +204,34 @@ export function RegistrationForm({ invited = false }: { invited?: boolean }) {
     } finally {
       setPending(false);
     }
+  }
+
+  if (verification) {
+    return (
+      <EmailVerification
+        verification={verification}
+        onCancelled={async () => {
+          await mutateVerification(null, { revalidate: false });
+          setEmail("");
+        }}
+        onChanged={async (value) => {
+          await mutateVerification(value, { revalidate: false });
+        }}
+        onVerified={async () => {
+          window.location.assign("/dashboard");
+        }}
+      />
+    );
+  }
+  if (verificationError) {
+    return (
+      <AuthFormLayout footer={null} title="Sprawdzanie weryfikacji">
+        <p role="alert">Nie udało się sprawdzić stanu weryfikacji.</p>
+        <Button onPress={() => void mutateVerification()}>
+          Spróbuj ponownie
+        </Button>
+      </AuthFormLayout>
+    );
   }
 
   return (
@@ -327,6 +377,7 @@ export function RegistrationForm({ invited = false }: { invited?: boolean }) {
           <Button
             isDisabled={
               checkingAccount ||
+              checkingVerification ||
               (!!accountError &&
                 !(
                   accountError instanceof ApiError &&

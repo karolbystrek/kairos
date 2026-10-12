@@ -37,6 +37,7 @@ import {
   PlatformAnalytics,
   RestaurantAnalytics,
 } from "@/components/analytics-management";
+import { EmailVerification } from "@/components/email-verification";
 import { AuthFormLayout } from "@/components/auth-form-layout";
 import { IntegrationManagement } from "@/components/integration-management";
 import { LocationCreationModal } from "@/components/location-creation-modal";
@@ -48,6 +49,8 @@ import { subscribeToAuthenticationRequired } from "@/src/api/auth-state";
 import { ApiError } from "@/src/api/api-fetch";
 import {
   getCurrentAccount,
+  getPendingVerification,
+  pendingVerificationKey,
   login as loginRequest,
   logout as logoutRequest,
   type AuthenticationResult,
@@ -265,6 +268,17 @@ export function StaffPanel({
   });
 
   const {
+    data: verification,
+    error: verificationError,
+    isLoading: checkingVerification,
+    mutate: mutateVerification,
+  } = useSWR(
+    !account && !isLoading ? pendingVerificationKey : null,
+    getPendingVerification,
+    { shouldRetryOnError: false },
+  );
+
+  const {
     data: locations,
     error: locationsError,
     mutate: mutateLocations,
@@ -316,6 +330,12 @@ export function StaffPanel({
     const currentAccount = await triggerLogin(credentials);
 
     if (!currentAccount) return;
+    if ("verificationRequired" in currentAccount) {
+      await mutateVerification(currentAccount, { revalidate: false });
+
+      return;
+    }
+    await mutateVerification(null, { revalidate: false });
     await mutateCache(isStaffCacheKey, undefined, { revalidate: false });
     await mutateAccount(currentAccount, { revalidate: false });
   }
@@ -345,6 +365,43 @@ export function StaffPanel({
     }
   }, [account, isSignedOut, isUnauthorized, router, screen]);
 
+  if (screen === "login" && checkingVerification) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <Spinner aria-label="Sprawdzanie weryfikacji" />
+      </div>
+    );
+  }
+
+  if (screen === "login" && verification) {
+    return (
+      <EmailVerification
+        verification={verification}
+        onCancelled={async () => {
+          await mutateVerification(null, { revalidate: false });
+          resetLogin();
+        }}
+        onChanged={async (value) => {
+          await mutateVerification(value, { revalidate: false });
+        }}
+        onVerified={async (value) => {
+          await mutateVerification(null, { revalidate: false });
+          await mutateCache(isStaffCacheKey, undefined, { revalidate: false });
+          await mutateAccount(value, { revalidate: false });
+        }}
+      />
+    );
+  }
+  if (screen === "login" && verificationError) {
+    return (
+      <AuthFormLayout footer={null} title="Sprawdzanie weryfikacji">
+        <p role="alert">Nie udało się sprawdzić stanu weryfikacji.</p>
+        <Button onPress={() => void mutateVerification()}>
+          Spróbuj ponownie
+        </Button>
+      </AuthFormLayout>
+    );
+  }
   if (screen === "login" && (isUnauthorized || isSignedOut)) {
     return (
       <>

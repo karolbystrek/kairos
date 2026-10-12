@@ -92,6 +92,11 @@ export default function PrivacyPolicyPage() {
           umownych.
         </li>
         <li>
+          Resend – wysyłka kodów weryfikacyjnych i zaproszeń do konta. Dostawca
+          otrzymuje adres odbiorcy i treść wiadomości potrzebne do jej
+          dostarczenia.
+        </li>
+        <li>
           Administratorzy i kierownicy Restauracji, w której masz konto, widzą
           Twój adres e-mail, rolę i status konta.
         </li>
@@ -107,12 +112,14 @@ export default function PrivacyPolicyPage() {
         konta od razu blokuje logowanie, a po 30 dniach trwale usuwamy konto,
         jego dane w usłudze logowania i związane z nim zaproszenia. Do tego
         czasu adres e-mail pozostaje zablokowany przed ponownym użyciem.
-        Zaproszenia usuwamy 30 dni po ich wygaśnięciu lub odwołaniu. Sesja
-        wygasa po wylogowaniu lub 30 dniach braku aktywności. Logi serwera z
-        adresami IP i zdarzeniami bezpieczeństwa są nadpisywane po osiągnięciu
-        limitu rozmiaru. Pozostałe dane zostaną usunięte w ciągu 30 dni po
-        zakończeniu Okresu testowego. Zbiorcze statystyki zachowujemy do
-        trwałego usunięcia danych restauracji, również po usunięciu lokalu.
+        Zaproszenia usuwamy 30 dni po ich wygaśnięciu lub odwołaniu.
+        Niedokończoną rejestrację, wraz z danymi w usłudze logowania, usuwamy 30
+        dni po wysłaniu ostatniego kodu, a zapisy wysyłki e-maili 30 dni po jej
+        zakończeniu. Sesja wygasa po wylogowaniu lub 30 dniach braku aktywności.
+        Logi serwera z adresami IP i zdarzeniami bezpieczeństwa są nadpisywane
+        po osiągnięciu limitu rozmiaru. Pozostałe dane zostaną usunięte w ciągu
+        30 dni po zakończeniu Okresu testowego. Zbiorcze statystyki zachowujemy
+        do trwałego usunięcia danych restauracji, również po usunięciu lokalu.
       </p>
 
       <h2>Twoje prawa</h2>

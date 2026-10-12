@@ -61,7 +61,7 @@
 * Staff order-list operations return only `IN_PREPARATION` and `READY` orders.
 ### Authentication, accounts and locations
 
-* Backend-mediated ZITADEL password authentication, immediate registration,
+* Backend-mediated ZITADEL password authentication, email-verified registration,
   durable/rolling sessions, provider outage/revocation, current local access,
   password change, local/global logout and cookie/CSRF behavior are covered by
   provider-isolated and HTTP contract tests. Live provider acceptance is separate.
@@ -69,7 +69,11 @@
   confirmation with errors attached to the correct fields before provider
   provisioning. Local/provider identity conflicts have an Email field error;
   known provider password failures have a safe Password field error.
-* Successful public registration creates the tenant, administrator and browser
+* Public registration creates no tenant or administrator before a correct
+  6-digit email code. Resending observes a 60-second cooldown, incorrect codes
+  permit five attempts and provider expiry is enforced. Unverified sign-in
+  resumes the code step; abandoned identities without Accounts can be replaced.
+* Successful public email confirmation creates the tenant, administrator and browser
   session without creating a location. The main panel requires first-location
   creation, survives reload and later sign-in with onboarding incomplete,
   prevents dismissal, retains failed input, and opens the new location's Orders
@@ -81,7 +85,7 @@
   remain behind required onboarding until a location exists, and are available
   when all locations are disabled without the invitation warning container.
 * Username, local password hashes, custom refresh sessions, Platform Operator,
-  verification staging and Tenant Registration Invitations are absent from the
+  Tenant Registration Invitations are absent from the
   initial schema and runtime. Existing local data needs no migration.
 * Authorized account listing returns only manageable member accounts in the
   current tenant and, for a manager, only operators assigned to that manager's
@@ -133,10 +137,13 @@
   account and location assignment without further approval. It never creates or
   reserves an incomplete account before redemption.
 * An invitation expires seven days after issuance, stores only a SHA-256 hash
-  of its once-revealed 32-byte random bearer token, may be revoked by an
+  of its emailed 32-byte random bearer token, may be revoked by an
   authorized account manager, and remains unconsumed after invalid or conflicting
   registration input. Multiple invitations for one location and role are
-  allowed, but concurrent claims of one invitation create exactly one account.
+  allowed for different emails, but active invitations are unique per tenant/email.
+  Confirmed creation/resend replaces the old entry and token atomically, requires
+  authority over both targets, and starts a fresh seven-day lifetime. The panel
+  and API expose no shareable token or link. Concurrent claims of one invitation create exactly one account.
   Expiration is derived during list, preview, and redemption from `expiresAt`;
   no worker or write-on-read materializes an `EXPIRED` lifecycle state.
 * Each pending invitation fixes a required valid normalized recipient email.
@@ -144,9 +151,11 @@
   read-only beside clearly spaced location/role context. Mismatched redemption
   email is rejected before provider provisioning and rechecked atomically.
   Details identify the fixed role and location, creator, creation time, and expiry. Its icon-and-text Revoke action
-  requires inline hold confirmation, and terminal invitations leave the collection while their
-  secret-free metadata is retained for 30 days after they end without a
-  history UI.
+  requires inline hold confirmation. Paginated, sorted history retains terminal
+  metadata, lifecycle state and queued/sent/failed email delivery state. Managers
+  see only operator invitations for their location; administrators see the
+  tenant. Active pending invitations with failed delivery can be resent after
+  confirmation; expired invitations use ordinary creation.
 * Redemption requires the issuer to remain enabled and authorized. A signed-in
   browser and the API both require explicit sign-out before redemption, while
   verified completion creates the browser session and opens the assigned
@@ -161,8 +170,8 @@
   states receive specific identity-free guidance while unknown tokens remain
   indistinguishable.
 * Invitation redemption creates only a new account and cannot add access to an
-  existing account. Required globally unique email remains unverified and is
-  not trusted for recovery or external-identity linking.
+  existing account. The fixed globally unique invited email is marked verified without a code
+  step; redemption cannot change it or link an existing identity.
 * A location manager can access and manage orders only in its assigned location.
 * A location operator can list, create, read, and update orders only in its assigned location.
 * One person-oriented operator account can be used on that staff member's

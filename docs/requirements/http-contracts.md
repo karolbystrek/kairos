@@ -31,6 +31,7 @@ PUT    /api/accounts/v1/{accountId}/status
 GET    /api/account-invitations/v1
 POST   /api/account-invitations/v1
 DELETE /api/account-invitations/v1/{invitationId}
+POST   /api/account-invitations/v1/{invitationId}/resend
 POST   /api/account-invitation-previews/v1
 POST   /api/account-invitation-redemptions/v1
 
@@ -75,8 +76,13 @@ DELETE /api/accounts/v1/{accountId}
 Authentication returns one current-Account shape with Account UUID, email,
 tenant UUID, tenant role, optional location assignment, and capabilities. No
 username, Account-kind discriminator, password, or provider credential is
-returned. Login/public registration/invitation registration return `200` with
-the current Account and an HttpOnly session cookie. Registration accepts
+returned. Verified login/invitation registration and email confirmation return
+`200` with the current Account and an HttpOnly session cookie. Public
+registration and unverified login without an Account instead return verification
+state (`verificationRequired`, `email`, `resendAvailableAt`) with a pending
+session that grants no tenant authority. GET/POST `/api/auth/v1/verification`
+reads state/confirms `{code}`; POST `/api/auth/v1/verification/resend` requests a
+new code after the cooldown. Registration accepts
 email/password/passwordConfirmation; only member registration requires `token`.
 Public registration creates no location. Registration input failures use Problem
 Details with a `fieldErrors` object mapping `email`, `password`, or
@@ -128,18 +134,27 @@ targets as unknown.
 
 #### Invitation contracts
 
-The Account Invitation list, creation, and revocation operations are authenticated and
+The Account Invitation list, creation, resend and revocation operations are authenticated and
 scoped by the caller's account-management authority. Preview and redemption are
 anonymous, accept the bearer token only in their validated request bodies,
 retain normal browser CSRF protection, and never log those bodies. Preview
-returns the fixed recipient email, location name, role, and expiration needed by
+returns the fixed recipient email, restaurant administrator email, location
+name, role, and expiration needed by
 the registration page. Creation requires email, location, and role; list and
-creation responses include the recipient email. Redemption rejects an email
+creation responses include the recipient email and delivery state, never a token
+or link. `GET ?page=0&size=20&sort=desc` returns `{items,totalElements,page,size}`
+for the authorized history (`asc` selects oldest first). Lifecycle states are
+`PENDING`, `REDEEMED`, `REVOKED`, `REPLACED`, and derived `EXPIRED`; delivery
+states are `QUEUED`, `SENT`, `FAILED`. Creation defaults `replaceExisting` to
+`false` and returns `409` for an active invitation to that tenant/email. Explicit
+`true` replaces it only with authority over both old and new targets.
+`POST /{invitationId}/resend` requires `{replaceExisting:true}` and an active
+pending invitation; it returns a fresh replacement with a new seven-day token. Redemption rejects an email
 that differs after normalization with an Email field error and `400`, before
 provider provisioning and again inside the local redemption transaction. Redemption removes the token fragment from browser
 history after success or a terminal response. Validation failures return `400`,
 an available invitation with conflicting email or provider identity returns `409`, a
-known expired, revoked, or redeemed invitation returns `410`, an unknown token
+known expired, revoked, replaced or redeemed invitation returns `410`, an unknown token
 returns `404`, and any valid existing panel session receives `403`.
 
 #### Integration and order contracts

@@ -75,8 +75,42 @@ public class RetentionPurgeService {
             workerDiscoveryRepository.purgeRetained(WorkerOperation.INVITATION_PURGE, id);
             return true;
         });
-        if (accounts + locations + invitations > 0) {
-            log.info("Retention purge removed {} accounts, {} locations and {} invitations", accounts, locations, invitations);
+        var deferredRegistrations = new HashSet<String>();
+        var registrations = purgeBatch("registration", transactionTemplate, status -> {
+            var registration = workerDiscoveryRepository.nextAbandonedRegistration(cutoff, deferredRegistrations);
+            if (registration == null) {
+                return null;
+            }
+            // A provisioned subject belongs to a real account whose verification lost only its cleanup.
+            if (!registration.provisioned()) {
+                try {
+                    identityProvider.deleteUser(registration.subject());
+                } catch (ResponseStatusException exception) {
+                    if (exception.getStatusCode().value() != 404) {
+                        meters.counter("kairos.worker.failures", "worker", "retention").increment();
+                        log.warn("Deferred purge of abandoned registration: identity provider returned {}",
+                                exception.getStatusCode().value());
+                        deferredRegistrations.add(registration.subject());
+                        status.setRollbackOnly();
+                        return false;
+                    }
+                }
+            }
+            workerDiscoveryRepository.purgeRegistration(registration.subject());
+            return true;
+        });
+        Integer emails;
+        try {
+            emails = transactionTemplate.execute(status ->
+                    workerDiscoveryRepository.purgeFinishedEmailDeliveries(cutoff, properties.batchSize()));
+        } catch (RuntimeException exception) {
+            meters.counter("kairos.worker.failures", "worker", "retention").increment();
+            log.error("Retention purge of email deliveries failed", exception);
+            emails = 0;
+        }
+        if (accounts + locations + invitations + registrations + emails > 0) {
+            log.info("Retention purge removed {} accounts, {} locations, {} invitations, {} registrations and {} email deliveries",
+                    accounts, locations, invitations, registrations, emails);
         }
     }
 

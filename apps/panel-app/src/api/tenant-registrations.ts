@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { passwordInputSchema, requiredEmailInputSchema } from "./account-input";
-import { request } from "./api-fetch";
+import { request, resetCsrf } from "./api-fetch";
 import { authenticationResultSchema } from "./authentication";
 export const registrationInputSchema = z
   .object({
@@ -14,8 +14,8 @@ export const registrationInputSchema = z
     { message: "Hasła muszą być takie same.", path: ["passwordConfirmation"] },
   );
 export type TenantRegistrationInput = z.input<typeof registrationInputSchema>;
-export function registerTenant(registration: TenantRegistrationInput) {
-  return request(
+export async function registerTenant(registration: TenantRegistrationInput) {
+  const result = await request(
     "/api/tenant-registrations/v1",
     authenticationResultSchema,
     {
@@ -25,4 +25,8 @@ export function registerTenant(registration: TenantRegistrationInput) {
     },
     { notifyUnauthorized: false },
   );
+
+  resetCsrf();
+
+  return result;
 }

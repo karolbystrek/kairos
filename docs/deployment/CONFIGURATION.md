@@ -5,6 +5,7 @@
 - [Persistent configuration and keys](#persistent-configuration-and-keys)
 - [Contents](#contents)
 - [2. Prepare persistent configuration and keys](#2-prepare-persistent-configuration-and-keys)
+  - [Transactional email (Resend)](#transactional-email-resend)
 
 Use [the production runbook](RUNBOOK.md) for prerequisites and the sequence.
 
@@ -23,7 +24,7 @@ preserving credentials. `.env.example` remains the local configuration inventory
 Do not source environment files as shell scripts or print resolved Compose
 configuration into tickets/logs.
 
-Setup generates the stable ZITADEL master key, webhook and push encryption keys,
+Setup generates the stable ZITADEL master key, webhook, push and email encryption keys,
 and matching P-256 VAPID pair. Do not use `--replace-keys` to make startup pass.
 Never discard the master key while retaining ZITADEL's database. Keep a protected copy of runtime configuration, application keys and TLS material
 outside the VPS for a fresh rebuild. Database backups are deferred under the
@@ -41,6 +42,7 @@ outside the VPS for a fresh rebuild. Database backups are deferred under the
 | `KAIROS_CUSTOMER_APP_HOST`, `KAIROS_PANEL_APP_HOST`, `KAIROS_API_HOST` | Hostnames only; chosen customer, panel and API names |
 | `KAIROS_APPLICATION_SECRETS_DIRECTORY`, `KAIROS_TLS_DIRECTORY` | `/srv/kairos/secrets`, `/srv/kairos/tls` |
 | `WEBHOOK_DESTINATION_POLICY`, `PUSH_DESTINATION_POLICY` | Both `PUBLIC_HTTPS`; never carry the local webhook relaxation into production |
+| `EMAIL_DELIVERY_MODE`, `RESEND_API_KEY` | Hosted mode `RESEND` and a Resend sending key; the API refuses production startup without it. Local/test mode `LOG` sends no mail and logs no message secrets. |
 | `VAPID_SUBJECT` | Operator-owned `mailto:` contact or public HTTPS contact URL |
 | `ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD` | Strong administrator password, not the example's local default |
 | `ZITADEL_FIRSTINSTANCE_ORG_MACHINE_PAT_EXPIRATIONDATE` | Deliberate bootstrap credential expiry with renewal scheduled before it |
@@ -61,3 +63,49 @@ startup and the disposable development schema policy. The operator will recreate
 the VPS database for this revision; ordinary deployment never resets volumes or
 repairs an old checksum. Live runtime
 isolation and application acceptance remain required before public launch.
+
+### Transactional email (Resend)
+
+Kairos sends Polish mail as `Kairos <no-reply@kairos.karolbystrek.pl>` through
+the Resend HTTP API; ZITADEL needs no SMTP configuration. Every step below changes
+a live resource and requires explicit approval for its scope.
+
+1. In Resend, add the domain `kairos.karolbystrek.pl`. Create the DKIM TXT
+   record and the `send` MX and SPF TXT records it lists in Cloudflare as
+   **DNS only** (unproxied), and keep a `_dmarc` TXT record (`p=none` while
+   monitoring delivery). Wait until Resend reports the domain as verified.
+2. In the Resend domain settings, disable open and click tracking. Kairos sends
+   no tracking options, so this setting is what keeps tracking off.
+3. Create an API key with **Sending access** restricted to that domain. Set it
+   as `RESEND_API_KEY` in `/srv/kairos/production.env` together with
+   `EMAIL_DELIVERY_MODE=RESEND`. Never commit, print or paste the key. Deployment
+   fails before changing containers when it is missing.
+4. Allow outbound HTTPS from the host to `api.resend.com:443`. Lightsail permits
+   outbound traffic by default; check this only where egress filtering exists.
+
+Bootstrap generates the dedicated 32-byte
+`/srv/kairos/secrets/email-encryption.bin`, mounted read-only at
+`/run/secrets/email-encryption.bin`. Keep a protected off-host copy with the
+other keys: queued messages cannot be decrypted without it. Never print codes,
+invitation tokens or pending message contents.
+
+A host bootstrapped before this key existed holds five keys, and bootstrap
+refuses the partial set. Add only the missing key through administrator SSH,
+reusing an existing key's owner, then rerun bootstrap:
+
+```sh
+sudo openssl rand -out /srv/kairos/secrets/email-encryption.bin 32
+sudo chown --reference=/srv/kairos/secrets/webhook-encryption.bin \
+  /srv/kairos/secrets/email-encryption.bin
+sudo chmod 0400 /srv/kairos/secrets/email-encryption.bin
+```
+
+Never use `--replace-keys` to add this file: it regenerates every key, including
+the ones existing encrypted data depends on.
+
+After the first deployment with email, register with an inbox you control and
+confirm that the Polish verification code arrives from the sender above and
+completes registration. Then invite a second inbox and redeem the invitation
+with that address. The panel's invitation history must show the delivery as
+sent, and the Resend dashboard must list both messages. Check the spam folder
+before tightening DMARC.
