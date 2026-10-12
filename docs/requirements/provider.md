@@ -34,7 +34,8 @@ codes through its own transactional email delivery worker.
 Validate invitation/email availability before provider provisioning. Create and
 password-authenticate the provider identity. Administrator registration commits
 the tenant/admin only after email confirmation; invitation registration commits
-its member transaction after invitation validation. First-location creation is a separate
+its member transaction after invitation validation and marks the invited
+provider email verified without a separate code step. First-location creation is a separate
 authenticated transaction after account registration. Recheck invitation eligibility and consume
 it atomically with the Account and assignment. On local failure, terminate the
 new provider session and attempt deletion of only the newly provisioned identity.

@@ -44,10 +44,10 @@ public class DatabaseIsolationVerifier implements ApplicationRunner {
                         WHERE p.polrelid=to_regclass('public.' || expected.table_name)))
                 AND (SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public'
                     AND p.proname IN ('valid_staff','lock_staff_location','lock_account_location','api_key_authentication','record_api_key_use','valid_integration','staff_authentication','identity_conflict',
-                        'verify_push_subscription','claim_email_delivery','complete_email_delivery',
+                        'verify_push_subscription','claim_email_delivery','complete_email_delivery','lock_pending_invitation','cancel_redeemed_invitation_email','next_abandoned_registration','purge_registration','purge_finished_email_deliveries',
                         'count_push_enrollments','cancel_push_deliveries','next_webhook_fanout','next_push_fanout','next_webhook_delivery','next_push_delivery',
                         'next_expired_push_subscription','next_dormant_push_subscription','next_terminal_push_delivery',
-                        'next_purgeable_account','next_purgeable_location','next_finished_invitation','purge_retained','valid_worker','next_order_measurement','record_usage_action','operational_backlog','valid_platform_administrator'))=29
+                        'next_purgeable_account','next_purgeable_location','next_finished_invitation','purge_retained','valid_worker','next_order_measurement','record_usage_action','operational_backlog','valid_platform_administrator'))=34
                 AND NOT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
                     WHERE n.nspname IN ('kairos_security','public') AND p.prosecdef
                     AND (p.proowner=r.oid OR NOT has_function_privilege(current_user,p.oid,'EXECUTE')

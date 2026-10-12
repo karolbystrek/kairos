@@ -20,6 +20,9 @@ import pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase;
 import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
 
 import java.util.UUID;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -45,6 +48,7 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
     @Autowired private JdbcTemplate runtimeDatabase;
     @Autowired private AccountInvitationService invitations;
     @Autowired private RegistrationVerificationService verification;
+    @Autowired private PlatformTransactionManager transactions;
 
     @Test
     void registrationCreatesNoTenantUntilCodeThenEstablishesDurableSecureSession() throws Exception {
@@ -214,7 +218,9 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
         var invitation = invitations.create(tenant.administrator(), tenant.firstLocationId(), AssignmentRole.MANAGER, email);
         configure(email);
         doAnswer(call -> {
-            invitations.revoke(tenant.administrator(), invitation.invitation().id());
+            var transaction = new TransactionTemplate(transactions);
+            transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+            transaction.executeWithoutResult(status -> invitations.revoke(tenant.administrator(), invitation.invitation().id()));
             return new ProviderSession(UUID.randomUUID().toString(), email);
         }).when(identityProvider).signIn(eq(email), anyString());
         mvc.perform(csrf(postApi("/account-invitation-redemptions/v1").content(registration(email, invitation.token()))))
@@ -311,6 +317,22 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
             assertThat(replacement.get(5, TimeUnit.SECONDS)).isInstanceOf(RegistrationValidationException.class);
         }
         verify(identityProvider, never()).deleteUser(email);
+        assertThat(database.queryForObject("SELECT COUNT(*) FROM accounts WHERE email=?", Integer.class, email)).isOne();
+    }
+
+    @Test
+    void invitationRegistrationVerifiesOnlyTheIntendedRecipient() throws Exception {
+        var tenant = new IntegrationTestFixture(database).createTenant();
+        var email = email();
+        var invitation = invitations.create(tenant.administrator(), tenant.firstLocationId(), AssignmentRole.OPERATOR, email);
+        mvc.perform(csrf(postApi("/account-invitation-redemptions/v1").content(registration(email(), invitation.token()))))
+            .andExpect(status().isBadRequest());
+        verify(identityProvider, never()).markEmailVerified(anyString(), anyString());
+        configure(email);
+        mvc.perform(csrf(postApi("/account-invitation-redemptions/v1").content(registration(email, invitation.token()))))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.tenantRole").value("MEMBER"))
+            .andExpect(jsonPath("$.verificationRequired").doesNotExist());
+        verify(identityProvider).markEmailVerified(email, email);
         assertThat(database.queryForObject("SELECT COUNT(*) FROM accounts WHERE email=?", Integer.class, email)).isOne();
     }
 

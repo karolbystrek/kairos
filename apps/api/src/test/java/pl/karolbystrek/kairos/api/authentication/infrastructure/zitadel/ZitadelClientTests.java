@@ -158,6 +158,16 @@ class ZitadelClientTests {
         server.verify();
     }
 
+    @Test
+    void invitedEmailIsMarkedVerifiedWithoutProviderMail() {
+        server.expect(requestTo("http://zitadel:8080/v2/users/user"))
+            .andExpect(method(HttpMethod.PATCH))
+            .andExpect(content().json("{\"human\":{\"email\":{\"email\":\"invited@example.com\",\"isVerified\":true}}}"))
+            .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+        client.markEmailVerified("user", "invited@example.com");
+        server.verify();
+    }
+
     private void state(String session) {
         server.expect(requestTo("http://zitadel:8080/v2/sessions/session"))
             .andRespond(withSuccess("{\"session\":" + session + "}", MediaType.APPLICATION_JSON));

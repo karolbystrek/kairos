@@ -18,6 +18,7 @@ public record CreateAccountInvitationRequest(
     UUID locationId,
 
     @NotNull(message = "Assignment role is required")
-    AssignmentRole role
+    AssignmentRole role,
+    Boolean replaceExisting
 ) {
 }

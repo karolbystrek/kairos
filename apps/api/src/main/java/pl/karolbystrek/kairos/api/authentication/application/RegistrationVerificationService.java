@@ -2,6 +2,7 @@ package pl.karolbystrek.kairos.api.authentication.application;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -23,6 +24,9 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
 import java.util.Map;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 
 @Service
 @RequiredArgsConstructor
@@ -40,18 +44,30 @@ public class RegistrationVerificationService {
     private final DatabaseAccessContext access;
     private final PlatformTransactionManager transactions;
     private final Clock clock;
+    private Semaphore nestedFlows;
+
+    // Nested flows hold one connection while opening a REQUIRES_NEW one; staying below the pool size guarantees progress.
+    @Value("${spring.datasource.hikari.maximum-pool-size:10}")
+    void limitNestedFlows(int poolSize) {
+        nestedFlows = new Semaphore(Math.max(1, poolSize / 2));
+    }
+
+    /** Runs a flow that may open a nested transaction; call it before any connection is taken. */
+    public <T> T nested(Supplier<T> flow) {
+        try {
+            if (!nestedFlows.tryAcquire(10, TimeUnit.SECONDS))
+                throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Registration is busy. Try again.");
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Registration is busy. Try again.");
+        }
+        try { return flow.get(); }
+        finally { nestedFlows.release(); }
+    }
 
     public Pending register(String email, String password) {
-        return new TransactionTemplate(transactions).execute(status -> {
-            lockEmail(email);
-            requireNoAccount(email, null);
-            var existing = provider.findByEmail(email);
-            if (existing.isPresent()) {
-                var identity = existing.get();
-                requireNoAccount(email, identity.id());
-                if (identity.verified()) throw conflict();
-                replaceUnverified(identity);
-            }
+        return nested(() -> new TransactionTemplate(transactions).execute(status -> {
+            prepareIdentity(email);
             ZitadelClient.PendingUser user;
             try { user = provider.createUnverifiedUser(email, password); }
             catch (ResponseStatusException exception) {
@@ -73,7 +89,7 @@ public class RegistrationVerificationService {
                 catch (RuntimeException cleanup) { log.error("Pending registration identity cleanup failed"); }
                 throw exception;
             }
-        });
+        }));
     }
 
     public Pending resume(ZitadelClient.ProviderSession identity, String email) {
@@ -121,7 +137,7 @@ public class RegistrationVerificationService {
     }
 
     public StaffPrincipal verify(Pending pending, String code) {
-        var result = new TransactionTemplate(transactions).execute(status -> {
+        var result = nested(() -> new TransactionTemplate(transactions).execute(status -> {
             lockEmail(pending.email());
             if (!provider.isValid(pending.identity())) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
             // An earlier successful commit may have lost its HTTP response.
@@ -144,9 +160,21 @@ public class RegistrationVerificationService {
             mail.cancel((UUID) row.get("delivery_id"));
             database.update("DELETE FROM pending_registrations WHERE subject=?", pending.identity().userId());
             return new Completion(principal, null);
-        });
+        }));
         if (result.error() != null) throw result.error();
         return result.principal();
+    }
+
+    void prepareIdentity(String email) {
+        lockEmail(email);
+        requireNoAccount(email, null);
+        var existing = provider.findByEmail(email);
+        if (existing.isPresent()) {
+            var identity = existing.get();
+            requireNoAccount(email, identity.id());
+            if (identity.verified()) throw conflict();
+            replaceUnverified(identity);
+        }
     }
 
     private void replaceUnverified(ZitadelClient.UserEmail identity) {
@@ -176,8 +204,8 @@ public class RegistrationVerificationService {
     }
     private UUID send(String email, String code) {
         if (!code.matches("[0-9]{6}")) throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Email verification is unavailable");
-        return mail.enqueue(email, "Verify your Kairos email", "Your Kairos verification code is " + code
-            + ".\nEnter it in the registration screen. If it expires, request a new code.\nIf you did not register, ignore this email.");
+        return mail.enqueue(email, "Kod weryfikacyjny Kairos", "Twój kod weryfikacyjny Kairos to " + code
+            + ".\nWpisz go na ekranie rejestracji. Jeśli kod wygaśnie, wyślij nowy.\nJeśli nie zakładasz konta w Kairos, zignoruj tę wiadomość.");
     }
     private void requireNoAccount(String email, String subject) {
         if (accounts.identityConflict(email, subject)) throw conflict();

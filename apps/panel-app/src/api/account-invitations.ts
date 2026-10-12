@@ -14,13 +14,16 @@ const invitationSchema = z.object({
   issuedByEmail: z.string(),
   createdAt: z.iso.datetime({ offset: true }),
   expiresAt: z.iso.datetime({ offset: true }),
+  state: z.enum(["PENDING", "REDEEMED", "REVOKED", "REPLACED", "EXPIRED"]),
+  deliveryState: z.enum(["QUEUED", "SENT", "FAILED"]),
 });
 
-const createdInvitationSchema = invitationSchema.extend({
-  invitationLink: z.url(),
+const invitationsSchema = z.object({
+  items: z.array(invitationSchema),
+  totalElements: z.number().int().nonnegative(),
+  page: z.number().int().nonnegative(),
+  size: z.number().int().positive(),
 });
-
-const invitationsSchema = z.array(invitationSchema);
 
 const previewSchema = z.object({
   email: z.email(),
@@ -33,6 +36,7 @@ const createInvitationInputSchema = z.object({
   email: requiredEmailInputSchema,
   locationId: z.uuid(),
   role: assignmentRoleSchema,
+  replaceExisting: z.boolean().default(false),
 });
 
 const redemptionInputSchema = z.object({
@@ -43,7 +47,7 @@ const redemptionInputSchema = z.object({
 });
 
 export type AccountInvitation = z.infer<typeof invitationSchema>;
-export type CreatedAccountInvitation = z.infer<typeof createdInvitationSchema>;
+export type CreatedAccountInvitation = AccountInvitation;
 export type AccountInvitationPreview = z.infer<typeof previewSchema>;
 export type CreateAccountInvitationInput = z.input<
   typeof createInvitationInputSchema
@@ -52,8 +56,27 @@ export type RedeemAccountInvitationInput = z.input<
   typeof redemptionInputSchema
 >;
 
-export function listAccountInvitations(): Promise<AccountInvitation[]> {
-  return request("/api/account-invitations/v1", invitationsSchema);
+export function listAccountInvitations(
+  page = 0,
+  sort: "asc" | "desc" = "desc",
+) {
+  const query = new URLSearchParams({ page: String(page), size: "20", sort });
+
+  return request(`/api/account-invitations/v1?${query}`, invitationsSchema);
+}
+
+export function resendAccountInvitation(
+  invitationId: string,
+): Promise<AccountInvitation> {
+  return request(
+    `/api/account-invitations/v1/${encodeURIComponent(invitationId)}/resend`,
+    invitationSchema,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ replaceExisting: true }),
+    },
+  );
 }
 
 export function createAccountInvitation(
@@ -61,7 +84,7 @@ export function createAccountInvitation(
 ): Promise<CreatedAccountInvitation> {
   const input = createInvitationInputSchema.parse(invitation);
 
-  return request("/api/account-invitations/v1", createdInvitationSchema, {
+  return request("/api/account-invitations/v1", invitationSchema, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),

@@ -14,12 +14,12 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import pl.karolbystrek.kairos.api.account.api.model.AccountInvitationResponse;
 import pl.karolbystrek.kairos.api.account.api.model.CreateAccountInvitationRequest;
-import pl.karolbystrek.kairos.api.account.api.model.CreatedAccountInvitationResponse;
+import pl.karolbystrek.kairos.api.account.api.model.AccountInvitationPageResponse;
+import pl.karolbystrek.kairos.api.account.api.model.ResendAccountInvitationRequest;
+import org.springframework.web.bind.annotation.RequestParam;
 import pl.karolbystrek.kairos.api.account.application.AccountInvitationService;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
-import pl.karolbystrek.kairos.api.config.ApplicationOriginsProperties;
 
-import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -28,27 +28,27 @@ import java.util.UUID;
 class AccountInvitationController {
 
     private final AccountInvitationService invitationService;
-    private final ApplicationOriginsProperties origins;
 
     @GetMapping
-    List<AccountInvitationResponse> list(
-        @AuthenticationPrincipal StaffPrincipal principal
-    ) {
-        return invitationService.listPending(principal).stream()
-            .map(AccountInvitationResponse::from)
-            .toList();
+    AccountInvitationPageResponse list(@AuthenticationPrincipal StaffPrincipal principal,
+        @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size,
+        @RequestParam(defaultValue = "desc") String sort) {
+        return AccountInvitationPageResponse.from(invitationService.history(principal, page, size, sort));
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    CreatedAccountInvitationResponse create(
-        @AuthenticationPrincipal StaffPrincipal principal,
-        @Valid @RequestBody CreateAccountInvitationRequest request
-    ) {
-        return CreatedAccountInvitationResponse.from(
-            invitationService.create(principal, request.locationId(), request.role(), request.email()),
-            origins.panel()
-        );
+    AccountInvitationResponse create(@AuthenticationPrincipal StaffPrincipal principal,
+        @Valid @RequestBody CreateAccountInvitationRequest request) {
+        return AccountInvitationResponse.from(invitationService.create(principal, request.locationId(), request.role(),
+            request.email(), Boolean.TRUE.equals(request.replaceExisting())).invitation());
+    }
+
+    @PostMapping("/{invitationId}/resend")
+    @ResponseStatus(HttpStatus.CREATED)
+    AccountInvitationResponse resend(@AuthenticationPrincipal StaffPrincipal principal, @PathVariable UUID invitationId,
+        @Valid @RequestBody ResendAccountInvitationRequest request) {
+        return AccountInvitationResponse.from(invitationService.resend(principal, invitationId, Boolean.TRUE.equals(request.replaceExisting())).invitation());
     }
 
     @DeleteMapping("/{invitationId}")

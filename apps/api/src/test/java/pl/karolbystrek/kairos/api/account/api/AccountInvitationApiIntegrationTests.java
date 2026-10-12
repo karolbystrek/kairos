@@ -1,7 +1,6 @@
 package pl.karolbystrek.kairos.api.account.api;
 
 import jakarta.servlet.http.Cookie;
-import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatchers;
@@ -21,6 +20,8 @@ import pl.karolbystrek.kairos.api.authentication.infrastructure.zitadel.ZitadelC
 import pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase;
 import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
 import tools.jackson.databind.ObjectMapper;
+import pl.karolbystrek.kairos.api.email.infrastructure.security.EmailPayloadCipher;
+import tools.jackson.databind.JsonNode;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -55,6 +56,8 @@ class AccountInvitationApiIntegrationTests extends RedisListenerIsolatedIntegrat
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired private EmailPayloadCipher emailCipher;
 
     private UUID tenantId;
     private UUID locationId;
@@ -106,9 +109,8 @@ class AccountInvitationApiIntegrationTests extends RedisListenerIsolatedIntegrat
             .andExpect(jsonPath("$.locationName").value("Main restaurant"))
             .andExpect(jsonPath("$.role").value("MANAGER"))
             .andExpect(jsonPath("$.email").value("invited.person@example.com"))
-            .andExpect(jsonPath("$.invitationLink").value(Matchers.startsWith(
-                "http://localhost:3001/account-registration#invitation="
-            )))
+            .andExpect(jsonPath("$.invitationLink").doesNotExist())
+            .andExpect(jsonPath("$.deliveryState").value("QUEUED"))
             .andReturn();
         var after = Instant.now();
 
@@ -116,8 +118,7 @@ class AccountInvitationApiIntegrationTests extends RedisListenerIsolatedIntegrat
         var invitationId = UUID.fromString(response.get("id").asText());
         var createdAt = Instant.parse(response.get("createdAt").asText());
         var expiresAt = Instant.parse(response.get("expiresAt").asText());
-        var invitationLink = response.get("invitationLink").asText();
-        var rawToken = invitationLink.substring(invitationLink.indexOf("#invitation=") + 12);
+        var rawToken = tokenFrom(response);
         var persisted = jdbcTemplate.queryForMap(
             """
                 SELECT tenant_id, location_id, issued_by_account_id, assignment_role,
@@ -229,14 +230,14 @@ class AccountInvitationApiIntegrationTests extends RedisListenerIsolatedIntegrat
     }
 
     @Test
-    void administratorListsAndRevokesOnlyEffectivePendingInvitations() throws Exception {
+    void administratorListsCompleteHistoryAndRevokesPendingInvitations() throws Exception {
         var first = createInvitation("MANAGER");
-        var second = createInvitation("OPERATOR");
+        var second = createInvitation("OPERATOR", "another.person@example.com");
 
         mockMvc.perform(withAuthentication(apiGet("/account-invitations/v1")))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.length()").value(2))
-            .andExpect(jsonPath("$[0].invitationLink").doesNotExist());
+            .andExpect(jsonPath("$.items.length()").value(2))
+            .andExpect(jsonPath("$.items[0].invitationLink").doesNotExist());
 
         mockMvc.perform(withAuthenticationAndCsrf(apiDelete(
                 "/account-invitations/v1/{invitationId}",
@@ -246,8 +247,9 @@ class AccountInvitationApiIntegrationTests extends RedisListenerIsolatedIntegrat
 
         mockMvc.perform(withAuthentication(apiGet("/account-invitations/v1")))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.length()").value(1))
-            .andExpect(jsonPath("$[0].id").value(second.get("id").asText()));
+            .andExpect(jsonPath("$.items.length()").value(2))
+            .andExpect(jsonPath("$.items[0].id").value(second.get("id").asText()))
+            .andExpect(jsonPath("$.items[1].state").value("REVOKED"));
         assertThat(jdbcTemplate.queryForObject(
             "SELECT revocation_reason FROM account_invitations WHERE id = ?",
             String.class,
@@ -291,7 +293,7 @@ class AccountInvitationApiIntegrationTests extends RedisListenerIsolatedIntegrat
     }
 
     @Test
-    void correctableConflictAndSignedInAttemptDoNotConsumeInvitation() throws Exception {
+    void incorrectRecipientAndSignedInAttemptDoNotConsumeInvitation() throws Exception {
         var created = createInvitation("OPERATOR");
         var invitationId = UUID.fromString(created.get("id").asText());
         var token = tokenFrom(created);
@@ -304,7 +306,7 @@ class AccountInvitationApiIntegrationTests extends RedisListenerIsolatedIntegrat
                     "invitation-admin-" + administrator.accountId(),
                     "invitation-admin-" + administrator.accountId() + "@example.com"
                 )), csrf))
-            .andExpect(status().isConflict());
+            .andExpect(status().isBadRequest());
         assertThat(invitationState(invitationId)).isEqualTo("PENDING");
 
         mockMvc.perform(withAuthenticationAndCsrf(
@@ -343,7 +345,7 @@ class AccountInvitationApiIntegrationTests extends RedisListenerIsolatedIntegrat
 
         mockMvc.perform(withAuthentication(apiGet("/account-invitations/v1")))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.length()").value(0));
+            .andExpect(jsonPath("$.items[0].state").value("EXPIRED"));
 
         var csrf = csrfCookie();
         var preview = apiPost("/account-invitation-previews/v1")
@@ -436,20 +438,31 @@ class AccountInvitationApiIntegrationTests extends RedisListenerIsolatedIntegrat
         );
     }
 
-    private tools.jackson.databind.JsonNode createInvitation(String role) throws Exception {
+    private JsonNode createInvitation(String role) throws Exception {
+        return createInvitation(role, "invited.person@example.com");
+    }
+
+    private JsonNode createInvitation(String role, String email) throws Exception {
         var result = mockMvc.perform(withAuthenticationAndCsrf(apiPost("/account-invitations/v1")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
-                    {"locationId":"%s","role":"%s","email":"invited.person@example.com"}
-                    """.formatted(locationId, role))))
+                    {"locationId":"%s","role":"%s","email":"%s"}
+                    """.formatted(locationId, role, email))))
             .andExpect(status().isCreated())
             .andReturn();
         return objectMapper.readTree(result.getResponse().getContentAsByteArray());
     }
 
-    private static String tokenFrom(tools.jackson.databind.JsonNode created) {
-        var link = created.get("invitationLink").asText();
-        return link.substring(link.indexOf("#invitation=") + 12);
+    private String tokenFrom(JsonNode created) {
+        var row = jdbcTemplate.queryForMap("""
+            SELECT d.id,d.encrypted_payload,d.payload_nonce FROM email_deliveries d
+            JOIN account_invitations i ON i.delivery_id=d.id WHERE i.id=?
+            """, UUID.fromString(created.get("id").asText()));
+        var body = objectMapper.readTree(emailCipher.decrypt((UUID) row.get("id"),
+            (byte[]) row.get("encrypted_payload"), (byte[]) row.get("payload_nonce"))).get("text").asText();
+        var marker = "#invitation=";
+        var offset = body.indexOf(marker) + marker.length();
+        return body.substring(offset, body.indexOf('\n', offset));
     }
 
     private MockHttpServletRequestBuilder withAuthenticationAndCsrf(

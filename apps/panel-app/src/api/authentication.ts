@@ -16,7 +16,10 @@ export const currentAccountSchema = z.object({
 export const pendingVerificationSchema = z.object({
   verificationRequired: z.literal(true),
   email: z.string(),
-  resendAvailableAt: z.iso.datetime({ offset: true }),
+  // z.iso is not yet initialised when the prerender bundle evaluates this module.
+  resendAvailableAt: z
+    .string()
+    .refine((value) => !Number.isNaN(Date.parse(value))),
 });
 export type PendingVerification = z.infer<typeof pendingVerificationSchema>;
 export const authenticationResultSchema = z.union([

@@ -46,6 +46,12 @@ public class AccountInvitation {
     @Column(name = "token_hash", nullable = false, unique = true, length = 64)
     private String tokenHash;
 
+    @Column(name = "delivery_id", nullable = false)
+    private UUID deliveryId;
+
+    @Column(name = "issued_by_email", nullable = false, length = 200)
+    private String issuedByEmail;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 32)
     private AccountInvitationState state;
@@ -94,6 +100,24 @@ public class AccountInvitation {
         invitation.createdAt = now;
         invitation.updatedAt = now;
         return invitation;
+    }
+
+    public void attachDelivery(@NonNull UUID deliveryId, @NonNull String issuedByEmail) {
+        this.deliveryId = deliveryId;
+        this.issuedByEmail = issuedByEmail;
+    }
+
+    public void replace(@NonNull Instant now) {
+        if (!isPendingAt(now)) throw new IllegalStateException("Only a pending invitation can be replaced");
+        state = AccountInvitationState.REPLACED;
+        updatedAt = now;
+    }
+
+    public void expire(@NonNull Instant now) {
+        if (state == AccountInvitationState.PENDING && isExpiredAt(now)) {
+            state = AccountInvitationState.EXPIRED;
+            updatedAt = now;
+        }
     }
 
     public boolean isExpiredAt(@NonNull Instant now) {

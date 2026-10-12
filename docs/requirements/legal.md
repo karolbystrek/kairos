@@ -103,6 +103,9 @@ them. The trade-off is that customers who close the app never see it.
   [retention purge](resilience.md#retention-purge) deletes the account with its
   ZITADEL identity and invitations, or the location with its orders and push
   data. Until then an archived account's email stays reserved.
+- Abandoned registrations, with their unverified ZITADEL identity, are
+  deleted 30 days after the last code; finished email delivery records are
+  deleted 30 days after completion once nothing references them.
 - Security events: invitations are deleted 30 days after they end, staff
   sessions expire after 30 idle days, and production logs rotate at three
   10 MB files per service.

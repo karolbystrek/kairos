@@ -283,6 +283,8 @@ CREATE TABLE account_invitations
     tenant_id            UUID                     NOT NULL,
     location_id          UUID                     NOT NULL,
     issued_by_account_id UUID                     NOT NULL,
+    issued_by_email      VARCHAR(200)             NOT NULL,
+    delivery_id          UUID                     NOT NULL,
     assignment_role      VARCHAR(32)              NOT NULL,
     token_hash           VARCHAR(64)              NOT NULL UNIQUE,
     state                VARCHAR(32)              NOT NULL,
@@ -307,7 +309,7 @@ CREATE TABLE account_invitations
     CONSTRAINT account_invitations_token_hash_check
         CHECK (token_hash ~ '^[0-9a-f]{64}$'),
     CONSTRAINT account_invitations_state_check
-        CHECK (state IN ('PENDING', 'REDEEMED', 'REVOKED')),
+        CHECK (state IN ('PENDING', 'REDEEMED', 'REVOKED', 'REPLACED', 'EXPIRED')),
     CONSTRAINT account_invitations_expiry_check
         CHECK (expires_at = created_at + INTERVAL '7' DAY),
     CONSTRAINT account_invitations_updated_at_check
@@ -317,7 +319,7 @@ CREATE TABLE account_invitations
         AND (redeemed_at IS NULL OR (redeemed_at >= created_at AND updated_at = redeemed_at))
         ),
     CONSTRAINT account_invitations_lifecycle_check CHECK (
-        (state = 'PENDING'
+        (state IN ('PENDING','REPLACED','EXPIRED')
             AND revocation_reason IS NULL
             AND revoked_at IS NULL
             AND redeemed_account_id IS NULL
@@ -342,6 +344,8 @@ CREATE TABLE account_invitations
             'LOCATION_ARCHIVED'
             ))
 );
+
+CREATE UNIQUE INDEX account_invitations_one_pending_recipient_idx ON account_invitations(tenant_id,email) WHERE state='PENDING';
 
 CREATE INDEX account_invitations_tenant_pending_idx
     ON account_invitations (tenant_id, state, expires_at, created_at DESC);
@@ -1193,7 +1197,7 @@ CREATE FUNCTION public.next_finished_invitation(cutoff timestamptz) RETURNS uuid
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE selected uuid;
 BEGIN
-    SELECT i.id INTO selected FROM public.account_invitations i WHERE (i.state='REVOKED' AND i.revoked_at<cutoff) OR (i.state='PENDING' AND i.expires_at<cutoff) ORDER BY i.updated_at,i.id LIMIT 1 FOR UPDATE SKIP LOCKED;
+    SELECT i.id INTO selected FROM public.account_invitations i WHERE (i.state IN ('REVOKED','REPLACED') AND i.updated_at<cutoff) OR (i.state IN ('PENDING','EXPIRED') AND i.expires_at<cutoff) ORDER BY i.updated_at,i.id LIMIT 1 FOR UPDATE SKIP LOCKED;
     IF selected IS NOT NULL THEN PERFORM set_config('kairos.selected','INVITATION_PURGE:' || selected::text,true); END IF;
     RETURN selected;
 END $$;
@@ -1212,7 +1216,7 @@ BEGIN
         PERFORM 1 FROM public.locations l WHERE l.id=resource AND l.status='ARCHIVED' FOR UPDATE;
     ELSE
         PERFORM 1 FROM public.account_invitations i WHERE i.id=resource
-            AND (i.state='REVOKED' OR (i.state='PENDING' AND i.expires_at<CURRENT_TIMESTAMP)) FOR UPDATE;
+            AND (i.state IN ('REVOKED','REPLACED','EXPIRED') OR (i.state='PENDING' AND i.expires_at<CURRENT_TIMESTAMP)) FOR UPDATE;
     END IF;
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Only deleted data can be purged' USING ERRCODE='42501';
@@ -1273,7 +1277,7 @@ CREATE TRIGGER stable_ownership BEFORE UPDATE ON menu_items FOR EACH ROW EXECUTE
 CREATE TRIGGER stable_ownership BEFORE UPDATE ON location_menus FOR EACH ROW EXECUTE FUNCTION kairos_security.stable_ownership('location_id','tenant_id');
 CREATE TRIGGER stable_ownership BEFORE UPDATE ON accounts FOR EACH ROW EXECUTE FUNCTION kairos_security.stable_ownership('id','tenant_id','provider_subject','email','tenant_role');
 CREATE TRIGGER stable_ownership BEFORE UPDATE ON location_assignments FOR EACH ROW EXECUTE FUNCTION kairos_security.stable_ownership('account_id','location_id','tenant_id','role');
-CREATE TRIGGER stable_ownership BEFORE UPDATE ON account_invitations FOR EACH ROW EXECUTE FUNCTION kairos_security.stable_ownership('id','tenant_id','location_id','issued_by_account_id','assignment_role','token_hash');
+CREATE TRIGGER stable_ownership BEFORE UPDATE ON account_invitations FOR EACH ROW EXECUTE FUNCTION kairos_security.stable_ownership('id','tenant_id','location_id','issued_by_account_id','issued_by_email','delivery_id','assignment_role','token_hash');
 CREATE TRIGGER stable_ownership BEFORE UPDATE ON external_integrations FOR EACH ROW EXECUTE FUNCTION kairos_security.stable_ownership('id','tenant_id');
 CREATE TRIGGER stable_ownership BEFORE UPDATE ON api_keys FOR EACH ROW EXECUTE FUNCTION kairos_security.stable_ownership('id','tenant_id','integration_id','secret_hash');
 CREATE TRIGGER stable_ownership BEFORE UPDATE ON api_key_location_access FOR EACH ROW EXECUTE FUNCTION kairos_security.stable_ownership('api_key_id','location_id','tenant_id');
@@ -1416,6 +1420,7 @@ CREATE TABLE email_deliveries (
         OR (owner_scope='verification' AND tenant_id IS NULL AND location_id IS NULL)),
     CONSTRAINT email_location_tenant_fk FOREIGN KEY (location_id,tenant_id) REFERENCES locations(id,tenant_id) ON DELETE CASCADE
 );
+ALTER TABLE account_invitations ADD CONSTRAINT invitation_delivery_fk FOREIGN KEY (delivery_id) REFERENCES email_deliveries(id);
 CREATE INDEX email_deliveries_available_idx ON email_deliveries(next_attempt_at,created_at,id) WHERE state='QUEUED';
 CREATE FUNCTION kairos_security.email_access(owner_scope text,owner_identity text,tenant uuid,location uuid) RETURNS boolean
 LANGUAGE sql STABLE SET search_path=pg_catalog AS $$
@@ -1512,3 +1517,73 @@ CREATE POLICY scoped_update ON pending_registrations FOR UPDATE USING
 CREATE POLICY scoped_delete ON pending_registrations FOR DELETE USING
     (kairos_security.setting('scope')='verification' AND subject=kairos_security.setting('identity'));
 GRANT SELECT,INSERT,UPDATE,DELETE ON pending_registrations TO "${runtimeUser}";
+
+CREATE FUNCTION public.lock_pending_invitation(tenant uuid,recipient text)
+RETURNS TABLE(invitation_id uuid,administrator_email text)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
+BEGIN
+    IF NOT (kairos_security.staff_tenant(tenant,true) OR (kairos_security.staff_tenant(tenant) AND EXISTS(
+        SELECT 1 FROM public.location_assignments x JOIN public.locations l ON l.id=x.location_id
+        WHERE x.account_id=kairos_security.identity() AND x.role='MANAGER' AND l.status='ENABLED'))) THEN
+        RAISE EXCEPTION 'Invitation management is not granted' USING ERRCODE='42501';
+    END IF;
+    PERFORM pg_advisory_xact_lock(hashtextextended(tenant::text || ':' || recipient,0));
+    RETURN QUERY SELECT (SELECT i.id FROM public.account_invitations i WHERE i.tenant_id=tenant AND i.email=recipient
+        AND i.state='PENDING' FOR UPDATE), (SELECT a.email::text FROM public.accounts a
+        WHERE a.tenant_id=tenant AND a.tenant_role='ADMIN' AND a.status='ENABLED' ORDER BY a.created_at LIMIT 1);
+END $$;
+CREATE FUNCTION public.cancel_redeemed_invitation_email(invitation uuid) RETURNS boolean
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
+BEGIN
+    UPDATE public.email_deliveries d SET state='FAILED',encrypted_payload=NULL,payload_nonce=NULL,
+        completed_at=current_timestamp,claim_token=NULL,claim_until=NULL
+        FROM public.account_invitations i WHERE i.id=invitation AND i.delivery_id=d.id AND i.state='REDEEMED'
+            AND kairos_security.setting('scope')='invitation' AND i.token_hash=kairos_security.setting('identity')
+            AND kairos_security.includes('references',i.redeemed_account_id) AND d.state='QUEUED';
+    RETURN FOUND;
+END $$;
+REVOKE EXECUTE ON FUNCTION public.lock_pending_invitation(uuid,text),public.cancel_redeemed_invitation_email(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.lock_pending_invitation(uuid,text),public.cancel_redeemed_invitation_email(uuid) TO "${runtimeUser}";
+
+-- Abandoned registrations keep an unverified provider identity; the API deletes it unless an account already uses it.
+CREATE FUNCTION public.next_abandoned_registration(cutoff timestamptz,skipped text) RETURNS TABLE(registration_subject text,provisioned boolean)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE selected text; address text;
+BEGIN
+    SELECT r.subject,r.email INTO selected,address FROM public.pending_registrations r WHERE r.resend_available_at<cutoff
+        AND NOT r.subject=ANY(string_to_array(skipped,',')) ORDER BY r.resend_available_at,r.subject LIMIT 1 FOR UPDATE SKIP LOCKED;
+    -- A registration step in flight holds the email lock; the row waits for the next cycle.
+    IF selected IS NULL OR NOT pg_try_advisory_xact_lock(hashtextextended(address,0)) THEN RETURN; END IF;
+    PERFORM set_config('kairos.selected','REGISTRATION_PURGE:' || selected,true);
+    RETURN QUERY SELECT selected,EXISTS(SELECT 1 FROM public.accounts a WHERE a.provider_subject=selected);
+END $$;
+CREATE FUNCTION public.purge_registration(registration text) RETURNS boolean
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE delivery uuid;
+BEGIN
+    IF kairos_security.setting('selected') IS DISTINCT FROM 'REGISTRATION_PURGE:' || registration THEN
+        RAISE EXCEPTION 'Retention purge capability required' USING ERRCODE='42501';
+    END IF;
+    -- Settings are only defence in depth; codes expire long before a day passes.
+    DELETE FROM public.pending_registrations r WHERE r.subject=registration
+        AND r.resend_available_at<current_timestamp-interval '1 day' RETURNING r.delivery_id INTO delivery;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Only deleted data can be purged' USING ERRCODE='42501';
+    END IF;
+    DELETE FROM public.email_deliveries d WHERE d.id=delivery;
+    RETURN true;
+END $$;
+-- Finished deliveries carry no payload; history keeps those still referenced by an invitation.
+CREATE FUNCTION public.purge_finished_email_deliveries(cutoff timestamptz,batch integer) RETURNS integer
+LANGUAGE sql SECURITY DEFINER SET search_path=pg_catalog AS $$
+    WITH purged AS (DELETE FROM public.email_deliveries d WHERE d.id IN (
+        SELECT x.id FROM public.email_deliveries x WHERE x.state IN ('SENT','FAILED') AND x.completed_at<cutoff
+            AND NOT EXISTS(SELECT 1 FROM public.account_invitations i WHERE i.delivery_id=x.id)
+            AND NOT EXISTS(SELECT 1 FROM public.pending_registrations r WHERE r.delivery_id=x.id)
+        ORDER BY x.completed_at,x.id LIMIT batch FOR UPDATE SKIP LOCKED) RETURNING 1)
+    SELECT count(*)::integer FROM purged
+$$;
+REVOKE EXECUTE ON FUNCTION public.next_abandoned_registration(timestamptz,text),public.purge_registration(text),
+    public.purge_finished_email_deliveries(timestamptz,integer) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.next_abandoned_registration(timestamptz,text),public.purge_registration(text),
+    public.purge_finished_email_deliveries(timestamptz,integer) TO "${runtimeUser}";

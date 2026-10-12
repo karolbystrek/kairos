@@ -137,10 +137,13 @@
   account and location assignment without further approval. It never creates or
   reserves an incomplete account before redemption.
 * An invitation expires seven days after issuance, stores only a SHA-256 hash
-  of its once-revealed 32-byte random bearer token, may be revoked by an
+  of its emailed 32-byte random bearer token, may be revoked by an
   authorized account manager, and remains unconsumed after invalid or conflicting
   registration input. Multiple invitations for one location and role are
-  allowed, but concurrent claims of one invitation create exactly one account.
+  allowed for different emails, but active invitations are unique per tenant/email.
+  Confirmed creation/resend replaces the old entry and token atomically, requires
+  authority over both targets, and starts a fresh seven-day lifetime. The panel
+  and API expose no shareable token or link. Concurrent claims of one invitation create exactly one account.
   Expiration is derived during list, preview, and redemption from `expiresAt`;
   no worker or write-on-read materializes an `EXPIRED` lifecycle state.
 * Each pending invitation fixes a required valid normalized recipient email.
@@ -148,9 +151,11 @@
   read-only beside clearly spaced location/role context. Mismatched redemption
   email is rejected before provider provisioning and rechecked atomically.
   Details identify the fixed role and location, creator, creation time, and expiry. Its icon-and-text Revoke action
-  requires inline hold confirmation, and terminal invitations leave the collection while their
-  secret-free metadata is retained for 30 days after they end without a
-  history UI.
+  requires inline hold confirmation. Paginated, sorted history retains terminal
+  metadata, lifecycle state and queued/sent/failed email delivery state. Managers
+  see only operator invitations for their location; administrators see the
+  tenant. Active pending invitations with failed delivery can be resent after
+  confirmation; expired invitations use ordinary creation.
 * Redemption requires the issuer to remain enabled and authorized. A signed-in
   browser and the API both require explicit sign-out before redemption, while
   verified completion creates the browser session and opens the assigned
@@ -165,8 +170,8 @@
   states receive specific identity-free guidance while unknown tokens remain
   indistinguishable.
 * Invitation redemption creates only a new account and cannot add access to an
-  existing account. Required globally unique email remains unverified and is
-  not trusted for recovery or external-identity linking.
+  existing account. The fixed globally unique invited email is marked verified without a code
+  step; redemption cannot change it or link an existing identity.
 * A location manager can access and manage orders only in its assigned location.
 * A location operator can list, create, read, and update orders only in its assigned location.
 * One person-oriented operator account can be used on that staff member's

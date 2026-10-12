@@ -51,7 +51,15 @@
   with its orders, order history, outbox events, webhook and push deliveries,
   push enrollments, invitations and remaining integration selections.
 * Anonymous order and usage aggregates and self-contained business inputs survive location purge; permanent tenant deletion erases them. Usage ingestion and business processing coordinate through tenant locks.
-* Finished invitations are deleted 30 days after revocation or expiry.
+* Finished invitations are deleted 30 days after revocation, replacement or expiry.
+* A registration whose last code was sent more than 30 days ago is removed with
+  its unverified ZITADEL identity, unless an account already uses that identity.
+  A provider failure defers it to a later cycle.
+* Sent and failed email deliveries are deleted 30 days after completion once no
+  invitation or pending registration references them.
+* Invitation creation/replacement and its email outbox acceptance commit
+  atomically. Replacement cancels queued old delivery, invalidates the old token
+  and reserves the tenant/email for only one active invitation.
 * Each item is discovered with `FOR UPDATE SKIP LOCKED` and erased in its own
   transaction by a guarded `SECURITY DEFINER` function, so row policies stay
   closed to deletion.

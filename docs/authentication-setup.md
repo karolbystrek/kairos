@@ -51,16 +51,17 @@ Confirming ownership opens the existing first-location onboarding flow. Codes
 use the provider expiry, permit five wrong attempts and can be resent after
 60 seconds. Unverified sign-in without an Account resumes this step; a new
 registration can replace an abandoned unverified identity without an Account.
-Member registration consumes a fixed invitation. Password recovery, social
+Member registration consumes an emailed invitation bound to its recipient and
+marks that email verified without a separate code step. Password recovery, social
 login and MFA remain deferred.
 
-Kairos sends English mail through Resend from
+Kairos sends Polish mail through Resend from
 `Kairos <no-reply@kairos.karolbystrek.pl>` with no Reply-To or open/click tracking.
 ZITADEL needs no SMTP configuration. Set `RESEND_API_KEY` in protected production
 configuration and preserve the bootstrap-generated `email-encryption.bin`.
 Production refuses startup without the API key; local/test mode logs delivery
 metadata without codes or message bodies and sends no email. See
-[configuration](deployment/CONFIGURATION.md) and
+[transactional email setup](deployment/CONFIGURATION.md#transactional-email-resend) and
 [key maintenance](deployment/MAINTENANCE.md).
 Signed-in users can change a password using the current password; this signs out
 all sessions and requires a new login.
@@ -119,3 +120,9 @@ exercise the running Compose stack.
 References: [Session API](https://zitadel.com/docs/guides/integrate/login-ui/username-password),
 [session validation](https://zitadel.com/docs/guides/integrate/login-ui/session-validation),
 and [Spring Session JDBC](https://docs.spring.io/spring-session/reference/configuration/jdbc.html).
+
+The provider bootstrap checks the pinned ZITADEL email-code generator and sets
+six digits without letters or symbols, preserving its configured expiry. It
+checks this policy even when the service PAT already exists; new instances also
+receive the numeric default through Compose. Updating an existing live provider
+requires separately approved deployment scope.

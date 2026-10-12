@@ -8,6 +8,9 @@ import pl.karolbystrek.kairos.api.account.domain.invitation.AccountInvitation;
 import pl.karolbystrek.kairos.api.account.domain.invitation.AccountInvitationState;
 import pl.karolbystrek.kairos.api.account.domain.assignment.AssignmentRole;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -20,19 +23,10 @@ public interface AccountInvitationRepository extends JpaRepository<AccountInvita
     @Query("SELECT i.locationId FROM AccountInvitation i WHERE i.tokenHash = :tokenHash")
     Optional<UUID> findLocationIdByTokenHash(String tokenHash);
 
-    List<AccountInvitation> findAllByTenantIdAndStateAndExpiresAtAfterOrderByCreatedAtDesc(
-        UUID tenantId,
-        AccountInvitationState state,
-        Instant now
-    );
+    Page<AccountInvitation> findAllByTenantId(UUID tenantId, Pageable page);
 
-    List<AccountInvitation> findAllByTenantIdAndLocationIdAndAssignmentRoleAndStateAndExpiresAtAfterOrderByCreatedAtDesc(
-        UUID tenantId,
-        UUID locationId,
-        AssignmentRole assignmentRole,
-        AccountInvitationState state,
-        Instant now
-    );
+    Page<AccountInvitation> findAllByTenantIdAndLocationIdAndAssignmentRole(
+        UUID tenantId, UUID locationId, AssignmentRole role, Pageable page);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<AccountInvitation> findForUpdateByTokenHash(String tokenHash);

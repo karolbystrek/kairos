@@ -27,14 +27,16 @@ The database schema must include tables covering the following concepts. Names a
   including stable identity, normalized recipient email, direct tenant ownership,
   fixed target location and
   manager or operator role, issuing account, SHA-256 hash of a single-use
-  32-byte random Base64url bearer credential, `PENDING`, `REDEEMED`, or
-  `REVOKED` lifecycle state and internal revocation reason, seven-day absolute
+  32-byte random Base64url bearer credential, `PENDING`, `REDEEMED`,
+  `REVOKED`, or `REPLACED` lifecycle state and internal revocation reason, seven-day absolute
   expiry, and timestamps. Expiration is derived from the deadline rather than
-  persisted as a fourth lifecycle state. An invitation fixes its recipient email
+  persisted as an additional lifecycle state. An invitation fixes its recipient email
   but contains no password and is not itself an account or a reservation of a
   globally unique Account email. Multiple pending
-  invitations may share a target location and role. Revoked invitations are
-  deleted 30 days after revocation and pending ones 30 days after expiry; a
+  invitations may share a target location and role; active entries are unique per
+  tenant and normalized recipient email. Replacement retains the previous row
+  as `REPLACED` and creates a fresh token/lifetime. Revoked/replaced invitations are
+  deleted 30 days after revocation/replacement and pending ones 30 days after expiry; a
   redeemed invitation is deleted with its issuing or redeeming account, or with
   its location (see [retention purge](resilience.md#retention-purge)).
 * **Location assignments:** relationship between a non-admin tenant Account and its
@@ -64,7 +66,8 @@ The database schema must include tables covering the following concepts. Names a
   provider idempotency key, attempt count and next-attempt time. Pending message
   contents (including verification codes and invitation tokens) are encrypted
   with a dedicated externally mounted 32-byte key. Terminal states erase the
-  encrypted message contents.
+  encrypted message contents; unreferenced terminal rows are purged after 30
+  days (see [retention purge](resilience.md#retention-purge)).
 * **Order outbox events:** immutable event identity, order/location and tracking association, exact serialized webhook payload, resulting order state, occurrence time, and independent webhook and customer-push fan-out state.
 * **Webhook deliveries:** recipient-specific captured destination, payload, signing versions, claim state, one attempt outcome, bounded response details, and durable success or dead-letter state.
 * **Customer push subscriptions:** a browser-context capability with hashed

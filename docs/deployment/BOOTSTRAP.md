@@ -213,7 +213,10 @@ Fill the six blank passwords (`POSTGRES_PASSWORD`, `KAIROS_DB_OWNER_PASSWORD`,
 `ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD`) with different
 strong values. Set `VAPID_SUBJECT` to your `mailto:` contact and set a deliberate
 `ZITADEL_FIRSTINSTANCE_ORG_MACHINE_PAT_EXPIRATIONDATE` (UTC ISO 8601), with renewal
-scheduled before expiry. Do not leave these fields blank at deployment.
+scheduled before expiry. Set `RESEND_API_KEY` to the domain-restricted sending key
+and keep `EMAIL_DELIVERY_MODE=RESEND`; see
+[transactional email](CONFIGURATION.md#transactional-email-resend). Do not leave
+these fields blank at deployment.
 If `production.env` already exists, edit those settings and reconcile public
 settings against the example; do not overwrite existing credentials with a new
 copy. Hostnames and browser origins must match Cloudflare and the GitHub build

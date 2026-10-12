@@ -63,7 +63,8 @@ safe corrective errors. Signing in with an unverified identity without an
 Account resumes verification. Registering an email held by such an abandoned
 identity replaces it; an existing Account is never replaced.
 
-Managers/operators register through member invitations. Forgotten-password
+Managers/operators register through emailed, recipient-bound member invitations.
+Redemption verifies the fixed email without a separate code step. Forgotten-password
 recovery remains deferred. Initial provider
 policy is a minimum of 12 characters without mandatory character classes or
 scheduled password expiry. Registration validates that configured minimum,

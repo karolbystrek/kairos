@@ -27,13 +27,13 @@ import useSWRMutation from "swr/mutation";
 import { HoldToConfirmButton } from "@/components/hold-to-confirm-button";
 import { PanelPopup } from "@/components/panel-popup";
 import { FormSelect, FormTextField } from "@/components/form-controls";
-import { OneTimeSecret } from "@/components/integrations/one-time-secret";
 import { PanelCard } from "@/components/panel-card";
 import { PanelDetailHeader } from "@/components/panel-detail-header";
 import {
   createAccountInvitation,
   listAccountInvitations,
   revokeAccountInvitation,
+  resendAccountInvitation,
   type AccountInvitation,
   type CreatedAccountInvitation,
   type CreateAccountInvitationInput,
@@ -64,6 +64,13 @@ function createInvitationMutation(
   { arg }: { arg: CreateAccountInvitationInput },
 ): Promise<CreatedAccountInvitation> {
   return createAccountInvitation(arg);
+}
+
+function resendInvitationMutation(
+  _key: ReturnType<typeof staffInvitationsKey>,
+  { arg }: { arg: string },
+): Promise<AccountInvitation> {
+  return resendAccountInvitation(arg);
 }
 
 function revokeInvitationMutation(
@@ -131,6 +138,19 @@ function LocationSelect({
   );
 }
 
+const invitationStates = {
+  PENDING: "Oczekujące",
+  REDEEMED: "Wykorzystane",
+  REVOKED: "Unieważnione",
+  REPLACED: "Zastąpione",
+  EXPIRED: "Wygasłe",
+};
+const deliveryStates = {
+  QUEUED: "E-mail w kolejce",
+  SENT: "E-mail wysłany",
+  FAILED: "Wysyłka nieudana",
+};
+
 function formatDateTime(value: string): string {
   return new Intl.DateTimeFormat("pl-PL", {
     dateStyle: "medium",
@@ -149,6 +169,10 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
     useState<CreatedAccountInvitation>();
   const [selectedLocationId, setSelectedLocationId] = useState<string>();
   const [role, setRole] = useState<AssignmentRole>("OPERATOR");
+  const [invitationPage, setInvitationPage] = useState(0);
+  const [invitationSort, setInvitationSort] = useState<"asc" | "desc">("desc");
+  const [replacementInput, setReplacementInput] =
+    useState<CreateAccountInvitationInput>();
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -178,21 +202,25 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
     shouldRetryOnError,
   });
   const {
-    data: invitations = [],
+    data: invitationHistory,
     error: invitationsError,
     isLoading: areInvitationsLoading,
     mutate: mutateInvitations,
-  } = useSWR(staffInvitationsKey(account.accountId), listAccountInvitations, {
-    errorRetryCount: 3,
-    shouldRetryOnError,
-  });
+  } = useSWR(
+    staffInvitationsKey(account.accountId, invitationPage, invitationSort),
+    () => listAccountInvitations(invitationPage, invitationSort),
+    {
+      errorRetryCount: 3,
+      shouldRetryOnError,
+    },
+  );
   const {
     error: creationError,
     isMutating: isCreating,
     reset: resetCreation,
     trigger: triggerCreation,
   } = useSWRMutation(
-    staffInvitationsKey(account.accountId),
+    staffInvitationsKey(account.accountId, invitationPage, invitationSort),
     createInvitationMutation,
     { throwOnError: false },
   );
@@ -202,8 +230,18 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
     reset: resetRevocation,
     trigger: triggerRevocation,
   } = useSWRMutation(
-    staffInvitationsKey(account.accountId),
+    staffInvitationsKey(account.accountId, invitationPage, invitationSort),
     revokeInvitationMutation,
+    { throwOnError: false },
+  );
+  const {
+    error: resendError,
+    isMutating: isResending,
+    reset: resetResend,
+    trigger: triggerResend,
+  } = useSWRMutation(
+    staffInvitationsKey(account.accountId, invitationPage, invitationSort),
+    resendInvitationMutation,
     { throwOnError: false },
   );
   const {
@@ -236,10 +274,8 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
   const locationNames = new Map(
     locations.map((location) => [location.id, location.name]),
   );
-  const pendingInvitations = invitations.filter(
-    (invitation) => new Date(invitation.expiresAt).getTime() > now,
-  );
-  const selectedInvitation = pendingInvitations.find(
+  const invitations = invitationHistory?.items ?? [];
+  const selectedInvitation = invitations.find(
     (invitation) => invitation.id === selectedInvitationId,
   );
   const collectionError = locationsError ?? accountsError;
@@ -256,38 +292,63 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
     }
     setEmailError(undefined);
     resetCreation();
-    const created = await triggerCreation({
+    await issueInvitation({
       email: parsedEmail.data,
       locationId,
       role: selectedRole,
+      replaceExisting: false,
     });
+  }
 
-    if (!created) return;
-    setCreatedInvitation(created);
-    setIsCreateOpen(true);
-    await mutateInvitations((current) => [created, ...(current ?? [])], {
-      revalidate: false,
-    });
-    void mutateInvitations(undefined, { throwOnError: false });
+  async function issueInvitation(
+    input: CreateAccountInvitationInput,
+  ): Promise<boolean> {
+    if (isCreating) return false;
+    resetCreation();
+    try {
+      const created = await triggerCreation(input, { throwOnError: true });
+
+      if (!created) return false;
+      setReplacementInput(undefined);
+      setCreatedInvitation(created);
+      setIsCreateOpen(true);
+      await mutateInvitations(undefined, { throwOnError: false });
+
+      return true;
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 409)
+        setReplacementInput(input);
+
+      return false;
+    }
   }
 
   async function revokeInvitation(
     invitationToRevoke: AccountInvitation,
   ): Promise<void> {
-    if (isRevoking) return;
+    if (isRevoking || isResending) return;
     resetRevocation();
     const revoked = await triggerRevocation(invitationToRevoke.id);
 
     if (!revoked) return;
-    await mutateInvitations(
-      (current) =>
-        (current ?? []).filter(
-          (invitation) => invitation.id !== invitationToRevoke.id,
-        ),
-      { revalidate: false },
-    );
     setSelectedInvitationId(undefined);
-    void mutateInvitations(undefined, { throwOnError: false });
+    await mutateInvitations(undefined, { throwOnError: false });
+  }
+
+  async function resendInvitation(
+    invitation: AccountInvitation,
+  ): Promise<boolean> {
+    if (isResending || isRevoking) return false;
+    resetResend();
+    const replacement = await triggerResend(invitation.id);
+
+    if (!replacement) return false;
+    setSelectedInvitationId(undefined);
+    setCreatedInvitation(replacement);
+    setIsCreateOpen(true);
+    await mutateInvitations(undefined, { throwOnError: false });
+
+    return true;
   }
 
   async function changeStatus(
@@ -346,6 +407,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
       return;
     }
     resetCreation();
+    setReplacementInput(undefined);
     setSelectedLocationId(locationId ?? enabledLocations[0]?.id);
     setRole("OPERATOR");
     setEmail("");
@@ -412,6 +474,61 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
           </Alert.Content>
         </Alert>
       )}
+      <div className="flex flex-wrap items-center gap-3">
+        <FormSelect
+          isDisabled={isCreating || isRevoking || isResending}
+          label="Kolejność zaproszeń"
+          selectedKey={invitationSort}
+          onSelectionChange={(key) => {
+            setInvitationSort(key === "asc" ? "asc" : "desc");
+            setInvitationPage(0);
+            setSelectedInvitationId(undefined);
+          }}
+        >
+          <ListBox>
+            <ListBox.Item id="desc">Od najnowszych</ListBox.Item>
+            <ListBox.Item id="asc">Od najstarszych</ListBox.Item>
+          </ListBox>
+        </FormSelect>
+        <Button
+          isDisabled={
+            invitationPage === 0 ||
+            areInvitationsLoading ||
+            isCreating ||
+            isRevoking ||
+            isResending
+          }
+          variant="secondary"
+          onPress={() => {
+            setInvitationPage(invitationPage - 1);
+            setSelectedInvitationId(undefined);
+          }}
+        >
+          Poprzednia strona zaproszeń
+        </Button>
+        <span className="text-sm text-muted">
+          Strona {invitationPage + 1} · {invitationHistory?.totalElements ?? 0}{" "}
+          zaproszeń
+        </span>
+        <Button
+          isDisabled={
+            isCreating ||
+            isRevoking ||
+            isResending ||
+            !invitationHistory ||
+            (invitationPage + 1) * invitationHistory.size >=
+              invitationHistory.totalElements ||
+            areInvitationsLoading
+          }
+          variant="secondary"
+          onPress={() => {
+            setInvitationPage(invitationPage + 1);
+            setSelectedInvitationId(undefined);
+          }}
+        >
+          Następna strona zaproszeń
+        </Button>
+      </div>
       {areInvitationsLoading && (
         <div className="flex items-center gap-2 text-sm text-muted">
           <Spinner aria-label="Wczytywanie zaproszeń" size="sm" />
@@ -427,12 +544,12 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
 
       {areAccountsLoading &&
       accounts.length === 0 &&
-      pendingInvitations.length === 0 ? (
+      invitations.length === 0 ? (
         <div className="flex min-h-80 items-center justify-center">
           <Spinner aria-label="Wczytywanie kont" />
         </div>
       ) : accounts.length === 0 &&
-        pendingInvitations.length === 0 &&
+        invitations.length === 0 &&
         !areInvitationsLoading &&
         !invitationsError ? (
         <div className="py-12">
@@ -474,21 +591,27 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
                 }}
               />
             ))}
-            {pendingInvitations.map((invitation) => (
+            {invitations.map((invitation) => (
               <PanelCard
                 key={invitation.id}
-                accessibilityLabel={`Pokaż zaproszenie dla ${invitation.email}, oczekujące`}
+                accessibilityLabel={`Pokaż zaproszenie dla ${invitation.email}, ${invitationStates[invitation.state]}`}
                 metadata={
                   <p className="mt-2 break-words text-sm text-muted">
                     {invitation.role === "MANAGER" ? "Kierownik" : "Pracownik"}{" "}
                     · {invitation.locationName}
+                    <br />
+                    {invitationStates[invitation.state]} ·{" "}
+                    {deliveryStates[invitation.deliveryState]}
+                    <br />
+                    {formatDateTime(invitation.createdAt)}
                   </p>
                 }
-                status="PENDING"
+                status={invitation.state === "PENDING" ? "PENDING" : undefined}
                 title={invitation.email}
                 onPress={() => {
                   setSelectedAccountId(undefined);
                   resetRevocation();
+                  resetResend();
                   setSelectedInvitationId(invitation.id);
                 }}
               />
@@ -624,27 +747,33 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
       >
         <PanelPopup.Header>
           <PanelPopup.Heading>
-            {createdInvitation ? "Link zaproszenia" : "Nowe konto"}
+            {createdInvitation
+              ? "Zaproszenie wysłane do kolejki"
+              : "Nowe konto"}
           </PanelPopup.Heading>
         </PanelPopup.Header>
         {createdInvitation ? (
           <PanelPopup.Body className="min-w-0 max-w-full pb-6">
-            <OneTimeSecret
-              secret={{
-                title: "Udostępnij zaproszenie",
-                description: `${createdInvitation.email} · ${createdInvitation.role === "MANAGER" ? "Kierownik" : "Pracownik"} · ${createdInvitation.locationName}`,
-                value: createdInvitation.invitationLink,
-              }}
-              onConfirmed={() => {
+            <p className="break-words">
+              Wiadomość z zaproszeniem do lokalu{" "}
+              {createdInvitation.locationName} dla {createdInvitation.email}{" "}
+              oczekuje na wysłanie. Stan wysyłki znajdziesz w historii
+              zaproszeń.
+            </p>
+            <Button
+              className="mt-4"
+              onPress={() => {
                 setCreatedInvitation(undefined);
                 setIsCreateOpen(false);
               }}
-            />
+            >
+              Gotowe
+            </Button>
           </PanelPopup.Body>
         ) : (
           <form className="min-w-0 max-w-full" onSubmit={submitInvitation}>
             <PanelPopup.Body className="flex min-w-0 max-w-full flex-col gap-4">
-              {creationError && (
+              {creationError && !replacementInput && (
                 <Alert status="danger">
                   <Alert.Indicator />
                   <Alert.Content>
@@ -662,7 +791,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
                 isRequired
                 errorMessage={emailError}
                 inputProps={{ type: "email", autoComplete: "email" }}
-                isDisabled={isCreating}
+                isDisabled={isCreating || !!replacementInput}
                 label="E-mail zapraszanej osoby"
                 maxLength={200}
                 name="invitation-email"
@@ -672,7 +801,20 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
                   setEmailError(undefined);
                 }}
               />
-              {isAdministrator ? (
+              {replacementInput ? (
+                <p>
+                  Lokal:{" "}
+                  {
+                    locations.find(
+                      (location) => location.id === replacementInput.locationId,
+                    )?.name
+                  }{" "}
+                  ·{" "}
+                  {replacementInput.role === "MANAGER"
+                    ? "Kierownik"
+                    : "Pracownik"}
+                </p>
+              ) : isAdministrator ? (
                 <LocationSelect
                   locations={enabledLocations}
                   selectedId={locationId}
@@ -689,7 +831,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
                   </p>
                 </div>
               )}
-              {isAdministrator && (
+              {isAdministrator && !replacementInput && (
                 <RadioGroup
                   className="min-w-0 max-w-full"
                   name="account-role"
@@ -723,10 +865,40 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
               <Button aria-label="Anuluj" slot="close" variant="tertiary">
                 Anuluj
               </Button>
-              <Button isPending={isCreating} type="submit">
-                <PlusIcon size={18} />
-                {isCreating ? "Tworzenie…" : "Utwórz zaproszenie"}
-              </Button>
+              {replacementInput ? (
+                <div className="flex flex-col gap-3">
+                  <p role="alert">
+                    Dla tego adresu istnieje oczekujące zaproszenie. Zastąpienie
+                    unieważni poprzedni link i wyśle nową wiadomość.
+                  </p>
+                  <HoldToConfirmButton
+                    isDisabled={isCreating}
+                    isPending={isCreating}
+                    onConfirm={() =>
+                      issueInvitation({
+                        ...replacementInput,
+                        replaceExisting: true,
+                      })
+                    }
+                  >
+                    Przytrzymaj, aby zastąpić zaproszenie
+                  </HoldToConfirmButton>
+                  <Button
+                    variant="tertiary"
+                    onPress={() => {
+                      setReplacementInput(undefined);
+                      resetCreation();
+                    }}
+                  >
+                    Wróć do formularza
+                  </Button>
+                </div>
+              ) : (
+                <Button isPending={isCreating} type="submit">
+                  <PlusIcon size={18} />
+                  {isCreating ? "Tworzenie…" : "Utwórz zaproszenie"}
+                </Button>
+              )}
             </PanelPopup.Footer>
           </form>
         )}
@@ -746,19 +918,45 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
               eyebrow="Zaproszenie"
               title={selectedInvitation.email}
               trailingActions={
-                <HoldToConfirmButton
-                  isDisabled={isRevoking}
-                  isPending={isRevoking}
-                  onConfirm={() => revokeInvitation(selectedInvitation)}
-                >
-                  <DisableIcon size={18} /> Przytrzymaj, aby unieważnić
-                </HoldToConfirmButton>
+                selectedInvitation.state === "PENDING" &&
+                new Date(selectedInvitation.expiresAt).getTime() > now ? (
+                  <>
+                    <HoldToConfirmButton
+                      isDisabled={isRevoking || isResending}
+                      isPending={isRevoking}
+                      onConfirm={() => revokeInvitation(selectedInvitation)}
+                    >
+                      <DisableIcon size={18} /> Przytrzymaj, aby unieważnić
+                    </HoldToConfirmButton>
+                    <HoldToConfirmButton
+                      isDisabled={isRevoking || isResending}
+                      isPending={isResending}
+                      onConfirm={() => resendInvitation(selectedInvitation)}
+                    >
+                      <RefreshCw size={18} /> Przytrzymaj, aby wysłać ponownie
+                    </HoldToConfirmButton>
+                  </>
+                ) : undefined
               }
             />
-            <p className="mt-3 text-sm text-muted">
-              Zaproszenie dla {selectedInvitation.email} do lokalu{" "}
-              {selectedInvitation.locationName} natychmiast przestanie działać.
-            </p>
+            {selectedInvitation.state === "PENDING" && (
+              <p className="mt-3 text-sm text-muted">
+                Unieważnienie lub ponowna wysyłka natychmiast unieważni
+                poprzedni link. Ponowna wysyłka utworzy nowe zaproszenie i wyśle
+                e-mail.
+              </p>
+            )}
+            {resendError && (
+              <Alert status="danger">
+                <Alert.Content>
+                  <Alert.Title>Nie udało się wysłać ponownie</Alert.Title>
+                  <Alert.Description>
+                    {getErrorMessage(resendError)}
+                  </Alert.Description>
+                </Alert.Content>
+              </Alert>
+            )}
+
             {revocationError && (
               <Alert status="danger">
                 <Alert.Content>
@@ -774,7 +972,15 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
             <dl className="mt-6 grid gap-5 border-t border-separator pt-6 sm:grid-cols-2">
               <div>
                 <dt className="text-sm text-muted">Status</dt>
-                <dd className="mt-1 font-medium">Oczekujące</dd>
+                <dd className="mt-1 font-medium">
+                  {invitationStates[selectedInvitation.state]}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm text-muted">Wysyłka</dt>
+                <dd className="mt-1 font-medium">
+                  {deliveryStates[selectedInvitation.deliveryState]}
+                </dd>
               </div>
               <div>
                 <dt className="text-sm text-muted">Rola</dt>
