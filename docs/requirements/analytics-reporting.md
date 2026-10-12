@@ -25,9 +25,12 @@ Reports read the hourly aggregates of [order analytics](order-analytics.md) and
 - Operators, customers and integration credentials have no analytics access.
 
 The API derives tenant ownership from the session; clients cannot widen it.
-Row-level security repeats the scope: aggregate rows are readable only to the
-tenant administrator, the current manager of that location, or the bound
-platform reporting scope. Tenant-only usage actions (no location) appear in
+The database repeats the scope: order aggregates are read through the
+`order_hourly_reports` security-barrier view and usage aggregates through
+row-level security, both admitting only the tenant administrator, the current
+manager of that location, or the bound platform reporting scope. The analytics
+worker's own upsert policy is left unchanged so reporting adds no per-row cost
+to aggregation. Tenant-only usage actions (no location) appear in
 tenant reports and never in location or manager reports.
 
 ## Platform authority

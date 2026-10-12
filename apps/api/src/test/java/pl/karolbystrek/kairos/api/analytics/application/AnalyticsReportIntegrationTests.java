@@ -204,7 +204,7 @@ class AnalyticsReportIntegrationTests extends RedisListenerIsolatedIntegrationTe
     private List<UUID> visibleLocations(StaffPrincipal principal) {
         return new TransactionTemplate(transactions).execute(status -> {
             access.staff(principal);
-            return runtime.queryForList("SELECT DISTINCT location_id FROM order_hourly_analytics", UUID.class);
+            return runtime.queryForList("SELECT DISTINCT location_id FROM order_hourly_reports", UUID.class);
         });
     }
 

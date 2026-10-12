@@ -1090,8 +1090,7 @@ CREATE POLICY scoped_insert ON order_measurements FOR INSERT WITH CHECK (
     AND (kairos_security.staff_location(location_id) OR kairos_security.integration_location(location_id,true)));
 CREATE POLICY scoped_delete ON order_measurements FOR DELETE USING (kairos_security.worker('ANALYTICS',id));
 ALTER TABLE order_hourly_analytics ENABLE ROW LEVEL SECURITY;
-CREATE POLICY scoped_select ON order_hourly_analytics FOR SELECT USING (kairos_security.analytics_hour(tenant_id,location_id,hour,status,bucket_version)
-    OR kairos_security.analytics_report(tenant_id,location_id));
+CREATE POLICY scoped_select ON order_hourly_analytics FOR SELECT USING (kairos_security.analytics_hour(tenant_id,location_id,hour,status,bucket_version));
 CREATE POLICY scoped_insert ON order_hourly_analytics FOR INSERT WITH CHECK (kairos_security.analytics_hour(tenant_id,location_id,hour,status,bucket_version));
 CREATE POLICY scoped_update ON order_hourly_analytics FOR UPDATE USING (kairos_security.analytics_hour(tenant_id,location_id,hour,status,bucket_version)) WITH CHECK (kairos_security.analytics_hour(tenant_id,location_id,hour,status,bucket_version));
 
@@ -1328,6 +1327,10 @@ ALTER TABLE usage_hourly_analytics ENABLE ROW LEVEL SECURITY;
 CREATE POLICY scoped_select ON usage_hourly_analytics FOR SELECT USING (kairos_security.analytics_report(tenant_id,location_id));
 ALTER TABLE platform_administrators ENABLE ROW LEVEL SECURITY;
 CREATE POLICY scoped_select ON platform_administrators FOR SELECT USING (false);
+-- Reports read through this owner view so the worker's per-row upsert policy stays unchanged.
+CREATE VIEW order_hourly_reports WITH (security_barrier) AS
+    SELECT tenant_id,location_id,hour,status,transition_count,duration_count,total_duration_ms
+    FROM order_hourly_analytics WHERE kairos_security.analytics_report(tenant_id,location_id);
 CREATE POLICY scoped_insert ON usage_hourly_analytics FOR INSERT WITH CHECK (false);
 CREATE POLICY scoped_update ON usage_hourly_analytics FOR UPDATE USING (false) WITH CHECK (false);
 
@@ -1400,6 +1403,7 @@ GRANT SELECT,INSERT,UPDATE,DELETE ON tenants,locations,menus,menu_items,location
     order_measurements,order_hourly_analytics,usage_hourly_analytics,platform_administrators,orders,order_history,order_outbox_events,webhook_deliveries,webhook_delivery_signing_versions,
     customer_push_subscriptions,customer_push_enrollments,customer_push_deliveries,
     spring_session,spring_session_attributes TO "${runtimeUser}";
+GRANT SELECT ON order_hourly_reports TO "${runtimeUser}";
 GRANT USAGE ON SEQUENCE order_history_id_seq TO "${runtimeUser}";
 GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA kairos_security TO "${runtimeUser}";
 GRANT EXECUTE ON FUNCTION public.operational_backlog(),public.valid_staff(uuid,uuid,text),public.lock_staff_location(),public.lock_account_location(uuid),

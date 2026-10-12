@@ -12,7 +12,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
-/** Reads hourly aggregates; row-level security additionally limits every query to the bound reporting scope. */
+/** Reads hourly aggregates; the report view and usage row-level security also limit every query to the bound reporting scope. */
 @Repository
 @RequiredArgsConstructor
 @Transactional(propagation = Propagation.MANDATORY)
@@ -34,7 +34,7 @@ public class AnalyticsReportRepository {
         return database.query("""
                 SELECT (hour AT TIME ZONE ?)::date AS day, status, sum(transition_count) AS transitions,
                     sum(duration_count) AS samples, sum(total_duration_ms) AS duration
-                FROM order_hourly_analytics WHERE hour >= ? AND hour < ? AND %s
+                FROM order_hourly_reports WHERE hour >= ? AND hour < ? AND %s
                 GROUP BY 1, 2
                 """.formatted(SCOPE), (row, index) -> new OrderRow(row.getObject("day", LocalDate.class),
                 row.getString("status"), row.getLong("transitions"), row.getLong("samples"), row.getLong("duration")),
@@ -45,7 +45,7 @@ public class AnalyticsReportRepository {
         return database.query("""
                 SELECT a.location_id, CASE WHEN l.status <> 'ARCHIVED' THEN l.name END AS name, a.status,
                     sum(a.transition_count) AS transitions
-                FROM order_hourly_analytics a LEFT JOIN locations l ON l.id=a.location_id
+                FROM order_hourly_reports a LEFT JOIN locations l ON l.id=a.location_id
                 WHERE a.tenant_id=? AND a.hour >= ? AND a.hour < ?
                 GROUP BY 1, 2, 3
                 """, (row, index) -> new LocationRow(row.getObject("location_id", UUID.class), row.getString("name"),
@@ -64,7 +64,7 @@ public class AnalyticsReportRepository {
     /** Earliest aggregated hour in scope; earlier days have no collected data rather than zero activity. */
     public Instant firstRecordedHour(UUID tenantId, UUID locationId) {
         var first = database.queryForObject("""
-                SELECT LEAST((SELECT min(hour) FROM order_hourly_analytics WHERE %1$s),
+                SELECT LEAST((SELECT min(hour) FROM order_hourly_reports WHERE %1$s),
                     (SELECT min(hour) FROM usage_hourly_analytics WHERE %1$s))
                 """.formatted(SCOPE), Timestamp.class,
                 tenantId, tenantId, locationId, locationId, tenantId, tenantId, locationId, locationId);
