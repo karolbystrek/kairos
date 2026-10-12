@@ -106,6 +106,11 @@ review push or reminder schedule is sent. Best-effort review clicks and explicit
 dismissals follow [usage analytics](usage-analytics.md). Physical-device
 acceptance remains outstanding.
 
+Administrators and managers see role-scoped business, panel-usage and review
+analytics in the panel; a manually granted platform administrator also sees
+cross-tenant totals and current API health. See
+[analytics reporting](analytics-reporting.md).
+
 Draft Polish terms, privacy notices and their in-app entry points are in place;
 the remaining [legal readiness gates](legal.md#launch-blockers) must close
 before real users.

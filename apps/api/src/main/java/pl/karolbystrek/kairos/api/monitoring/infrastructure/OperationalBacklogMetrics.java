@@ -69,6 +69,13 @@ public class OperationalBacklogMetrics {
         }
     }
 
+    /** The last successful snapshot, its epoch-second time (0 when none), and whether the latest refresh succeeded. */
+    public Snapshot snapshot() {
+        return new Snapshot(snapshot, (long) lastSuccess, up);
+    }
+
+    public record Snapshot(Map<String, Backlog> workers, long observedAtEpochSecond, boolean current) {}
+
     private double pending(String worker) {
         var backlog = snapshot.get(worker);
         return backlog == null ? Double.NaN : backlog.pending();
@@ -79,5 +86,5 @@ public class OperationalBacklogMetrics {
         return backlog == null ? Double.NaN : backlog.oldestAge();
     }
 
-    private record Backlog(long pending, double oldestAge) {}
+    public record Backlog(long pending, double oldestAge) {}
 }

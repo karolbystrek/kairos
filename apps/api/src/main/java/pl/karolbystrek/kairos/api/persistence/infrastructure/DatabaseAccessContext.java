@@ -31,6 +31,22 @@ public class DatabaseAccessContext {
         bind("staff", principal.accountId().toString(), "", "");
     }
 
+    public void platformAnalytics(StaffPrincipal principal) {
+        requireTransaction();
+        if (principal == null || !Boolean.TRUE.equals(database.queryForObject(
+                "SELECT public.valid_staff(?, ?, ?) AND public.valid_platform_administrator(?)", Boolean.class,
+                principal.accountId(), principal.tenantId(), principal.tenantRole().name(), principal.accountId()))) {
+            throw new StaffAccessDeniedException("Platform analytics access is not granted");
+        }
+        bind("platform-analytics", principal.accountId().toString(), "", "");
+    }
+
+    public boolean isPlatformAdministrator(UUID accountId) {
+        requireTransaction();
+        return Boolean.TRUE.equals(database.queryForObject(
+                "SELECT public.valid_platform_administrator(?)", Boolean.class, accountId));
+    }
+
     public void lockStaffLocation() {
         requireTransaction();
         if (!Boolean.TRUE.equals(database.queryForObject("SELECT public.lock_staff_location()", Boolean.class))) {

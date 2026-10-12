@@ -42,6 +42,9 @@ GET    /api/tracked-orders/v1/{trackingReference}
 GET    /api/tracked-orders/v1/{trackingReference}/events
 POST   /api/tracked-orders/v1/{trackingReference}/review-actions
 POST   /api/usage-analytics/v1/actions
+GET    /api/analytics/v1/report?from&to&zone[&locationId]
+GET    /api/platform-analytics/v1/report?from&to&zone
+GET    /api/platform-analytics/v1/health
 
 GET    /api/customer-notifications/v1/configuration
 PUT    /api/customer-notifications/v1/subscription

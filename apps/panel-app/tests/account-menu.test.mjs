@@ -82,6 +82,8 @@ function panel(screen = "dashboard") {
   return {
     requests, actions, cacheClears, redirects, render, ApiError,
     workspace: key => find(node => node.type === ui.Tabs).onSelectionChange(key),
+    tabs: () => elements(render()).filter(node => node.type === "Tabs.Tab").map(node => node.props.id),
+    selected: () => find(node => node.type === ui.Tabs).selectedKey,
     session(value, error, isLoading = false) { account = value; accountError = error; loading = isLoading; },
     signIn: () => find(node => node.type?.name === "SignedOutPanel").onSignIn({ email: "staff@example.com", password: "password" }),
     expire: () => expireSession(),
@@ -194,4 +196,17 @@ test("workspace entries count once without counting rerenders or the selected ta
   view.workspace("orders");
   view.workspace("menus");
   assert.deepEqual(view.actions, ["menu_editor_opened", "integration_settings_opened", "menu_editor_opened"]);
+});
+
+test("analytics tabs follow capabilities and revoked platform access leaves its tab", () => {
+  const view = panel();
+  view.session({ accountId: "staff", capabilities: ["MANAGE_ORDERS"] });
+  assert.deepEqual(view.tabs(), []);
+  view.session({ accountId: "staff", capabilities: ["MANAGE_ORDERS", "VIEW_ANALYTICS", "VIEW_PLATFORM_ANALYTICS"] });
+  assert.deepEqual(view.tabs(), ["orders", "analytics", "platform"]);
+  view.workspace("platform");
+  assert.equal(view.selected(), "platform");
+  view.session({ accountId: "staff", capabilities: ["MANAGE_ORDERS", "VIEW_ANALYTICS"] });
+  assert.deepEqual(view.tabs(), ["orders", "analytics"]);
+  assert.equal(view.selected(), "orders");
 });

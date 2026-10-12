@@ -582,6 +582,13 @@ CREATE TABLE order_hourly_analytics (
     CHECK (status IN ('READY','COMPLETED') OR (duration_count=0 AND total_duration_ms=0)),
     CHECK (duration_count > 0 OR total_duration_ms=0)
 );
+CREATE INDEX order_hourly_analytics_hour_idx ON order_hourly_analytics(hour);
+
+-- Granted and revoked manually by the database owner; the runtime role can never write it.
+CREATE TABLE platform_administrators (
+    account_id uuid PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,
+    granted_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 
 CREATE INDEX order_outbox_webhook_available_idx
     ON order_outbox_events (webhook_fanout_completed_at, occurred_at, id);
@@ -823,6 +830,18 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
     SELECT version=1 AND EXISTS(SELECT 1 FROM public.order_measurements m
         WHERE kairos_security.worker('ANALYTICS',m.id) AND m.tenant_id=tenant AND m.location_id=location
             AND m.status=state AND date_trunc('hour',m.occurred_at AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'=at_hour)
+$$;
+CREATE FUNCTION public.valid_platform_administrator(account_id uuid) RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
+    SELECT EXISTS(SELECT 1 FROM public.platform_administrators p JOIN public.accounts a ON a.id=p.account_id
+        WHERE a.id=valid_platform_administrator.account_id AND a.status='ENABLED')
+$$;
+-- Aggregates are readable by tenant administrators, current location managers, and the bound platform reporting scope.
+CREATE FUNCTION kairos_security.analytics_report(tenant uuid,location uuid) RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
+    SELECT kairos_security.staff_tenant(tenant,true) OR kairos_security.staff_location(location,true)
+        OR (kairos_security.setting('scope')='platform-analytics'
+            AND public.valid_platform_administrator(kairos_security.identity()))
 $$;
 CREATE FUNCTION kairos_security.event_access(event uuid) RETURNS boolean
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
@@ -1071,7 +1090,8 @@ CREATE POLICY scoped_insert ON order_measurements FOR INSERT WITH CHECK (
     AND (kairos_security.staff_location(location_id) OR kairos_security.integration_location(location_id,true)));
 CREATE POLICY scoped_delete ON order_measurements FOR DELETE USING (kairos_security.worker('ANALYTICS',id));
 ALTER TABLE order_hourly_analytics ENABLE ROW LEVEL SECURITY;
-CREATE POLICY scoped_select ON order_hourly_analytics FOR SELECT USING (kairos_security.analytics_hour(tenant_id,location_id,hour,status,bucket_version));
+CREATE POLICY scoped_select ON order_hourly_analytics FOR SELECT USING (kairos_security.analytics_hour(tenant_id,location_id,hour,status,bucket_version)
+    OR kairos_security.analytics_report(tenant_id,location_id));
 CREATE POLICY scoped_insert ON order_hourly_analytics FOR INSERT WITH CHECK (kairos_security.analytics_hour(tenant_id,location_id,hour,status,bucket_version));
 CREATE POLICY scoped_update ON order_hourly_analytics FOR UPDATE USING (kairos_security.analytics_hour(tenant_id,location_id,hour,status,bucket_version)) WITH CHECK (kairos_security.analytics_hour(tenant_id,location_id,hour,status,bucket_version));
 
@@ -1303,8 +1323,11 @@ CREATE TABLE usage_hourly_analytics (
     UNIQUE NULLS NOT DISTINCT (tenant_id,location_id,hour,event),
     CHECK (hour=date_trunc('hour',hour AT TIME ZONE 'UTC') AT TIME ZONE 'UTC')
 );
+CREATE INDEX usage_hourly_analytics_hour_idx ON usage_hourly_analytics(hour);
 ALTER TABLE usage_hourly_analytics ENABLE ROW LEVEL SECURITY;
-CREATE POLICY scoped_select ON usage_hourly_analytics FOR SELECT USING (false);
+CREATE POLICY scoped_select ON usage_hourly_analytics FOR SELECT USING (kairos_security.analytics_report(tenant_id,location_id));
+ALTER TABLE platform_administrators ENABLE ROW LEVEL SECURITY;
+CREATE POLICY scoped_select ON platform_administrators FOR SELECT USING (false);
 CREATE POLICY scoped_insert ON usage_hourly_analytics FOR INSERT WITH CHECK (false);
 CREATE POLICY scoped_update ON usage_hourly_analytics FOR UPDATE USING (false) WITH CHECK (false);
 
@@ -1374,7 +1397,7 @@ GRANT USAGE ON SCHEMA public,kairos_security TO "${runtimeUser}";
 GRANT SELECT,INSERT,UPDATE,DELETE ON tenants,locations,menus,menu_items,location_menus,accounts,location_assignments,account_invitations,
     external_integrations,api_keys,api_key_scopes,api_key_location_access,
     webhook_subscriptions,webhook_subscription_location_access,webhook_subscription_event_types,webhook_signing_secret_versions,
-    order_measurements,order_hourly_analytics,usage_hourly_analytics,orders,order_history,order_outbox_events,webhook_deliveries,webhook_delivery_signing_versions,
+    order_measurements,order_hourly_analytics,usage_hourly_analytics,platform_administrators,orders,order_history,order_outbox_events,webhook_deliveries,webhook_delivery_signing_versions,
     customer_push_subscriptions,customer_push_enrollments,customer_push_deliveries,
     spring_session,spring_session_attributes TO "${runtimeUser}";
 GRANT USAGE ON SEQUENCE order_history_id_seq TO "${runtimeUser}";
@@ -1388,5 +1411,5 @@ GRANT EXECUTE ON FUNCTION public.operational_backlog(),public.valid_staff(uuid,u
     public.next_expired_push_subscription(timestamptz),public.next_dormant_push_subscription(timestamptz),
     public.next_terminal_push_delivery(timestamptz,timestamptz),public.next_purgeable_account(timestamptz,text),
     public.next_purgeable_location(timestamptz),public.next_finished_invitation(timestamptz),public.purge_retained(text,uuid),
-    public.record_usage_action(uuid,uuid,text,timestamptz),public.next_order_measurement(),public.valid_worker(text,uuid,uuid) TO "${runtimeUser}";
+    public.record_usage_action(uuid,uuid,text,timestamptz),public.next_order_measurement(),public.valid_platform_administrator(uuid),public.valid_worker(text,uuid,uuid) TO "${runtimeUser}";
 COMMENT ON SCHEMA kairos_security IS 'kairos-rls-v1';
