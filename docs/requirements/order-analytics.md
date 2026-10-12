@@ -20,7 +20,8 @@ Collection starts when the new collector code is deployed. There is no historica
 scan, configurable activation date, or acceptance-time cutoff. Existing orders
 contribute subsequent accepted transitions and durations available from their
 lifecycle timestamps; their past creation does not receive an invented count.
-No reports, dashboard, or cloud deployment are included in this increment.
+Reports follow [analytics reporting](analytics-reporting.md); cloud deployment
+is a separate action.
 
 Preparation duration runs from creation to readiness. Collection duration runs
 from readiness to completion. Both use accepted transition times, independent of

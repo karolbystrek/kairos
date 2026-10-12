@@ -11,6 +11,7 @@ import pl.karolbystrek.kairos.api.account.domain.assignment.AssignmentRole;
 import pl.karolbystrek.kairos.api.account.infrastructure.persistence.AccountRepository;
 import pl.karolbystrek.kairos.api.authentication.application.model.CurrentAccountView;
 import pl.karolbystrek.kairos.api.location.infrastructure.persistence.LocationRepository;
+import pl.karolbystrek.kairos.api.persistence.infrastructure.DatabaseAccessContext;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -22,6 +23,7 @@ public class CurrentAccountService {
     private final AccountRepository accountRepository;
     private final StaffAccessService staffAccessService;
     private final LocationRepository locationRepository;
+    private final DatabaseAccessContext databaseAccess;
 
     @Transactional(readOnly = true)
     public CurrentAccountView get(PanelPrincipal principal) {
@@ -75,6 +77,12 @@ public class CurrentAccountService {
         else if (access.assignmentRole() == AssignmentRole.MANAGER) {
             capabilities.add("INVITE_OPERATORS");
             capabilities.add("CHOOSE_LOCATION_MENU");
+        }
+        if (access.isTenantAdmin() || access.assignmentRole() == AssignmentRole.MANAGER) {
+            capabilities.add("VIEW_ANALYTICS");
+        }
+        if (databaseAccess.isPlatformAdministrator(access.accountId())) {
+            capabilities.add("VIEW_PLATFORM_ANALYTICS");
         }
 
         return new CurrentAccountView(

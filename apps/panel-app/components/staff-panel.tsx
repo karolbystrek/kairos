@@ -13,6 +13,8 @@ import {
   Tooltip,
 } from "@heroui/react";
 import {
+  Activity as PlatformIcon,
+  ChartColumn as AnalyticsIcon,
   ClipboardList as OrdersIcon,
   UserRound as AccountIcon,
   MapPin as LocationsIcon,
@@ -31,6 +33,10 @@ import { PanelPopup } from "@/components/panel-popup";
 import { FormTextField } from "@/components/form-controls";
 import { OrderManagement } from "@/components/order-management";
 import { AccountManagement } from "@/components/account-management";
+import {
+  PlatformAnalytics,
+  RestaurantAnalytics,
+} from "@/components/analytics-management";
 import { AuthFormLayout } from "@/components/auth-form-layout";
 import { IntegrationManagement } from "@/components/integration-management";
 import { LocationCreationModal } from "@/components/location-creation-modal";
@@ -398,6 +404,16 @@ export function StaffPanel({
   const canChooseLocationMenu = account.capabilities.includes(
     "CHOOSE_LOCATION_MENU",
   );
+  const canViewAnalytics = account.capabilities.includes("VIEW_ANALYTICS");
+  const canViewPlatform = account.capabilities.includes(
+    "VIEW_PLATFORM_ANALYTICS",
+  );
+  // A revoked capability removes its tab; never leave the selection on a hidden panel.
+  const visibleWorkspace =
+    (workspace === "analytics" && !canViewAnalytics) ||
+    (workspace === "platform" && !canViewPlatform)
+      ? "orders"
+      : workspace;
 
   if (canManageLocations && !locations) {
     return locationsError ? (
@@ -468,13 +484,15 @@ export function StaffPanel({
       {canManageAccounts ||
       canManageLocations ||
       canManageIntegrations ||
-      canChooseLocationMenu ? (
+      canChooseLocationMenu ||
+      canViewAnalytics ||
+      canViewPlatform ? (
         <Tabs
-          selectedKey={workspace}
+          selectedKey={visibleWorkspace}
           onSelectionChange={(key) => {
             const next = String(key);
 
-            if (next === workspace) return;
+            if (next === visibleWorkspace) return;
             if (next === "menus") recordPanelAction("menu_editor_opened");
             if (next === "integrations")
               recordPanelAction("integration_settings_opened");
@@ -531,6 +549,24 @@ export function StaffPanel({
                     <Tabs.Indicator />
                   </Tabs.Tab>
                 )}
+                {canViewAnalytics && (
+                  <Tabs.Tab id="analytics">
+                    <span className="tab-motion-content">
+                      <AnalyticsIcon size={18} />
+                      <span>Analityka</span>
+                    </span>
+                    <Tabs.Indicator />
+                  </Tabs.Tab>
+                )}
+                {canViewPlatform && (
+                  <Tabs.Tab id="platform">
+                    <span className="tab-motion-content">
+                      <PlatformIcon size={18} />
+                      <span>Platforma</span>
+                    </span>
+                    <Tabs.Indicator />
+                  </Tabs.Tab>
+                )}
               </Tabs.List>
             </Tabs.ListContainer>
             {utilities}
@@ -543,7 +579,7 @@ export function StaffPanel({
               canViewTenantOrders={account.capabilities.includes(
                 "VIEW_TENANT_ORDERS",
               )}
-              isActive={workspace === "orders"}
+              isActive={visibleWorkspace === "orders"}
               requestedLocationId={requestedOrderLocationId}
               onRequestedLocationApplied={() =>
                 setRequestedOrderLocationId(undefined)
@@ -584,6 +620,24 @@ export function StaffPanel({
               <IntegrationManagement
                 key={`integrations-${account.accountId}`}
                 accountId={account.accountId}
+              />
+            </Tabs.Panel>
+          )}
+          {canViewAnalytics && (
+            <Tabs.Panel className="pt-6" id="analytics">
+              <RestaurantAnalytics
+                key={`analytics-${account.accountId}`}
+                account={account}
+                onAccessLost={() => void mutateAccount()}
+              />
+            </Tabs.Panel>
+          )}
+          {canViewPlatform && (
+            <Tabs.Panel className="pt-6" id="platform">
+              <PlatformAnalytics
+                key={`platform-${account.accountId}`}
+                accountId={account.accountId}
+                onAccessLost={() => void mutateAccount()}
               />
             </Tabs.Panel>
           )}

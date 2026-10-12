@@ -59,6 +59,8 @@ public class SecurityConfig {
         source.registerCorsConfiguration("/account-invitation-redemptions/**", panelConfiguration);
         source.registerCorsConfiguration("/orders/**", panelConfiguration);
         source.registerCorsConfiguration("/usage-analytics/**", panelConfiguration);
+        source.registerCorsConfiguration("/analytics/**", panelConfiguration);
+        source.registerCorsConfiguration("/platform-analytics/**", panelConfiguration);
         source.registerCorsConfiguration("/menus/**", panelConfiguration);
         source.registerCorsConfiguration("/external-integrations/**", panelConfiguration);
         source.registerCorsConfiguration("/api-keys/**", panelConfiguration);
@@ -158,6 +160,8 @@ public class SecurityConfig {
                                 "/accounts/v1/**",
                                 "/account-invitations/v1/**",
                                 "/usage-analytics/v1/**",
+                                "/analytics/v1/**",
+                                "/platform-analytics/v1/**",
                                 "/orders/v1/**",
                                 "/external-integrations/v1/**",
                                 "/api-keys/v1/**",

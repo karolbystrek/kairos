@@ -59,8 +59,9 @@ Counters and timers reset on process restart. Attempts can be lost around a cras
 or repeated during recovery and are not authoritative business counts. Backlog
 counts are cross-tenant operational totals, approximate snapshots, and lose
 purged/deleted records. No historical samples are retained until an external
-collector is connected. Collector/Grafana deployment, alerts, tracing, reporting
-APIs and dashboards are outside this increment; Redis remains unchanged.
+collector is connected. Collector/Grafana deployment, alerts and tracing are
+outside this increment; Redis remains unchanged. The platform administrator's
+sanitized current view follows [platform health](analytics-reporting.md#current-platform-health).
 
 If oldest analytics input age persistently exceeds about one minute, compare cycle
 duration and datasource pressure before tuning batching/indexes or worker count.

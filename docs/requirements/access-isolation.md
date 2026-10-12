@@ -57,6 +57,8 @@ All tenant-owned data is protected at both application and database levels. Post
 
 Orders derive tenant ownership through their physical location rather than storing a second direct tenant relationship. RLS policies for orders and their dependent records must verify the location's tenant and, for staff or External Integration operations, the principal's access to that location. A location cannot be reassigned to another tenant after operational data has been created; such a change requires an explicit migration.
 
+The only cross-tenant staff read is the manually granted platform reporting scope, limited to anonymous hourly analytics aggregates; see [platform authority](analytics-reporting.md#platform-authority).
+
 Each location stores an IANA time-zone identifier initialized to `UTC`. The current order-numbering increment deliberately uses UTC rather than the stored location setting. The API runtime, injected application clock, and database session use UTC without an environment-selectable alternative in this scope. Location-specific civil-time numbering is deferred.
 
 The API datasource uses a restricted, non-owning PostgreSQL role; Flyway uses a

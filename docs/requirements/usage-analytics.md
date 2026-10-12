@@ -67,8 +67,8 @@ scoped ingestion permits only authorized increments.
 Tenant-first locking serializes ingestion with permanent tenant deletion; tenant
 foreign-key cascade removes all action aggregates without concurrent recreation.
 Location keys have no foreign key to operational locations, so location purge
-preserves counts. Aggregates are retained indefinitely for now. Reporting APIs,
-dashboards and new system-administrator authorization are excluded.
+preserves counts. Aggregates are retained indefinitely for now. Reports follow
+[analytics reporting](analytics-reporting.md).
 
 ## Accuracy and privacy limits
 

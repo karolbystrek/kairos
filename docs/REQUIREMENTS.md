@@ -28,6 +28,7 @@ Do not skip an applicable requirement because it lives in another file.
 | [Anonymous order analytics](requirements/order-analytics.md) | Durable counts/durations, worker processing, deployment boundary and analytics retention |
 | [Operational metrics](requirements/operational-metrics.md) | Protected export, bounded instrumentation, worker backlog and collector limits |
 | [Anonymous panel and review usage](requirements/usage-analytics.md) | Browser action definitions, authorized ingestion, approximate counts and retention |
+| [Analytics reporting and platform health](requirements/analytics-reporting.md) | Role-scoped and platform reports, manual platform authority, date semantics and current health |
 | [Order lifecycle and customer application](requirements/orders-customer.md) | Order changes, customer tracking, PWA, offline and notifications |
 | [Staff panel requirements](requirements/staff-panel.md) | Staff queues, navigation, management UI and confirmations |
 | [External Integration API and webhooks](requirements/external-integrations.md) | Integration credentials, external orders and webhook delivery |
