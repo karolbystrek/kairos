@@ -5,18 +5,61 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import pl.karolbystrek.kairos.api.order.application.model.OrderStatusChangedEvent;
 import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
 
+import pl.karolbystrek.kairos.api.order.application.OrderService;
+import pl.karolbystrek.kairos.api.order.api.model.CustomerOrderEventResponse;
+import pl.karolbystrek.kairos.api.order.application.model.TrackedOrderView;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import java.io.IOException;
+import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 class OrderSseEmitterRegistryTests {
 
     private final OrderSseEmitterRegistry registry = new OrderSseEmitterRegistry(ignored -> new RecordingEmitter());
+
+    @Test
+    void deliversTerminalSnapshotBeforeClosingTheStream() {
+        var reference = UUID.randomUUID();
+        var orders = mock(OrderService.class);
+        when(orders.findTrackedOrder(reference)).thenReturn(new TrackedOrderView(
+                "42", OrderStatus.COMPLETED, Instant.parse("2026-07-24T12:00:00Z"), null));
+
+        var emitter = (RecordingEmitter) registry.subscribe(reference, orders);
+
+        assertThat(emitter.events).hasSize(1);
+        assertThat(emitter.events.getFirst().status()).isEqualTo(OrderStatus.COMPLETED);
+        assertThat(emitter.events.getFirst().label()).isEqualTo("42");
+        assertThat(emitter.completed).isTrue();
+        assertThat(registry.connectionCount(reference)).isZero();
+    }
+
+    @Test
+    void recoveryRefreshesEveryConnectedCustomerFromPostgres() {
+        var reference = UUID.randomUUID();
+        var orders = mock(OrderService.class);
+        when(orders.findTrackedOrder(reference)).thenReturn(new TrackedOrderView(
+                "42", OrderStatus.READY, Instant.parse("2026-07-24T12:00:00Z"), null));
+        var first = (RecordingEmitter) registry.register(reference);
+        var second = (RecordingEmitter) registry.register(reference);
+
+        registry.refresh(orders);
+
+        assertThat(first.events.getFirst().status()).isEqualTo(OrderStatus.READY);
+        assertThat(second.events.getFirst().status()).isEqualTo(OrderStatus.READY);
+        assertThat(first.completed).isFalse();
+    }
 
     @Test
     void forwardsOnlyToTheMatchingReferenceAndRetainsConnectionsForActiveEvents() {
@@ -30,12 +73,11 @@ class OrderSseEmitterRegistryTests {
                 UUID.randomUUID(),
                 matchingReference,
                 OrderStatus.READY,
-                Instant.parse("2026-07-24T12:00:00Z")
-        );
+                Instant.parse("2026-07-24T12:00:00Z"), "42", null, UUID.randomUUID(), UUID.randomUUID());
         registry.forward(event);
 
-        assertThat(first.events).containsExactly(event);
-        assertThat(second.events).containsExactly(event);
+        assertThat(first.events).containsExactly(CustomerOrderEventResponse.from(event));
+        assertThat(second.events).containsExactly(CustomerOrderEventResponse.from(event));
         assertThat(other.events).isEmpty();
         assertThat(first.completed).isFalse();
         assertThat(second.completed).isFalse();
@@ -56,12 +98,11 @@ class OrderSseEmitterRegistryTests {
                 UUID.randomUUID(),
                 matchingReference,
                 OrderStatus.CANCELED,
-                Instant.parse("2026-07-24T12:00:00Z")
-        );
+                Instant.parse("2026-07-24T12:00:00Z"), "42", null, UUID.randomUUID(), UUID.randomUUID());
         registry.forward(event);
 
-        assertThat(first.events).containsExactly(event);
-        assertThat(second.events).containsExactly(event);
+        assertThat(first.events).containsExactly(CustomerOrderEventResponse.from(event));
+        assertThat(second.events).containsExactly(CustomerOrderEventResponse.from(event));
         assertThat(other.events).isEmpty();
         assertThat(first.completed).isTrue();
         assertThat(second.completed).isTrue();
@@ -94,8 +135,7 @@ class OrderSseEmitterRegistryTests {
                 UUID.randomUUID(),
                 trackingReference,
                 OrderStatus.READY,
-                Instant.parse("2026-07-24T12:00:00Z")
-        ));
+                Instant.parse("2026-07-24T12:00:00Z"), "42", null, UUID.randomUUID(), UUID.randomUUID()));
 
         assertThat(failingRegistry.connectionCount(trackingReference)).isZero();
         assertThat(emitter.completeWithErrorCalled).isFalse();
@@ -111,6 +151,45 @@ class OrderSseEmitterRegistryTests {
 
         assertThat(failingRegistry.connectionCount(trackingReference)).isZero();
         assertThat(emitter.completeWithErrorCalled).isFalse();
+    }
+
+    @Test
+    void aBlockedClientDoesNotDelayOtherConnections() {
+        var release = new CountDownLatch(1);
+        var delivered = new CountDownLatch(1);
+        var emitters = new ArrayDeque<SseEmitter>(List.of(new SseEmitter() {
+            @Override
+            public void send(SseEventBuilder builder) throws IOException {
+                try {
+                    release.await();
+                } catch (InterruptedException exception) {
+                    throw new IOException(exception);
+                }
+            }
+        }, new SseEmitter() {
+            @Override
+            public void send(SseEventBuilder builder) {
+                if (builder.build().stream().anyMatch(part -> part.getData() instanceof CustomerOrderEventResponse)) {
+                    delivered.countDown();
+                }
+            }
+        }));
+        var concurrent = new OrderSseEmitterRegistry(ignored -> emitters.removeFirst(), Thread::startVirtualThread);
+        var blocked = UUID.randomUUID();
+        var other = UUID.randomUUID();
+        try {
+            assertTimeoutPreemptively(Duration.ofSeconds(5), () -> {
+                concurrent.register(blocked);
+                concurrent.register(other);
+                concurrent.forward(new OrderStatusChangedEvent(UUID.randomUUID(), blocked, OrderStatus.READY,
+                        Instant.parse("2026-07-24T12:00:00Z"), "41", null, UUID.randomUUID(), UUID.randomUUID()));
+                concurrent.forward(new OrderStatusChangedEvent(UUID.randomUUID(), other, OrderStatus.READY,
+                        Instant.parse("2026-07-24T12:00:00Z"), "42", null, UUID.randomUUID(), UUID.randomUUID()));
+                assertThat(delivered.await(5, TimeUnit.SECONDS)).isTrue();
+            });
+        } finally {
+            release.countDown();
+        }
     }
 
     @Test
@@ -139,13 +218,13 @@ class OrderSseEmitterRegistryTests {
 
     private static final class RecordingEmitter extends SseEmitter {
 
-        private final List<OrderStatusChangedEvent> events = new ArrayList<>();
+        private final List<CustomerOrderEventResponse> events = new ArrayList<>();
         private boolean completed;
 
         @Override
         public void send(SseEventBuilder builder) {
             for (var part : builder.build()) {
-                if (part.getData() instanceof OrderStatusChangedEvent event) {
+                if (part.getData() instanceof CustomerOrderEventResponse event) {
                     events.add(event);
                 }
             }

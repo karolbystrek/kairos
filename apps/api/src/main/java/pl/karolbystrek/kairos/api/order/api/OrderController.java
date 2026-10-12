@@ -3,6 +3,9 @@ package pl.karolbystrek.kairos.api.order.api;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import pl.karolbystrek.kairos.api.order.infrastructure.sse.StaffOrderSseEmitterRegistry;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -29,6 +32,13 @@ import java.util.UUID;
 class OrderController {
 
     private final OrderService orderService;
+    private final StaffOrderSseEmitterRegistry emitterRegistry;
+
+    @GetMapping(path = "/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    SseEmitter subscribe(@AuthenticationPrincipal StaffPrincipal principal,
+                         @RequestParam(required = false) UUID locationId) {
+        return emitterRegistry.subscribe(principal, locationId);
+    }
 
     @GetMapping
     List<StaffOrderResponse> listOrders(

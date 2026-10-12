@@ -23,8 +23,10 @@ The current walking vertical slice is implemented for local development:
   public tenant registration, fixed manually shared manager/operator invitations,
   durable rolling browser sessions, password changes and local/global logout;
 * on-screen customer QR codes and anonymous tracking through REST;
-* customer-only SSE invalidation through Redis Pub/Sub with REST
-  reconciliation;
+* state-carrying customer SSE and authenticated live staff queue snapshots on
+  one Redis Pub/Sub topic, subscription-recovery snapshots, monotonic customer
+  reconciliation and asynchronous commit-triggered push/webhook workers with
+  five-second recovery polling;
 * customer PWA manifest, order-aware first-launch, unclosed-order restoration,
   scan-first default page, explicit terminal-order closing, active-only
   IndexedDB snapshots, in-app QR scanning, generated Serwist service worker,

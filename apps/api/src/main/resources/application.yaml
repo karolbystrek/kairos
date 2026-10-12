@@ -73,8 +73,7 @@ kairos:
     worker:
       batch-size: 50
       claim-lease: 30s
-      fanout-poll-delay: 500ms
-      delivery-poll-delay: 500ms
+      recovery-poll-delay: 5s
       initial-delay: 1s
     destination-policy: "${WEBHOOK_DESTINATION_POLICY:PUBLIC_HTTPS}"
   review-invitations:
@@ -105,8 +104,7 @@ kairos:
     worker:
       batch-size: 50
       claim-lease: 30s
-      fanout-poll-delay: 500ms
-      delivery-poll-delay: 500ms
+      recovery-poll-delay: 5s
       initial-delay: 1s
       cleanup-delay: 1h
       cleanup-initial-delay: 5m

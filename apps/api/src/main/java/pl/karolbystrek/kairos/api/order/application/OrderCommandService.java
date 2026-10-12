@@ -85,7 +85,8 @@ public class OrderCommandService {
                 );
         orderRepository.save(order);
         historyRepository.save(historyFor(order, order.getStatus(), now, initiator));
-        eventOutbox.recordCreated(order, now);
+        var eventId = eventOutbox.recordCreated(order, now);
+        eventPublisher.publishEvent(OrderStatusChangedEvent.from(eventId, order));
         measurements.record(order, now, null);
         return order;
     }
@@ -111,12 +112,7 @@ public class OrderCommandService {
         measurements.record(order, now, durationMs);
         historyRepository.save(historyFor(order, target, now, initiator));
         var eventId = eventOutbox.recordStatusChanged(order, now);
-        eventPublisher.publishEvent(new OrderStatusChangedEvent(
-                eventId,
-                order.getTrackingReference(),
-                target,
-                now
-        ));
+        eventPublisher.publishEvent(OrderStatusChangedEvent.from(eventId, order));
         return true;
     }
 

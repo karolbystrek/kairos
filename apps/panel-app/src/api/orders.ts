@@ -2,6 +2,8 @@ import { z } from "zod";
 
 import { request } from "./api-fetch";
 
+import { apiBaseUrl } from "@/src/config/public-environment";
+
 export const orderStatusSchema = z.enum([
   "IN_PREPARATION",
   "READY",
@@ -22,6 +24,28 @@ export const staffOrderSchema = z.object({
 });
 
 const staffOrdersSchema = z.array(staffOrderSchema);
+
+export function subscribeToOrderQueue(
+  locationId: string | undefined,
+  onSnapshot: (orders: StaffOrder[]) => void,
+  onDisconnected: () => void,
+): () => void {
+  const url = new URL("/api/orders/v1/events", apiBaseUrl);
+
+  if (locationId) url.searchParams.set("locationId", locationId);
+  const events = new EventSource(url, { withCredentials: true });
+
+  events.addEventListener("order-queue", (event) => {
+    try {
+      onSnapshot(staffOrdersSchema.parse(JSON.parse(event.data)));
+    } catch {
+      onDisconnected();
+    }
+  });
+  events.onerror = onDisconnected;
+
+  return () => events.close();
+}
 
 export const customOrderLabelSchema = z
   .string()

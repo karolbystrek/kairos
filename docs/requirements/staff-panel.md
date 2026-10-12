@@ -25,7 +25,9 @@ The staff panel must:
   location's active [menu](menus.md) before creation;
 * allow tenant administrators to manage tenant menus and choose each location's
   active menu, and location managers to choose their own location's menu;
-* display and refresh only active order queues by location;
+* display only active queues by location or authorized tenant-wide scope,
+  receiving current queue snapshots and other staff/integration changes through
+  authenticated SSE, with stream access rechecked at least every five minutes;
 * allow only valid order transitions permitted by the account's role;
 * allow tenant administrators to issue account invitations for location
   managers and operators within their tenant;

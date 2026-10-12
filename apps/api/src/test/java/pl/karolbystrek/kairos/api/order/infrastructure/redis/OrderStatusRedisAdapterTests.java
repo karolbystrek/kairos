@@ -8,6 +8,9 @@ import pl.karolbystrek.kairos.api.order.application.model.OrderStatusChangedEven
 import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
 import pl.karolbystrek.kairos.api.order.infrastructure.sse.OrderSseEmitterRegistry;
 import tools.jackson.databind.json.JsonMapper;
+import pl.karolbystrek.kairos.api.order.application.OrderService;
+import pl.karolbystrek.kairos.api.order.infrastructure.sse.StaffOrderSseEmitterRegistry;
+import static org.mockito.Mockito.mock;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -34,7 +37,7 @@ class OrderStatusRedisAdapterTests {
         assertThat(redisTemplate.channel)
                 .isEqualTo(OrderEventRedisConfiguration.ORDER_STATUS_CHANNEL);
         var payload = objectMapper.readTree(redisTemplate.payload);
-        assertThat(payload.get("version").asInt()).isEqualTo(2);
+        assertThat(payload.get("version").asInt()).isEqualTo(1);
         assertThat(payload.get("eventId").asText())
                 .isEqualTo("00000000-0000-0000-0000-000000000002");
         assertThat(payload.get("trackingReference").asText())
@@ -49,7 +52,7 @@ class OrderStatusRedisAdapterTests {
     @Test
     void ignoresMalformedAndUnsupportedMessages() {
         var registry = new CapturingEmitterRegistry();
-        var subscriber = new OrderStatusRedisSubscriber(objectMapper, registry);
+        var subscriber = new OrderStatusRedisSubscriber(objectMapper, registry, mock(StaffOrderSseEmitterRegistry.class), mock(OrderService.class));
 
         subscriber.onMessage(message("not-json"), null);
         subscriber.onMessage(message("""
@@ -58,8 +61,17 @@ class OrderStatusRedisAdapterTests {
                   "eventId": "00000000-0000-0000-0000-000000000002",
                   "trackingReference": "00000000-0000-0000-0000-000000000001",
                   "status": "READY",
-                  "updatedAt": "2026-07-24T12:00:00Z"
+                  "updatedAt": "2026-07-24T12:00:00Z",
+                  "label": "42",
+                  "tenantId": "00000000-0000-0000-0000-000000000003",
+                  "locationId": "00000000-0000-0000-0000-000000000004"
                 }
+                """), null);
+
+        subscriber.onMessage(message("""
+                {"version":1,"eventId":"00000000-0000-0000-0000-000000000002",
+                 "trackingReference":"00000000-0000-0000-0000-000000000001",
+                 "status":"READY","updatedAt":"2026-07-24T12:00:00Z"}
                 """), null);
 
         assertThat(registry.events).isEmpty();
@@ -68,15 +80,18 @@ class OrderStatusRedisAdapterTests {
     @Test
     void forwardsAValidMessageToTheLocalRegistry() {
         var registry = new CapturingEmitterRegistry();
-        var subscriber = new OrderStatusRedisSubscriber(objectMapper, registry);
+        var subscriber = new OrderStatusRedisSubscriber(objectMapper, registry, mock(StaffOrderSseEmitterRegistry.class), mock(OrderService.class));
         var event = event(OrderStatus.COMPLETED);
         var payload = """
                 {
-                  "version": 2,
+                  "version": 1,
                   "eventId": "00000000-0000-0000-0000-000000000002",
                   "trackingReference": "00000000-0000-0000-0000-000000000001",
                   "status": "COMPLETED",
-                  "updatedAt": "2026-07-24T12:00:00Z"
+                  "updatedAt": "2026-07-24T12:00:00Z",
+                  "label": "42",
+                  "tenantId": "00000000-0000-0000-0000-000000000003",
+                  "locationId": "00000000-0000-0000-0000-000000000004"
                 }
                 """;
 
@@ -97,8 +112,7 @@ class OrderStatusRedisAdapterTests {
                 UUID.fromString("00000000-0000-0000-0000-000000000002"),
                 UUID.fromString("00000000-0000-0000-0000-000000000001"),
                 status,
-                Instant.parse("2026-07-24T12:00:00Z")
-        );
+                Instant.parse("2026-07-24T12:00:00Z"), "42", null, UUID.fromString("00000000-0000-0000-0000-000000000003"), UUID.fromString("00000000-0000-0000-0000-000000000004"));
     }
 
     private static class RecordingStringRedisTemplate extends StringRedisTemplate {

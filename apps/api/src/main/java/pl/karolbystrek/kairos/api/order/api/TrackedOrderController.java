@@ -30,19 +30,6 @@ class TrackedOrderController {
 
     @GetMapping(path = "/{trackingReference}/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     ResponseEntity<SseEmitter> subscribe(@PathVariable UUID trackingReference) {
-        var emitter = emitterRegistry.register(trackingReference);
-
-        try {
-            var trackedOrder = orderService.findTrackedOrder(trackingReference);
-            if (!trackedOrder.status().isTerminal()) {
-                return ResponseEntity.ok(emitter);
-            }
-        } catch (RuntimeException exception) {
-            emitterRegistry.complete(trackingReference, emitter);
-            throw exception;
-        }
-
-        emitterRegistry.complete(trackingReference, emitter);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(emitterRegistry.subscribe(trackingReference, orderService));
     }
 }

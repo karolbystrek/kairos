@@ -9,6 +9,6 @@ class OrderSseConfiguration {
 
     @Bean
     OrderSseEmitterRegistry orderSseEmitterRegistry() {
-        return new OrderSseEmitterRegistry(SseEmitter::new);
+        return new OrderSseEmitterRegistry(SseEmitter::new, Thread::startVirtualThread);
     }
 }

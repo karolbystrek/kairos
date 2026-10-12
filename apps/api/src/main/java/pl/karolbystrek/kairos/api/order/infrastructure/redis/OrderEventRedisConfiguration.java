@@ -12,7 +12,7 @@ import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 class OrderEventRedisConfiguration {
 
     /**
-     * Best-effort JSON invalidations for customer order status changes.
+     * Best-effort committed order state for customer and staff streams.
      * The payload carries its own schema version.
      */
     static final String ORDER_STATUS_CHANNEL = "kairos.order-status-changed";

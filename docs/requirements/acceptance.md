@@ -172,7 +172,15 @@
 * Unauthenticated, unauthorized, cross-tenant, and cross-location staff or External Integration access is rejected, including when accessing data directly through repositories protected by RLS.
 ### Customer tracking, PWA and Web Push
 
-* Customer tracking works without an account, receives validated SSE invalidations only for the possessed tracking reference, and reconciles through REST after events and reconnects.
+* Customer tracking works without an account, receives validated customer state
+  only for the possessed tracking reference on stream connect, changes and Redis
+  recovery, applies it without REST fetches, and never regresses under unordered
+  REST, SSE or Web Push arrivals. Disconnected tracking retains REST fallback.
+* Staff queues stream authorized active snapshots for location and tenant scopes,
+  include other staff/integration changes, and recheck access within five minutes.
+* Committed order changes wake push/webhook fanout and delivery immediately;
+  rollback wakes nothing, and five-second recovery preserves multi-instance
+  claims, abandoned work and due retries.
 * The customer application exposes a valid globally branded manifest and the
   required regular, maskable, Apple touch, and favicon assets supplied for the
   project.

@@ -4,17 +4,21 @@ import { Alert, Button, Spinner } from "@heroui/react";
 import { ScanLine, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import useSWR from "swr";
+import useSWR, { unstable_serialize, useSWRConfig } from "swr";
 import useSWRSubscription from "swr/subscription";
+import { z } from "zod";
 
 import { CustomerToolbar } from "@/components/customer-toolbar";
 import {
   ApiError,
   getTrackedOrder,
+  customerOrderSchema,
   orderStatusChangedEventSchema,
   type CustomerOrder,
 } from "@/src/api/orders";
 import { apiUrl } from "@/src/api/api-url";
+import { createOrderState } from "@/src/orders/order-state";
+import { orderStatusSchema } from "@/src/orders/order-status";
 import { isActiveOrderStatus } from "@/src/orders/order-status";
 import { updateApplicationBadge } from "@/src/pwa/badge";
 import { useCustomerNotifications } from "@/src/pwa/notification-provider";
@@ -58,12 +62,12 @@ const statusCopy = {
 function useOrderEventStream({
   enabled,
   trackingReference,
-  revalidate,
+  applyOrder,
   setConnected,
 }: {
   enabled: boolean;
   trackingReference: string;
-  revalidate: () => Promise<CustomerOrder | undefined>;
+  applyOrder: (order: CustomerOrder) => void;
   setConnected: (connected: boolean) => void;
 }) {
   useSWRSubscription(
@@ -77,7 +81,6 @@ function useOrderEventStream({
 
       eventSource.onopen = () => {
         setConnected(true);
-        void revalidate();
       };
       eventSource.onerror = () => {
         setConnected(false);
@@ -89,10 +92,10 @@ function useOrderEventStream({
           );
 
           if (parsed.success && parsed.data.trackingReference === reference) {
-            void revalidate();
+            applyOrder(parsed.data);
           }
         } catch {
-          // Invalid events are ignored; REST remains authoritative.
+          // Malformed stream data must not enter the customer state.
         }
       };
 
@@ -121,6 +124,14 @@ export function OrderTracker({
   const [isOnline, setIsOnline] = useState(true);
   const destinationSaved = useRef<Promise<void>>(Promise.resolve());
   const previousTransition = useRef<string | null>(null);
+  const { cache } = useSWRConfig();
+  const [orderState] = useState(() => {
+    const cached = customerOrderSchema.safeParse(
+      cache.get(unstable_serialize(["tracked-order", trackingReference]))?.data,
+    );
+
+    return createOrderState(cached.success ? cached.data : undefined);
+  });
   const {
     data: order,
     error,
@@ -128,11 +139,16 @@ export function OrderTracker({
     mutate,
   } = useSWR(
     ["tracked-order", trackingReference] as const,
-    ([, reference]) => getTrackedOrder(reference),
+    async ([, reference]) => {
+      const stored = await readTrackedOrder(reference);
+
+      if (stored) orderState.accept(stored);
+
+      return orderState.accept(await getTrackedOrder(reference));
+    },
     {
       errorRetryCount: 3,
-      // Invalidation clears SWR's cache before refetching. Retain the last
-      // authoritative order so that stream ownership does not flap meanwhile.
+      // Retain the last state while fallback or focus requests are in flight.
       keepPreviousData: true,
       refreshInterval: (latestOrder) =>
         isActive(latestOrder) && !isStreamConnected ? 15_000 : 0,
@@ -240,9 +256,50 @@ export function OrderTracker({
   useOrderEventStream({
     enabled: isOrderActive,
     trackingReference,
-    revalidate: () => mutate(undefined, { throwOnError: false }),
+    applyOrder: (candidate) => {
+      void mutate(
+        (current) => {
+          if (current) orderState.accept(current);
+
+          return orderState.accept(candidate);
+        },
+        { revalidate: false },
+      );
+    },
     setConnected: setIsStreamConnected,
   });
+
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) return;
+    const receiveTransition = (event: MessageEvent<unknown>) => {
+      const result = z
+        .object({
+          type: z.literal("KAIROS_ORDER_TRANSITION"),
+          trackingReference: z.uuid(),
+          status: orderStatusSchema,
+          transitionedAt: z.iso.datetime({ offset: true }),
+        })
+        .safeParse(event.data);
+
+      if (
+        !result.success ||
+        result.data.trackingReference !== trackingReference
+      )
+        return;
+      const transition = {
+        status: result.data.status,
+        updatedAt: result.data.transitionedAt,
+      };
+      const next = orderState.transition(transition);
+
+      if (next) void mutate(next, { revalidate: false });
+    };
+
+    navigator.serviceWorker.addEventListener("message", receiveTransition);
+
+    return () =>
+      navigator.serviceWorker.removeEventListener("message", receiveTransition);
+  }, [mutate, orderState, trackingReference]);
 
   if ((isLoading || (error && !offlineLookupComplete)) && !displayedOrder) {
     return (

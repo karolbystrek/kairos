@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import {
+  canApplyStatus,
   isActiveOrderStatus,
   orderStatusSchema,
   type OrderStatus,
@@ -301,6 +302,22 @@ export async function rememberTrackedOrder(
         tombstoneResult.success &&
         tombstoneResult.data.mode === "terminal" &&
         tombstoneResult.data.expiresAt > Date.now();
+
+      const currentResult = storedOrderSchema.safeParse(
+        await requestResult(orderStore.get(parsed.data.trackingReference)),
+      );
+
+      if (
+        (currentResult.success &&
+          !canApplyStatus(currentResult.data.status, parsed.data.status)) ||
+        (terminalTombstoneIsCurrent &&
+          tombstoneResult.data.status &&
+          !canApplyStatus(tombstoneResult.data.status, parsed.data.status))
+      ) {
+        await transactionComplete(transaction);
+
+        return;
+      }
 
       if (isActiveOrderStatus(parsed.data.status)) {
         if (!terminalTombstoneIsCurrent) {
@@ -637,21 +654,6 @@ async function removeExpiredPushMetadata(
       }
     }
   }
-}
-
-function canApplyStatus(current: OrderStatus, candidate: OrderStatus): boolean {
-  if (current === candidate) {
-    return true;
-  }
-
-  return (
-    (current === "IN_PREPARATION" &&
-      (candidate === "READY" ||
-        candidate === "COMPLETED" ||
-        candidate === "CANCELED")) ||
-    (current === "READY" &&
-      (candidate === "COMPLETED" || candidate === "CANCELED"))
-  );
 }
 
 function isNotificationMetadata(value: unknown): value is NotificationMetadata {

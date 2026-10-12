@@ -55,15 +55,17 @@ class TrackedOrderApiIntegrationTests extends RedisListenerIsolatedIntegrationTe
     }
 
     @Test
-    void exposesAnAnonymousReadOnlyEventStreamOnlyForActiveOrders() throws Exception {
+    void exposesInitialStateForActiveAndTerminalOrders() throws Exception {
         var activeReference = insertOrder("7", "READY");
         var terminalReference = insertOrder("8", "CANCELED");
 
         mockMvc.perform(apiGet("/tracked-orders/v1/{trackingReference}/events", activeReference))
                 .andExpect(status().isOk())
                 .andExpect(request().asyncStarted());
-        mockMvc.perform(apiGet("/tracked-orders/v1/{trackingReference}/events", terminalReference))
-                .andExpect(status().isNoContent());
+        var stream = mockMvc.perform(apiGet("/tracked-orders/v1/{trackingReference}/events", terminalReference))
+                .andExpect(status().isOk())
+                .andReturn().getResponse();
+        org.assertj.core.api.Assertions.assertThat(awaitStreamContent(stream, "CANCELED")).contains("CANCELED");
     }
 
     private UUID insertOrder(String label, String status) {

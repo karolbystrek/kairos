@@ -44,8 +44,7 @@ kairos:
     worker:
       batch-size: 10
       claim-lease: 30s
-      fanout-poll-delay: 500ms
-      delivery-poll-delay: 500ms
+      recovery-poll-delay: 5s
       initial-delay: 24h
     destination-policy: LOCAL_DEVELOPMENT
   retention:
@@ -74,8 +73,7 @@ kairos:
     worker:
       batch-size: 10
       claim-lease: 30s
-      fanout-poll-delay: 500ms
-      delivery-poll-delay: 500ms
+      recovery-poll-delay: 5s
       initial-delay: 24h
       cleanup-delay: 1h
       cleanup-initial-delay: 24h

@@ -8,20 +8,52 @@
 
 ## 6. Real-Time Communication
 
-The API exposes a Server-Sent Events stream for each active customer tracking
-reference. In the local environment the customer application connects to that
-stream on the dedicated API HTTPS origin through NGINX. The stream is
-anonymous and read-only: possession of the high-entropy tracking reference
-grants access to that order's events but never authorizes a command. The
-customer validates each compact event with Zod and treats it only as an
-invalidation signal; SWR then retrieves the authoritative customer
-representation through REST.
+The API exposes an anonymous, read-only Server-Sent Events stream for each
+customer tracking reference. Possession of the high-entropy reference grants
+access only to that order's customer representation, never to staff data or
+commands. The stream sends an `order-status-changed` event containing
+`eventId`, `trackingReference`, `label`, `status`, `updatedAt`, and
+`reviewInvitation` on opening and reopening, and after status changes. The
+client validates the state with Zod and applies it directly without an extra
+REST request. An already terminal order receives its final snapshot and the
+stream ends; terminal changes likewise deliver state before closing.
 
-Order-state events are published only after the PostgreSQL transition and history transaction commits. Redis Pub/Sub distributes each event to every live API instance, and each instance forwards it to its locally connected SSE clients for that tracking reference. Publishing and subscription are mandatory application behavior and have no feature flag. Redis remains part of application health reporting and its health contributor must not be disabled. The publishing instance must not turn a committed transition into a failed command response when Redis is unavailable.
+PostgreSQL remains authoritative. Creation and status events are published
+only after the order, history and outbox transaction commits. One Redis Pub/Sub
+topic distributes committed order changes to every API instance for both
+customer and staff streams, without sticky routing. Redis publishing and
+subscription are mandatory application behavior with no feature flag; Redis
+health reporting remains enabled. A publication failure cannot turn a committed
+command into a failed response.
 
-Redis Pub/Sub and SSE are intentionally non-durable. The client reconciles through REST when the stream opens or reopens, on focus, and after browser connectivity returns. Cache invalidation may clear the internal SWR entry before refetching, but the customer UI retains the last authoritative order during that request so the active stream is not torn down and reopened. While SSE is disconnected it falls back to approximately 15-second REST polling. No periodic safety request runs while SSE appears healthy, so the current increment accepts the rare possibility that an after-commit Redis publication failure leaves a page stale until another reconciliation trigger.
+Redis Pub/Sub and SSE are non-durable. When an instance subscribes again after
+Redis recovery, it refreshes its connected customer and staff streams from
+PostgreSQL. Customer REST remains available for initial loading, focus and
+browser connectivity recovery, with approximately 15-second polling while the
+stream is unavailable. Healthy streams require no periodic REST safety request.
+A lost publication without subscription interruption can still leave a page
+stale until another reconciliation trigger. Customer REST, stream snapshots,
+stream events, Web Push messages and IndexedDB persistence share monotonic
+status reconciliation: `IN_PREPARATION` advances to `READY` or a terminal state,
+`READY` advances only to a terminal state, and a terminal state never changes.
+Status precedence, rather than wall-clock timestamp order, prevents regression.
 
-A terminal transition produces the final invalidation and ends the live stream. Opening an already terminal order returns its REST state without maintaining an SSE connection. Servlet async and error redispatches continue processing the authorization decision made for the original request instead of being treated as new protected commands.
+Authenticated staff use `/api/orders/v1/events` with an optional `locationId`,
+matching the queue REST endpoint's location and tenant-wide access rules. The
+`order-queue` event carries the full current active queue on opening/reopening
+and after relevant committed creations or transitions. Queue refresh and
+snapshot delivery are serialized per connection so an older snapshot cannot
+replace a newer queue. Access is rechecked before refresh and at least every
+five minutes; denied connections end. Active revocation on assignment or
+session changes remains out of scope. Staff state stays scoped to the signed-in
+account and queue, with REST recovery while disconnected. Servlet async and
+error redispatches preserve the original request's authorization decision.
+
+Push and webhook workers wake asynchronously after an order transaction
+commits, run fanout before delivery, and coalesce overlapping wakeups while
+draining available batches. PostgreSQL claim locks and delivery leases retain
+the existing multi-instance at-least-once guarantees. Five-second recovery
+cycles process abandoned work and due retries without frequent idle polling.
 
 Web Push complements rather than replaces this foreground contract. `READY`,
 `COMPLETED`, and `CANCELED` order events are durably fanned out to enrolled
@@ -31,5 +63,5 @@ application still reconciles authoritative state through REST. At-least-once
 delivery, unordered push services, and multiple subscriptions require stable
 event IDs, state-graph monotonicity, replacement tags, and pre-submission checks
 against current PostgreSQL order state. Google review invitations are in-app
-only and never produce a push delivery. Authenticated staff queue streaming remains deferred. Future genuinely bidirectional features may introduce
+only and never produce a push delivery. Future genuinely bidirectional features may introduce
 WebSocket independently rather than changing the SSE or Web Push contracts.

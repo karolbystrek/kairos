@@ -25,10 +25,14 @@
   front of Spring.
 ## Real-time and security invariants
 
-- Customer SSE and Web Push are invalidation or notification mechanisms; REST
-  remains authoritative. Tracked-order REST stays network-only in the service
-  worker, and explicit IndexedDB snapshots must be labelled stale when used
-  offline.
+- PostgreSQL remains authoritative; customer SSE carries customer state and
+  staff SSE carries authorized active queues over one Redis order-change topic.
+  Customer REST, SSE and Web Push reconcile monotonically by status. Streams
+  deliver snapshots on connect and Redis resubscription; staff access is checked
+  at least every five minutes. Tracked-order REST stays network-only in the
+  service worker, and offline IndexedDB snapshots must be labelled stale.
+- Push and webhook workers wake asynchronously after commit, fan out before
+  delivery, and retain PostgreSQL claims with five-second recovery polling.
 - Enforce security and tenant access in the API. Frontend redirects and hidden
   controls are user-experience features, not authorization controls.
 - Keep authentication credentials unavailable to JavaScript; browser sessions

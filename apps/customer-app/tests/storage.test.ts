@@ -4,6 +4,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import {
   readLastStableDestination,
+  readTrackedOrder,
+  rememberTrackedOrder,
   rememberLastStableDestination,
 } from "@/src/pwa/storage";
 
@@ -37,4 +39,11 @@ describe("last stable destination", () => {
       trackingReference: TRACKING_REFERENCE,
     });
   });
+});
+
+it("does not let stale REST persistence undo a ready Push or stream state", async () => {
+  const order = { trackingReference: TRACKING_REFERENCE, label: "A12", updatedAt: "2026-10-12T10:00:00Z" };
+  await rememberTrackedOrder({ ...order, status: "READY" });
+  await rememberTrackedOrder({ ...order, status: "IN_PREPARATION" });
+  expect((await readTrackedOrder(TRACKING_REFERENCE))?.status).toBe("READY");
 });

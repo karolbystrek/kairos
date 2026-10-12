@@ -3,6 +3,7 @@ package pl.karolbystrek.kairos.api.order.infrastructure.redis;
 import lombok.NonNull;
 import pl.karolbystrek.kairos.api.order.application.model.OrderStatusChangedEvent;
 import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
+import pl.karolbystrek.kairos.api.order.application.model.ReviewInvitationView;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -12,9 +13,13 @@ public record OrderStatusRedisMessage(
         @NonNull UUID eventId,
         @NonNull UUID trackingReference,
         @NonNull OrderStatus status,
-        @NonNull Instant updatedAt
+        @NonNull Instant updatedAt,
+        @NonNull String label,
+        ReviewInvitationView reviewInvitation,
+        @NonNull UUID tenantId,
+        @NonNull UUID locationId
 ) {
-    public static final int CURRENT_VERSION = 2;
+    public static final int CURRENT_VERSION = 1;
 
     public static OrderStatusRedisMessage from(OrderStatusChangedEvent event) {
         return new OrderStatusRedisMessage(
@@ -22,7 +27,7 @@ public record OrderStatusRedisMessage(
                 event.eventId(),
                 event.trackingReference(),
                 event.status(),
-                event.updatedAt()
+                event.updatedAt(), event.label(), event.reviewInvitation(), event.tenantId(), event.locationId()
         );
     }
 
@@ -31,6 +36,6 @@ public record OrderStatusRedisMessage(
     }
 
     public OrderStatusChangedEvent toApplicationEvent() {
-        return new OrderStatusChangedEvent(eventId, trackingReference, status, updatedAt);
+        return new OrderStatusChangedEvent(eventId, trackingReference, status, updatedAt, label, reviewInvitation, tenantId, locationId);
     }
 }
