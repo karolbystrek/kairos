@@ -172,8 +172,9 @@ class OrderApiIntegrationTests extends RedisListenerIsolatedIntegrationTest {
                 .andExpect(request().asyncStarted())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM))
                 .andReturn().getResponse();
-        assertThat(awaitStreamContent(stream, "event:order-queue"))
-                .contains(active.id().toString())
+        // Wait for the payload, not the event name: SSE writes them separately.
+        assertThat(awaitStreamContent(stream, active.id().toString()))
+                .contains("event:order-queue")
                 .doesNotContain(terminal.id().toString());
     }
 

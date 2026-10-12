@@ -115,6 +115,8 @@ else
   tar -xzf "$incoming/release.tar.gz" -C "$incoming"
   mv -T "$incoming" "$release"
 fi
+# The postgres container user must read the init script; the 0700 release directory still isolates it.
+chmod 0755 "$release/deployment/postgres/bootstrap.sh"
 configuration=$(mktemp /srv/kairos/.production.env.XXXXXXXXXX)
 trap 'rm -f -- "$configuration"' EXIT
 cat > "$configuration" <<'KAIROS_PRODUCTION_ENV'
