@@ -17,15 +17,11 @@ TEMPLATE = Path(__file__).with_name('production.env.example')
 DEPLOYMENT_SUPPLIED = {'KAIROS_IMAGE_REGISTRY', 'KAIROS_RELEASE_VERSION'}
 
 
-def production_configuration(template, secrets, variables):
-    """Template defaults plus GitHub Environment values; errors name keys, never values."""
+def production_configuration(template, values):
+    """Template defaults plus values deploy.yml maps from GitHub; errors name keys, never values."""
     lines = template.splitlines()
     keys = [line.split('=', 1)[0] for line in lines if line and not line.startswith('#')]
-    both = sorted(set(keys) & set(secrets) & set(variables))
-    if both:
-        raise ValidationError(f'set as both secret and variable: {", ".join(both)}')
-    values = secrets | variables
-    supplied = {key: str(values[key]) for key in keys
+    supplied = {key: values[key] for key in keys
                 if values.get(key, '') != '' and key not in DEPLOYMENT_SUPPLIED}
     unsafe = sorted(key for key, value in supplied.items() if re.search("['\r\n]", value))
     if unsafe:
@@ -72,9 +68,7 @@ def main():
                     summary.write(f'- {service}: `{image}`\n')
 
             stage = 'production configuration'
-            configuration = production_configuration(
-                TEMPLATE.read_text(), json.loads(os.environ['PRODUCTION_SECRETS']),
-                json.loads(os.environ['PRODUCTION_VARIABLES']))
+            configuration = production_configuration(TEMPLATE.read_text(), os.environ)
 
             stage = 'SSH configuration'
             host, user = os.environ['DEPLOY_HOST'], os.environ['DEPLOY_USER']

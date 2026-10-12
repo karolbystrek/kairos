@@ -18,19 +18,25 @@ prepare application keys. Production configuration is owned by the GitHub
 committed `deployment/production.env.example` plus that Environment's values:
 
 - The template lists every production setting. A setting with a template
-  default needs no GitHub value; a GitHub value overrides the default.
+  default needs no GitHub value.
 - Every blank template setting except `KAIROS_IMAGE_REGISTRY` and
-  `KAIROS_RELEASE_VERSION` is required. Store sensitive values as Environment
-  secrets and public ones as variables; a key set as both fails the deployment.
-- Repository-level variables are also visible, so `NEXT_PUBLIC_API_BASE_URL`
-  and `NEXT_PUBLIC_CUSTOMER_APP_URL` used for image builds also override the
-  template origins.
+  `KAIROS_RELEASE_VERSION` is required. Sensitive values are Environment
+  secrets and public ones are variables.
+- The deploy step in `.github/workflows/deploy.yml` names every required key
+  explicitly (`secrets.NAME` or `vars.NAME`). It never passes all secrets at
+  once: GitHub flags `toJSON(secrets)` as possible exfiltration and holds the run.
 - Missing values, or values containing `'` or a newline, fail deployment before
   any SSH connection, naming keys only. Values are written single-quoted, so `$`
   is literal.
-- A new setting needs only a template line and, without a default, a GitHub
-  value; the workflow is unchanged. Values reach the host only over the deploy
-  job's SSH connection, never images, release bundles or artifacts.
+- Values reach the host only over the deploy job's SSH connection, never
+  images, release bundles or artifacts.
+
+**Adding a required production setting:** whenever a change adds a blank
+(required) key to `deployment/production.env.example`, also add its value to
+the GitHub `production` Environment (secret or variable) and map it in the
+deploy step of `deploy.yml`, in the same change. Set the value before merging,
+otherwise the next deployment fails on the missing key. Overriding a defaulted
+setting from GitHub likewise needs both the Environment value and the mapping.
 
 Set the required values with `gh secret set NAME --env production --repo
 karolbystrek/kairos` (it prompts for the value) or `gh variable set`.
