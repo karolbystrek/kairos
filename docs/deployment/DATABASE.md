@@ -7,6 +7,9 @@
 - [Credentials and fresh startup](#credentials-and-fresh-startup)
 - [Spring persistence and RLS](#spring-persistence-and-rls)
 - [Development schema changes](#development-schema-changes)
+- [Platform administrator grants](#platform-administrator-grants)
+  - [Grant platform access](#grant-platform-access)
+  - [Verify and revoke](#verify-and-revoke)
 
 ## Credentials and fresh startup
 
@@ -65,3 +68,62 @@ Any volume reset is an operator action requiring explicit authorization.
 After initialization, deploy the reviewed revision through the existing production
 Environment approval gate and verify application health and representative scoped
 operations. No repository script resets volumes or repairs Flyway history.
+
+## Platform administrator grants
+
+[Platform authority](../requirements/analytics-reporting.md#platform-authority)
+is added to an existing enabled staff account; it is never self-service. Only
+the owner role can write `platform_administrators`. Granting or revoking it
+changes live production data, so it needs the owner's explicit approval.
+
+The commands run on the production host as the deployment account. They find
+the `kairos` project's PostgreSQL container through Compose labels, and the
+container's own environment supplies the owner role and database name. The
+image trusts local socket connections, so no password is entered and nothing
+secret appears in the command line.
+
+### Grant platform access
+
+1. Create the account through normal registration or invitation, sign in once
+   and finish onboarding. Note its email address.
+2. SSH to the production host. Replace the email on the `\set` line, then run:
+
+   ```sh
+   postgres=$(docker ps -q --filter label=com.docker.compose.project=kairos \
+     --filter label=com.docker.compose.service=postgres)
+   docker exec -i "$postgres" sh -c \
+     'psql -X -v ON_ERROR_STOP=1 -U "$KAIROS_DB_OWNER_USER" -d "$POSTGRES_DB"' <<'SQL'
+   \set email 'admin@example.com'
+   INSERT INTO platform_administrators (account_id)
+   SELECT id FROM accounts WHERE email = lower(:'email') AND status = 'ENABLED'
+   ON CONFLICT DO NOTHING
+   RETURNING account_id;
+   SQL
+   ```
+
+3. Expect one returned `account_id` and `INSERT 0 1`. `INSERT 0 0` with no row
+   means the account is unknown, not enabled, or already granted; check it
+   before retrying.
+4. Reload the panel as that account. The Platform tab appears without signing
+   in again because every request rechecks the grant.
+
+### Verify and revoke
+
+Run the same command with a different SQL body. To list current grants:
+
+```sql
+SELECT a.email, a.status, p.granted_at
+FROM platform_administrators p JOIN accounts a ON a.id = p.account_id
+ORDER BY p.granted_at;
+```
+
+To revoke one, keeping the `\set email` line:
+
+```sql
+DELETE FROM platform_administrators
+WHERE account_id = (SELECT id FROM accounts WHERE email = lower(:'email'))
+RETURNING account_id;
+```
+
+Revocation takes effect on the account's next request. Disabling or deleting
+the account also ends platform access, and account purge removes the grant.

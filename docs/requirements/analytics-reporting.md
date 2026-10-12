@@ -47,6 +47,8 @@ DELETE FROM platform_administrators
 WHERE account_id = (SELECT id FROM accounts WHERE email = 'owner@example.com');
 ```
 
+The production host procedure is in
+[platform administrator grants](../deployment/DATABASE.md#platform-administrator-grants).
 The holder must remain an enabled staff account. Every platform request
 rechecks the grant, so revocation, disabling or account deletion takes effect
 on the next request under the existing session rules. `GET /api/auth/v1/me`

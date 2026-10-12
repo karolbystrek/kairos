@@ -42,7 +42,7 @@ step and check its prerequisites. Public launch still requires every launch gate
 
 ## Related procedures
 
-- [PostgreSQL roles and initialization](DATABASE.md): fresh role setup and development schema changes.
+- [PostgreSQL roles and initialization](DATABASE.md): fresh role setup, development schema changes and [platform administrator grants](DATABASE.md#platform-administrator-grants).
 - [Ubuntu VM bootstrap](BOOTSTRAP.md): repeatable host packages, account and keys.
 - [Native Lightsail email alarms](MONITORING.md): reduced development coverage and activation.
 - [AWS OIDC and temporary SSH](AWS-SSH.md): approved firewall lifecycle and recovery.
