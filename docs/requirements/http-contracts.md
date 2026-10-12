@@ -35,6 +35,7 @@ POST   /api/account-invitation-previews/v1
 POST   /api/account-invitation-redemptions/v1
 
 GET    /api/orders/v1
+GET    /api/orders/v1/events
 POST   /api/orders/v1
 PUT    /api/orders/v1/{orderId}/status
 

@@ -34,6 +34,7 @@ import {
   createOrderInputSchema,
   describeOrderItems,
   listOrders,
+  subscribeToOrderQueue,
   updateOrderStatus,
   type CreateOrderInput,
   type OrderStatus,
@@ -380,6 +381,10 @@ export function OrderManagement({
     enabledLocations.length > 0
       ? ordersKey(accountId, locationId ?? tenantOrderScope)
       : null;
+  const queueScope = currentOrdersKey
+    ? `${accountId}:${locationId ?? tenantOrderScope}`
+    : null;
+  const [connectedQueueScope, setConnectedQueueScope] = useState<string>();
 
   const {
     data: orders = [],
@@ -390,8 +395,38 @@ export function OrderManagement({
     currentOrdersKey,
     ([, , , scope]) =>
       listOrders(scope === tenantOrderScope ? undefined : scope),
-    { errorRetryCount: 3, shouldRetryOnError },
+    {
+      errorRetryCount: 3,
+      shouldRetryOnError,
+      refreshInterval:
+        isActive && connectedQueueScope !== queueScope ? 15_000 : 0,
+    },
   );
+
+  useEffect(() => {
+    if (!isActive || !queueScope) return;
+    let disposed = false;
+    const disconnect = () => {
+      if (disposed) return;
+      setConnectedQueueScope(undefined);
+      void mutateOrders().catch(() => undefined);
+    };
+    const close = subscribeToOrderQueue(
+      locationId,
+      (snapshot) => {
+        if (disposed) return;
+        setConnectedQueueScope(queueScope);
+        // SWR discards REST requests started before this snapshot arrived.
+        void mutateOrders(snapshot, { revalidate: false });
+      },
+      disconnect,
+    );
+
+    return () => {
+      disposed = true;
+      close();
+    };
+  }, [isActive, queueScope, locationId, mutateOrders]);
 
   const {
     error: createOrderError,
@@ -495,18 +530,11 @@ export function OrderManagement({
       return;
     }
 
-    await mutateOrders(
-      (current) => [
-        order,
-        ...(current ?? []).filter((item) => item.id !== order.id),
-      ],
-      { revalidate: false },
-    );
     setCustomLabel("");
     setItemQuantities({});
     setIsCreateOpen(false);
     setQrOrder(order);
-    void mutateOrders(undefined, { throwOnError: false });
+    void mutateOrders().catch(() => undefined);
   }
 
   async function updateStatus(
@@ -523,17 +551,8 @@ export function OrderManagement({
     const isTerminal =
       updated.status === "COMPLETED" || updated.status === "CANCELED";
 
-    await mutateOrders(
-      (current) =>
-        isTerminal
-          ? (current ?? []).filter((item) => item.id !== updated.id)
-          : (current ?? [updated]).map((item) =>
-              item.id === updated.id ? updated : item,
-            ),
-      { revalidate: false },
-    );
     if (isTerminal && qrOrder?.id === updated.id) setQrOrder(undefined);
-    void mutateOrders(undefined, { throwOnError: false });
+    void mutateOrders().catch(() => undefined);
 
     return true;
   }

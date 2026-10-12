@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -34,6 +35,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -151,6 +153,28 @@ class OrderApiIntegrationTests extends RedisListenerIsolatedIntegrationTest {
                 ready
         );
         assertActiveQueue(apiGet("/orders/v1"), inPreparation, ready);
+    }
+
+    @Test
+    void queueStreamUsesRestAuthorizationAndCarriesOnlyTheActiveQueue() throws Exception {
+        var active = orderService.createOrder(principal, locationId, "active-stream-order");
+        var terminal = orderService.createOrder(principal, locationId, "terminal-stream-order");
+        orderService.updateStatus(principal, terminal.id(), OrderStatus.CANCELED);
+
+        mockMvc.perform(apiGet("/orders/v1/events"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(withAuthentication(apiGet("/orders/v1/events")
+                        .queryParam("locationId", UUID.randomUUID().toString())))
+                .andExpect(status().isNotFound());
+        var stream = mockMvc.perform(withAuthentication(apiGet("/orders/v1/events")
+                        .queryParam("locationId", locationId.toString())))
+                .andExpect(status().isOk())
+                .andExpect(request().asyncStarted())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM))
+                .andReturn().getResponse();
+        assertThat(awaitStreamContent(stream, "event:order-queue"))
+                .contains(active.id().toString())
+                .doesNotContain(terminal.id().toString());
     }
 
     private void assertActiveQueue(

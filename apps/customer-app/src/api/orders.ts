@@ -32,11 +32,9 @@ export const customerOrderSchema = z.object({
   reviewInvitation: reviewInvitationSchema.nullish(),
 });
 
-export const orderStatusChangedEventSchema = z.object({
+export const orderStatusChangedEventSchema = customerOrderSchema.extend({
   eventId: z.uuid(),
   trackingReference: z.uuid(),
-  status: orderStatusSchema,
-  updatedAt: z.iso.datetime({ offset: true }),
 });
 
 export type { OrderStatus } from "@/src/orders/order-status";

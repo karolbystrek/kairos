@@ -19,3 +19,15 @@ export const orderStatusLabels: Record<OrderStatus, string> = {
 export function isActiveOrderStatus(status: OrderStatus | undefined): boolean {
   return status === "IN_PREPARATION" || status === "READY";
 }
+
+export function canApplyStatus(
+  current: OrderStatus,
+  candidate: OrderStatus,
+): boolean {
+  return (
+    current === candidate ||
+    (current === "IN_PREPARATION" && candidate !== "IN_PREPARATION") ||
+    (current === "READY" &&
+      (candidate === "COMPLETED" || candidate === "CANCELED"))
+  );
+}

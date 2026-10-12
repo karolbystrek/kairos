@@ -36,8 +36,8 @@ The customer application must:
 * open directly from an order-specific QR code without login or installation;
 * display the current order state before establishing real-time communication;
 * open an anonymous Server-Sent Events stream scoped only to the referenced order;
-* validate every received event before using it as a signal to revalidate the authoritative REST state;
-* rely on the browser's native `EventSource` reconnection and fetch the current state through REST whenever the stream opens or reopens;
+* validate and apply customer state carried by each event without a REST request, rejecting status regressions across REST, SSE, Web Push and stored snapshots;
+* rely on native `EventSource` reconnection and receive the current state directly on every stream opening or reopening and after Redis subscription recovery;
 * poll REST approximately every 15 seconds while the event stream is disconnected, and stop fallback polling when it reconnects;
 * reconcile through REST on focus and browser connectivity restoration;
 * make an active order's current status the dominant content and its immutable

@@ -39,7 +39,7 @@ Do not skip an applicable requirement because it lives in another file.
 | [Provider setup and registration consistency](requirements/provider.md) | ZITADEL provisioning, service credentials and registration cleanup |
 | [Customer, integration and tenant access](requirements/access-isolation.md) | Any authorization, tenant isolation, RLS or customer capability change |
 | [Persistence requirements](requirements/persistence.md) | Schema, migrations, ownership, secret storage and automatic order labels |
-| [Real-time communication](requirements/real-time.md) | Customer SSE, Redis Pub/Sub and Web Push invalidation |
+| [Real-time communication](requirements/real-time.md) | Customer state SSE, staff queue SSE, Redis Pub/Sub and Web Push |
 | [Local routing and hosted releases](requirements/routing-releases.md) | Compose, gateway, CI builds, release publication, deployment and VM bootstrap |
 | [HTTP resource families and contracts](requirements/http-contracts.md) | API endpoints, response shapes, lifecycle operations and HTTP behavior |
 | [Hosted ingress and Cloudflare range maintenance](requirements/hosted-ingress.md) | Cloudflare, public TLS, trusted proxies, firewall and cache acceptance |
