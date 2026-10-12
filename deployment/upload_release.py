@@ -12,6 +12,35 @@ import tempfile
 from deploy import inputs, failure_reason, ValidationError
 from release_manifest import RUNTIME_FILES
 
+TEMPLATE = Path(__file__).with_name('production.env.example')
+# deploy.py supplies these from the verified release, overriding the env file.
+DEPLOYMENT_SUPPLIED = {'KAIROS_IMAGE_REGISTRY', 'KAIROS_RELEASE_VERSION'}
+
+
+def production_configuration(template, secrets, variables):
+    """Template defaults plus GitHub Environment values; errors name keys, never values."""
+    lines = template.splitlines()
+    keys = [line.split('=', 1)[0] for line in lines if line and not line.startswith('#')]
+    both = sorted(set(keys) & set(secrets) & set(variables))
+    if both:
+        raise ValidationError(f'set as both secret and variable: {", ".join(both)}')
+    values = secrets | variables
+    supplied = {key: str(values[key]) for key in keys
+                if values.get(key, '') != '' and key not in DEPLOYMENT_SUPPLIED}
+    unsafe = sorted(key for key, value in supplied.items() if re.search("['\r\n]", value))
+    if unsafe:
+        raise ValidationError(f'values must not contain quotes or newlines: {", ".join(unsafe)}')
+    missing = [line[:-1] for line in lines if re.fullmatch(r'[A-Z0-9_]+=', line)
+               and line[:-1] not in supplied and line[:-1] not in DEPLOYMENT_SUPPLIED]
+    if missing:
+        raise ValidationError(f'missing production configuration: {", ".join(missing)}')
+    output = []
+    for line in lines:
+        key = line.split('=', 1)[0]
+        # Single quotes keep Compose from interpolating $ in secrets.
+        output.append(f"{key}='{supplied[key]}'" if key in supplied else line)
+    return '\n'.join(output) + '\n'
+
 
 def main():
     stage = 'release validation'
@@ -41,6 +70,11 @@ def main():
                 summary.write(f'## Production release\n\nRevision: `{revision}`\n\n')
                 for service, image in manifest['images'].items():
                     summary.write(f'- {service}: `{image}`\n')
+
+            stage = 'production configuration'
+            configuration = production_configuration(
+                TEMPLATE.read_text(), json.loads(os.environ['PRODUCTION_SECRETS']),
+                json.loads(os.environ['PRODUCTION_VARIABLES']))
 
             stage = 'SSH configuration'
             host, user = os.environ['DEPLOY_HOST'], os.environ['DEPLOY_USER']
@@ -87,6 +121,11 @@ else
   tar -xzf "$incoming/release.tar.gz" -C "$incoming"
   mv -T "$incoming" "$release"
 fi
+configuration=$(mktemp /srv/kairos/.production.env.XXXXXXXXXX)
+trap 'rm -f -- "$configuration"' EXIT
+cat > "$configuration" <<'KAIROS_PRODUCTION_ENV'
+''' + configuration + '''KAIROS_PRODUCTION_ENV
+mv -f "$configuration" /srv/kairos/production.env
 bash "$release/deployment/deploy.sh" "$release" /srv/kairos/production.env
 ''', timeout=3600)
             finally:

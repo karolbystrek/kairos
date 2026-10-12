@@ -151,6 +151,9 @@ jobs:
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          # Only keys named in deployment/production.env.example are used.
+          PRODUCTION_SECRETS: ${{ toJSON(secrets) }}
+          PRODUCTION_VARIABLES: ${{ toJSON(vars) }}
         run: python3 deployment/upload_release.py "$RELEASE_DIRECTORY" "$RELEASE_REVISION"
 
       - name: Remove temporary deployment SSH access

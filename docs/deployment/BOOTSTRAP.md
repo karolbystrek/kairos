@@ -8,7 +8,7 @@
 - [SSH aliases on your Mac](#ssh-aliases-on-your-mac)
 - [Run the bootstrap](#run-the-bootstrap)
 - [Verify, then stop](#verify-then-stop)
-- [Prepare production configuration after bootstrap verification](#prepare-production-configuration-after-bootstrap-verification)
+- [Set production configuration in GitHub](#set-production-configuration-in-github)
 - [Repository validation](#repository-validation)
 
 This prepares one Ubuntu 24.04 x86-64 host, including the provisioned Lightsail
@@ -177,50 +177,41 @@ or partial key sets stop bootstrap rather than being replaced. Public-key
 installation adds the supplied key without revoking prior keys; intentional key
 rotation/revocation is separate maintenance.
 
-On a fresh host, `/srv/kairos/production.env.example` is mode `0600` and contains
-repository-owned production defaults from `deployment/production.env.example`. Bootstrap deliberately does
-not create `/srv/kairos/production.env`. If that file already exists, it is
-preserved byte-for-byte. Reruns refresh only the non-secret example, including
-on hosts previously bootstrapped with local defaults. Keys are stored under `/srv/kairos/secrets` with directory
+Bootstrap never creates or changes `/srv/kairos/production.env`; each deployment
+writes it from GitHub. Keys are stored under `/srv/kairos/secrets` with directory
 mode `0700` and file mode `0400`; release and TLS directories use `0700`. The
 six-key set includes `email-encryption.bin` for pending transactional mail;
 [configuration](CONFIGURATION.md) describes adding this file to an older host
 without replacing its existing keys and installing the required Resend key.
 
-## Prepare production configuration after bootstrap verification
+## Set production configuration in GitHub
 
-After merging the template change, update your trusted main checkout and rerun
-bootstrap (the SSH-alias command above). For an already prepared VM, use
-`--tags configuration` to refresh configuration inputs without host/package tasks.
-The existing production environment and application keys are preserved.
-
-Use administrator SSH for the interactive editor; the deployment key deliberately
-forbids a PTY:
+Production configuration lives in the GitHub `production` Environment, not on
+the host; each deployment writes `/srv/kairos/production.env` from it and the
+committed template. See [configuration](CONFIGURATION.md) for the rules.
+Set the six passwords (`POSTGRES_PASSWORD`, `KAIROS_DB_OWNER_PASSWORD`,
+`KAIROS_DB_RUNTIME_PASSWORD`, `REDIS_PASSWORD`, `ZITADEL_DB_PASSWORD`,
+`ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD`) to different strong values, plus
+`ZITADEL_FIRSTINSTANCE_ORG_MACHINE_PAT_EXPIRATIONDATE` (UTC ISO 8601) and
+`RESEND_API_KEY` (see [transactional email](CONFIGURATION.md#transactional-email-resend)),
+as secrets, and `VAPID_SUBJECT` (your `mailto:` contact) as a variable:
 
 ```sh
-ssh kairos
-sudo -iu kairos-deploy
-cd /srv/kairos
-if [ ! -e production.env ]; then
-  (umask 077; cp production.env.example production.env)
-fi
-chmod 0600 production.env
-nano production.env
+for name in POSTGRES_PASSWORD KAIROS_DB_OWNER_PASSWORD KAIROS_DB_RUNTIME_PASSWORD \
+  REDIS_PASSWORD ZITADEL_DB_PASSWORD ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD \
+  ZITADEL_FIRSTINSTANCE_ORG_MACHINE_PAT_EXPIRATIONDATE RESEND_API_KEY; do
+  gh secret set "$name" --env production --repo karolbystrek/kairos
+done
+gh variable set VAPID_SUBJECT --env production --repo karolbystrek/kairos
 ```
 
-Fill the six blank passwords (`POSTGRES_PASSWORD`, `KAIROS_DB_OWNER_PASSWORD`,
-`KAIROS_DB_RUNTIME_PASSWORD`, `REDIS_PASSWORD`, `ZITADEL_DB_PASSWORD`,
-`ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD`) with different
-strong values. Set `VAPID_SUBJECT` to your `mailto:` contact and set a deliberate
-`ZITADEL_FIRSTINSTANCE_ORG_MACHINE_PAT_EXPIRATIONDATE` (UTC ISO 8601), with renewal
-scheduled before expiry. Set `RESEND_API_KEY` to the domain-restricted sending key
-and keep `EMAIL_DELIVERY_MODE=RESEND`; see
-[transactional email](CONFIGURATION.md#transactional-email-resend). Do not leave
-these fields blank at deployment.
-If `production.env` already exists, edit those settings and reconcile public
-settings against the example; do not overwrite existing credentials with a new
-copy. Hostnames and browser origins must match Cloudflare and the GitHub build
-variables. Deployment supplies the blank registry/release fields.
+Each command prompts for its value. Deployment fails before any SSH connection
+while one is missing. On a host whose databases were already initialized from a
+hand-edited `production.env`, copy its existing passwords, PAT expiry and other
+non-default values into GitHub instead, and keep a protected copy of that file
+before the first deployment overwrites it; new passwords would not match the
+initialized PostgreSQL roles or ZITADEL administrator. Hostnames and browser origins must match Cloudflare and
+the GitHub build variables. Deployment supplies the blank registry/release fields.
 
 Owner and runtime database roles must differ from each other and from the
 initial PostgreSQL administrator. Fresh PostgreSQL startup creates these roles
@@ -231,8 +222,8 @@ recreated by the operator for the revised V1.
 The template is safe to commit; the live environment, keys and certificates are
 not. No password generation, container start or deployment occurs in bootstrap.
 
-Stop here and confirm bootstrap and the second run before proceeding. Production
-passwords/configuration, registry credentials, Cloudflare DNS/certificate/cache
+Stop here and confirm bootstrap and the second run before proceeding. Registry
+credentials, Cloudflare DNS/certificate/cache
 rules, Lightsail firewall restrictions, GitHub Environment protection and the
 first application deployment are later steps. Existing launch gates, including
 RLS and live acceptance still apply. Backups/restore are deferred for the current

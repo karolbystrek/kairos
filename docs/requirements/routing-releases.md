@@ -192,14 +192,17 @@ rather than removing existing infrastructure. Installed packages are retained on
 reruns; upgrades remain deliberately scheduled maintenance.
 
 Host preparation reuses this checkout's `setup.sh` with `--keep-env --keep-keys
---no-tls`, preserves existing production configuration and key bytes, rejects
-invalid/partial key sets, and removes temporary setup inputs even on failure.
-Bootstrap publishes `/srv/kairos/production.env.example` from repository-owned
-`deployment/production.env.example`, with production hostnames, persistent paths
-and public-HTTPS destination policies. Reruns refresh only this non-secret
-example. Passwords, operator contact and bootstrap PAT expiry are blank for
-operator input; the live `production.env` is never created or overwritten by
-bootstrap. The local `.env.example` remains unchanged.
+--no-tls`, preserves existing key bytes, rejects invalid/partial key sets, and
+removes temporary setup inputs even on failure. Bootstrap never creates or
+changes `production.env`. The GitHub `production` Environment owns production
+configuration: each deployment writes `/srv/kairos/production.env` atomically
+(mode `0600`) from repository-owned `deployment/production.env.example` plus
+Environment secrets/variables. Template defaults need no GitHub value; blank
+template settings are required, and a missing, duplicated (secret and variable)
+or unsafe value fails before SSH, naming keys only. Values reach the host only
+over the deploy job's SSH connection, never images, bundles or artifacts; image
+build/publish jobs have no Environment access. The local `.env.example` remains
+unchanged.
 Bootstrap does not run `reset.sh`, start applications, configure provider/network
 firewalls, DNS, TLS or GitHub Environment settings. Those remain separate operator
 steps. See [VM bootstrap](../deployment/BOOTSTRAP.md); actual host and repeat-run
@@ -212,8 +215,9 @@ environment with no users. All orders, accounts and ZITADEL state may be lost
 after host failure and recreated. Scheduled database backups, off-host backup
 storage/encryption/retention, destructive-migration backup procedures, data-loss
 and recovery targets, and replacement-host restore rehearsals are deferred.
-Keep protected runtime configuration, application keys and TLS material outside
-the VPS to rebuild a fresh installation. This is not database restoration.
+Runtime configuration lives in the GitHub `production` Environment; keep
+protected application keys and TLS material outside the VPS to rebuild a fresh
+installation. This is not database restoration.
 Acceptance of data loss does not authorize automatic deletion, resets or key
 regeneration; existing runtime approval and data-safety rules still apply.
 The fresh-development V1 policy remains until explicitly changed at launch.
