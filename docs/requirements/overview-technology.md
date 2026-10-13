@@ -96,8 +96,9 @@ dark appearance uses black, dark gray, and the equivalent blue. Semantic error
 or destructive color is reserved for the states that require it. Hierarchy
 comes primarily from typography, alignment, spacing, and separators rather
 than visible containers. Routine content must not be wrapped in cards, bordered
-boxes, or decorative materials. Elevation is reserved for genuinely floating
-layers such as menus and modal sheets.
+boxes, or decorative materials. Use solid surfaces without gradients; reserve
+colour for meaningful actions, selection and status. Shadows belong only to floating layers such as menus and
+modal sheets; preserve keyboard focus indicators and the scanner aperture.
 Both frontends use one backdrop treatment for every modal, confirmation dialog,
 and drawer: a neutral tint at 20% opacity derived from the foreground color and
 an 8-pixel background blur. It follows Light and Dark appearance, keeps the
@@ -129,11 +130,16 @@ once-revealed secret is displayed in the panel.
 
 Both frontends use one CSS-defined foundation before component styling: a
 4-point spacing basis with 4, 8, 12, 16, 24, 32, and 48-pixel steps; 32-pixel
-compact, 40-pixel regular, and 44-pixel touch control sizes; small 6-pixel,
-medium 10-pixel, and large 14-pixel corner radii; a restrained system-font type
-scale; and one-pixel separators. Pill geometry is limited to controls whose
-meaning requires it. Staff controls retain comfortable touch targets while
+compact, 40-pixel regular, and 44-pixel touch control sizes; one shared 10-pixel
+rectangular corner radius; a restrained system-font type scale with a 16-pixel
+body baseline; and one-pixel separators. Pill geometry is limited to controls
+whose meaning requires it. Staff controls retain comfortable touch targets while
 queue content remains compact enough for an operational tablet workspace.
+Order numbers and key metrics lead the hierarchy; supporting details stay smaller.
+Secondary text remains visibly distinct and meets 4.5:1 contrast on its surface in
+both themes. Use comfortable multiline leading, naturally growing containers,
+and aligned titles, labels and details. Keep icons only when they aid navigation,
+actions or status recognition; match perceived stroke weight, not size alone.
 Text inputs and selectors use the regular control height by default. When an
 input and actions share an inline control row, that row owns one semantic height
 for every peer so their alignment can be changed centrally without per-control
@@ -188,11 +194,12 @@ Location, Account, Invitation and Integration cards omit navigation arrows;
 the full-card target and motion communicate that they are clickable. They
 share the medium corner scale, page surface at rest, one-pixel separators, and
 an 8-pixel inter-card rhythm with immediate motion feedback on hover and press,
-and a subtle neutral focus indicator for keyboard navigation only. Management collection cards use restrained colour surfaces for
-enabled, disabled, and pending status; explicit status appears in their detail
-popup. Order selection retains its blue selection surface without a decorative
-leading edge. Cards keep identity and compact accessories inline across phone, tablet,
-and desktop widths; essential text reflows instead of being removed.
+and a subtle neutral focus indicator for keyboard navigation only. Management
+collection cards use neutral surfaces with explicit status text or compact chips
+in the list and detail popup. Order selection retains its blue selection surface
+without a decorative leading edge. Cards keep identity and compact accessories
+aligned across screen widths;
+actions wrap when needed and essential text reflows instead of being removed.
 
 Routine interactive surfaces in both frontends use one shared short motion
 system: a restrained scale lift on precise-pointer hover, immediate compression

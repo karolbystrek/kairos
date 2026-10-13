@@ -227,14 +227,14 @@ function Metric({
   detail?: string;
 }) {
   return (
-    <div className="min-w-0 rounded-lg bg-surface-secondary px-3 py-3">
+    <div className="min-w-0 rounded-lg bg-surface-secondary p-4">
       <dt className="text-sm secondary-text">{label}</dt>
       <dd
-        className={`${prominence === "primary" ? "text-5xl" : prominence === "large" ? "text-3xl" : "text-2xl"} break-words font-semibold tracking-tight tabular-nums`}
+        className={`${prominence === "primary" ? "text-5xl" : prominence === "large" ? "text-3xl" : "text-2xl"} mt-2 break-words font-semibold leading-tight tracking-tight tabular-nums`}
       >
         {value}
       </dd>
-      {detail && <dd className="text-xs secondary-text">{detail}</dd>}
+      {detail && <dd className="mt-2 text-sm secondary-text">{detail}</dd>}
     </div>
   );
 }

@@ -19,14 +19,12 @@ export function PanelDetailHeader({
 }) {
   return (
     <header className="min-w-0">
-      <p className="text-xs font-medium uppercase tracking-[0.1em] secondary-text">
-        {eyebrow}
-      </p>
+      <p className="text-sm secondary-text">{eyebrow}</p>
       <div className="mt-1 flex min-w-0 flex-wrap items-center gap-3">
         <div className="min-w-0 flex-[1_1_14rem]">
           {titleEditor ?? (
-            <div className="flex min-w-0 items-center gap-2">
-              <h2 className="truncate text-2xl font-semibold tracking-tight">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <h2 className="break-words text-2xl font-semibold tracking-tight">
                 {title}
               </h2>
               {titleAction}

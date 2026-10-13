@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { Button } from "@heroui/react";
+import { Button, Chip } from "@heroui/react";
 
 export function PanelCard({
   accessibilityLabel,
@@ -39,14 +39,24 @@ export function PanelCard({
       <div
         className={`panel-card-content relative z-10 ${onPress ? "pointer-events-none" : ""}`}
       >
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-[1_1_10rem]">
           <p className="break-words text-lg font-semibold tracking-[-0.025em]">
             {title}
           </p>
-          {metadata && <div className="mt-0.5 min-w-0 text-xs">{metadata}</div>}
+          {metadata && <div className="mt-1 min-w-0 text-sm">{metadata}</div>}
+          {(status === "ENABLED" || status === "DISABLED") && (
+            <Chip
+              className="mt-2"
+              color={status === "ENABLED" ? "success" : "default"}
+              size="sm"
+              variant="soft"
+            >
+              {status === "ENABLED" ? "Włączone" : "Wyłączone"}
+            </Chip>
+          )}
         </div>
         {trailing && (
-          <div className="panel-card-trailing flex max-w-full shrink-0 items-center justify-end gap-2">
+          <div className="panel-card-trailing flex max-w-full flex-wrap items-center justify-end gap-2">
             {trailing}
           </div>
         )}

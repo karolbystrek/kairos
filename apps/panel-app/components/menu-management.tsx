@@ -11,11 +11,7 @@ import {
   Tooltip,
   toast,
 } from "@heroui/react";
-import {
-  CheckIcon as SaveIcon,
-  PlusIcon,
-  TrashIcon as DeleteIcon,
-} from "@phosphor-icons/react";
+import { PlusIcon, TrashIcon as DeleteIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
 import { ZodError } from "zod";
@@ -332,7 +328,6 @@ export function MenuManagement({
               Anuluj
             </Button>
             <Button isPending={pendingAction === "save"} type="submit">
-              <SaveIcon size={18} />
               {pendingAction === "save" ? "Zapisywanie…" : "Zapisz"}
             </Button>
           </PanelPopup.Footer>
