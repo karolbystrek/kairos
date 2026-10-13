@@ -366,7 +366,7 @@ export function OrderTracker({
         aria-live="polite"
         className="flex flex-1 flex-col items-center justify-center py-12 text-center sm:py-16"
       >
-        <p className="text-4xl font-semibold tabular-nums">
+        <p className="order-number">
           <span className="sr-only">Zamówienie </span>#{displayedOrder.number}
         </p>
         {displayedOrder.label && (
@@ -374,7 +374,7 @@ export function OrderTracker({
             {displayedOrder.label}
           </p>
         )}
-        <h1 className="status-title mt-4 max-w-[14ch]">
+        <h1 className="status-title mt-4 max-w-[20ch]">
           {statusCopy[displayedOrder.status]}
         </h1>
         {!isActiveOrderStatus(displayedOrder.status) && (

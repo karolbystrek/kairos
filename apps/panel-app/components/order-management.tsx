@@ -5,7 +5,6 @@ import {
   ArrowCounterClockwiseIcon,
   ArrowLeftIcon,
   ArrowRightIcon,
-  ClockIcon,
   PlusIcon,
   XIcon as CloseIcon,
 } from "@phosphor-icons/react";
@@ -278,16 +277,15 @@ function OrderCard({
             <span className="break-words">{locationName}</span>
           )}
           <span className="flex shrink-0 items-center gap-1.5">
-            <ClockIcon size={15} />
             {elapsedTime(order.createdAt, now)}
           </span>
         </div>
       }
       title={
         <>
-          <span className="tabular-nums">#{order.number}</span>
+          <span className="order-number">#{order.number}</span>
           {order.label && (
-            <span className="ml-2 font-normal secondary-text">
+            <span className="ml-2 text-sm font-normal secondary-text">
               {order.label}
             </span>
           )}

@@ -50,14 +50,14 @@
 	--control-touch: 2.75rem;
 	--navigation-height: 3rem;
 
-	--radius-small: 0.375rem;
-	--radius-medium: 0.625rem;
-	--radius-large: 0.875rem;
-	--radius: 0.25rem;
+	--radius: 0.625rem;
+	--radius-small: var(--radius);
+	--radius-medium: var(--radius);
+	--radius-large: var(--radius);
 	--field-radius: var(--radius-small);
 
-	--type-caption: 0.75rem;
-	--type-body: 0.9375rem;
+	--type-caption: 0.8125rem;
+	--type-body: 1rem;
 	--type-callout: 1.0625rem;
 	--type-heading: 1.25rem;
 	--type-title: clamp(1.75rem, 3vw, 2.25rem);
@@ -156,7 +156,7 @@
 	--danger-soft: color-mix(in srgb, var(--system-red) 15%, var(--system-background));
 	--danger-soft-foreground: var(--system-red);
 	--separator: var(--system-gray-4);
-	--text-secondary: var(--secondary-label);
+	--text-secondary: color-mix(in srgb, var(--label) 65%, var(--system-background));
 	--selection: color-mix(in srgb, var(--system-blue) 15%, var(--system-background));
 	--selection-hover: color-mix(in srgb, var(--system-blue) 25%, var(--system-background));
 	--muted: var(--text-secondary);
@@ -165,7 +165,7 @@
 	--border: var(--separator);
 	--field-background: var(--system-gray-6);
 	--field-foreground: var(--label);
-	--field-placeholder: var(--system-gray);
+	--field-placeholder: var(--text-secondary);
 	--overlay: var(--system-background);
 	--overlay-foreground: var(--label);
 	--segment: var(--system-background);
@@ -178,6 +178,48 @@
 	--segment: var(--system-gray-5);
 }
 
+/* Keep utility classes and HeroUI surfaces on the same rectangular radius. */
+@theme inline {
+	--radius-sm: var(--radius);
+	--radius-md: var(--radius);
+	--radius-lg: var(--radius);
+	--radius-xl: var(--radius);
+	--radius-2xl: var(--radius);
+	--radius-3xl: var(--radius);
+	--radius-4xl: var(--radius);
+	--text-xs: var(--type-caption);
+}
+
+:root,
+.light,
+.dark {
+	--surface-shadow: none;
+	--field-shadow: none;
+	--overlay-shadow: var(--shadow-floating);
+}
+
+@media (prefers-contrast: more) {
+	:root,
+	.light,
+	.dark {
+		--text-secondary: color-mix(in srgb, var(--label) 80%, var(--system-background));
+	}
+}
+
+.chip {
+	border-radius: 999px;
+}
+
+.tabs__list,
+.tabs__list-container {
+	border-radius: var(--radius);
+}
+
+.tabs__indicator {
+	border-radius: var(--radius);
+	box-shadow: none;
+}
+
 html {
 	background: var(--background);
 	scroll-behavior: smooth;
@@ -187,7 +229,7 @@ body {
 	min-width: 320px;
 	font-feature-settings: "kern", "liga", "calt", "tnum";
 	font-size: var(--type-body);
-	line-height: 1.45;
+	line-height: 1.55;
 	text-rendering: optimizeLegibility;
 }
 
@@ -199,7 +241,7 @@ body {
 	font-size: var(--type-title);
 	font-weight: 650;
 	letter-spacing: -0.035em;
-	line-height: 1.08;
+	line-height: 1.2;
 }
 
 .app-name {
@@ -226,7 +268,7 @@ body {
 	font-size: var(--type-display);
 	font-weight: 650;
 	letter-spacing: -0.04em;
-	line-height: 1.08;
+	line-height: 1.2;
 	text-wrap: balance;
 }
 
@@ -822,7 +864,16 @@ body {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
+	flex-wrap: wrap;
 	gap: var(--space-3);
+}
+
+.order-number {
+	font-size: 1.5rem;
+	font-weight: 650;
+	line-height: 1.2;
+	letter-spacing: -0.025em;
+	font-variant-numeric: tabular-nums;
 }
 
 .panel-card-trailing .button {
@@ -929,7 +980,7 @@ body {
 	.panel-navigation .tabs__tab {
 		height: var(--control-touch);
 		padding-inline: var(--space-4);
-		border-radius: calc(var(--radius-large) - 0.25rem);
+		border-radius: var(--radius);
 		transition:
 			background-color var(--interaction-duration) var(--interaction-easing),
 			color var(--interaction-duration) var(--interaction-easing),
@@ -938,7 +989,7 @@ body {
 	}
 
 	.panel-navigation .tabs__indicator {
-		border-radius: calc(var(--radius-large) - 0.25rem);
+		border-radius: var(--radius);
 		box-shadow: none;
 	}
 }
@@ -957,20 +1008,6 @@ body {
 
 .entity-card-grid .panel-card + .panel-card {
   margin-top: 0;
-}
-
-.entity-card-grid .panel-card[data-status="ENABLED"] {
-  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
-  border-color: color-mix(in srgb, var(--accent) 30%, var(--separator));
-}
-
-.entity-card-grid .panel-card[data-status="DISABLED"] {
-  background: var(--surface-secondary);
-}
-
-.entity-card-grid .panel-card[data-status="PENDING"] {
-  background: color-mix(in srgb, var(--invitation-status) 12%, var(--surface));
-  border-color: color-mix(in srgb, var(--invitation-status) 35%, var(--separator));
 }
 
 /* Hover keeps each control's resting colours; press feedback remains physical. */

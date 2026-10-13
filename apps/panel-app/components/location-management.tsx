@@ -437,7 +437,6 @@ export function LocationManagement({
                               isPending={pendingAction === "rename"}
                               type="submit"
                             >
-                              <EnableIcon size={20} />
                               Zapisz
                             </Button>
                           </Tooltip.Trigger>
@@ -600,7 +599,7 @@ export function LocationManagement({
                       isPending={pendingAction === "reviews"}
                       type="submit"
                     >
-                      <EnableIcon size={18} /> Zapisz ustawienia opinii
+                      Zapisz ustawienia opinii
                     </Button>
                   </form>
                 )}

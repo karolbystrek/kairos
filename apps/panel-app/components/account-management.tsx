@@ -639,9 +639,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
                 )}
                 <dl className="mt-8 grid gap-5 border-t border-separator pt-6 sm:grid-cols-2">
                   <div>
-                    <dt className="text-xs font-medium uppercase tracking-[0.12em] text-muted">
-                      Rola
-                    </dt>
+                    <dt className="text-sm text-muted">Rola</dt>
                     <dd className="mt-1 font-medium">
                       {selectedAccount.role === "MANAGER"
                         ? "Kierownik"
@@ -649,26 +647,20 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-xs font-medium uppercase tracking-[0.12em] text-muted">
-                      Lokal
-                    </dt>
+                    <dt className="text-sm text-muted">Lokal</dt>
                     <dd className="mt-1 font-medium">
                       {locationNames.get(selectedAccount.locationId) ??
                         "Niedostępny"}
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-xs font-medium uppercase tracking-[0.12em] text-muted">
-                      E-mail
-                    </dt>
+                    <dt className="text-sm text-muted">E-mail</dt>
                     <dd className="mt-1 break-words font-medium">
                       {selectedAccount.email}
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-xs font-medium uppercase tracking-[0.12em] text-muted">
-                      Utworzono
-                    </dt>
+                    <dt className="text-sm text-muted">Utworzono</dt>
                     <dd className="mt-1 font-medium">
                       {new Date(selectedAccount.createdAt).toLocaleDateString(
                         "pl-PL",

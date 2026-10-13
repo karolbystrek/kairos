@@ -65,9 +65,9 @@ export function CustomerHome({
   }, [installationTrackingReference, router]);
 
   return (
-    <section className="relative flex flex-1 flex-col">
-      <CustomerToolbar className="absolute right-0 top-0 z-10" />
-      <div className="flex flex-1 items-center justify-center">
+    <section className="flex flex-1 flex-col">
+      <CustomerToolbar className="self-end" />
+      <div className="flex flex-1 items-center justify-center py-6">
         {isReady ? (
           <Button
             aria-label="Zeskanuj kod QR"
@@ -83,12 +83,12 @@ export function CustomerHome({
         )}
       </div>
       {isReady && showScanInAppHint && (
-        <p className="absolute bottom-12 left-1/2 w-full max-w-xs -translate-x-1/2 text-center text-sm text-muted">
+        <p className="mx-auto w-full max-w-xs text-center text-sm text-muted">
           Kolejne zamówienia skanuj w tej aplikacji.
         </p>
       )}
       <Link
-        className="absolute bottom-0 left-1/2 min-h-11 -translate-x-1/2 text-sm text-muted"
+        className="min-h-11 self-center text-sm text-muted"
         href="/prywatnosc"
       >
         Prywatność

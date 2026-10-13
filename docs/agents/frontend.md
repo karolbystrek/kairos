@@ -20,6 +20,9 @@ handling and provide a usable fallback.
 
 ## Components and effects
 
+Preserve the [visual design rules](../requirements/overview-technology.md#appearance-and-popup-behavior),
+including typography, status presentation and icon restraint in the following sections.
+
 - Use HeroUI (`@heroui/react`) for UI components. Charts are the exception:
   use shadcn chart components on Recharts, themed with shared semantic tokens.
 - Use Phosphor Icons (`@phosphor-icons/react`, `*Icon` exports) for interface

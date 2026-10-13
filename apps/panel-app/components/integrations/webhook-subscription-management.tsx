@@ -226,7 +226,6 @@ function WebhookEditor({
         />
         <div className="confirmation-actions">
           <Button isPending={isPending} type="submit">
-            <CheckIcon size={18} />
             {isPending ? "Zapisywanie…" : "Zapisz"}
           </Button>
           <Button

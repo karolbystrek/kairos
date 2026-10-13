@@ -1,6 +1,6 @@
 "use client";
 
-import { SignOutIcon, UserPlusIcon } from "@phosphor-icons/react";
+import { SignOutIcon } from "@phosphor-icons/react";
 import { useSyncExternalStore, useState, type FormEvent } from "react";
 import {
   Alert,
@@ -392,7 +392,7 @@ export function RegistrationForm({ invited = false }: { invited?: boolean }) {
             isPending={pending}
             type="submit"
           >
-            <UserPlusIcon aria-hidden="true" size={18} /> Utwórz konto
+            Utwórz konto
           </Button>
         </form>
       )}
