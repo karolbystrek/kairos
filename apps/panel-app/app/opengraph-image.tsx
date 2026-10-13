@@ -11,8 +11,8 @@ export const size = PREVIEW_IMAGE.size;
 export const contentType = "image/png";
 
 export default async function OpenGraphImage() {
-  const icon = await readFile(
-    join(process.cwd(), "public/icons/kairos-icon-512.png"),
+  const lockup = await readFile(
+    join(process.cwd(), "public/icons/kairos-lockup.png"),
   );
 
   return new ImageResponse(
@@ -29,15 +29,12 @@ export default async function OpenGraphImage() {
           color: "#1d1d1f",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
-          {/* eslint-disable-next-line jsx-a11y/alt-text */}
-          <img
-            height={120}
-            src={`data:image/png;base64,${icon.toString("base64")}`}
-            width={120}
-          />
-          <span style={{ fontSize: 64, letterSpacing: "-0.04em" }}>Kairos</span>
-        </div>
+        {/* eslint-disable-next-line jsx-a11y/alt-text */}
+        <img
+          height={120}
+          src={`data:image/png;base64,${lockup.toString("base64")}`}
+          width={311}
+        />
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
           <div
             style={{
@@ -60,7 +57,7 @@ export default async function OpenGraphImage() {
               width: 64,
               height: 8,
               borderRadius: 4,
-              background: "#0a84ff",
+              background: "#0088ff",
             }}
           />
           <span style={{ fontSize: 28, color: "#6e6e73" }}>

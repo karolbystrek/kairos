@@ -91,6 +91,8 @@ service; existing explicit approval remains valid within its stated scope.
   before declaring work complete.
 - [Local development](docs/agents/local-development.md): before setup, migration,
   container, data, or runtime work; preserves user-owned containers/data.
+- [Brand mark](docs/brand/README.md): before changing logos, icons, favicons
+  or share-preview images.
 - [Documentation maintenance](docs/agents/documentation.md): before documentation
   changes or recording accepted decisions. Keep agent guidance focused by purpose
   and update this index whenever it changes; keep task records in GitHub.
