@@ -13,8 +13,7 @@
 Agent execution of AWS/Cloudflare resource changes requires explicit user
 approval; read-only inspection is allowed. See [cloud operations](../agents/cloud-operations.md).
 
-The production job obtains AWS credentials only after the protected `production`
-Environment approves it. No long-lived AWS access keys are stored in GitHub.
+Only the main-restricted `production` Environment job obtains AWS credentials. No long-lived AWS access keys are stored in GitHub.
 The current deployment account/SSH key remains unchanged. This does not deploy
 applications or relax the permanent SSH/HTTPS firewall rules.
 

@@ -6,21 +6,92 @@ on:
 
 permissions:
   contents: read
-  actions: read
 
 jobs:
-  publish:
-    name: Publish release
+  ci:
+    name: CI
     if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/ci.yml
+
+  build:
+    name: Build ${{ matrix.service }}
+    needs: ci
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       contents: read
-      actions: read
       packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - customer-app
+          - panel-app
+          - api
     concurrency:
-      group: publish-${{ github.sha }}
+      group: build-${{ github.sha }}-${{ matrix.service }}
       cancel-in-progress: false
+    env:
+      IMAGE: ghcr.io/${{ github.repository }}/${{ matrix.service }}:sha-${{ github.sha }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: GHCR login
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # A rebuild changes digests, which the host rejects for an existing revision.
+      - name: Check existing image
+        id: existing
+        run: |
+          if skopeo inspect --raw "docker://$IMAGE" >/dev/null 2>&1; then
+            echo "$IMAGE already exists; reusing it."
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Buildx
+        if: steps.existing.outputs.found != 'true'
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      - name: Build & push image
+        if: steps.existing.outputs.found != 'true'
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: apps/${{ matrix.service }}
+          target: runner
+          platforms: linux/amd64
+          pull: true
+          push: true
+          tags: ${{ env.IMAGE }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=sha-${{ github.sha }}
+          build-args: |
+            NEXT_PUBLIC_API_BASE_URL=${{ vars.NEXT_PUBLIC_API_BASE_URL }}
+            NEXT_PUBLIC_CUSTOMER_APP_URL=${{ vars.NEXT_PUBLIC_CUSTOMER_APP_URL }}
+            NEXT_PUBLIC_PANEL_APP_URL=${{ vars.NEXT_PUBLIC_PANEL_APP_URL }}
+            NEXT_TELEMETRY_DISABLED=1
+          cache-from: type=gha,scope=${{ matrix.service }}
+          # min keeps image layers from evicting the dependency caches pull requests use.
+          cache-to: type=gha,mode=min,scope=${{ matrix.service }}
+          provenance: mode=max
+
+  publish:
+    name: Publish release
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: read
     env:
       IMAGE_REGISTRY: ghcr.io/${{ github.repository }}
       IMAGE_TAG: sha-${{ github.sha }}
@@ -31,12 +102,6 @@ jobs:
           ref: ${{ github.sha }}
           persist-credentials: false
 
-      - name: Find validated CI images
-        id: images
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: python3 deployment/find_ci_images.py
-
       - name: GHCR login
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
@@ -44,33 +109,10 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Download images
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          github-token: ${{ github.token }}
-          run-id: ${{ steps.images.outputs.run_id }}
-          pattern: image-*
-          merge-multiple: true
-          path: images
-
-      - name: Publish images
-        shell: bash
-        run: |
-          for service in customer-app panel-app api; do
-            image="${IMAGE_REGISTRY}/${service}:${IMAGE_TAG}"
-            if skopeo inspect --raw "docker://$image" >/dev/null 2>&1; then
-              echo "$image already exists; leaving it unchanged."
-            else
-              skopeo copy --all --preserve-digests \
-                --digestfile "images/${service}.published" \
-                "oci-archive:images/${service}.tar" "docker://$image"
-              test "$(cat "images/${service}.digest")" = "$(cat "images/${service}.published")"
-            fi
-          done
-
       - name: Inspect images
         shell: bash
         run: |
+          printf 'Deployment revision: `%s`\n' "$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
           mkdir -p image-inspections
           for service in customer-app panel-app api; do
             image="${IMAGE_REGISTRY}/${service}:${IMAGE_TAG}"

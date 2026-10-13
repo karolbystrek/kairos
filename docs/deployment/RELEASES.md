@@ -10,31 +10,25 @@ Use [the production runbook](RUNBOOK.md) for prerequisites and the sequence.
 
 ## 5. First install and later releases
 
-CI validates main pushes and builds all three application images without
-publishing to GHCR or requesting production approval. Main CI image artifacts
-are retained for 30 days. After provisioning and authorization, start the
-separate deployment workflow from `main`:
+CI validates pull requests and main pushes without building images. After
+provisioning and authorization, start the deployment workflow from `main`
+(the default branch; other refs are refused):
 
 ```bash
 gh workflow run deploy.yml --ref main
 ```
 
 Deployment always uses the latest `main` revision captured when the workflow
-is dispatched; there is no revision input. Its `Publish release` job locates a
-successful main CI run for that exact revision with all three unexpired image
-artifacts, publishes those exact images, and creates the `release-manifest`
-artifact. Missing or expired images fail publication before production approval;
-finish or rerun CI for the revision, then retry deployment. Publication reuses
-existing immutable registry images and regenerates a byte-identical bundle from
-the same image digests and runtime contents. Rebuilding images with changed
-digests or changing runtime files cannot replace an existing host release under
-that revision; use a new revision. The deployment revision stays fixed even if
-`main` advances while approval is pending.
-
-Review the selected CI run, full revision, all three digests, launch blockers and
-maintenance window before approving `Deploy production`. Retain both workflow
-run IDs as release evidence. New main pushes create no deployment approval waits;
-actual deployments remain serialized and do not cancel an active deployment.
+is dispatched; there is no revision input, and dispatching is the production
+approval. It runs the full CI workflow for that revision, then builds and pushes
+all three images to GHCR. An image that already exists for the revision is reused
+unchanged, so retries keep the same digests. The `Publish release` job inspects
+the images and creates the `release-manifest` artifact, regenerating a
+byte-identical bundle for an existing revision. Changing runtime files cannot
+replace an existing host release under that revision; use a new revision. The
+deployment revision stays fixed even if `main` advances during the run. Retain
+the workflow run ID as release evidence. Deployments are serialized and do not
+cancel an active deployment.
 
 Actions verifies the bundled manifest against the selected revision, uploads through
 a private incoming directory, activates `/srv/kairos/releases/<revision>`, then

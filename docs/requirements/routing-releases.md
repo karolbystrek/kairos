@@ -51,26 +51,21 @@ requests go directly to the dedicated API origin through the gateway.
 ### Validation and immutable publication
 
 GitHub Actions validates pull requests and `main` with frontend lint, type checks,
-configured tests and production Docker builds, and the complete Maven `verify`
-lifecycle followed by the API Docker build. Frontend
-validation requires the non-secret `NEXT_PUBLIC_API_BASE_URL`,
-`NEXT_PUBLIC_CUSTOMER_APP_URL` and `NEXT_PUBLIC_PANEL_APP_URL` inputs.
+configured tests and production `npm run build`, and the complete Maven `verify`
+lifecycle. CI builds no images. Frontend validation requires the non-secret
+`NEXT_PUBLIC_API_BASE_URL`, `NEXT_PUBLIC_CUSTOMER_APP_URL` and
+`NEXT_PUBLIC_PANEL_APP_URL` inputs. Main CI keeps dependency caches warm for
+pull requests.
 
-CI never publishes images. Manual production deployment dispatches on `main`
-publish all three application images only from successful CI for the dispatch
-revision; pull requests never publish. Existing full-revision
-tags remain unchanged. Every published or reused image is pulled for
-`linux/amd64` and inspected for the matching source-revision label and a
-repository-owned GHCR registry digest. Validation jobs export OCI image archives
-with provenance and upload them with their build digests on main CI runs,
-retained for 30 days. The deployment workflow's `Publish release` job copies
-those exact artifacts to GHCR using Skopeo with
-all manifests and digest preservation, checks published digests against build
-outputs, captures inspections locally, and verifies all three before uploading
-the `release-manifest` artifact. Publication never rebuilds the images and is
-serialized for the same revision. Previously published immutable tags remain
-unchanged and are inspected before reuse. PRs build images without publishing.
-Failed or incomplete publication cannot produce an eligible release.
+Only the manual production deployment builds and publishes images. It first runs
+the full CI workflow for the dispatch revision; failed validation stops before
+any image is built. Each image is then built with provenance for `linux/amd64`
+and pushed to GHCR under its full-revision tag, serialized per revision and
+service. An existing full-revision tag is reused unchanged and never rebuilt,
+because a rebuild changes digests. The `Publish release` job pulls and inspects
+all three images for the matching source-revision label and a repository-owned
+GHCR registry digest before uploading the `release-manifest` artifact. Failed or
+incomplete publication cannot produce an eligible release.
 
 That artifact contains `release.json` with a full 40-character lowercase Git
 `revision` and `images` entries for `customer-app`, `panel-app`, and `api`, each
@@ -79,13 +74,10 @@ using `ghcr.io/karolbystrek/kairos/<service>@sha256:<64 lowercase hex>`.
 hosted Compose files, both NGINX configuration files, and the ZITADEL bootstrap
 script, PostgreSQL entrypoint role initialization script,
 exact V1 SQL, and the deployment shell command/Python helper. An explicit file allowlist
-excludes environment files, certificates and private keys. CI ends after
-validation and image building and never requests production approval. The separate
+excludes environment files, certificates and private keys. The separate
 `deploy.yml` workflow runs only by manual dispatch on `main`, with no revision
-input. It uses the latest main revision captured at dispatch and locates a
-successful main CI run for that exact SHA with all three unexpired image
-artifacts. Missing or expired images fail publication before production approval.
-The revision remains fixed if `main` advances afterward.
+input; every job refuses other refs. It uses the main revision captured at
+dispatch, which remains fixed if `main` advances afterward.
 
 The production job targets the `production` GitHub Environment, downloads its
 own workflow's release artifact, validates its manifest/archive against the dispatch
@@ -126,12 +118,11 @@ a retry requires an identical archive. It invokes the bundled host command with
 `/srv/kairos/production.env` and retains the host deployment lock. Actions reports
 the validated revision, three digests and deployment result without credentials.
 The host needs GNU `tar`, `mv`, and `cmp` alongside the deployment prerequisites.
-Required reviewer/main-only Environment protection and operator secrets must
-be provisioned before releases are allowed; the workflow cannot install
-those protections. The owner may approve their own initiated runs
-(`prevent_self_review=false`), and administrator bypass remains allowed
-(`can_admins_bypass=true`) under the owner-approved policy. Live approval/withheld-approval and deployment acceptance
-remain operator launch checks.
+Main-only Environment protection and operator secrets must be provisioned
+before releases are allowed; the workflow cannot install those protections.
+Manually dispatching the workflow is the production approval; the Environment
+has no separate required reviewer. Deployment acceptance remains an operator
+launch check.
 
 `deployment/deploy.sh RELEASE_DIRECTORY ENV_FILE` runs on the Linux VM against
 an extracted exact-revision bundle. Both arguments are absolute; the environment
