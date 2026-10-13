@@ -7,7 +7,7 @@ import type {
   WebhookSubscriptionInput,
 } from "@/src/api/webhook-subscriptions";
 
-import { Alert, Button, Spinner, Tooltip, toast } from "@heroui/react";
+import { Alert, Button, Tooltip, toast } from "@heroui/react";
 import {
   ProhibitIcon as DisableIcon,
   CheckIcon,
@@ -26,6 +26,7 @@ import {
   getIntegrationErrorMessage,
   shouldRetryIntegrationRequest,
 } from "@/components/integrations/integration-ui";
+import { RowListSkeleton } from "@/components/loading-skeleton";
 import { staffWebhookSubscriptionsKey } from "@/src/api/cache-keys";
 import {
   archiveWebhookSubscription,
@@ -583,7 +584,7 @@ export function WebhookSubscriptionManagement({
         <h3 className="text-xl font-semibold">Webhooki</h3>
 
         {areSubscriptionsLoading ? (
-          <Spinner aria-label="Wczytywanie subskrypcji webhooków" />
+          <RowListSkeleton label="Wczytywanie subskrypcji webhooków" />
         ) : subscriptions.length === 0 ? (
           <p className="text-muted">Brak skonfigurowanych webhooków.</p>
         ) : (

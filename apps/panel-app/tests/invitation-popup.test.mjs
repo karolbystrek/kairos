@@ -62,6 +62,13 @@ function workspace(kind = "account-management", collections = {}) {
       new Function("require", "exports", inputSource)(require, inputExports);
       return inputExports;
     }
+    if (name === "@/components/loading-skeleton") {
+      const skeletonExports = {};
+      const skeletonSource = ts.transpileModule(readFileSync(new URL("../components/loading-skeleton.tsx", import.meta.url), "utf8"),
+        { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
+      new Function("require", "exports", skeletonSource)(dependencies, skeletonExports);
+      return skeletonExports;
+    }
     if (name === "@/src/api/usage-analytics") return { recordPanelAction() {} };
     if (name === "@/src/api/api-fetch") return { ApiError };
     if (name.startsWith("@/")) return new Proxy({}, { get: (_, key) => String(key) });
@@ -75,6 +82,7 @@ function workspace(kind = "account-management", collections = {}) {
   function elements(node) {
     if (!node || typeof node !== "object") return [];
     if (Array.isArray(node)) return node.flatMap(elements);
+    if (typeof node.type === "function" && node.type.name === "LoadingStatus") return elements(node.type(node.props));
     return [node, ...elements(node.props?.children), ...elements(node.props?.trailingActions), ...elements(node.props?.titleEditor), ...elements(node.props?.titleAction)];
   }
   function render() {
@@ -171,7 +179,9 @@ test("invitation loading and failure preserve loaded accounts and offer invitati
   const account = { id: "member", email: "member@example.com", role: "OPERATOR", locationId: "location", status: "ENABLED", createdAt: "2026-01-01T00:00:00Z" };
   const loading = workspace("account-management", { accounts: [account], loading: { invitations: true } });
   assert.equal(loading.nodes().filter(node => node.type === "PanelCard").length, 1);
-  assert.ok(loading.nodes().some(node => node.props?.["aria-label"] === "Wczytywanie zaproszeń"));
+  const status = loading.nodes().find(node => node.props?.role === "status");
+  assert.ok(status);
+  assert.ok(status.props.children.some(node => node.props?.children === "Wczytywanie zaproszeń"));
   const failed = workspace("account-management", { accounts: [account], errors: { invitations: new Error("Unavailable") } });
   assert.equal(failed.nodes().filter(node => node.type === "PanelCard").length, 1);
   const retry = failed.nodes().find(node => node.props?.["aria-label"] === "Spróbuj ponownie wczytać zaproszenia");

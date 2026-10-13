@@ -1,8 +1,9 @@
 "use client";
 
-import { Alert, Spinner } from "@heroui/react";
+import { Alert } from "@heroui/react";
 import { useEffect, useState } from "react";
 
+import { OrderLoadingSkeleton } from "@/components/order-loading-skeleton";
 import { CustomerToolbar } from "@/components/customer-toolbar";
 import { CustomerHome } from "@/app/customer-home";
 import { orderStatusLabels } from "@/src/orders/order-status";
@@ -53,9 +54,7 @@ export function OfflineNavigationFallback() {
     return (
       <section className="flex flex-1 flex-col">
         <CustomerToolbar />
-        <div className="flex flex-1 items-center justify-center">
-          <Spinner aria-label="Wczytywanie zapisanego statusu zamówienia" />
-        </div>
+        <OrderLoadingSkeleton label="Wczytywanie zapisanego statusu zamówienia" />
       </section>
     );
   }

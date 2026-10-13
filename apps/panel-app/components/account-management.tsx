@@ -10,7 +10,6 @@ import {
   ListBox,
   Radio,
   RadioGroup,
-  Spinner,
   Label,
   Tooltip,
   toast,
@@ -25,6 +24,11 @@ import { useEffect, useState } from "react";
 import useSWR from "swr";
 import useSWRMutation from "swr/mutation";
 
+import {
+  CardGridSkeleton,
+  CardSkeleton,
+  LoadingStatus,
+} from "@/components/loading-skeleton";
 import { HoldToConfirmButton } from "@/components/hold-to-confirm-button";
 import { CardDensityControl } from "@/components/card-density";
 import { PanelPopup } from "@/components/panel-popup";
@@ -478,12 +482,6 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
           </Alert.Content>
         </Alert>
       )}
-      {areInvitationsLoading && (
-        <div className="flex items-center gap-2 text-sm text-muted">
-          <Spinner aria-label="Wczytywanie zaproszeń" size="sm" />
-          <span>Wczytywanie zaproszeń…</span>
-        </div>
-      )}
 
       {!areLocationsLoading && enabledLocations.length === 0 && (
         <p className="text-sm text-muted">
@@ -494,9 +492,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
       {areAccountsLoading &&
       accounts.length === 0 &&
       invitations.length === 0 ? (
-        <div className="flex min-h-80 items-center justify-center">
-          <Spinner aria-label="Wczytywanie kont" />
-        </div>
+        <CardGridSkeleton metadata label="Wczytywanie kont" />
       ) : accounts.length === 0 &&
         invitations.length === 0 &&
         !areInvitationsLoading &&
@@ -540,6 +536,11 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
                 }}
               />
             ))}
+            {areInvitationsLoading && invitations.length === 0 && (
+              <LoadingStatus label="Wczytywanie zaproszeń">
+                <CardSkeleton metadata />
+              </LoadingStatus>
+            )}
             {invitations.map((invitation) => (
               <PanelCard
                 key={invitation.id}
