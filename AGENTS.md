@@ -5,15 +5,6 @@ orders, staff manage queues, and external systems use REST APIs and webhooks.
 Repository: [https://github.com/karolbystrek/kairos](https://github.com/karolbystrek/kairos).
 Use `gh` for all GitHub operations.
 
-## Contents
-
-- [Kairos](#kairos)
-- [Contents](#contents)
-- [Required workflow](#required-workflow)
-- [Cloud resource approval](#cloud-resource-approval)
-- [Repository and stack](#repository-and-stack)
-- [Read when relevant](#read-when-relevant)
-
 ## Required workflow
 
 For every task, invoke the `/grilling` skill before starting the task discussion
@@ -67,12 +58,8 @@ service; existing explicit approval remains valid within its stated scope.
 
 ## Repository and stack
 
-- `apps/customer-app/`: Next.js customer PWA, Serwist, IndexedDB, Web Push.
-- `apps/panel-app/`: Next.js authenticated staff panel.
-- Both frontends: Next.js 16, React 19, TypeScript, Tailwind CSS 4, HeroUI 3,
-  Phosphor Icons, Zod, native `fetch`, and SWR.
-- `apps/api/`: Java 25, Spring Boot 4, Spring Security/MVC; PostgreSQL is
-  authoritative, Redis Pub/Sub distributes customer events, ZITADEL owns identity.
+- PostgreSQL is authoritative, Redis Pub/Sub distributes customer events,
+  ZITADEL owns identity.
 - `compose.yaml`: shared Docker Compose topology with NGINX HTTPS ingress.
   Applications own their manifests and Dockerfiles.
 
