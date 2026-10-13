@@ -736,9 +736,25 @@ body {
 	bottom: max(1rem, env(safe-area-inset-bottom));
 }
 
+.panel-navigation .tabs__list {
+	display: grid;
+	grid-auto-flow: column;
+	grid-auto-columns: minmax(4.5rem, 1fr);
+	width: 100%;
+	gap: 0.125rem;
+	padding: 0;
+}
+
 .panel-navigation .tabs__tab {
-	column-gap: var(--space-2);
-	height: var(--control-regular);
+	min-width: 0;
+	height: 3.5rem;
+	padding-inline: var(--space-2);
+}
+
+.panel-navigation .tab-motion-content {
+	flex-direction: column;
+	gap: 0.25rem;
+	font-size: 0.6875rem;
 }
 
 .tab-motion-content {
@@ -880,7 +896,7 @@ body {
 @media (min-width: 40rem) {
 	.panel-workspace-controls {
 		display: grid;
-		grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+		grid-template-columns: calc(2 * var(--control-touch) + var(--space-2)) minmax(0, 1fr) calc(2 * var(--control-touch) + var(--space-2));
 		gap: var(--space-4);
 	}
 
@@ -893,16 +909,26 @@ body {
 	}
 
 	.mobile-navigation {
-		position: static;
+		position: relative;
+		inset: auto;
 		justify-self: center;
+		max-width: 100%;
 	}
 
 	.panel-navigation .tabs__list {
-		gap: 0.125rem;
-		padding: 0;
+		grid-auto-columns: minmax(max-content, 1fr);
+		width: max-content;
+	}
+
+	.panel-navigation .tab-motion-content {
+		flex-direction: row;
+		gap: var(--space-2);
+		font-size: inherit;
 	}
 
 	.panel-navigation .tabs__tab {
+		height: var(--control-touch);
+		padding-inline: var(--space-4);
 		border-radius: calc(var(--radius-large) - 0.25rem);
 		transition:
 			background-color var(--interaction-duration) var(--interaction-easing),
@@ -927,27 +953,6 @@ body {
   min-height: 7rem;
   padding: var(--space-4);
   border: 1px solid var(--separator);
-}
-
-/* Viewer-chosen density; phones always use one full-width column. */
-@media (min-width: 40rem) {
-  :root[data-card-density="compact"] .entity-card-grid {
-    grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
-  }
-
-  :root[data-card-density="compact"] .entity-card-grid .panel-card {
-    min-height: 5rem;
-    padding: var(--space-3);
-  }
-
-  :root[data-card-density="comfortable"] .entity-card-grid {
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
-  }
-
-  :root[data-card-density="comfortable"] .entity-card-grid .panel-card {
-    min-height: 9rem;
-    padding: var(--space-6);
-  }
 }
 
 .entity-card-grid .panel-card + .panel-card {
@@ -1163,13 +1168,4 @@ body {
 .legal-document-body a {
   text-decoration: underline;
   text-underline-offset: 0.15em;
-}
-
-/* Skeletons pulse calmly and hold still when motion is reduced. */
-@media (prefers-reduced-motion: reduce) {
-	.skeleton,
-	.skeleton::before,
-	.skeleton::after {
-		animation: none;
-	}
 }

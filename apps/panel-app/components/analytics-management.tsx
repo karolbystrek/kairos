@@ -3,14 +3,13 @@
 import type { ReactNode } from "react";
 import type { CurrentAccount } from "@/src/api/authentication";
 
-import { Skeleton } from "@heroui/react";
 import { Alert, Button, Input, Label, ListBox, TextField } from "@heroui/react";
 import { ArrowsClockwiseIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
 import { Bar, BarChart, CartesianGrid, Cell, XAxis, YAxis } from "recharts";
 
-import { LoadingStatus } from "@/components/loading-skeleton";
+import { LoadingIndicator } from "@/components/loading-indicator";
 import { ChartContainer, ChartTooltip } from "@/components/chart";
 import { FormSelect } from "@/components/form-controls";
 import { ApiError } from "@/src/api/api-fetch";
@@ -546,7 +545,7 @@ function ReportArea({
     );
   }
   if (!report) {
-    return <AnalyticsSkeleton platform={platform} />;
+    return <LoadingIndicator label="Wczytywanie analityki" />;
   }
 
   return (
@@ -701,19 +700,7 @@ function HealthView({
         onRetry={onRetry}
       />
     ) : (
-      <LoadingStatus
-        className="grid grid-cols-1 gap-3 sm:grid-cols-3"
-        label="Wczytywanie stanu systemu"
-      >
-        {[0, 1, 2].map((metric) => (
-          <Skeleton
-            key={metric}
-            animationType="pulse"
-            aria-hidden="true"
-            className="h-20 rounded-lg"
-          />
-        ))}
-      </LoadingStatus>
+      <LoadingIndicator label="Wczytywanie stanu systemu" />
     );
   }
 
@@ -827,68 +814,5 @@ export function PlatformAnalytics({
         />
       </div>
     </div>
-  );
-}
-
-function AnalyticsSkeleton({ platform }: { platform: boolean }) {
-  return (
-    <LoadingStatus
-      className="flex min-w-0 flex-col gap-6"
-      label="Wczytywanie analityki"
-    >
-      <div aria-hidden="true" className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        {[0, 1, 2].map((metric) => (
-          <Skeleton
-            key={metric}
-            animationType="pulse"
-            className="h-25 rounded-lg"
-          />
-        ))}
-      </div>
-      <div aria-hidden="true" className="grid grid-cols-3 gap-3">
-        {[0, 1, 2].map((metric) => (
-          <Skeleton
-            key={metric}
-            animationType="pulse"
-            className="h-20 rounded-lg"
-          />
-        ))}
-      </div>
-      <div aria-hidden="true" className="flex flex-col gap-3">
-        <Skeleton animationType="pulse" className="h-7 w-64 rounded-md" />
-        <Skeleton
-          animationType="pulse"
-          className="h-[260px] w-full rounded-lg"
-        />
-      </div>
-      <Skeleton
-        animationType="pulse"
-        aria-hidden="true"
-        className="h-7 w-40 rounded-md"
-      />
-      <div aria-hidden="true" className="grid grid-cols-2 gap-3">
-        {[0, 1].map((metric) => (
-          <Skeleton
-            key={metric}
-            animationType="pulse"
-            className="h-20 rounded-lg"
-          />
-        ))}
-      </div>
-      {platform && (
-        <div aria-hidden="true" className="flex flex-col gap-3">
-          <Skeleton animationType="pulse" className="h-7 w-48 rounded-md" />
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            {[0, 1, 2, 3].map((metric) => (
-              <Skeleton
-                key={metric}
-                animationType="pulse"
-                className="h-20 rounded-lg"
-              />
-            ))}
-          </div>
-        </div>
-      )}
-    </LoadingStatus>
   );
 }

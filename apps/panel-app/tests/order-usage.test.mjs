@@ -52,6 +52,7 @@ function queue() {
   }
   return {
     actions, render,
+    nodes: () => elements(render()),
     loaded() { loading = false; },
     openForm() { elements(render()).find(node => node.props?.["aria-label"] === "Nowe zamówienie").props.onPress(); },
     closeForm() { elements(render()).find(node => node.props?.isOpen !== undefined && node.props?.onOpenChange).props.onOpenChange(false); },
@@ -79,4 +80,17 @@ test("each real form opening counts its default location even from the tenant qu
   view.closeForm();
   view.openForm();
   assert.deepEqual(view.actions, [["queue_opened", undefined], ["order_creation_form_opened", "location-one"], ["order_creation_form_opened", "location-one"]]);
+});
+
+
+test("initial queue loading does not show headings or an empty queue", () => {
+  const view = queue();
+  const initial = view.nodes();
+  assert.ok(initial.some(node => node.type === "LoadingIndicator" && node.props.label === "Wczytywanie lokali"));
+  assert.equal(initial.some(node => node.type === "h2" && node.props.children === "W przygotowaniu"), false);
+  assert.equal(initial.some(node => node.type === "p" && node.props.children === "Brak zamówień w przygotowaniu"), false);
+  view.loaded();
+  const loaded = view.nodes();
+  assert.ok(loaded.some(node => node.type === "h2" && node.props.children === "W przygotowaniu"));
+  assert.ok(loaded.some(node => node.type === "p" && node.props.children === "Brak zamówień w przygotowaniu"));
 });

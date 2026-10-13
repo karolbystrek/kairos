@@ -12,6 +12,13 @@
 
 ### 3.3 Staff panel
 
+The dashboard keeps its selected workspace in the URL fragment (for example,
+`#integrations`). Refresh, direct links and browser Back/Forward retain that
+selection. Missing, unknown, unavailable or onboarding-disabled workspaces fall
+back to Orders. Initial content loading uses a small accessible loading indicator, with no
+skeletons or placeholder queue headings. Loaded content remains visible during
+background refreshes; empty states appear only after loading completes.
+
 The staff panel must:
 
 * offer public email/password registration that creates a tenant and its first
@@ -66,7 +73,11 @@ account.
 
 Orders, Locations, Menu, Accounts, and Integrations use one adaptive tab-style
 navigation system: a centered rounded segmented control on tablet and desktop and bottom
-navigation on narrow mobile layouts. Only authorized destinations are present.
+navigation on narrow mobile layouts. Tabs share equal widths determined by the
+visible destinations. Tablet and desktop show icons beside labels; phones show
+icons above small labels. The bar scrolls horizontally when destinations do not
+fit, preserving readable labels and touch targets. Only authorized destinations
+are present.
 An administrator with no non-archived location first sees the required
 first-location modal over the rendered workspace. The workspace remains visible
 through the shared blurred backdrop but cannot be interacted with while the
@@ -154,10 +165,8 @@ responsive card collections and relevant creation controls, with no automatic
 selection or persistent right-hand details. Selecting a card opens details and
 applicable management actions in the shared centered popup, adapted to available
 mobile space. There is no collection search or filtering in this increment.
-On tablet and desktop, smaller-cards and larger-cards controls switch every
-collection between compact, default and comfortable density; the choice is
-panel-wide and remembered on the device. Phones always use one full-width
-column without these controls.
+Collections use one consistent responsive card size with no density controls
+or saved density preference. Phones use one full-width column.
 
 Popups are sized by content: confirmations small, single-purpose forms medium,
 entity and order details large, and order creation extra large.

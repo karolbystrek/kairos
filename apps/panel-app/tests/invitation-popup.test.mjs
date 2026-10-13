@@ -62,12 +62,12 @@ function workspace(kind = "account-management", collections = {}) {
       new Function("require", "exports", inputSource)(require, inputExports);
       return inputExports;
     }
-    if (name === "@/components/loading-skeleton") {
-      const skeletonExports = {};
-      const skeletonSource = ts.transpileModule(readFileSync(new URL("../components/loading-skeleton.tsx", import.meta.url), "utf8"),
+    if (name === "@/components/loading-indicator") {
+      const loadingExports = {};
+      const loadingSource = ts.transpileModule(readFileSync(new URL("../components/loading-indicator.tsx", import.meta.url), "utf8"),
         { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
-      new Function("require", "exports", skeletonSource)(dependencies, skeletonExports);
-      return skeletonExports;
+      new Function("require", "exports", loadingSource)(dependencies, loadingExports);
+      return loadingExports;
     }
     if (name === "@/src/api/usage-analytics") return { recordPanelAction() {} };
     if (name === "@/src/api/api-fetch") return { ApiError };
@@ -82,7 +82,7 @@ function workspace(kind = "account-management", collections = {}) {
   function elements(node) {
     if (!node || typeof node !== "object") return [];
     if (Array.isArray(node)) return node.flatMap(elements);
-    if (typeof node.type === "function" && node.type.name === "LoadingStatus") return elements(node.type(node.props));
+    if (typeof node.type === "function" && node.type.name === "LoadingIndicator") return elements(node.type(node.props));
     return [node, ...elements(node.props?.children), ...elements(node.props?.trailingActions), ...elements(node.props?.titleEditor), ...elements(node.props?.titleAction)];
   }
   function render() {

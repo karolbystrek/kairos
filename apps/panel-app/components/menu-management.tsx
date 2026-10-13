@@ -20,10 +20,9 @@ import { useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
 import { ZodError } from "zod";
 
-import { CardDensityControl } from "@/components/card-density";
 import { FormTextField } from "@/components/form-controls";
 import { HoldToConfirmButton } from "@/components/hold-to-confirm-button";
-import { CardGridSkeleton } from "@/components/loading-skeleton";
+import { LoadingIndicator } from "@/components/loading-indicator";
 import { PanelCard } from "@/components/panel-card";
 import { PanelPopup } from "@/components/panel-popup";
 import { ApiError } from "@/src/api/api-fetch";
@@ -204,7 +203,6 @@ export function MenuManagement({
             <Tooltip.Content>Nowe menu</Tooltip.Content>
           </Tooltip>
         )}
-        <CardDensityControl />
       </div>
 
       {loadError && (
@@ -218,7 +216,7 @@ export function MenuManagement({
       )}
 
       {areMenusLoading ? (
-        <CardGridSkeleton metadata label="Wczytywanie menu" />
+        <LoadingIndicator label="Wczytywanie menu" />
       ) : (
         <>
           {menus.length === 0 ? (

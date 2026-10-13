@@ -3,7 +3,7 @@
 import { Alert } from "@heroui/react";
 import { useEffect, useState } from "react";
 
-import { OrderLoadingSkeleton } from "@/components/order-loading-skeleton";
+import { OrderLoadingIndicator } from "@/components/order-loading-indicator";
 import { CustomerToolbar } from "@/components/customer-toolbar";
 import { CustomerHome } from "@/app/customer-home";
 import { orderStatusLabels } from "@/src/orders/order-status";
@@ -54,7 +54,7 @@ export function OfflineNavigationFallback() {
     return (
       <section className="flex flex-1 flex-col">
         <CustomerToolbar />
-        <OrderLoadingSkeleton label="Wczytywanie zapisanego statusu zamówienia" />
+        <OrderLoadingIndicator label="Wczytywanie zapisanego statusu zamówienia" />
       </section>
     );
   }

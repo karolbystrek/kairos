@@ -23,7 +23,7 @@ import {
   getIntegrationErrorMessage,
   shouldRetryIntegrationRequest,
 } from "@/components/integrations/integration-ui";
-import { RowListSkeleton } from "@/components/loading-skeleton";
+import { LoadingIndicator } from "@/components/loading-indicator";
 import {
   deleteApiKey,
   issueApiKey,
@@ -281,7 +281,7 @@ export function ApiKeyManagement({
         <h3 className="text-xl font-semibold">Klucze API</h3>
 
         {areApiKeysLoading ? (
-          <RowListSkeleton apiKeys label="Wczytywanie kluczy API" />
+          <LoadingIndicator label="Wczytywanie kluczy API" />
         ) : apiKeys.length === 0 ? (
           <p className="text-muted">Brak kluczy API.</p>
         ) : (

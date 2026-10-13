@@ -27,7 +27,7 @@ import {
   FlowArrowIcon as IntegrationIcon,
   XIcon as CloseIcon,
 } from "@phosphor-icons/react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import useSWR, { useSWRConfig } from "swr";
 import useSWRMutation from "swr/mutation";
@@ -48,7 +48,6 @@ import { LocationCreationModal } from "@/components/location-creation-modal";
 import { LocationManagement } from "@/components/location-management";
 import { MenuManagement } from "@/components/menu-management";
 import { PasswordChangeDialog } from "@/components/password-change-dialog";
-import { CardGridSkeleton } from "@/components/loading-skeleton";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { subscribeToAuthenticationRequired } from "@/src/api/auth-state";
 import { ApiError } from "@/src/api/api-fetch";
@@ -248,6 +247,20 @@ function SignedOutPanel({
   );
 }
 
+function subscribeToWorkspace(callback: () => void) {
+  window.addEventListener("hashchange", callback);
+
+  return () => window.removeEventListener("hashchange", callback);
+}
+
+function getWorkspace() {
+  return window.location.hash.slice(1) || "orders";
+}
+
+function setSelectedWorkspace(workspace: string) {
+  window.location.hash = workspace;
+}
+
 export function StaffPanel({
   screen = "dashboard",
 }: {
@@ -255,7 +268,11 @@ export function StaffPanel({
 } = {}) {
   const router = useRouter();
   const { mutate: mutateCache } = useSWRConfig();
-  const [selectedWorkspace, setSelectedWorkspace] = useState("orders");
+  const selectedWorkspace = useSyncExternalStore(
+    subscribeToWorkspace,
+    getWorkspace,
+    () => "orders",
+  );
   const [requestedOrderLocationId, setRequestedOrderLocationId] =
     useState<string>();
   const [signOutScope, setSignOutScope] = useState<
@@ -471,25 +488,19 @@ export function StaffPanel({
   const canViewPlatform = account.capabilities.includes(
     "VIEW_PLATFORM_ANALYTICS",
   );
-  // A revoked capability removes its tab; never leave the selection on a hidden panel.
-  const visibleWorkspace =
-    (workspace === "analytics" && !canViewAnalytics) ||
-    (workspace === "platform" && !canViewPlatform)
-      ? "orders"
-      : workspace;
+  const availableWorkspaces = [
+    "orders",
+    ...(canManageLocations || canChooseLocationMenu ? ["locations"] : []),
+    ...(canChooseLocationMenu ? ["menus"] : []),
+    ...(canManageAccounts ? ["accounts"] : []),
+    ...(canManageIntegrations ? ["integrations"] : []),
+    ...(canViewAnalytics ? ["analytics"] : []),
+    ...(canViewPlatform ? ["platform"] : []),
+  ];
+  const visibleWorkspace = availableWorkspaces.includes(workspace)
+    ? workspace
+    : "orders";
 
-  if (canManageLocations && !locations) {
-    return locationsError ? (
-      <div className="flex flex-col gap-4 py-12">
-        <p role="alert">Nie udało się wczytać lokali. Spróbuj ponownie.</p>
-        <Button onPress={() => void mutateLocations()}>
-          <ArrowsClockwiseIcon aria-hidden="true" size={18} /> Spróbuj ponownie
-        </Button>
-      </div>
-    ) : (
-      <CardGridSkeleton label="Wczytywanie lokali" />
-    );
-  }
   const needsFirstLocation = canManageLocations && hasNoLocations;
   const utilities = (
     <div className="panel-workspace-utilities flex shrink-0 items-center gap-2">
@@ -542,6 +553,16 @@ export function StaffPanel({
             </Alert.Description>
           </Alert.Content>
         </Alert>
+      )}
+
+      {canManageLocations && !locations && locationsError && (
+        <div className="flex flex-col items-start gap-4">
+          <p role="alert">Nie udało się wczytać lokali. Spróbuj ponownie.</p>
+          <Button onPress={() => void mutateLocations()}>
+            <ArrowsClockwiseIcon aria-hidden="true" size={18} /> Spróbuj
+            ponownie
+          </Button>
+        </div>
       )}
 
       {canManageAccounts ||
