@@ -5,7 +5,8 @@
 .env.*.local
 /.env.tmp.*
 /.kairos-setup.*
-/.codex/
+/.codex/*
+!/.codex/hooks.json
 
 # Private key material
 /secrets/
