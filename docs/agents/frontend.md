@@ -25,6 +25,13 @@ handling and provide a usable fallback.
 - Use Phosphor Icons (`@phosphor-icons/react`, `*Icon` exports) for interface
   icons: regular weight by default and fill for "on" states. Do not add
   handwritten inline SVG icon components.
+- Colours come from Apple's HIG system colours, kept in two layers in each
+  app's `styles/globals.css`, with an identical primitives block in both apps.
+  The `--system-*` primitives are the only place hex values appear; they switch
+  between light, dark and `prefers-contrast: more`. HeroUI's semantic tokens
+  (`--accent`, `--surface`, …) reference only those primitives. Components use
+  semantic tokens only; Tailwind's default palette is disabled. Text uses the
+  OS system font stack; do not add web fonts.
 - Reserve React effects for synchronization with external systems such as
   EventSource or browser APIs; do not use effects for routine REST request
   orchestration.
