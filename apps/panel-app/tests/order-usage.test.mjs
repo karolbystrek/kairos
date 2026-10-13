@@ -30,7 +30,7 @@ function queue() {
     if (name === "swr/mutation") return { default: () => ({ reset() {}, isMutating: false }) };
     if (name === "@/src/api/cache-keys") return { staffLocationsKey: () => ["staff", "account", "locations"], staffLocationMenuKey: () => null };
     if (name === "@/src/api/usage-analytics") return { recordPanelAction: (...args) => actions.push(args) };
-    if (name === "@/src/api/orders") return { subscribeToOrderQueue: () => () => {} };
+    if (name === "@/src/api/orders") return { subscribeToOrderQueue: () => () => {}, describeOrderItems: () => "" };
     if (name.startsWith("@/")) return new Proxy({}, { get: (_, key) => String(key) });
     // Phosphor's CommonJS build does not load under Node's require; icons are inert here.
     if (name === "@phosphor-icons/react") return new Proxy({}, { get: (_, key) => String(key) });

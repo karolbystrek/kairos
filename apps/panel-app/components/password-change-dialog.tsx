@@ -60,7 +60,7 @@ export function PasswordChangeDialog({
   }
 
   return (
-    <PanelPopup isOpen={isOpen} onOpenChange={close}>
+    <PanelPopup isOpen={isOpen} size="md" onOpenChange={close}>
       <PanelPopup.Header>
         <PanelPopup.Heading>Zmień hasło</PanelPopup.Heading>
       </PanelPopup.Header>

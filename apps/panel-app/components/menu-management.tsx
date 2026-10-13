@@ -6,7 +6,6 @@ import {
   Alert,
   Button,
   Label,
-  ListBox,
   Spinner,
   TextArea,
   TextField,
@@ -21,29 +20,21 @@ import { useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
 import { ZodError } from "zod";
 
-import { FormSelect, FormTextField } from "@/components/form-controls";
+import { CardDensityControl } from "@/components/card-density";
+import { FormTextField } from "@/components/form-controls";
 import { HoldToConfirmButton } from "@/components/hold-to-confirm-button";
 import { PanelCard } from "@/components/panel-card";
 import { PanelPopup } from "@/components/panel-popup";
 import { ApiError } from "@/src/api/api-fetch";
-import {
-  staffLocationMenuKey,
-  staffLocationsKey,
-  staffMenusKey,
-} from "@/src/api/cache-keys";
-import { listLocations, type Location } from "@/src/api/locations";
+import { staffMenusKey } from "@/src/api/cache-keys";
 import {
   createMenu,
   deleteMenu,
-  getLocationMenu,
   listMenus,
   parseMenuItems,
-  setLocationMenu,
   updateMenu,
   type Menu,
 } from "@/src/api/menus";
-
-const noMenuKey = "none";
 
 type MenuDraft = {
   menu?: Menu;
@@ -60,7 +51,7 @@ function getErrorMessage(error: unknown): string {
       case "urn:kairos:problem:menu-name-conflict":
         return "Menu o tej nazwie już istnieje.";
       case "urn:kairos:problem:menu-in-use":
-        return "Tego menu używa co najmniej jeden lokal. Wybierz w nich inne menu, zanim je usuniesz.";
+        return "Tego menu używa co najmniej jeden lokal. Wybierz w szczegółach tych lokali inne menu, zanim je usuniesz.";
     }
 
     return error.message;
@@ -92,89 +83,6 @@ function itemCount(count: number): string {
   return `${count.toLocaleString("pl-PL")} ${noun}`;
 }
 
-function LocationMenuSelect({
-  accountId,
-  location,
-  menus,
-}: {
-  accountId: string;
-  location: Location;
-  menus: Menu[];
-}) {
-  const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<unknown>();
-  const {
-    data: activeMenu,
-    error: loadError,
-    isLoading,
-    mutate,
-  } = useSWR(
-    staffLocationMenuKey(accountId, location.id),
-    () => getLocationMenu(location.id),
-    { errorRetryCount: 3, shouldRetryOnError },
-  );
-  const items = [
-    { id: noMenuKey, name: "Bez menu" },
-    ...menus,
-    ...(activeMenu && !menus.some((menu) => menu.id === activeMenu.id)
-      ? [activeMenu]
-      : []),
-  ];
-
-  async function select(menuId: string) {
-    if (isSaving) return;
-    setError(undefined);
-    setIsSaving(true);
-    try {
-      const updated = await setLocationMenu(
-        location.id,
-        menuId === noMenuKey ? null : menuId,
-      );
-
-      await mutate(updated, { revalidate: false });
-    } catch (caught) {
-      setError(caught);
-    } finally {
-      setIsSaving(false);
-    }
-  }
-
-  return (
-    <div className="flex flex-col gap-2 border-t border-separator py-4 sm:flex-row sm:items-center sm:justify-between">
-      <p className="min-w-0 break-words font-medium">{location.name}</p>
-      <div className="flex w-full flex-col gap-2 sm:max-w-xs">
-        <FormSelect
-          className="w-full"
-          isDisabled={isLoading || isSaving || Boolean(loadError)}
-          label={`Menu lokalu ${location.name}`}
-          selectedKey={loadError ? null : (activeMenu?.id ?? noMenuKey)}
-          onSelectionChange={(key) => {
-            if (key !== null) void select(String(key));
-          }}
-        >
-          <ListBox items={items}>
-            {(item) => (
-              <ListBox.Item id={item.id} textValue={item.name}>
-                {item.name}
-              </ListBox.Item>
-            )}
-          </ListBox>
-        </FormSelect>
-        {loadError && (
-          <p className="text-sm text-danger" role="alert">
-            Nie udało się wczytać menu tego lokalu.
-          </p>
-        )}
-        {error !== undefined && (
-          <p className="text-sm text-danger" role="alert">
-            {getErrorMessage(error)}
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
-
 export function MenuManagement({
   accountId,
   canManageMenus,
@@ -196,11 +104,6 @@ export function MenuManagement({
     errorRetryCount: 3,
     shouldRetryOnError,
   });
-  const { data: locations = [], error: locationsError } = useSWR(
-    staffLocationsKey(accountId),
-    listLocations,
-    { errorRetryCount: 3, shouldRetryOnError },
-  );
 
   function openDraft(menu?: Menu) {
     setDraftError(undefined);
@@ -276,7 +179,7 @@ export function MenuManagement({
     }
   }
 
-  const loadError = menusError ?? locationsError;
+  const loadError = menusError;
 
   return (
     <div className="flex flex-col gap-6">
@@ -298,6 +201,7 @@ export function MenuManagement({
             <Tooltip.Content>Nowe menu</Tooltip.Content>
           </Tooltip>
         )}
+        <CardDensityControl />
       </div>
 
       {loadError && (
@@ -346,26 +250,12 @@ export function MenuManagement({
               ))}
             </section>
           )}
-
-          {menus.length > 0 && locations.length > 0 && (
-            <section className="flex flex-col">
-              <h2 className="section-title pb-3">Menu lokali</h2>
-              {locations.map((location) => (
-                <LocationMenuSelect
-                  key={location.id}
-                  accountId={accountId}
-                  location={location}
-                  menus={menus}
-                />
-              ))}
-            </section>
-          )}
         </>
       )}
 
       <PanelPopup
         isOpen={Boolean(draft)}
-        size="lg"
+        size="md"
         onOpenChange={(open) => {
           if (!open && !pendingAction) setDraft(undefined);
         }}

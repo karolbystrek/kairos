@@ -85,8 +85,10 @@ pending logout prevents repeat submissions without preventing popup dismissal. C
 the existing focused form, omits persistent password-length guidance, and retains
 validation errors and the explanation that success signs out every device.
 
-Locations appears between Orders and Accounts for a tenant administrator and
-is absent for managers and operators. The Locations collection includes enabled
+Locations appears between Orders and Accounts for tenant administrators and
+location managers and is absent for operators. Managers see only their assigned
+location; its details offer the active-menu choice without administrative
+actions. The Locations collection includes enabled
 and disabled locations and omits archived locations. Operational selectors and
 new Account Invitation, API Key, and webhook-subscription forms offer only
 enabled locations.
@@ -97,15 +99,21 @@ The active queue uses adjacent **In preparation** and **Ready** sections on
 tablet and desktop and the same two sections stacked vertically on mobile.
 These sections use headings, counts, whitespace, and a shared separator rather
 than large rounded lane containers. Order creation begins from one compact,
-icon-and-text creation action at the start of the active workspace. Its focused
-sheet contains one optional label field. When the location has an active menu,
-the sheet also lists its items; tapping an item selects it with quantity 1,
-tapping it again removes it, and add and remove controls change the quantity.
-Changing items prefills the label as described in
-[menus](menus.md#ordering-from-a-menu); the label stays editable. Successful creation continues directly into a large,
-dismissible customer QR sheet; explicitly requesting an existing order's QR
-uses the same presentation. The underlying queue remains visible to preserve
-context. The Orders, Locations, Menu, Accounts, and Integrations creation actions
+icon-and-text creation action at the start of the active workspace and opens an
+extra-large popup that fills the screen on phones. When the location has an
+active menu, step 1 shows its items as tiles in menu order: each tap adds one,
+up to 99; a selected tile shows its quantity, a distinct state and a decrease
+control. Menus with more than 12 items add a search field, ignoring case and
+diacritics, that is focused automatically only with a precise pointer; Enter
+adds the single match and clears the search. A **Next** action with the total
+item count is always available, including with no items. Step 2 holds the label,
+prefilled from the items as described in [menus](menus.md#ordering-from-a-menu)
+and editable independently, with a restore-from-items action when it differs.
+Back keeps the selection; Create occupies the Next position, and steps switch
+in place with a short cross-fade that respects reduced motion. Without an
+active menu, or when the menu cannot load, the flow opens at step 2.
+Successful creation continues directly into the order details popup.
+The underlying queue remains visible to preserve context. The Orders, Locations, Menu, Accounts, and Integrations creation actions
 share one 44-pixel control height, an icon with Polish text, an accessible name
 and a pointer tooltip above the workspace content on every layout. Repeated Orders, Locations, Accounts and
 Integrations titles are visually hidden; the selected navigation tab identifies
@@ -120,8 +128,10 @@ changing the selected workspace destination. Successful creation closes the
 modal, keeps Orders visible, and selects the new enabled location for the first
 order.
 
-The customer-QR sheet contains only the centered order number with its label
-beneath when present, a dominant QR code, and the essential close control. It does not repeat queue status, elapsed
+Order details show the centered order number with its label beneath when
+present, the dominant customer QR code to scan again, and the order's menu items
+with quantities. On wide screens the items sit left of the QR code; narrow
+screens stack the QR code first. Details do not repeat queue status, elapsed
 time, explanatory copy, or a redundant footer action.
 
 Canceling an order requires a concise confirmation that identifies the order
@@ -131,7 +141,7 @@ Each active-order card shows its elapsed waiting time, updated approximately
 once per minute. The duration is supporting information: the prominent order
 number beside its quieter label and the next valid action remain more
 prominent. Creator attribution is not shown. The
-complete compact card remains a direct target for opening its customer QR code,
+complete compact card remains a direct target for opening its order details,
 without a duplicate QR control. One trailing action group exposes two large
 controls directly: the next valid status, labeled **Ready** or **Complete**, and
 cancel. Cancel retains its order-specific confirmation rather than being hidden
@@ -139,11 +149,18 @@ in an overflow menu.
 
 #### Management collections and details
 
-Locations, Accounts, and External Integrations initially show only responsive
-card collections and relevant creation controls, with no automatic selection or
-persistent right-hand details. Selecting a card opens details and applicable
-management actions in the shared centered popup, adapted to available mobile
-space. There is no collection search or filtering in this increment.
+Locations, Menu, Accounts, and External Integrations initially show only
+responsive card collections and relevant creation controls, with no automatic
+selection or persistent right-hand details. Selecting a card opens details and
+applicable management actions in the shared centered popup, adapted to available
+mobile space. There is no collection search or filtering in this increment.
+On tablet and desktop, smaller-cards and larger-cards controls switch every
+collection between compact, default and comfortable density; the choice is
+panel-wide and remembered on the device. Phones always use one full-width
+column without these controls.
+
+Popups are sized by content: confirmations small, single-purpose forms medium,
+entity and order details large, and order creation extra large.
 
 New member access begins in an invitation popup capturing recipient email,
 fixed location, and manager or operator role. Kairos emails the resulting link;
@@ -178,7 +195,8 @@ popup uses the direct **Integration name** placeholder with an accessible label.
 Location cards retain enabled-first display-name ordering with stable identity
 as a tie-breaker. The popup action rail contains Edit, Disable or Enable, and
 Delete. Delete remains visible but unavailable until the location is disabled
-and another non-archived location exists. Details explain that the last location
+and another non-archived location exists. Details include the location's
+active-menu choice, saved as soon as it changes. Details explain that the last location
 can be disabled but cannot be deleted, and offer no time-zone editor or unrelated
 operational fields.
 

@@ -575,7 +575,7 @@ export function StaffPanel({
                   </span>
                   <Tabs.Indicator />
                 </Tabs.Tab>
-                {canManageLocations && (
+                {(canManageLocations || canChooseLocationMenu) && (
                   <Tabs.Tab id="locations">
                     <span className="tab-motion-content">
                       <LocationsIcon size={18} />
@@ -648,11 +648,12 @@ export function StaffPanel({
               }
             />
           </Tabs.Panel>
-          {canManageLocations && (
+          {(canManageLocations || canChooseLocationMenu) && (
             <Tabs.Panel className="pt-6" id="locations">
               <LocationManagement
                 key={`locations-${account.accountId}`}
                 accountId={account.accountId}
+                canManageLocations={canManageLocations}
                 onViewOrders={(locationId) => {
                   setRequestedOrderLocationId(locationId);
                   setSelectedWorkspace("orders");
@@ -742,9 +743,9 @@ export function StaffPanel({
       />
 
       <PanelPopup
-        className="sm:max-w-[420px]"
         isOpen={signOutScope !== null}
         role="alertdialog"
+        size="sm"
         onOpenChange={(open) => {
           if (!open) {
             setSignOutScope(null);

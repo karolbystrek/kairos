@@ -9,13 +9,14 @@ type PanelPopupProps = Pick<
   ComponentProps<typeof Modal>,
   "isOpen" | "onOpenChange"
 > &
-  Pick<ComponentProps<typeof Modal.Container>, "size"> &
   Pick<
     ComponentProps<typeof Modal.Dialog>,
     "className" | "role" | "aria-label"
   > & {
     children?: ReactNode;
     isRequired?: boolean;
+    // sm: confirmations, md: single-purpose forms, lg: entity details, xl: wide workflows.
+    size: "sm" | "md" | "lg" | "xl";
   };
 
 export function PanelPopup({
@@ -25,7 +26,7 @@ export function PanelPopup({
   isRequired = false,
   onOpenChange,
   role = "dialog",
-  size = "lg",
+  size,
   ...props
 }: PanelPopupProps) {
   return (
@@ -39,10 +40,10 @@ export function PanelPopup({
         isDismissable={!isRequired}
         isKeyboardDismissDisabled={isRequired}
       >
-        <Modal.Container placement="center" size={size}>
+        <Modal.Container placement="center" size={size === "xl" ? "lg" : size}>
           <Modal.Dialog
             {...props}
-            className={`panel-popup ${className ?? ""}`}
+            className={`panel-popup ${size === "xl" ? "panel-popup--xl" : ""} ${className ?? ""}`}
             role={role}
           >
             {!isRequired && (

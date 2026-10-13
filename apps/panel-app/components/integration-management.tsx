@@ -18,6 +18,7 @@ import { useRef, useState } from "react";
 import useSWR from "swr";
 
 import { HoldToConfirmButton } from "@/components/hold-to-confirm-button";
+import { CardDensityControl } from "@/components/card-density";
 import { PanelPopup } from "@/components/panel-popup";
 import { FormTextField } from "@/components/form-controls";
 import { ApiKeyManagement } from "@/components/integrations/api-key-management";
@@ -436,6 +437,7 @@ export function IntegrationManagement({ accountId }: { accountId: string }) {
           </Tooltip.Trigger>
           <Tooltip.Content>Nowa integracja</Tooltip.Content>
         </Tooltip>
+        <CardDensityControl />
       </div>
 
       {Boolean(error) && (
@@ -512,7 +514,7 @@ export function IntegrationManagement({ accountId }: { accountId: string }) {
 
       <PanelPopup
         isOpen={isCreateOpen}
-        size="sm"
+        size="md"
         onOpenChange={setIsCreateOpen}
       >
         <PanelPopup.Header>

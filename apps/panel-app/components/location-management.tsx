@@ -2,7 +2,7 @@
 
 import type { FormEvent } from "react";
 
-import { Alert, Button, Spinner, Tooltip } from "@heroui/react";
+import { Alert, Button, ListBox, Spinner, Tooltip } from "@heroui/react";
 import {
   ArrowUpRightIcon,
   ProhibitIcon as DisableIcon,
@@ -15,14 +15,19 @@ import { useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
 import { ZodError } from "zod";
 
+import { CardDensityControl } from "@/components/card-density";
 import { HoldToConfirmButton } from "@/components/hold-to-confirm-button";
 import { PanelPopup } from "@/components/panel-popup";
-import { FormTextField } from "@/components/form-controls";
+import { FormSelect, FormTextField } from "@/components/form-controls";
 import { LocationCreationModal } from "@/components/location-creation-modal";
 import { PanelCard } from "@/components/panel-card";
 import { PanelDetailHeader } from "@/components/panel-detail-header";
 import { ApiError } from "@/src/api/api-fetch";
-import { staffLocationsKey } from "@/src/api/cache-keys";
+import {
+  staffLocationMenuKey,
+  staffLocationsKey,
+  staffMenusKey,
+} from "@/src/api/cache-keys";
 import {
   deleteLocation,
   listLocations,
@@ -33,6 +38,7 @@ import {
   updateLocationReviewLink,
   type Location,
 } from "@/src/api/locations";
+import { getLocationMenu, listMenus, setLocationMenu } from "@/src/api/menus";
 
 const activeOrdersProblemType = "urn:kairos:problem:location-active-orders";
 
@@ -67,11 +73,101 @@ function shouldRetryOnError(error: Error): boolean {
   );
 }
 
+const noMenuKey = "none";
+
+function LocationMenuSelect({
+  accountId,
+  location,
+}: {
+  accountId: string;
+  location: Location;
+}) {
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<unknown>();
+  const { data: menus = [], error: menusError } = useSWR(
+    staffMenusKey(accountId),
+    listMenus,
+    { errorRetryCount: 3, shouldRetryOnError },
+  );
+  const {
+    data: activeMenu,
+    error: activeMenuError,
+    isLoading,
+    mutate,
+  } = useSWR(
+    staffLocationMenuKey(accountId, location.id),
+    () => getLocationMenu(location.id),
+    { errorRetryCount: 3, shouldRetryOnError },
+  );
+  const loadError = menusError ?? activeMenuError;
+  const items = [
+    { id: noMenuKey, name: "Bez menu" },
+    ...menus,
+    ...(activeMenu && !menus.some((menu) => menu.id === activeMenu.id)
+      ? [activeMenu]
+      : []),
+  ];
+
+  async function select(menuId: string) {
+    if (isSaving) return;
+    setError(undefined);
+    setIsSaving(true);
+    try {
+      const updated = await setLocationMenu(
+        location.id,
+        menuId === noMenuKey ? null : menuId,
+      );
+
+      await mutate(updated, { revalidate: false });
+    } catch (caught) {
+      setError(caught);
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  return (
+    <div className="mt-6 flex flex-col gap-2">
+      <FormSelect
+        className="w-full sm:max-w-xs"
+        isDisabled={isLoading || isSaving || Boolean(loadError)}
+        label="Menu lokalu"
+        selectedKey={loadError ? null : (activeMenu?.id ?? noMenuKey)}
+        onSelectionChange={(key) => {
+          if (key !== null) void select(String(key));
+        }}
+      >
+        <ListBox items={items}>
+          {(item) => (
+            <ListBox.Item id={item.id} textValue={item.name}>
+              {item.name}
+            </ListBox.Item>
+          )}
+        </ListBox>
+      </FormSelect>
+      {loadError && (
+        <p className="text-sm text-danger" role="alert">
+          Nie udało się wczytać menu tego lokalu.
+        </p>
+      )}
+      {error !== undefined && (
+        <p className="text-sm text-danger" role="alert">
+          {error instanceof ApiError
+            ? error.message
+            : "Nie udało się zmienić menu lokalu. Sprawdź połączenie i spróbuj ponownie."}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function LocationManagement({
   accountId,
+  canManageLocations,
   onViewOrders,
 }: {
   accountId: string;
+  canManageLocations: boolean;
   onViewOrders: (locationId: string) => void;
 }) {
   const { mutate: mutateCache } = useSWRConfig();
@@ -205,20 +301,23 @@ export function LocationManagement({
     <div className="flex flex-col gap-6">
       <div className="flex items-center gap-4">
         <h1 className="sr-only">Lokale</h1>
-        <Tooltip delay={500}>
-          <Tooltip.Trigger>
-            <Button
-              aria-label="Nowy lokal"
-              className="rounded-md"
-              size="lg"
-              onPress={() => setIsCreateOpen(true)}
-            >
-              <PlusIcon size={20} />
-              Nowy lokal
-            </Button>
-          </Tooltip.Trigger>
-          <Tooltip.Content>Nowy lokal</Tooltip.Content>
-        </Tooltip>
+        {canManageLocations && (
+          <Tooltip delay={500}>
+            <Tooltip.Trigger>
+              <Button
+                aria-label="Nowy lokal"
+                className="rounded-md"
+                size="lg"
+                onPress={() => setIsCreateOpen(true)}
+              >
+                <PlusIcon size={20} />
+                Nowy lokal
+              </Button>
+            </Tooltip.Trigger>
+            <Tooltip.Content>Nowy lokal</Tooltip.Content>
+          </Tooltip>
+        )}
+        <CardDensityControl />
       </div>
 
       {(locationsError || error) && (
@@ -266,6 +365,7 @@ export function LocationManagement({
               key={selectedLocation.id}
               isOpen
               aria-label={`Lokal ${selectedLocation.name}`}
+              size="lg"
               onOpenChange={(open) => {
                 if (!open) selectLocation();
               }}
@@ -282,7 +382,7 @@ export function LocationManagement({
                   }}
                   title={selectedLocation.name}
                   titleAction={
-                    editName === undefined ? (
+                    canManageLocations && editName === undefined ? (
                       <Tooltip delay={500}>
                         <Tooltip.Trigger>
                           <Button
@@ -355,7 +455,7 @@ export function LocationManagement({
                     )
                   }
                   trailingActions={
-                    editName === undefined ? (
+                    canManageLocations && editName === undefined ? (
                       <>
                         {selectedLocation.status === "ENABLED" ? (
                           <HoldToConfirmButton
@@ -411,11 +511,13 @@ export function LocationManagement({
                     ) : null
                   }
                 />
-                <p className="mt-4 text-sm text-muted">
-                  {selectedLocation.status === "ENABLED"
-                    ? "Wyłączenie wyłączy i wyloguje przypisane konta oraz unieważni zaproszenia. Najpierw zakończ aktywne zamówienia."
-                    : "Włączenie obejmie wszystkie przypisane konta, także wyłączone osobno. Usunięcie lokalu i kont jest nieodwracalne. Historia zamówień pozostanie dostępna."}
-                </p>
+                {canManageLocations && (
+                  <p className="mt-4 text-sm text-muted">
+                    {selectedLocation.status === "ENABLED"
+                      ? "Wyłączenie wyłączy i wyloguje przypisane konta oraz unieważni zaproszenia. Najpierw zakończ aktywne zamówienia."
+                      : "Włączenie obejmie wszystkie przypisane konta, także wyłączone osobno. Usunięcie lokalu i kont jest nieodwracalne. Historia zamówień pozostanie dostępna."}
+                  </p>
+                )}
                 {actionError !== undefined && (
                   <Alert status="danger">
                     <Alert.Content>
@@ -455,37 +557,44 @@ export function LocationManagement({
                   <span className="secondary-text">Strefa czasowa: </span>
                   {selectedLocation.timeZone}
                 </p>
-                <form
-                  className="mt-6 flex flex-col gap-3"
-                  onSubmit={submitReviews}
-                >
-                  <FormTextField
-                    fullWidth
-                    inputProps={{ type: "url" }}
-                    isDisabled={Boolean(pendingAction)}
-                    label="Link do opinii Google"
-                    maxLength={2048}
-                    name="google-review-url"
-                    placeholder="Link do opinii Google (puste pole wyłącza zaproszenia)"
-                    value={
-                      editReviewUrl ?? selectedLocation.googleReviewUrl ?? ""
-                    }
-                    onChange={setEditReviewUrl}
-                  />
-                  <p className="secondary-text">
-                    Zaproszenie do opinii pokazujemy klientowi raz w aplikacji,
-                    po odebraniu zamówienia, bez powiadomienia push.
-                  </p>
-                  <Button
-                    className="self-start"
-                    isDisabled={Boolean(pendingAction)}
-                    isPending={pendingAction === "reviews"}
-                    type="submit"
+                <LocationMenuSelect
+                  accountId={accountId}
+                  location={selectedLocation}
+                />
+                {canManageLocations && (
+                  <form
+                    className="mt-6 flex flex-col gap-3"
+                    onSubmit={submitReviews}
                   >
-                    <EnableIcon size={18} /> Zapisz ustawienia opinii
-                  </Button>
-                </form>
-                {locations.length <= 1 && (
+                    <FormTextField
+                      fullWidth
+                      inputProps={{ type: "url" }}
+                      isDisabled={Boolean(pendingAction)}
+                      label="Link do opinii Google"
+                      maxLength={2048}
+                      name="google-review-url"
+                      placeholder="Link do opinii Google (puste pole wyłącza zaproszenia)"
+                      value={
+                        editReviewUrl ?? selectedLocation.googleReviewUrl ?? ""
+                      }
+                      onChange={setEditReviewUrl}
+                    />
+                    <p className="secondary-text">
+                      Zaproszenie do opinii pokazujemy klientowi raz w
+                      aplikacji, po odebraniu zamówienia, bez powiadomienia
+                      push.
+                    </p>
+                    <Button
+                      className="self-start"
+                      isDisabled={Boolean(pendingAction)}
+                      isPending={pendingAction === "reviews"}
+                      type="submit"
+                    >
+                      <EnableIcon size={18} /> Zapisz ustawienia opinii
+                    </Button>
+                  </form>
+                )}
+                {canManageLocations && locations.length <= 1 && (
                   <p className="mt-4 text-sm text-muted">
                     Ostatni lokal można wyłączyć, ale nie można go usunąć.
                   </p>
@@ -496,12 +605,14 @@ export function LocationManagement({
         </>
       )}
 
-      <LocationCreationModal
-        accountId={accountId}
-        isOpen={isCreateOpen}
-        onCreated={(location) => selectLocation(location.id)}
-        onOpenChange={setIsCreateOpen}
-      />
+      {canManageLocations && (
+        <LocationCreationModal
+          accountId={accountId}
+          isOpen={isCreateOpen}
+          onCreated={(location) => selectLocation(location.id)}
+          onOpenChange={setIsCreateOpen}
+        />
+      )}
     </div>
   );
 }

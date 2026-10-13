@@ -28,7 +28,7 @@ complete item list and takes effect at once for every location using it.
 Each non-archived location has at most one active menu. A tenant administrator
 can choose or clear the active menu of any location in the tenant; a location
 manager can do so only for their own assigned location. Operators cannot change
-it. A menu that is active at any location cannot be deleted until every location
+it. The panel offers this choice in location details, not on the Menu page. A menu that is active at any location cannot be deleted until every location
 using it switches to another menu or to no menu. Deleting a location clears its
 active menu.
 
@@ -43,8 +43,8 @@ rejects items. Staff and External Integrations follow the same rules. Items are
 an immutable snapshot of names and quantities, so later menu edits or deletion
 never change existing orders.
 
-When the selected location has an active menu, the panel's order-creation sheet
-lists its items. Changing the selection regenerates the label field from it,
+When the selected location has an active menu, the panel's order-creation flow
+shows its items as tiles ([staff panel](staff-panel.md#orders-and-customer-qr)). Changing the selection regenerates the label field from it,
 for example `2× Burger, Frytki`: items follow the menu order, quantity 1 omits
 the multiplier, and items are separated by a comma and space. Text longer than
 the 80-character label limit is shortened with an ellipsis. Staff may then

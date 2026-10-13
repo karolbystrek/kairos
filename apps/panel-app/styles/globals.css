@@ -248,6 +248,83 @@ body {
 	padding-inline-start: var(--space-12);
 }
 
+/* HeroUI stops at lg; the container is fit-content, so xl needs an explicit width. */
+@media (min-width: 40rem) {
+	.panel-popup.panel-popup--xl {
+		width: min(48rem, 100vw - 5rem);
+		max-width: none;
+	}
+}
+
+/* A form wrapping body and footer must pass the dialog's height to the scrolling body. */
+.panel-popup > form {
+	display: flex;
+	min-height: 0;
+	flex: 1;
+	flex-direction: column;
+}
+
+/* The order-creation workspace uses the whole phone screen. */
+@media (max-width: 39.999rem) {
+	.order-create-popup {
+		height: 100%;
+	}
+}
+
+/* Corner room is reserved up front so selecting a tile never reflows its name. */
+.order-item-tile__button {
+	width: 100%;
+	height: 100%;
+	min-height: 5.5rem;
+	padding: 2.5rem var(--space-3) var(--space-3);
+	border: 1px solid var(--separator);
+	border-radius: var(--radius-large);
+	white-space: normal;
+	text-align: center;
+	font-weight: 500;
+}
+
+.order-item-tile[data-selected] .order-item-tile__button {
+	background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+	border-color: color-mix(in srgb, var(--accent) 55%, var(--separator));
+}
+
+.order-item-tile__quantity {
+	position: absolute;
+	top: var(--space-2);
+	right: var(--space-2);
+	min-width: 2rem;
+	padding: 0.125rem var(--space-2);
+	border-radius: 999px;
+	background: var(--accent);
+	color: var(--accent-foreground);
+	font-weight: 600;
+	text-align: center;
+	pointer-events: none;
+}
+
+.order-item-tile__decrease {
+	position: absolute;
+	top: var(--space-1);
+	left: var(--space-1);
+}
+
+.order-create-step {
+	animation: order-create-step-in 150ms ease-out;
+}
+
+@keyframes order-create-step-in {
+	from {
+		opacity: 0;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.order-create-step {
+		animation: none;
+	}
+}
+
 /* Shared backdrop treatment for every modal, confirmation, and drawer. */
 .modal__backdrop,
 .alert-dialog__backdrop,
@@ -811,6 +888,27 @@ body {
   min-height: 7rem;
   padding: var(--space-4);
   border: 1px solid var(--separator);
+}
+
+/* Viewer-chosen density; phones always use one full-width column. */
+@media (min-width: 40rem) {
+  :root[data-card-density="compact"] .entity-card-grid {
+    grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  }
+
+  :root[data-card-density="compact"] .entity-card-grid .panel-card {
+    min-height: 5rem;
+    padding: var(--space-3);
+  }
+
+  :root[data-card-density="comfortable"] .entity-card-grid {
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
+  }
+
+  :root[data-card-density="comfortable"] .entity-card-grid .panel-card {
+    min-height: 9rem;
+    padding: var(--space-6);
+  }
 }
 
 .entity-card-grid .panel-card + .panel-card {
