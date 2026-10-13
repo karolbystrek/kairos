@@ -26,7 +26,7 @@ function workspace(kind = "account-management", collections = {}) {
         return [state[index], value => { state[index] = value; }];
       },
     };
-    if (name === "@heroui/react") return new Proxy({}, { get: (_, key) => new Proxy(() => {}, { get: (_, part) => `${String(key)}.${String(part)}` }) });
+    if (name === "@heroui/react") return new Proxy({}, { get: (_, key) => new Proxy(() => {}, { get: (_, part) => key === "toast" ? () => {} : `${String(key)}.${String(part)}` }) });
     if (name === "swr") return { useSWRConfig: () => ({ mutate: async () => {} }), default: key => ({
       data: key === "locations" ? (collections.locations ?? [{ id: "location", status: "ENABLED", name: "Location" }, { id: "other", status: "ENABLED", name: "Other" }]) : key === "invitations" ? (collections.invitations ?? []).map(invitation => ({ state: "PENDING", deliveryState: "QUEUED", ...invitation })) : (key in collections ? collections[key] : []),
       error: collections.errors?.[key],

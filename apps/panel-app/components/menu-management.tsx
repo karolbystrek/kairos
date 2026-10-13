@@ -10,6 +10,7 @@ import {
   TextArea,
   TextField,
   Tooltip,
+  toast,
 } from "@heroui/react";
 import {
   CheckIcon as SaveIcon,
@@ -149,6 +150,7 @@ export function MenuManagement({
         { revalidate: false },
       );
       setDraft(undefined);
+      toast.success(`Zapisano menu „${saved.name}”`);
       void mutateMenus();
       if (draft.menu) await revalidateLocationMenus();
     } catch (caught) {
@@ -172,6 +174,7 @@ export function MenuManagement({
         { revalidate: false },
       );
       setDraft(undefined);
+      toast.success(`Usunięto menu „${draft.menu.name}”`);
     } catch (caught) {
       setDraftError(caught);
     } finally {

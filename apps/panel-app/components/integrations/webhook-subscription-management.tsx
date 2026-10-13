@@ -7,7 +7,7 @@ import type {
   WebhookSubscriptionInput,
 } from "@/src/api/webhook-subscriptions";
 
-import { Alert, Button, Spinner, Tooltip } from "@heroui/react";
+import { Alert, Button, Spinner, Tooltip, toast } from "@heroui/react";
 import {
   ProhibitIcon as DisableIcon,
   CheckIcon,
@@ -344,6 +344,7 @@ export function WebhookSubscriptionManagement({
         { revalidate: false },
       );
       setEditedSubscriptionId(undefined);
+      toast.success(`Zapisano webhook „${updated.name}”`);
     } catch (caught) {
       setActionError(caught);
     } finally {
@@ -369,6 +370,9 @@ export function WebhookSubscriptionManagement({
       await mutateSubscriptions(
         (current) => replaceSubscription(current, updated),
         { revalidate: false },
+      );
+      toast.success(
+        `${status === "ENABLED" ? "Włączono" : "Wyłączono"} webhook „${subscription.name}”`,
       );
 
       return true;
@@ -397,6 +401,7 @@ export function WebhookSubscriptionManagement({
       if (editedSubscriptionId === subscription.id) {
         setEditedSubscriptionId(undefined);
       }
+      toast.success(`Usunięto webhook „${subscription.name}”`);
 
       return true;
     } catch (caught) {

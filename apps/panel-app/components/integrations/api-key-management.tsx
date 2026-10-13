@@ -11,6 +11,7 @@ import {
   RadioGroup,
   Spinner,
   TextField,
+  toast,
 } from "@heroui/react";
 import { PlusIcon, TrashIcon } from "@phosphor-icons/react";
 import { useState } from "react";
@@ -143,6 +144,7 @@ export function ApiKeyManagement({
         (current) => (current ?? []).filter((key) => key.id !== apiKey.id),
         { revalidate: false },
       );
+      toast.success(`Usunięto klucz API „${apiKey.name}”`);
 
       return true;
     } catch (caught) {

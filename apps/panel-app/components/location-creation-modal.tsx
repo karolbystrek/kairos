@@ -2,7 +2,7 @@
 
 import type { FormEvent } from "react";
 
-import { Alert, Button } from "@heroui/react";
+import { Alert, Button, toast } from "@heroui/react";
 import { PlusIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 import { useSWRConfig } from "swr";
@@ -79,6 +79,7 @@ export function LocationCreationModal({
         { revalidate: false },
       );
       onCreated(location);
+      toast.success(`Utworzono lokal „${location.name}”`);
       onOpenChange(false);
       setName("");
       setReviewUrl("");
