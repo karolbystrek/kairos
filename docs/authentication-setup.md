@@ -102,11 +102,6 @@ replace `kairos.pat` in its credential volume, restart the API, then revoke the 
 PAT. Keep this operational process
 separate from application account/session expiry.
 
-No existing account/password migration is needed: V1 is the initial development
-schema. An existing development database may have
-a V1 checksum mismatch; reset it yourself when desired. Implementation never
-resets user-owned containers or volumes automatically.
-
 Provider provisioning and Kairos transactions cannot be atomic across services.
 On registration failure, Kairos attempts cleanup of the newly created identity.
 If provider cleanup fails or a create response is lost, an orphan may require

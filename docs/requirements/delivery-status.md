@@ -5,7 +5,7 @@
 - [Current delivery status and roadmap](#current-delivery-status-and-roadmap)
 - [Contents](#contents)
 - [10. Current Delivery Status and Roadmap](#10-current-delivery-status-and-roadmap)
-- [Implemented behavior and development schema](#implemented-behavior-and-development-schema)
+- [Implemented behavior](#implemented-behavior)
 - [Next integration and authentication acceptance](#next-integration-and-authentication-acceptance)
 - [Outstanding security and acceptance](#outstanding-security-and-acceptance)
 - [Deferred work](#deferred-work)
@@ -66,14 +66,11 @@ The current walking vertical slice is implemented for local development:
 * fresh PostgreSQL entrypoint role initialization and automatic Spring Flyway V1;
 * GitHub Actions validation for pull requests and `main`.
 
-### Implemented behavior and development schema
+### Implemented behavior
 
 The panel removes terminal orders from the active queue after an accepted
 transition and shows the customer QR code without a separate tracking-link,
-printing, or download workflow. The database starts empty. Because the local
-database was discarded while developing these increments, schema changes are
-consolidated in the initial Flyway migration rather than compatibility
-migrations.
+printing, or download workflow.
 
 The customer PWA now supplies the referenced 192×192 and 512×512 regular
 icons, 512×512 maskable icon, 180×180 Apple touch icon, and multi-resolution
@@ -126,8 +123,7 @@ collector is connected or operational history retained by this increment.
 
 Outstanding security and acceptance work:
 
-* recreate the disposable VPS stack for the revised V1 and verify restricted-role
-  RLS and scoped application/worker behavior on the hosted
+* verify restricted-role RLS and scoped application/worker behavior on the hosted
   runtime; repository implementation and disposable PostgreSQL tests do not
   establish live acceptance;
 * verify hosted gateway client addressing, throttling and origin-bypass blocking

@@ -86,7 +86,7 @@
   when all locations are disabled without the invitation warning container.
 * Username, local password hashes, custom refresh sessions, Platform Operator,
   Tenant Registration Invitations are absent from the
-  initial schema and runtime. Existing local data needs no migration.
+  initial schema and runtime.
 * Authorized account listing returns only manageable member accounts in the
   current tenant and, for a manager, only operators assigned to that manager's
   location.

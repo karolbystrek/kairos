@@ -6,7 +6,6 @@
 - [Contents](#contents)
 - [Credentials and fresh startup](#credentials-and-fresh-startup)
 - [Spring persistence and RLS](#spring-persistence-and-rls)
-- [Development schema changes](#development-schema-changes)
 - [Platform administrator grants](#platform-administrator-grants)
   - [Grant platform access](#grant-platform-access)
   - [Verify and revoke](#verify-and-revoke)
@@ -56,18 +55,6 @@ with its current claim token. No ordinary query receives owner access.
 API startup verifies the runtime role, ownership, policy revision and required
 grants. Repository tests exercise actual fresh PostgreSQL initialization, Flyway,
 runtime denial and scoped workflows; they do not establish hosted acceptance.
-
-## Development schema changes
-
-The current development policy edits V1 in place. The VPS data is disposable and
-the owner will recreate the Compose stack and database volume for this revision;
-no data-preserving upgrade or checksum repair is supplied. Recreating containers
-while retaining the PostgreSQL volume does not re-run role initialization or V1.
-Any volume reset is an operator action requiring explicit authorization.
-
-After initialization, deploy the reviewed revision through the existing production
-Environment approval gate and verify application health and representative scoped
-operations. No repository script resets volumes or repairs Flyway history.
 
 ## Platform administrator grants
 

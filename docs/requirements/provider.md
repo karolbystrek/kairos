@@ -44,11 +44,6 @@ No distributed transaction is introduced; email uses a durable outbox. A provide
 outage during cleanup can leave an orphan identity requiring operator cleanup;
 never attach an existing identity solely because its email matches.
 
-Treat Kairos as a fresh development repository until the user changes that
-policy: no existing-account/password migration or backward compatibility.
-V1 contains the accepted initial schema, including standard Spring Session JDBC
-tables. Do not introduce transitional migrations solely for development data.
-Local resets remain user-owned actions and are not performed automatically.
 See [authentication setup](../authentication-setup.md) for operational steps.
 
 ```mermaid
