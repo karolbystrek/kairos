@@ -72,11 +72,12 @@ existing account cannot redeem an invitation to gain another location or role.
 
 ### Invitation cards and synchronization
 
-Accounts presents created accounts and a paginated invitation history. History
+Accounts presents created accounts and the full invitation history. History
 shows recipient, role, location, issuer, creation/expiry times, lifecycle state
 and delivery state (`QUEUED`, `SENT`, `FAILED`), including terminal entries.
 Administrators see the tenant; managers see operator invitations for their own
-location. Server sorting supports newest or oldest first and stable ordering.
+location. History is ordered newest first, with stable ordering for equal
+creation times.
 
 Creating for an already invited email requires explicit replacement confirmation
 in the panel. The API returns `409` until replacement is confirmed. Replacement

@@ -28,6 +28,8 @@ import java.security.MessageDigest;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
@@ -233,11 +235,25 @@ class AccountInvitationApiIntegrationTests extends RedisListenerIsolatedIntegrat
     void administratorListsCompleteHistoryAndRevokesPendingInvitations() throws Exception {
         var first = createInvitation("MANAGER");
         var second = createInvitation("OPERATOR", "another.person@example.com");
+        var expectedIds = new ArrayList<String>();
+        expectedIds.add(first.get("id").asText());
+        expectedIds.add(second.get("id").asText());
+        for (var index = 0; index < 23; index++) {
+            expectedIds.add(createInvitation("OPERATOR", "history-" + index + "@example.com").get("id").asText());
+        }
+        var historyStart = Instant.now().minusSeconds(60);
+        for (var index = 0; index < expectedIds.size(); index++) {
+            var createdAt = historyStart.plusSeconds(index);
+            jdbcTemplate.update("UPDATE account_invitations SET created_at = ?, expires_at = ? WHERE id = ?",
+                Timestamp.from(createdAt), Timestamp.from(createdAt.plus(Duration.ofDays(7))),
+                UUID.fromString(expectedIds.get(index)));
+        }
+        Collections.reverse(expectedIds);
 
         mockMvc.perform(withAuthentication(apiGet("/account-invitations/v1")))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.items.length()").value(2))
-            .andExpect(jsonPath("$.items[0].invitationLink").doesNotExist());
+            .andExpect(jsonPath("$.length()").value(25))
+            .andExpect(jsonPath("$[0].invitationLink").doesNotExist());
 
         mockMvc.perform(withAuthenticationAndCsrf(apiDelete(
                 "/account-invitations/v1/{invitationId}",
@@ -247,9 +263,9 @@ class AccountInvitationApiIntegrationTests extends RedisListenerIsolatedIntegrat
 
         mockMvc.perform(withAuthentication(apiGet("/account-invitations/v1")))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.items.length()").value(2))
-            .andExpect(jsonPath("$.items[0].id").value(second.get("id").asText()))
-            .andExpect(jsonPath("$.items[1].state").value("REVOKED"));
+            .andExpect(jsonPath("$.length()").value(25))
+            .andExpect(jsonPath("$[*].id").value(expectedIds))
+            .andExpect(jsonPath("$[24].state").value("REVOKED"));
         assertThat(jdbcTemplate.queryForObject(
             "SELECT revocation_reason FROM account_invitations WHERE id = ?",
             String.class,
@@ -345,7 +361,7 @@ class AccountInvitationApiIntegrationTests extends RedisListenerIsolatedIntegrat
 
         mockMvc.perform(withAuthentication(apiGet("/account-invitations/v1")))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.items[0].state").value("EXPIRED"));
+            .andExpect(jsonPath("$[0].state").value("EXPIRED"));
 
         var csrf = csrfCookie();
         var preview = apiPost("/account-invitation-previews/v1")

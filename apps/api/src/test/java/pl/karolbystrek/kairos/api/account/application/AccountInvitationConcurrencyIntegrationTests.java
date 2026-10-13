@@ -189,7 +189,7 @@ class AccountInvitationConcurrencyIntegrationTests extends RedisListenerIsolated
         var resent = invitationService.resend(tenant.administrator(), replacement.invitation().id(), true);
         assertThatThrownBy(() -> invitationService.preview(replacement.token())).isInstanceOf(AccountInvitationUnavailableException.class);
         assertThat(invitationService.preview(resent.token()).email()).isEqualTo(email);
-        assertThat(invitationService.history(tenant.administrator(), 0, 20, "desc").getContent())
+        assertThat(invitationService.history(tenant.administrator()))
             .extracting(invitation -> invitation.state().name()).containsExactly("PENDING", "REPLACED", "REPLACED");
         assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM account_invitations WHERE tenant_id=? AND email=? AND state='PENDING'",
             Integer.class, tenant.administrator().tenantId(), email)).isEqualTo(1);
@@ -217,7 +217,7 @@ class AccountInvitationConcurrencyIntegrationTests extends RedisListenerIsolated
     }
 
     @Test
-    void managerHistoryIncludesAdminIssuedOperatorsOnlyAtOwnEnabledLocationAndSupportsPagination() {
+    void managerHistoryIncludesAdminIssuedOperatorsOnlyAtOwnEnabledLocation() {
         var tenant = new IntegrationTestFixture(jdbcTemplate).createTenant();
         var first = invitationService.create(tenant.administrator(), tenant.firstLocationId(), AssignmentRole.OPERATOR,
             "visible-" + UUID.randomUUID() + "@example.com");
@@ -225,11 +225,11 @@ class AccountInvitationConcurrencyIntegrationTests extends RedisListenerIsolated
             "manager-" + UUID.randomUUID() + "@example.com");
         invitationService.create(tenant.administrator(), tenant.secondLocationId(), AssignmentRole.OPERATOR,
             "hidden-" + UUID.randomUUID() + "@example.com");
-        var history = invitationService.history(tenant.manager(), 0, 1, "desc");
-        assertThat(history.getTotalElements()).isEqualTo(1);
-        assertThat(history.getContent()).extracting(invitation -> invitation.id()).containsExactly(first.invitation().id());
-        assertThat(history.getContent().getFirst().issuedByEmail()).isEqualTo(first.invitation().issuedByEmail());
-        assertThat(invitationService.history(tenant.administrator(), 1, 1, "asc").getTotalElements()).isEqualTo(3);
+        var history = invitationService.history(tenant.manager());
+        assertThat(history).hasSize(1);
+        assertThat(history).extracting(invitation -> invitation.id()).containsExactly(first.invitation().id());
+        assertThat(history.getFirst().issuedByEmail()).isEqualTo(first.invitation().issuedByEmail());
+        assertThat(invitationService.history(tenant.administrator())).hasSize(3);
     }
 
     @Test

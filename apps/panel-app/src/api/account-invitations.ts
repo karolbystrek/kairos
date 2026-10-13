@@ -18,12 +18,7 @@ const invitationSchema = z.object({
   deliveryState: z.enum(["QUEUED", "SENT", "FAILED"]),
 });
 
-const invitationsSchema = z.object({
-  items: z.array(invitationSchema),
-  totalElements: z.number().int().nonnegative(),
-  page: z.number().int().nonnegative(),
-  size: z.number().int().positive(),
-});
+const invitationsSchema = z.array(invitationSchema);
 
 const previewSchema = z.object({
   email: z.email(),
@@ -56,13 +51,8 @@ export type RedeemAccountInvitationInput = z.input<
   typeof redemptionInputSchema
 >;
 
-export function listAccountInvitations(
-  page = 0,
-  sort: "asc" | "desc" = "desc",
-) {
-  const query = new URLSearchParams({ page: String(page), size: "20", sort });
-
-  return request(`/api/account-invitations/v1?${query}`, invitationsSchema);
+export function listAccountInvitations() {
+  return request("/api/account-invitations/v1", invitationsSchema);
 }
 
 export function resendAccountInvitation(

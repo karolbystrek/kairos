@@ -142,8 +142,9 @@ returns the fixed recipient email, restaurant administrator email, location
 name, role, and expiration needed by
 the registration page. Creation requires email, location, and role; list and
 creation responses include the recipient email and delivery state, never a token
-or link. `GET ?page=0&size=20&sort=desc` returns `{items,totalElements,page,size}`
-for the authorized history (`asc` selects oldest first). Lifecycle states are
+or link. `GET` returns a JSON array of the complete authorized history, ordered by
+creation time descending, then ID descending for stable ties. The list has no
+paging or sorting parameters or response metadata. Lifecycle states are
 `PENDING`, `REDEEMED`, `REVOKED`, `REPLACED`, and derived `EXPIRED`; delivery
 states are `QUEUED`, `SENT`, `FAILED`. Creation defaults `replaceExisting` to
 `false` and returns `409` for an active invitation to that tenant/email. Explicit

@@ -11,9 +11,6 @@ import pl.karolbystrek.kairos.api.account.application.exception.AccountConflictE
 import pl.karolbystrek.kairos.api.email.application.EmailDeliveryService;
 import pl.karolbystrek.kairos.api.config.ApplicationOriginsProperties;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import pl.karolbystrek.kairos.api.account.application.exception.AccountInvitationUnavailableException;
 import pl.karolbystrek.kairos.api.account.application.exception.AccountNotFoundException;
 import pl.karolbystrek.kairos.api.account.application.exception.InvalidAccountRequestException;
@@ -41,6 +38,7 @@ import pl.karolbystrek.kairos.api.persistence.infrastructure.DatabaseAccessConte
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
@@ -140,17 +138,14 @@ public class AccountInvitationService {
     }
 
     @Transactional(readOnly = true)
-    public Page<AccountInvitationView> history(StaffPrincipal actor, int page, int size, String direction) {
+    public List<AccountInvitationView> history(StaffPrincipal actor) {
         var access = staffAccessService.resolve(actor);
         requireInvitationCapability(access);
-        if (page < 0 || size < 1 || size > 100 || !("asc".equals(direction) || "desc".equals(direction))) {
-            throw new InvalidAccountRequestException("Use a non-negative page, size between 1 and 100, and asc or desc sorting");
-        }
-        var sort = "asc".equals(direction) ? Sort.Direction.ASC : Sort.Direction.DESC;
-        var pageable = PageRequest.of(page, size, Sort.by(sort, "createdAt", "id"));
-        var invitations = access.isTenantAdmin() ? invitationRepository.findAllByTenantId(access.tenantId(), pageable)
-            : invitationRepository.findAllByTenantIdAndLocationIdAndAssignmentRole(access.tenantId(), access.locationId(), AssignmentRole.OPERATOR, pageable);
-        return invitations.map(invitation -> toView(invitation, requireLocation(invitation)));
+        var invitations = access.isTenantAdmin()
+            ? invitationRepository.findAllByTenantIdOrderByCreatedAtDescIdDesc(access.tenantId())
+            : invitationRepository.findAllByTenantIdAndLocationIdAndAssignmentRoleOrderByCreatedAtDescIdDesc(
+                access.tenantId(), access.locationId(), AssignmentRole.OPERATOR);
+        return invitations.stream().map(invitation -> toView(invitation, requireLocation(invitation))).toList();
     }
 
     @Transactional
