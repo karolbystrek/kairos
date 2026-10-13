@@ -15,7 +15,9 @@ import {
 import { ArrowsClockwiseIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
+import { Bar, BarChart, CartesianGrid, Cell, XAxis, YAxis } from "recharts";
 
+import { ChartContainer, ChartTooltip } from "@/components/chart";
 import { FormSelect } from "@/components/form-controls";
 import { ApiError } from "@/src/api/api-fetch";
 import {
@@ -223,16 +225,22 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 function Metric({
   label,
   value,
+  prominence,
   detail,
 }: {
   label: string;
   value: string;
+  prominence?: "primary" | "large";
   detail?: string;
 }) {
   return (
-    <div className="panel-card px-3 py-2">
+    <div className="min-w-0 rounded-lg bg-surface-secondary px-3 py-3">
       <dt className="text-sm secondary-text">{label}</dt>
-      <dd className="text-2xl font-semibold tracking-tight">{value}</dd>
+      <dd
+        className={`${prominence === "primary" ? "text-5xl" : prominence === "large" ? "text-3xl" : "text-2xl"} break-words font-semibold tracking-tight tabular-nums`}
+      >
+        {value}
+      </dd>
       {detail && <dd className="text-xs secondary-text">{detail}</dd>}
     </div>
   );
@@ -297,221 +305,238 @@ function LoadFailure({
   );
 }
 
-function ReportView({ report }: { report: AnalyticsReport }) {
-  if (report.firstRecordedHour === null) {
-    return (
-      <Alert status="default">
-        <Alert.Indicator />
-        <Alert.Content>
-          <Alert.Title>Brak zebranych danych</Alert.Title>
-          <Alert.Description>
-            Zbieranie danych rozpoczęło się wraz z wdrożeniem tej funkcji i nie
-            obejmuje wcześniejszej historii.
-          </Alert.Description>
-        </Alert.Content>
-      </Alert>
-    );
-  }
-  const collectedFrom = localDate(
-    new Date(report.firstRecordedHour),
-    report.zone,
-  );
-  const count = (values: Record<string, number>, key: string) =>
-    values[key] ?? 0;
-  const busiestDay = Math.max(
-    1,
-    ...report.days.map((day) => count(day.transitions, "IN_PREPARATION")),
-  );
-  const hasActivity = statuses.some(([key]) => count(report.transitions, key));
+type OrderChartDay = {
+  label: string;
+  value: number | null;
+  transitions: Record<string, number>;
+  partial?: boolean;
+};
+
+function OrderChart({
+  data,
+  byLocation = false,
+}: {
+  data: OrderChartDay[];
+  byLocation?: boolean;
+}) {
+  const [trigger, setTrigger] = useState<"hover" | "click">("hover");
 
   return (
-    <div className="flex flex-col gap-8">
-      {collectedFrom > report.from && (
-        <p className="text-sm secondary-text">
-          Dane są zbierane od {collectedFrom}; wcześniejsze dni oznaczono jako
-          brak danych, a nie jako zero.
-        </p>
-      )}
-      {!hasActivity && (
-        <p className="text-sm secondary-text">
-          Brak zmian statusu zamówień w wybranym okresie.
-        </p>
-      )}
+    <ChartContainer
+      className="w-full min-w-0 aspect-auto"
+      config={{ orders: { label: "Zamówienia", color: "var(--accent)" } }}
+      style={{ height: byLocation ? Math.max(200, data.length * 44) : 260 }}
+      onPointerDown={(event) =>
+        setTrigger(event.pointerType === "touch" ? "click" : "hover")
+      }
+      onPointerMove={(event) => {
+        if (event.pointerType === "mouse") setTrigger("hover");
+      }}
+    >
+      <BarChart
+        accessibilityLayer
+        aria-label={
+          byLocation
+            ? "Zakończone zamówienia według lokalu"
+            : "Przyjęte zamówienia według dnia"
+        }
+        data={data}
+        layout={byLocation ? "vertical" : "horizontal"}
+        margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
+      >
+        <CartesianGrid horizontal={!byLocation} vertical={byLocation} />
+        <XAxis
+          allowDecimals={false}
+          axisLine={false}
+          dataKey={byLocation ? undefined : "label"}
+          minTickGap={28}
+          tickFormatter={
+            byLocation
+              ? undefined
+              : (value: string) =>
+                  dayFormat.format(new Date(`${value}T00:00:00Z`))
+          }
+          tickLine={false}
+          type={byLocation ? "number" : "category"}
+        />
+        <YAxis
+          allowDecimals={false}
+          axisLine={false}
+          dataKey={byLocation ? "label" : undefined}
+          tickFormatter={
+            byLocation
+              ? (value: string) =>
+                  value.length > 14 ? `${value.slice(0, 14)}…` : value
+              : undefined
+          }
+          tickLine={false}
+          type={byLocation ? "category" : "number"}
+          width={byLocation ? 100 : 36}
+        />
+        <ChartTooltip
+          content={({ active, payload }) => {
+            const day: OrderChartDay | undefined = payload?.[0]?.payload;
 
-      <Section title="Zamówienia">
-        <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          {statuses.map(([key, label]) => (
-            <Metric
-              key={key}
-              label={label}
-              value={numberFormat.format(count(report.transitions, key))}
+            if (!active || !day || day.value === null) return null;
+
+            return (
+              <div className="max-w-[min(18rem,80vw)] rounded-lg border border-separator bg-surface px-3 py-2 text-sm shadow-md">
+                <p className="break-words font-medium">
+                  {byLocation
+                    ? day.label
+                    : dayFormat.format(new Date(`${day.label}T00:00:00Z`))}
+                  {day.partial && " · Dzień w toku"}
+                </p>
+                <dl className="mt-2 grid grid-cols-[1fr_auto] gap-x-4 gap-y-1">
+                  {statuses.map(([key, label]) => (
+                    <div key={key} className="contents">
+                      <dt className="secondary-text">{label}</dt>
+                      <dd className="tabular-nums">
+                        {numberFormat.format(day.transitions[key] ?? 0)}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            );
+          }}
+          cursor={{ fill: "var(--surface-secondary)" }}
+          trigger={trigger}
+        />
+        <Bar
+          dataKey="value"
+          fill="var(--color-orders)"
+          isAnimationActive={false}
+          maxBarSize={48}
+          radius={4}
+        >
+          {data.map((day, index) => (
+            <Cell
+              key={index}
+              fillOpacity={day.partial ? 0.45 : 1}
+              stroke={day.partial ? "var(--accent)" : undefined}
+              strokeDasharray={day.partial ? "3 3" : undefined}
             />
           ))}
-        </dl>
-        <p className="text-xs secondary-text">
-          Liczby zmian statusu w okresie. Przyjęte i zakończone w tym samym
-          okresie to różne zamówienia, więc ich iloraz nie jest wskaźnikiem
-          realizacji.
-        </p>
-        <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Metric
-            detail={`${numberFormat.format(report.preparation.samples)} próbek`}
-            label="Średni czas przygotowania"
-            value={formatDuration(report.preparation.meanMs)}
-          />
-          <Metric
-            detail={`${numberFormat.format(report.collection.samples)} próbek`}
-            label="Średni czas do odbioru"
-            value={formatDuration(report.collection.meanMs)}
-          />
-        </dl>
+        </Bar>
+      </BarChart>
+    </ChartContainer>
+  );
+}
+
+function ReportView({
+  report,
+  platform,
+}: {
+  report: AnalyticsReport;
+  platform: boolean;
+}) {
+  const collectedFrom =
+    report.firstRecordedHour === null
+      ? null
+      : localDate(new Date(report.firstRecordedHour), report.zone);
+  const count = (key: string) =>
+    numberFormat.format(report.transitions[key] ?? 0);
+
+  return (
+    <div className="flex min-w-0 flex-col gap-6">
+      <dl className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <Metric
+          label="Zakończone zamówienia"
+          prominence="primary"
+          value={count("COMPLETED")}
+        />
+        <Metric
+          label="Średni czas przygotowania"
+          prominence="large"
+          value={formatDuration(report.preparation.meanMs)}
+        />
+        <Metric
+          label="Średni czas do odbioru"
+          prominence="large"
+          value={formatDuration(report.collection.meanMs)}
+        />
+      </dl>
+      <dl className="grid grid-cols-3 gap-3">
+        {statuses
+          .filter(([key]) => key !== "COMPLETED")
+          .map(([key, label]) => (
+            <Metric key={key} label={label} value={count(key)} />
+          ))}
+      </dl>
+      <Section title="Przyjęte zamówienia dziennie">
+        <OrderChart
+          data={report.days.map((day) => ({
+            label: day.date,
+            value:
+              collectedFrom === null || day.date < collectedFrom
+                ? null
+                : (day.transitions.IN_PREPARATION ?? 0),
+            transitions: day.transitions,
+            partial: day.date === report.partialDay,
+          }))}
+        />
+        {report.partialDay && (
+          <p className="flex items-center gap-2 text-xs secondary-text">
+            <span
+              aria-hidden="true"
+              className="h-3 w-3 rounded-sm border border-dashed border-accent bg-accent/45"
+            />
+            Dzień w toku
+          </p>
+        )}
       </Section>
-
-      <Section title="Dzienny przebieg">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[34rem] text-sm">
-            <caption className="sr-only">
-              Zmiany statusu zamówień według dnia w strefie {report.zone}
-            </caption>
-            <thead>
-              <tr className="text-left secondary-text">
-                <th className="py-2 pr-3 font-medium" scope="col">
-                  Dzień
-                </th>
-                <th className="py-2 pr-3 font-medium" scope="col">
-                  Przyjęte
-                </th>
-                {statuses.slice(1).map(([key, label]) => (
-                  <th
-                    key={key}
-                    className="py-2 pr-3 text-right font-medium"
-                    scope="col"
-                  >
-                    {label}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {report.days.map((day) => {
-                const missing = day.date < collectedFrom;
-                const received = count(day.transitions, "IN_PREPARATION");
-
-                return (
-                  <tr key={day.date} className="border-t border-separator">
-                    <th className="py-2 pr-3 text-left font-normal" scope="row">
-                      {dayFormat.format(new Date(`${day.date}T00:00:00Z`))}
-                      {day.date === report.partialDay && (
-                        <span className="secondary-text"> (dzień w toku)</span>
-                      )}
-                    </th>
-                    {missing ? (
-                      <td className="py-2 secondary-text" colSpan={4}>
-                        brak danych
-                      </td>
-                    ) : (
-                      <>
-                        <td className="py-2 pr-3">
-                          <div className="flex items-center gap-2">
-                            <span className="w-10 tabular-nums">
-                              {numberFormat.format(received)}
-                            </span>
-                            <span
-                              aria-hidden="true"
-                              className="h-2 rounded-full bg-accent"
-                              style={{
-                                width: `${(received / busiestDay) * 8}rem`,
-                              }}
-                            />
-                          </div>
-                        </td>
-                        {statuses.slice(1).map(([key]) => (
-                          <td
-                            key={key}
-                            className="py-2 pr-3 text-right tabular-nums"
-                          >
-                            {numberFormat.format(count(day.transitions, key))}
-                          </td>
-                        ))}
-                      </>
-                    )}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </Section>
-
       {report.locations && report.locations.length > 0 && (
-        <Section title="Lokale">
-          <ul className="flex flex-col">
-            {report.locations.map((location) => (
-              <li
-                key={location.locationId}
-                className="panel-card flex flex-wrap justify-between gap-2 px-3 py-2"
-              >
-                <span className="font-medium">
-                  {location.name ??
-                    `Usunięta lokalizacja (${location.locationId.slice(0, 8)})`}
-                </span>
-                <span className="text-sm tabular-nums secondary-text">
-                  {statuses
-                    .map(
-                      ([key, label]) =>
-                        `${label}: ${numberFormat.format(count(location.transitions, key))}`,
-                    )
-                    .join(" · ")}
-                </span>
-              </li>
-            ))}
-          </ul>
+        <Section title="Zakończone zamówienia według lokalu">
+          <OrderChart
+            byLocation
+            data={report.locations.map((location) => ({
+              label:
+                location.name ??
+                `Usunięta lokalizacja (${location.locationId.slice(0, 8)})`,
+              value: location.transitions.COMPLETED ?? 0,
+              transitions: location.transitions,
+            }))}
+          />
         </Section>
       )}
-
-      <Section title="Korzystanie z panelu">
-        <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {featureActions.map(([key, label]) => (
-            <Metric
-              key={key}
-              label={label}
-              value={numberFormat.format(count(report.actions, key))}
-            />
-          ))}
-        </dl>
-        <p className="text-xs secondary-text">
-          Przybliżona liczba działań zgłoszonych przez przeglądarki. Część
-          działań może nie zostać zarejestrowana; liczby nie oznaczają liczby
-          osób.
-        </p>
-      </Section>
-
       <Section title="Opinie Google">
-        <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <dl className="grid grid-cols-2 gap-3">
           {reviewActions.map(([key, label]) => (
             <Metric
               key={key}
               label={label}
-              value={numberFormat.format(count(report.actions, key))}
+              value={numberFormat.format(report.actions[key] ?? 0)}
             />
           ))}
         </dl>
-        <p className="text-xs secondary-text">
-          Kliknięcie linku nie potwierdza wystawienia opinii. Zamknięcia
-          obejmują tylko wyraźne zamknięcie prośby przez klienta.
-        </p>
       </Section>
+      {platform && (
+        <Section title="Korzystanie z panelu">
+          <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {featureActions.map(([key, label]) => (
+              <Metric
+                key={key}
+                label={label}
+                value={numberFormat.format(report.actions[key] ?? 0)}
+              />
+            ))}
+          </dl>
+        </Section>
+      )}
     </div>
   );
 }
 
 function ReportArea({
+  platform = false,
   range,
   report,
   error,
   isLoading,
   onRetry,
 }: {
+  platform?: boolean;
   range: RangeState;
   report?: AnalyticsReport;
   error?: unknown;
@@ -541,13 +566,7 @@ function ReportArea({
           onRetry={onRetry}
         />
       )}
-      <p className="text-xs secondary-text">
-        Strefa czasowa: {report.zone}. Godzinowe dane UTC przypisano do dnia
-        według początku godziny, więc w strefach z przesunięciem
-        niepełnogodzinnym granice dni są przybliżone. Najnowsze zmiany mogą
-        pojawić się z kilkusekundowym opóźnieniem.
-      </p>
-      <ReportView report={report} />
+      <ReportView platform={platform} report={report} />
     </div>
   );
 }
@@ -614,7 +633,7 @@ export function RestaurantAnalytics({
   )?.name;
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex min-w-0 flex-col gap-6">
       <header>
         <h2 className="text-2xl font-semibold tracking-tight">Analityka</h2>
         {!isAdministrator && (
@@ -704,10 +723,6 @@ function HealthView({
           onRetry={onRetry}
         />
       )}
-      <p className="text-xs secondary-text">
-        Odczyt z {timeFormat.format(new Date(health.observedAt))}. Odświeżanie
-        co 30 s; historia dostępności nie jest przechowywana.
-      </p>
       <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Metric label="API" value={error ? "Nieznany" : "Działa"} />
         <Metric label="PostgreSQL" value={statusLabels[health.database]} />
@@ -725,45 +740,16 @@ function HealthView({
               {timeFormat.format(new Date(health.backlogObservedAt))}.
             </p>
           )}
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[24rem] text-sm">
-              <caption className="sr-only">Zaległości zadań w tle</caption>
-              <thead>
-                <tr className="text-left secondary-text">
-                  <th className="py-2 pr-3 font-medium" scope="col">
-                    Zadanie
-                  </th>
-                  <th className="py-2 pr-3 text-right font-medium" scope="col">
-                    Oczekujące
-                  </th>
-                  <th className="py-2 text-right font-medium" scope="col">
-                    Najstarsze
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {health.workers.map((worker) => (
-                  <tr key={worker.worker} className="border-t border-separator">
-                    <th className="py-2 pr-3 text-left font-normal" scope="row">
-                      {workerLabels[worker.worker] ?? worker.worker}
-                    </th>
-                    <td className="py-2 pr-3 text-right tabular-nums">
-                      {numberFormat.format(worker.pending)}
-                    </td>
-                    <td className="py-2 text-right tabular-nums">
-                      {worker.pending > 0
-                        ? formatAge(worker.oldestAgeSeconds)
-                        : "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <p className="text-xs secondary-text">
-            Oczekujące pomiary analityki opisują bieżące opóźnienie
-            przetwarzania, a nie dokładny moment kompletności raportów.
-          </p>
+          <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {health.workers.map((worker) => (
+              <Metric
+                key={worker.worker}
+                detail={`Najstarsze: ${worker.pending > 0 ? formatAge(worker.oldestAgeSeconds) : "—"}`}
+                label={workerLabels[worker.worker] ?? worker.worker}
+                value={`${numberFormat.format(worker.pending)} oczekujących`}
+              />
+            ))}
+          </dl>
         </>
       )}
     </div>
@@ -822,18 +808,15 @@ export function PlatformAnalytics({
           onRetry={() => void health.mutate()}
         />
       </Section>
-      <div className="flex flex-col gap-6">
+      <div className="flex min-w-0 flex-col gap-6">
         <header>
           <h2 className="text-2xl font-semibold tracking-tight">
             Analityka platformy
           </h2>
-          <p className="text-sm secondary-text">
-            Sumy ze wszystkich restauracji. Trwałe usunięcie restauracji usuwa
-            jej udział.
-          </p>
         </header>
         <RangeFilter state={range} />
         <ReportArea
+          platform
           error={report.error}
           isLoading={report.isLoading}
           range={range}

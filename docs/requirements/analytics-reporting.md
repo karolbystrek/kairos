@@ -70,8 +70,9 @@ Each report returns, for the range:
 - Mean preparation (creation to ready) and collection (ready to completion)
   durations with sample counts. Means divide merged duration totals by merged
   sample counts, never averages of hourly means. Zero samples yield no mean.
-- Counts of the four predefined panel actions, review-link clicks and explicit
-  review-prompt dismissals.
+- Review-link clicks and explicit review-prompt dismissals. Only platform
+  reports include the four predefined panel action counts; restaurant API
+  responses omit those action keys for administrators and managers.
 - For tenant-wide administrator reports only, per-location transition totals.
 
 Usage counts are approximate browser-reported actions, never unique people.
@@ -81,8 +82,8 @@ counts are not a cohort completion rate. Percentiles are deferred.
 Metadata includes `generatedAt`, the reporting zone, `partialDay` when the range
 ends today, and `firstRecordedHour`, the earliest aggregate hour in scope.
 Collection started at deployment without backfill, so days before that hour are
-shown as no data rather than zero. Reports do not claim an exact
-processed-through watermark; recent transitions may still await the analytics
+shown empty rather than zero, without explanatory text. Reports do not claim
+an exact processed-through watermark; recent transitions may still await the analytics
 worker.
 
 ## Dates, zones and ranges
@@ -130,11 +131,20 @@ location, range and zone, so another scope never shows a previous scope's
 results. A failed refresh keeps the last result with a stale notice; a 403
 clears platform data and refreshes capabilities. Health refreshes every 30
 seconds; a failed browser request is shown as unknown or unreachable because it
-cannot distinguish an API outage from a network failure. Daily trends render as
-a table with decorative bars, which is also the accessible equivalent.
+cannot distinguish an API outage from a network failure.
+
+Completed orders lead the page, with large mean preparation and pickup durations
+and secondary status counts. Daily received-order volume uses responsive
+shadcn/Recharts bars with theme tokens, keyboard accessibility and status details
+on hover or tap. The in-progress day has a distinct bar and label; days before
+collection are empty. Tenant-wide administrators also see completed-order
+comparisons by location and compact Google review metrics. Panel usage and
+system health appear only in the platform view. Explanatory footnotes and the
+daily table are removed; all analytics views fit mobile widths without horizontal
+scroll.
 
 ## Boundaries
 
 No customer dashboard, operational sample history, alerts, collector
-deployment, live infrastructure changes, CSV exports, comparisons, new tracked
-dimensions or finer-grained aggregation are included.
+deployment, live infrastructure changes, CSV exports, cross-period comparisons,
+new tracked dimensions or finer-grained aggregation are included.

@@ -74,10 +74,12 @@ class AnalyticsReportIntegrationTests extends RedisListenerIsolatedIntegrationTe
         order(other, other.firstLocationId(), HOUR, "IN_PREPARATION", 7, 0, 0);
         usage(tenant, null, "menu_editor_opened", 4);
         usage(tenant, tenant.firstLocationId(), "queue_opened", 5);
+        usage(tenant, tenant.firstLocationId(), "review_link_clicked", 6);
 
         var tenantReport = reports.restaurant(tenant.administrator(), WEEK, null);
         assertThat(tenantReport.transitions()).containsEntry("IN_PREPARATION", 5L);
-        assertThat(tenantReport.actions()).containsEntry("menu_editor_opened", 4L).containsEntry("queue_opened", 5L);
+        assertThat(tenantReport.actions()).containsOnlyKeys("review_link_clicked", "review_prompt_dismissed")
+                .containsEntry("review_link_clicked", 6L);
         assertThat(tenantReport.locations()).extracting(AnalyticsReportService.LocationTotals::locationId)
                 .containsExactlyInAnyOrder(tenant.firstLocationId(), tenant.secondLocationId());
         var locationReport = reports.restaurant(tenant.administrator(), WEEK, tenant.secondLocationId());
@@ -86,7 +88,13 @@ class AnalyticsReportIntegrationTests extends RedisListenerIsolatedIntegrationTe
         assertThat(locationReport.locations()).isNull();
         var managerReport = reports.restaurant(tenant.manager(), WEEK, null);
         assertThat(managerReport.transitions()).containsEntry("IN_PREPARATION", 2L);
-        assertThat(managerReport.actions()).containsEntry("menu_editor_opened", 0L).containsEntry("queue_opened", 5L);
+        assertThat(managerReport.actions()).containsOnlyKeys("review_link_clicked", "review_prompt_dismissed")
+                .containsEntry("review_link_clicked", 6L);
+        assertThat(locationReport.actions()).containsOnlyKeys("review_link_clicked", "review_prompt_dismissed");
+        owner.update("INSERT INTO platform_administrators(account_id) VALUES (?)", tenant.administrator().accountId());
+        assertThat(reports.platform(tenant.administrator(), WEEK).actions())
+                .containsEntry("menu_editor_opened", 4L).containsEntry("queue_opened", 5L)
+                .containsEntry("review_link_clicked", 6L);
 
         assertThatThrownBy(() -> reports.restaurant(tenant.manager(), WEEK, tenant.secondLocationId()))
                 .isInstanceOf(StaffAccessDeniedException.class);

@@ -20,7 +20,8 @@ handling and provide a usable fallback.
 
 ## Components and effects
 
-- Always use HeroUI (`@heroui/react`) for UI components.
+- Use HeroUI (`@heroui/react`) for UI components. Charts are the exception:
+  use shadcn chart components on Recharts, themed with shared semantic tokens.
 - Use Phosphor Icons (`@phosphor-icons/react`, `*Icon` exports) for interface
   icons: regular weight by default and fill for "on" states. Do not add
   handwritten inline SVG icon components.
