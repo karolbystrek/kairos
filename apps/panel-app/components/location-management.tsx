@@ -451,6 +451,10 @@ export function LocationManagement({
                     </Alert.Content>
                   </Alert>
                 )}
+                <p className="mt-6 text-sm">
+                  <span className="secondary-text">Strefa czasowa: </span>
+                  {selectedLocation.timeZone}
+                </p>
                 <form
                   className="mt-6 flex flex-col gap-3"
                   onSubmit={submitReviews}

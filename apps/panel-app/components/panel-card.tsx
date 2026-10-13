@@ -15,7 +15,7 @@ export function PanelCard({
   isSelected?: boolean;
   metadata?: ReactNode;
   onPress?: () => void;
-  title: string;
+  title: ReactNode;
   status?: "ENABLED" | "DISABLED" | "PENDING";
   trailing?: ReactNode;
 }) {

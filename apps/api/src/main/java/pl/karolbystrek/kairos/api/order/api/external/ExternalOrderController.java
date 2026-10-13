@@ -62,6 +62,7 @@ public class ExternalOrderController {
                 principal,
                 request.locationId(),
                 request.label(),
+                request.orderItems(),
                 idempotencyKey
         );
         var status = result.replayed() ? HttpStatus.OK : HttpStatus.CREATED;

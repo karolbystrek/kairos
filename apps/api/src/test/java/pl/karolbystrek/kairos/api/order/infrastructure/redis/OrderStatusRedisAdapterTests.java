@@ -37,7 +37,7 @@ class OrderStatusRedisAdapterTests {
         assertThat(redisTemplate.channel)
                 .isEqualTo(OrderEventRedisConfiguration.ORDER_STATUS_CHANNEL);
         var payload = objectMapper.readTree(redisTemplate.payload);
-        assertThat(payload.get("version").asInt()).isEqualTo(1);
+        assertThat(payload.get("version").asInt()).isEqualTo(2);
         assertThat(payload.get("eventId").asText())
                 .isEqualTo("00000000-0000-0000-0000-000000000002");
         assertThat(payload.get("trackingReference").asText())
@@ -69,7 +69,7 @@ class OrderStatusRedisAdapterTests {
                 """), null);
 
         subscriber.onMessage(message("""
-                {"version":1,"eventId":"00000000-0000-0000-0000-000000000002",
+                {"version":2,"eventId":"00000000-0000-0000-0000-000000000002",
                  "trackingReference":"00000000-0000-0000-0000-000000000001",
                  "status":"READY","updatedAt":"2026-07-24T12:00:00Z"}
                 """), null);
@@ -84,11 +84,12 @@ class OrderStatusRedisAdapterTests {
         var event = event(OrderStatus.COMPLETED);
         var payload = """
                 {
-                  "version": 1,
+                  "version": 2,
                   "eventId": "00000000-0000-0000-0000-000000000002",
                   "trackingReference": "00000000-0000-0000-0000-000000000001",
                   "status": "COMPLETED",
                   "updatedAt": "2026-07-24T12:00:00Z",
+                  "number": 42,
                   "label": "42",
                   "tenantId": "00000000-0000-0000-0000-000000000003",
                   "locationId": "00000000-0000-0000-0000-000000000004"
@@ -112,7 +113,7 @@ class OrderStatusRedisAdapterTests {
                 UUID.fromString("00000000-0000-0000-0000-000000000002"),
                 UUID.fromString("00000000-0000-0000-0000-000000000001"),
                 status,
-                Instant.parse("2026-07-24T12:00:00Z"), "42", null, UUID.fromString("00000000-0000-0000-0000-000000000003"), UUID.fromString("00000000-0000-0000-0000-000000000004"));
+                Instant.parse("2026-07-24T12:00:00Z"), 42L, "42", null, UUID.fromString("00000000-0000-0000-0000-000000000003"), UUID.fromString("00000000-0000-0000-0000-000000000004"));
     }
 
     private static class RecordingStringRedisTemplate extends StringRedisTemplate {

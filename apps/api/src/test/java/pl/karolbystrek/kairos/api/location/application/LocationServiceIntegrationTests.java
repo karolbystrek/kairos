@@ -102,12 +102,16 @@ class LocationServiceIntegrationTests extends RedisListenerIsolatedIntegrationTe
         assertThat(kitchen.status()).isEqualTo(LocationStatus.ENABLED);
         assertThatThrownBy(() -> locationService.create(administrator, "kItChEn"))
             .isInstanceOf(LocationConflictException.class);
+        assertThat(locationService.create(administrator, "Warsaw", null, "Europe/Warsaw").timeZone())
+            .isEqualTo("Europe/Warsaw");
+        assertThatThrownBy(() -> locationService.create(administrator, "Nowhere", null, "Mars/Olympus"))
+            .isInstanceOf(InvalidLocationRequestException.class);
 
         var renamed = locationService.rename(administrator, kitchen.id(), "  Counter  ");
         assertThat(renamed.name()).isEqualTo("Counter");
         assertThat(locationService.listAccessible(administrator))
             .extracting(location -> location.name())
-            .containsExactly("Alpha", "Counter");
+            .containsExactly("Alpha", "Counter", "Warsaw");
 
         locationService.updateStatus(administrator, kitchen.id(), LocationStatus.DISABLED);
         locationService.delete(administrator, kitchen.id());
@@ -116,7 +120,7 @@ class LocationServiceIntegrationTests extends RedisListenerIsolatedIntegrationTe
         assertThat(reused.id()).isNotEqualTo(kitchen.id());
         assertThat(locationService.listAccessible(administrator))
             .extracting(location -> location.name())
-            .containsExactly("Alpha", "counter");
+            .containsExactly("Alpha", "counter", "Warsaw");
         assertThat(jdbcTemplate.queryForObject(
             "SELECT status FROM locations WHERE id = ?",
             String.class,
@@ -413,12 +417,13 @@ class LocationServiceIntegrationTests extends RedisListenerIsolatedIntegrationTe
         jdbcTemplate.update(
             """
             INSERT INTO orders (
-                id, location_id, tracking_reference, label, status, created_at, updated_at
-            ) VALUES (?, ?, ?, '1', ?, ?, ?)
+                id, location_id, tracking_reference, number, business_date, status, created_at, updated_at
+            ) VALUES (?, ?, ?, (SELECT COUNT(*) + 1 FROM orders WHERE location_id = ?), CURRENT_DATE, ?, ?, ?)
             """,
             id,
             locationId,
             UUID.randomUUID(),
+            locationId,
             status,
             Timestamp.from(now),
             Timestamp.from(now)

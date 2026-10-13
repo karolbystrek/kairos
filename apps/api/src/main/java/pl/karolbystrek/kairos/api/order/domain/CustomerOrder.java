@@ -1,6 +1,8 @@
 package pl.karolbystrek.kairos.api.order.domain;
 
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -10,14 +12,19 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OrderColumn;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
+import org.hibernate.annotations.BatchSize;
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.NoArgsConstructor;
 import pl.karolbystrek.kairos.api.location.domain.Location;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -26,7 +33,7 @@ import java.util.UUID;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class CustomerOrder {
 
-    public static final int MAXIMUM_LABEL_LENGTH = 200;
+    public static final int MAXIMUM_LABEL_LENGTH = 80;
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -39,8 +46,21 @@ public class CustomerOrder {
     @Column(name = "tracking_reference", nullable = false, unique = true)
     private UUID trackingReference;
 
-    @Column(nullable = false, length = MAXIMUM_LABEL_LENGTH)
+    @Column(nullable = false, updatable = false)
+    private long number;
+
+    @Column(name = "business_date", nullable = false, updatable = false)
+    private LocalDate businessDate;
+
+    @Column(length = MAXIMUM_LABEL_LENGTH)
     private String label;
+
+    // Queue snapshots map many orders at once; batching avoids one items query per order.
+    @BatchSize(size = 100)
+    @ElementCollection
+    @CollectionTable(name = "order_items", joinColumns = @JoinColumn(name = "order_id"))
+    @OrderColumn(name = "position")
+    private List<OrderItem> items = new ArrayList<>();
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 32)
@@ -69,13 +89,19 @@ public class CustomerOrder {
 
     public static CustomerOrder create(
             @NonNull Location location,
-            @NonNull String label,
+            long number,
+            @NonNull LocalDate businessDate,
+            String label,
+            @NonNull List<OrderItem> items,
             @NonNull Instant now
     ) {
         var order = new CustomerOrder();
         order.location = location;
         order.trackingReference = UUID.randomUUID();
+        order.number = number;
+        order.businessDate = businessDate;
         order.label = label;
+        order.items = new ArrayList<>(items);
         order.status = OrderStatus.IN_PREPARATION;
         order.createdAt = now;
         order.updatedAt = now;
@@ -84,17 +110,24 @@ public class CustomerOrder {
 
     public static CustomerOrder createByIntegration(
             @NonNull Location location,
-            @NonNull String label,
+            long number,
+            @NonNull LocalDate businessDate,
+            String label,
+            @NonNull List<OrderItem> items,
             @NonNull Instant now,
             @NonNull UUID integrationId,
             @NonNull String idempotencyKey,
             @NonNull String requestFingerprint
     ) {
-        var order = create(location, label, now);
+        var order = create(location, number, businessDate, label, items, now);
         order.externalIntegrationId = integrationId;
         order.externalIdempotencyKey = idempotencyKey;
         order.externalRequestFingerprint = requestFingerprint;
         return order;
+    }
+
+    public List<OrderItem> getItems() {
+        return List.copyOf(items);
     }
 
     public void scheduleReview(@NonNull Instant dueAt) {

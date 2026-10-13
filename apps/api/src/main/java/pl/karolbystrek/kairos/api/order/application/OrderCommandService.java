@@ -7,6 +7,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import pl.karolbystrek.kairos.api.analytics.infrastructure.persistence.OrderMeasurementRepository;
 import pl.karolbystrek.kairos.api.location.domain.Location;
+import pl.karolbystrek.kairos.api.menu.application.MenuService;
 import pl.karolbystrek.kairos.api.notification.infrastructure.config.ReviewInvitationProperties;
 import pl.karolbystrek.kairos.api.order.application.exception.InvalidOrderRequestException;
 import pl.karolbystrek.kairos.api.order.application.model.ExternalOrderCreation;
@@ -15,6 +16,7 @@ import pl.karolbystrek.kairos.api.order.application.model.OrderStatusChangedEven
 import pl.karolbystrek.kairos.api.order.application.port.OrderEventOutbox;
 import pl.karolbystrek.kairos.api.order.domain.CustomerOrder;
 import pl.karolbystrek.kairos.api.order.domain.OrderHistory;
+import pl.karolbystrek.kairos.api.order.domain.OrderItem;
 import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
 import pl.karolbystrek.kairos.api.order.infrastructure.persistence.CustomerOrderRepository;
 import pl.karolbystrek.kairos.api.order.infrastructure.persistence.OrderHistoryRepository;
@@ -22,8 +24,9 @@ import pl.karolbystrek.kairos.api.order.infrastructure.persistence.OrderHistoryR
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
-import java.util.UUID;
+import java.time.ZoneId;
+import java.util.HashSet;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -35,49 +38,28 @@ public class OrderCommandService {
     private final OrderMeasurementRepository measurements;
     private final ApplicationEventPublisher eventPublisher;
     private final ReviewInvitationProperties reviewProperties;
+    private final MenuService menuService;
 
     @Transactional(propagation = Propagation.MANDATORY)
     public CustomerOrder create(
             Location location,
-            String customLabel,
-            OrderInitiator initiator,
-            ExternalOrderCreation externalCreation,
-            Instant now
-    ) {
-        var label = customLabel == null
-                ? Long.toString(nextAutomaticLabelNumber(location.getId(), now))
-                : customLabel;
-        return persist(location, label, initiator, externalCreation, now);
-    }
-
-    @Transactional(propagation = Propagation.MANDATORY)
-    public CustomerOrder createWithItems(
-            Location location,
-            String itemSummary,
-            OrderInitiator initiator,
-            Instant now
-    ) {
-        var label = nextAutomaticLabelNumber(location.getId(), now) + " · " + itemSummary;
-        if (label.codePointCount(0, label.length()) > CustomerOrder.MAXIMUM_LABEL_LENGTH) {
-            throw new InvalidOrderRequestException(
-                    "The selected menu items do not fit in an order label; choose fewer items"
-            );
-        }
-        return persist(location, label, initiator, null, now);
-    }
-
-    private CustomerOrder persist(
-            Location location,
             String label,
+            List<OrderItem> items,
             OrderInitiator initiator,
             ExternalOrderCreation externalCreation,
             Instant now
     ) {
+        requireMenuItems(location, items);
+        var businessDate = LocalDate.ofInstant(now, ZoneId.of(location.getTimeZone()));
+        var number = orderRepository.allocateNumber(location.getId(), businessDate);
         var order = externalCreation == null
-                ? CustomerOrder.create(location, label, now)
+                ? CustomerOrder.create(location, number, businessDate, label, items, now)
                 : CustomerOrder.createByIntegration(
                         location,
+                        number,
+                        businessDate,
                         label,
+                        items,
                         now,
                         externalCreation.integrationId(),
                         externalCreation.idempotencyKey(),
@@ -140,16 +122,22 @@ public class OrderCommandService {
         };
     }
 
-    private long nextAutomaticLabelNumber(UUID locationId, Instant now) {
-        var utcDate = LocalDate.ofInstant(now, ZoneOffset.UTC);
-        var startInclusive = utcDate.atStartOfDay(ZoneOffset.UTC).toInstant();
-        var endExclusive = utcDate.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
-        var existingOrderCount =
-                orderRepository.countByLocationIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
-                        locationId,
-                        startInclusive,
-                        endExclusive
-                );
-        return Math.addExact(existingOrderCount, 1);
+    private void requireMenuItems(Location location, List<OrderItem> items) {
+        if (items.isEmpty()) {
+            return;
+        }
+        var menuItems = menuService.activeMenuItems(location.getId());
+        if (menuItems.isEmpty()) {
+            throw new InvalidOrderRequestException("This location has no menu to choose items from");
+        }
+        var names = new HashSet<String>();
+        for (var item : items) {
+            if (!menuItems.contains(item.name())) {
+                throw new InvalidOrderRequestException("The menu has changed; reload it and choose the items again");
+            }
+            if (!names.add(item.name())) {
+                throw new InvalidOrderRequestException("Each menu item can be chosen only once");
+            }
+        }
     }
 }

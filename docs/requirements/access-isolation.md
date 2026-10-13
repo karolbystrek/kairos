@@ -59,7 +59,7 @@ Orders derive tenant ownership through their physical location rather than stori
 
 The only cross-tenant staff read is the manually granted platform reporting scope, limited to anonymous hourly analytics aggregates; see [platform authority](analytics-reporting.md#platform-authority).
 
-Each location stores an IANA time-zone identifier initialized to `UTC`. The current order-numbering increment deliberately uses UTC rather than the stored location setting. The API runtime, injected application clock, and database session use UTC without an environment-selectable alternative in this scope. Location-specific civil-time numbering is deferred.
+Each location stores the IANA time-zone identifier chosen at creation; daily order numbers follow that zone's local midnight. The API runtime, injected application clock, and database session use UTC without an environment-selectable alternative in this scope.
 
 The API datasource uses a restricted, non-owning PostgreSQL role; Flyway uses a
 separate migration owner and the initialization administrator is not exposed to

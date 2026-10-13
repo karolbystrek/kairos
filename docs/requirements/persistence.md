@@ -13,8 +13,8 @@ The database schema must include tables covering the following concepts. Names a
 * **Tenants:** stable identity and integration configuration.
 * **Locations:** physical restaurant belonging to one tenant, with a required
   trimmed human-readable display name, enabled, disabled, or archived status,
-  operational information, and an IANA time-zone identifier fixed at
-  `UTC` in this increment. Delete archives the row rather than physically
+  operational information, and an immutable IANA time-zone identifier chosen
+  at creation. Delete archives the row rather than physically
   removing its stable identity or historical relationships.
 * **Accounts:** stable UUID, normalized globally unique email, unique immutable
   ZITADEL provider subject, optional authentication cutoff, tenant ownership,
@@ -47,12 +47,12 @@ The database schema must include tables covering the following concepts. Names a
   cardinality can be changed explicitly in a future migration. Archiving an
   Account retains the assignment as its historical account-to-location
   relationship.
-* **Orders:** public tracking identity, owning location, immutable customer-visible text label, current state, and lifecycle timestamps. Tenant ownership is derived through the location.
+* **Orders:** public tracking identity, owning location, immutable daily number and local business date, optional customer-visible text label, ordered menu-item snapshot of names and quantities, current state, and lifecycle timestamps. Tenant ownership is derived through the location.
 * **Anonymous order measurements and hourly aggregates:** self-contained pending inputs and tenant/location/UTC-hour counts with versioned mergeable duration summaries; no order, tracking, user, label or payload association. Tenant deletion cascades both tables while location purge preserves them. See [anonymous order analytics](order-analytics.md).
 * **Anonymous usage hourly aggregates:** tenant, optional retained location UUID, UTC receipt hour, predefined action and additive count, without caller identities or raw input. Tenant deletion erases these aggregates and location purge preserves them; see [usage analytics](usage-analytics.md).
 * **Platform administrators:** manually granted account references, written only by the database owner and cascaded with account deletion; see [platform authority](analytics-reporting.md#platform-authority).
 * **Order history:** order association, resulting state, acceptance time, and the initiator category and identity when known; records are append-only and have an unambiguous order. Initiator categories distinguish users, external integrations, and system actions without coupling history to one authentication mechanism.
-* **Automatic order-label allocation:** when a custom label is omitted, the concurrency-safe decimal label is one greater than the count of all orders created for the location during the current UTC date. Custom-labeled orders advance this daily ordinal. No separate numbering date, numeric value, label source, or allocation state is stored on the order; the allocated text is persisted only in its label.
+* **Daily order-number counters:** one row per location and local business date holds the last allocated number. Creation atomically increments it in the order transaction, so concurrent creation never duplicates a number; a unique order constraint on location, business date and number backs this up. Counters are removed with their location.
 * **Menus:** tenant association, normalized name, ordered item names and the optional active menu of each location; see [menus](menus.md#menu-storage-and-access).
 * **External Integrations:** tenant association, normalized name, and enabled, disabled, or archived lifecycle state.
 * **API Keys:** immutable scopes, expiration, hashed one-time secret material and
@@ -89,7 +89,7 @@ The consolidated initial migration requires a normalized email for every
 account; local development data is recreated manually when applying that
 initial schema change.
 
-Order labels are trimmed, single-line text with a maximum of 200 characters; custom labels supplied by staff or External Integrations remain limited to 32 characters, and longer labels arise only from [menu-item selections](menus.md#ordering-from-a-menu). Automatic labeling is requested by omitting the custom label and uses the order's one-based creation ordinal among all orders at its location during the current UTC date. A provided blank label is invalid. Labels preserve casing, may contain ordinary Unicode text, and are not unique; staff remain responsible for avoiding ambiguous duplicates. Labels cannot be edited after order creation.
+Order labels are optional, trimmed, single-line text of at most 80 characters; blank input is stored as no label. Labels preserve casing, may contain ordinary Unicode text, and are not unique; the daily number identifies the order. Labels, numbers and items cannot be edited after order creation.
 
 Ownership columns and related order/location/tenant, event/order and webhook
 recipient/signing-version relationships are constrained consistently. Location

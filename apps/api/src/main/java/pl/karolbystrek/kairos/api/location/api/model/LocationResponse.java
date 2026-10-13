@@ -9,6 +9,7 @@ import java.util.UUID;
 public record LocationResponse(
         UUID id,
         String name,
+        String timeZone,
         LocationStatus status,
         Instant createdAt,
         Instant updatedAt,
@@ -18,6 +19,7 @@ public record LocationResponse(
         return new LocationResponse(
             location.id(),
             location.name(),
+            location.timeZone(),
             location.status(),
             location.createdAt(),
             location.updatedAt(),

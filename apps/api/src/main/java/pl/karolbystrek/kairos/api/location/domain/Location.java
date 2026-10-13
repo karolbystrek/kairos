@@ -13,6 +13,7 @@ import lombok.NoArgsConstructor;
 
 import java.util.Objects;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.util.UUID;
 
 @Entity
@@ -20,8 +21,6 @@ import java.util.UUID;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Location {
-
-    public static final String DEFAULT_TIME_ZONE = "UTC";
 
     @Id
     private UUID id;
@@ -64,6 +63,7 @@ public class Location {
     public static Location create(
         @NonNull UUID tenantId,
         @NonNull ManagedLocationName name,
+        @NonNull ZoneId timeZone,
         @NonNull Instant now
     ) {
         var location = new Location();
@@ -71,7 +71,7 @@ public class Location {
         location.tenantId = tenantId;
         location.name = name.value();
         location.normalizedName = name.normalizedValue();
-        location.timeZone = DEFAULT_TIME_ZONE;
+        location.timeZone = timeZone.getId();
         location.status = LocationStatus.ENABLED;
         location.createdAt = now;
         location.updatedAt = now;

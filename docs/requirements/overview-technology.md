@@ -146,7 +146,7 @@ so each field has a stable accessible name after a value is entered. Placeholder
 copy is concise, sentence case, and task-specific: text fields name the expected
 value (for example, **Email** or **Location name**) and empty selectors use
 **Select location**. Optional fields identify their default when needed, such as
-**Order label (automatic if empty)**. Placeholder typography and color come
+**Order label (optional)**. Placeholder typography and color come
 from shared semantic styles rather than per-page overrides.
 In dark appearance, form fields use a lighter dark-gray surface than the page
 and modal backgrounds so their boundaries remain visible without focus.

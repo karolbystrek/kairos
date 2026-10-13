@@ -13,7 +13,6 @@ import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTe
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -72,14 +71,14 @@ class ConcurrentOrderCreationIntegrationTests extends RedisListenerIsolatedInteg
         var tenantId = insertTenant();
         var locationId = insertLocation(tenantId);
         var principal = insertAdministrator(tenantId);
-        var tasks = new ArrayList<Callable<String>>();
+        var tasks = new ArrayList<Callable<Long>>();
         for (var index = 0; index < 6; index++) {
-            tasks.add(() -> orderService.createOrder(principal, locationId, null).label());
+            tasks.add(() -> orderService.createOrder(principal, locationId, null).number());
         }
 
-        List<String> labels;
+        List<Long> numbers;
         try (var executor = Executors.newFixedThreadPool(6)) {
-            labels = executor.invokeAll(tasks).stream()
+            numbers = executor.invokeAll(tasks).stream()
                     .map(future -> {
                         try {
                             return future.get();
@@ -87,11 +86,11 @@ class ConcurrentOrderCreationIntegrationTests extends RedisListenerIsolatedInteg
                             throw new IllegalStateException(exception);
                         }
                     })
-                    .sorted(Comparator.comparingLong(Long::parseLong))
+                    .sorted()
                     .toList();
         }
 
-        assertThat(labels).containsExactly("1", "2", "3", "4", "5", "6");
+        assertThat(numbers).containsExactly(1L, 2L, 3L, 4L, 5L, 6L);
     }
 
     private UUID insertTenant() {

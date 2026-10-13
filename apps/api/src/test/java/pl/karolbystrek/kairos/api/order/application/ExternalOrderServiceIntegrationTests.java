@@ -6,6 +6,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import pl.karolbystrek.kairos.api.integration.application.ApiKeyAuthenticationService;
 import pl.karolbystrek.kairos.api.integration.application.ApiKeyManagementService;
 import pl.karolbystrek.kairos.api.integration.application.ExternalIntegrationManagementService;
@@ -16,16 +18,21 @@ import pl.karolbystrek.kairos.api.integration.application.model.IssuedApiKeyView
 import pl.karolbystrek.kairos.api.integration.testsupport.IntegrationTestFixture;
 import pl.karolbystrek.kairos.api.integration.testsupport.MutableTestClock;
 import pl.karolbystrek.kairos.api.integration.testsupport.MutableTestClockConfiguration;
+import pl.karolbystrek.kairos.api.menu.application.MenuService;
+import pl.karolbystrek.kairos.api.menu.application.model.MenuView;
 import pl.karolbystrek.kairos.api.order.application.exception.ExternalOrderConflictException;
 import pl.karolbystrek.kairos.api.order.application.exception.InvalidOrderRequestException;
 import pl.karolbystrek.kairos.api.order.application.exception.ResourceNotFoundException;
 import pl.karolbystrek.kairos.api.order.domain.InvalidOrderTransitionException;
+import pl.karolbystrek.kairos.api.order.domain.OrderItem;
 import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
+import pl.karolbystrek.kairos.api.persistence.infrastructure.DatabaseAccessContext;
 import pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase;
 import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -52,6 +59,18 @@ class ExternalOrderServiceIntegrationTests extends RedisListenerIsolatedIntegrat
 
     @Autowired
     private MutableTestClock clock;
+
+    @Autowired
+    private MenuService menuService;
+
+    @Autowired
+    private JdbcTemplate runtime;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
+
+    @Autowired
+    private DatabaseAccessContext databaseAccess;
 
     private IntegrationTestFixture.TenantFixture tenant;
     private ExternalIntegrationView integration;
@@ -80,12 +99,14 @@ class ExternalOrderServiceIntegrationTests extends RedisListenerIsolatedIntegrat
                 principal,
                 tenant.firstLocationId(),
                 null,
+                List.of(),
                 "   "
         );
         var replay = orderService.create(
                 principal,
                 tenant.firstLocationId(),
                 null,
+                List.of(),
                 "   "
         );
 
@@ -101,18 +122,21 @@ class ExternalOrderServiceIntegrationTests extends RedisListenerIsolatedIntegrat
                 principal,
                 tenant.firstLocationId(),
                 "Different input",
+                List.of(),
                 "   "
         )).isInstanceOf(ExternalOrderConflictException.class);
         assertThatThrownBy(() -> orderService.create(
                 principal,
                 tenant.firstLocationId(),
                 null,
+                List.of(),
                 ""
         )).isInstanceOf(InvalidOrderRequestException.class);
         assertThatThrownBy(() -> orderService.create(
                 principal,
                 tenant.firstLocationId(),
                 null,
+                List.of(),
                 "é".repeat(128)
         )).isInstanceOf(InvalidOrderRequestException.class);
     }
@@ -123,6 +147,7 @@ class ExternalOrderServiceIntegrationTests extends RedisListenerIsolatedIntegrat
                 principal,
                 tenant.firstLocationId(),
                 null,
+                List.of(),
                 "visible"
         );
         var readOnlyKey = apiKeyService.issue(
@@ -141,12 +166,14 @@ class ExternalOrderServiceIntegrationTests extends RedisListenerIsolatedIntegrat
                 readOnlyPrincipal,
                 tenant.firstLocationId(),
                 null,
+                List.of(),
                 "read-only-create"
         )).isInstanceOf(IntegrationAccessDeniedException.class);
         assertThatThrownBy(() -> orderService.create(
                 principal,
                 tenant.secondLocationId(),
                 null,
+                List.of(),
                 "unassigned-location"
         )).isInstanceOf(IntegrationAccessDeniedException.class);
 
@@ -168,6 +195,7 @@ class ExternalOrderServiceIntegrationTests extends RedisListenerIsolatedIntegrat
                 otherPrincipal,
                 otherTenant.firstLocationId(),
                 null,
+                List.of(),
                 "hidden"
         );
 
@@ -186,6 +214,7 @@ class ExternalOrderServiceIntegrationTests extends RedisListenerIsolatedIntegrat
                 principal,
                 tenant.firstLocationId(),
                 "Counter 7",
+                List.of(),
                 "audit-order"
         );
         var initialHistoryCount = countRows("order_history", created.order().id());
@@ -247,6 +276,7 @@ class ExternalOrderServiceIntegrationTests extends RedisListenerIsolatedIntegrat
                 principal,
                 tenant.firstLocationId(),
                 null,
+                List.of(),
                 "page-1"
         ).order();
         clock.advance(Duration.ofSeconds(1));
@@ -254,6 +284,7 @@ class ExternalOrderServiceIntegrationTests extends RedisListenerIsolatedIntegrat
                 principal,
                 tenant.firstLocationId(),
                 null,
+                List.of(),
                 "page-2"
         ).order();
         clock.advance(Duration.ofSeconds(1));
@@ -261,6 +292,7 @@ class ExternalOrderServiceIntegrationTests extends RedisListenerIsolatedIntegrat
                 principal,
                 tenant.firstLocationId(),
                 null,
+                List.of(),
                 "page-3"
         ).order();
         orderService.updateStatus(principal, second.id(), OrderStatus.READY);
@@ -302,9 +334,9 @@ class ExternalOrderServiceIntegrationTests extends RedisListenerIsolatedIntegrat
     void writeOnlyPersistedScopeAllowsCommandsButDoesNotAllowReadEndpoints() {
         jdbcTemplate.update("DELETE FROM api_key_scopes WHERE api_key_id = ? AND scope = 'ORDERS_READ'", principal.apiKeyId());
         var writeOnly = authenticationService.authenticate(issuedKey.secret());
-        var created = orderService.create(writeOnly, tenant.firstLocationId(), null, "write-only");
+        var created = orderService.create(writeOnly, tenant.firstLocationId(), null, List.of(), "write-only");
         assertThat(created.order().status()).isEqualTo(OrderStatus.IN_PREPARATION);
-        assertThat(orderService.create(writeOnly, tenant.firstLocationId(), null, "write-only").replayed()).isTrue();
+        assertThat(orderService.create(writeOnly, tenant.firstLocationId(), null, List.of(), "write-only").replayed()).isTrue();
         assertThat(orderService.updateStatus(writeOnly, created.order().id(), OrderStatus.READY).status()).isEqualTo(OrderStatus.READY);
         assertThatThrownBy(() -> orderService.find(writeOnly, created.order().id()))
             .isInstanceOf(IntegrationAccessDeniedException.class);
@@ -314,13 +346,49 @@ class ExternalOrderServiceIntegrationTests extends RedisListenerIsolatedIntegrat
 
     @Test
     void rejectsPrincipalAfterItsPersistedLocationGrantChanges() {
-        var created = orderService.create(principal, tenant.firstLocationId(), null, "stale-grant").order();
+        var created = orderService.create(principal, tenant.firstLocationId(), null, List.of(), "stale-grant").order();
         jdbcTemplate.update("DELETE FROM api_key_location_access WHERE api_key_id = ? AND location_id = ?",
             principal.apiKeyId(), tenant.firstLocationId());
         assertThatThrownBy(() -> orderService.find(principal, created.id()))
             .isInstanceOf(IntegrationAccessDeniedException.class);
         assertThat(jdbcTemplate.queryForObject("SELECT status FROM orders WHERE id = ?",
             String.class, created.id())).isEqualTo("IN_PREPARATION");
+    }
+
+    @Test
+    void createsOrdersWithActiveMenuItemsFromTheMenuItsKeyCanRead() {
+        var locationId = tenant.firstLocationId();
+        var items = List.of(new OrderItem("Burger", 2));
+        assertThat(menuService.findLocationMenu(principal, locationId)).isEmpty();
+        assertThatThrownBy(() -> orderService.create(principal, locationId, null, items, "no-menu"))
+                .isInstanceOf(InvalidOrderRequestException.class);
+
+        var menu = menuService.create(tenant.administrator(), "Lunch", List.of("Burger", "Frytki"));
+        menuService.selectLocationMenu(tenant.administrator(), locationId, menu.id());
+        assertThat(menuService.findLocationMenu(principal, locationId).map(MenuView::items))
+                .contains(List.of("Burger", "Frytki"));
+        assertThatThrownBy(() -> menuService.findLocationMenu(principal, tenant.secondLocationId()))
+                .isInstanceOf(IntegrationAccessDeniedException.class);
+        var bar = menuService.create(tenant.administrator(), "Bar", List.of("Piwo"));
+        menuService.selectLocationMenu(tenant.administrator(), tenant.secondLocationId(), bar.id());
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            databaseAccess.integration(principal);
+            assertThat(runtime.queryForList("SELECT name FROM menu_items ORDER BY position", String.class))
+                    .containsExactly("Burger", "Frytki");
+            assertThat(runtime.queryForObject("SELECT count(*) FROM location_menus", Integer.class)).isEqualTo(1);
+        });
+
+        var created = orderService.create(principal, locationId, "Okienko", items, "with-items").order();
+        assertThat(created.number()).isEqualTo(1);
+        assertThat(created.items()).isEqualTo(items);
+        assertThat(orderService.find(principal, created.id()).items()).isEqualTo(items);
+        assertThat(orderService.create(principal, locationId, "Okienko", items, "with-items").replayed()).isTrue();
+        assertThatThrownBy(() -> orderService.create(
+                principal, locationId, "Okienko", List.of(new OrderItem("Frytki", 1)), "with-items"
+        )).isInstanceOf(ExternalOrderConflictException.class);
+        assertThatThrownBy(() -> orderService.create(
+                principal, locationId, null, List.of(new OrderItem("Pizza", 1)), "stale-item"
+        )).isInstanceOf(InvalidOrderRequestException.class);
     }
 
     private long countRows(String table, UUID orderId) {

@@ -19,7 +19,8 @@ const PUSH_FRESHNESS_MILLISECONDS = 10 * 60 * 1000;
 const storedOrderSchema = z
   .object({
     trackingReference: z.string().min(1),
-    label: z.string(),
+    number: z.number().int().positive(),
+    label: z.string().nullable(),
     status: orderStatusSchema,
     updatedAt: z.iso.datetime({ offset: true }),
     rememberedAt: z.number().finite(),

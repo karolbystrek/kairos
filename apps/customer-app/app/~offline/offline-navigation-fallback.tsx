@@ -94,7 +94,14 @@ export function OfflineNavigationFallback() {
         </Alert.Content>
       </Alert>
       <div className="flex flex-1 flex-col items-center justify-center py-12 text-center">
-        <p className="text-sm secondary-text">Zamówienie {snapshot.label}</p>
+        <p className="text-4xl font-semibold tabular-nums">
+          <span className="sr-only">Zamówienie </span>#{snapshot.number}
+        </p>
+        {snapshot.label && (
+          <p className="mt-1 max-w-md break-words text-sm secondary-text">
+            {snapshot.label}
+          </p>
+        )}
         <h1 className="status-title mt-4 max-w-[14ch]">
           {orderStatusLabels[snapshot.status]}
         </h1>

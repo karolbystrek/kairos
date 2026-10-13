@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import pl.karolbystrek.kairos.api.location.api.model.CreateLocationRequest;
 import pl.karolbystrek.kairos.api.location.api.model.LocationNameRequest;
 import pl.karolbystrek.kairos.api.location.api.model.LocationReviewLinkRequest;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
@@ -42,9 +43,11 @@ class LocationController {
     @ResponseStatus(HttpStatus.CREATED)
     LocationResponse createLocation(
         @AuthenticationPrincipal StaffPrincipal principal,
-        @Valid @RequestBody LocationNameRequest request
+        @Valid @RequestBody CreateLocationRequest request
     ) {
-        return LocationResponse.from(locationService.create(principal, request.name(), request.googleReviewUrl()));
+        return LocationResponse.from(
+            locationService.create(principal, request.name(), request.googleReviewUrl(), request.timeZone())
+        );
     }
 
     @PutMapping("/{locationId}")

@@ -5,6 +5,7 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import pl.karolbystrek.kairos.api.account.application.exception.StaffAccessDeniedException;
+import pl.karolbystrek.kairos.api.integration.application.exception.IntegrationAccessDeniedException;
 import pl.karolbystrek.kairos.api.menu.application.exception.InvalidMenuRequestException;
 import pl.karolbystrek.kairos.api.menu.application.exception.MenuConflictException;
 import pl.karolbystrek.kairos.api.menu.application.exception.MenuNotFoundException;
@@ -34,8 +35,8 @@ class MenuExceptionHandler {
         return problem;
     }
 
-    @ExceptionHandler(StaffAccessDeniedException.class)
-    ProblemDetail handleAccessDenied(StaffAccessDeniedException exception) {
+    @ExceptionHandler({StaffAccessDeniedException.class, IntegrationAccessDeniedException.class})
+    ProblemDetail handleAccessDenied(RuntimeException exception) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, exception.getMessage());
     }
 }

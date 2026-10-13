@@ -12,7 +12,7 @@ The API exposes an anonymous, read-only Server-Sent Events stream for each
 customer tracking reference. Possession of the high-entropy reference grants
 access only to that order's customer representation, never to staff data or
 commands. The stream sends an `order-status-changed` event containing
-`eventId`, `trackingReference`, `label`, `status`, `updatedAt`, and
+`eventId`, `trackingReference`, `number`, nullable `label`, `status`, `updatedAt`, and
 `reviewInvitation` on opening and reopening, and after status changes. The
 client validates the state with Zod and applies it directly without an extra
 REST request. An already terminal order receives its final snapshot and the

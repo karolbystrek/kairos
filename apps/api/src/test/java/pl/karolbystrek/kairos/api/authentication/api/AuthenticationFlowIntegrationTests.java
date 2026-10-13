@@ -133,8 +133,9 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
         session = login(email);
         mvc.perform(getApi("/locations/v1").cookie(session))
             .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(0));
-        mvc.perform(csrf(postApi("/locations/v1").cookie(session).content("{\"name\":\"  First location  \"}")))
+        mvc.perform(csrf(postApi("/locations/v1").cookie(session).content("{\"name\":\"  First location  \",\"timeZone\":\"Europe/Warsaw\"}")))
             .andExpect(status().isCreated()).andExpect(jsonPath("$.name").value("First location"))
+            .andExpect(jsonPath("$.timeZone").value("Europe/Warsaw"))
             .andExpect(jsonPath("$.status").value("ENABLED"));
         mvc.perform(getApi("/locations/v1").cookie(session))
             .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(1));

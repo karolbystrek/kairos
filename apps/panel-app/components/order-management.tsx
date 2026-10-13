@@ -34,6 +34,7 @@ import {
   createOrderInputSchema,
   describeOrderItems,
   listOrders,
+  maximumOrderLabelLength,
   subscribeToOrderQueue,
   updateOrderStatus,
   type CreateOrderInput,
@@ -228,7 +229,7 @@ function OrderQrCode({
     <div className="flex w-full justify-center">
       <Image
         unoptimized
-        alt={`Kod QR do śledzenia zamówienia ${order.label}`}
+        alt={`Kod QR do śledzenia zamówienia #${order.number}`}
         className="h-auto w-full max-w-[30rem]"
         height={640}
         src={qrCode}
@@ -261,12 +262,12 @@ function OrderCard({
   const nextStatusLabel = nextStatus === "READY" ? "Gotowe" : "Zakończ";
   const nextStatusAccessibilityLabel =
     nextStatus === "READY"
-      ? `Oznacz zamówienie ${order.label} jako gotowe`
-      : `Zakończ zamówienie ${order.label}`;
+      ? `Oznacz zamówienie #${order.number} jako gotowe`
+      : `Zakończ zamówienie #${order.number}`;
 
   return (
     <PanelCard
-      accessibilityLabel={`Pokaż kod QR zamówienia ${order.label}`}
+      accessibilityLabel={`Pokaż kod QR zamówienia #${order.number}`}
       metadata={
         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 secondary-text">
           {showLocation && locationName && (
@@ -278,7 +279,16 @@ function OrderCard({
           </span>
         </div>
       }
-      title={order.label}
+      title={
+        <>
+          <span className="tabular-nums">#{order.number}</span>
+          {order.label && (
+            <span className="ml-2 font-normal secondary-text">
+              {order.label}
+            </span>
+          )}
+        </>
+      }
       trailing={
         <>
           {nextStatus && (
@@ -297,7 +307,7 @@ function OrderCard({
             <Tooltip.Trigger>
               <Button
                 isIconOnly
-                aria-label={`Anuluj zamówienie ${order.label}`}
+                aria-label={`Anuluj zamówienie #${order.number}`}
                 className="rounded-md"
                 isDisabled={isUpdating}
                 size="lg"
@@ -338,9 +348,8 @@ export function OrderManagement({
   const [isCreateLocationOpen, setIsCreateLocationOpen] = useState(false);
   const [qrOrder, setQrOrder] = useState<StaffOrder>();
   const [cancelOrder, setCancelOrder] = useState<StaffOrder>();
-  const [customLabel, setCustomLabel] = useState("");
-  const [customLabelError, setCustomLabelError] = useState<string>();
-  const [itemsError, setItemsError] = useState<string>();
+  const [label, setLabel] = useState("");
+  const [labelError, setLabelError] = useState<string>();
   const [itemQuantities, setItemQuantities] = useState<ItemQuantities>({});
 
   const {
@@ -460,6 +469,19 @@ export function OrderManagement({
     .filter((item) => itemQuantities[item])
     .map((item) => ({ name: item, quantity: itemQuantities[item] }));
 
+  // Changing items regenerates the label and replaces manual edits.
+  function changeItems(quantities: ItemQuantities) {
+    setItemQuantities(quantities);
+    setLabel(
+      describeOrderItems(
+        (createMenu?.items ?? [])
+          .filter((item) => quantities[item])
+          .map((item) => ({ name: item, quantity: quantities[item] })),
+      ),
+    );
+    setLabelError(undefined);
+  }
+
   const ordersByStatus = useMemo(
     () => ({
       IN_PREPARATION: orders.filter(
@@ -491,6 +513,8 @@ export function OrderManagement({
     }
     resetCreateOrder();
     setItemQuantities({});
+    setLabel("");
+    setLabelError(undefined);
     setCreateLocationId(locationId ?? enabledLocations[0]?.id);
     setIsCreateOpen(true);
   }
@@ -499,25 +523,18 @@ export function OrderManagement({
     event.preventDefault();
     if (!createLocationId || isCreatingOrder) return;
 
-    const input =
-      selectedItems.length > 0
-        ? ({ mode: "ITEMS", items: selectedItems } as const)
-        : customLabel.trim()
-          ? ({ mode: "CUSTOM", label: customLabel } as const)
-          : ({ mode: "AUTO" } as const);
-    const validation = createOrderInputSchema.safeParse(input);
+    const validation = createOrderInputSchema.safeParse({
+      label,
+      items: selectedItems,
+    });
 
     if (!validation.success) {
-      const message = validation.error.issues[0]?.message;
-
-      if (input.mode === "ITEMS") setItemsError(message);
-      else setCustomLabelError(message);
+      setLabelError(validation.error.issues[0]?.message);
 
       return;
     }
 
-    setCustomLabelError(undefined);
-    setItemsError(undefined);
+    setLabelError(undefined);
     const order = await triggerCreateOrder({
       locationId: createLocationId,
       input: validation.data,
@@ -525,12 +542,12 @@ export function OrderManagement({
 
     if (!order) {
       // A rejected selection usually means the menu changed; show its current items.
-      if (input.mode === "ITEMS") void mutateCreateMenu();
+      if (selectedItems.length > 0) void mutateCreateMenu();
 
       return;
     }
 
-    setCustomLabel("");
+    setLabel("");
     setItemQuantities({});
     setIsCreateOpen(false);
     setQrOrder(order);
@@ -717,8 +734,8 @@ export function OrderManagement({
                 onChange={(nextLocationId) => {
                   setCreateLocationId(nextLocationId);
                   setItemQuantities({});
-                  setItemsError(undefined);
-                  setCustomLabelError(undefined);
+                  setLabel("");
+                  setLabelError(undefined);
                 }}
               />
             )}
@@ -727,10 +744,7 @@ export function OrderManagement({
                 isDisabled={isCreatingOrder}
                 menu={createMenu}
                 quantities={itemQuantities}
-                onChange={(quantities) => {
-                  setItemQuantities(quantities);
-                  setItemsError(undefined);
-                }}
+                onChange={changeItems}
               />
             )}
             {createMenuError && (
@@ -739,34 +753,21 @@ export function OrderManagement({
                 etykietą.
               </p>
             )}
-            {itemsError && (
-              <p className="text-sm text-danger" role="alert">
-                {itemsError}
-              </p>
-            )}
-            {selectedItems.length > 0 && (
-              <p className="break-words text-sm">
-                <span className="secondary-text">Etykieta: numer · </span>
-                {describeOrderItems(selectedItems)}
-              </p>
-            )}
             <FormTextField
               fullWidth
-              isDisabled={isCreatingOrder || selectedItems.length > 0}
-              isInvalid={Boolean(customLabelError)}
+              isDisabled={isCreatingOrder}
+              isInvalid={Boolean(labelError)}
               label="Etykieta zamówienia (opcjonalnie)"
-              maxLength={32}
-              name="custom-order-label"
-              placeholder="Etykieta zamówienia (puste pole nadaje ją automatycznie)"
-              value={customLabel}
+              maxLength={maximumOrderLabelLength}
+              name="order-label"
+              placeholder="Etykieta zamówienia (opcjonalnie)"
+              value={label}
               onChange={(value) => {
-                setCustomLabel(value);
-                setCustomLabelError(undefined);
+                setLabel(value);
+                setLabelError(undefined);
               }}
             />
-            {customLabelError && (
-              <p className="text-sm text-danger">{customLabelError}</p>
-            )}
+            {labelError && <p className="text-sm text-danger">{labelError}</p>}
           </PanelPopup.Body>
           <PanelPopup.Footer>
             <Button aria-label="Anuluj" slot="close" variant="tertiary">
@@ -799,10 +800,15 @@ export function OrderManagement({
           if (!open) setQrOrder(undefined);
         }}
       >
-        <PanelPopup.Header className="justify-center px-16 pb-2">
-          <PanelPopup.Heading className="break-words text-center text-lg font-medium tracking-normal secondary-text">
-            {qrOrder?.label}
+        <PanelPopup.Header className="flex-col items-center justify-center px-16 pb-2">
+          <PanelPopup.Heading className="text-center text-3xl font-semibold tabular-nums">
+            #{qrOrder?.number}
           </PanelPopup.Heading>
+          {qrOrder?.label && (
+            <p className="break-words text-center text-lg secondary-text">
+              {qrOrder.label}
+            </p>
+          )}
         </PanelPopup.Header>
         <PanelPopup.Body className="flex items-center justify-center px-6 pb-8 pt-2 sm:px-10">
           {qrOrder && <OrderQrCode accountId={accountId} order={qrOrder} />}
@@ -820,7 +826,7 @@ export function OrderManagement({
         <PanelPopup.Header>
           <PanelPopup.Icon status="warning" />
           <PanelPopup.Heading>
-            Anuluj zamówienie {cancelOrder?.label}?
+            Anuluj zamówienie #{cancelOrder?.number}?
           </PanelPopup.Heading>
         </PanelPopup.Header>
         <PanelPopup.Body>

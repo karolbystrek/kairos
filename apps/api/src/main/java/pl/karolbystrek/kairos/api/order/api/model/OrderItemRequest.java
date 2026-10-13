@@ -4,7 +4,7 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import pl.karolbystrek.kairos.api.order.application.model.OrderItemSelection;
+import pl.karolbystrek.kairos.api.order.domain.OrderItem;
 
 public record OrderItemRequest(
         @NotBlank(message = "Menu item name is required")
@@ -15,7 +15,7 @@ public record OrderItemRequest(
         @Max(value = 99, message = "Menu item quantity must be between 1 and 99")
         Integer quantity
 ) {
-    public OrderItemSelection toSelection() {
-        return new OrderItemSelection(name.strip(), quantity);
+    public OrderItem toItem() {
+        return new OrderItem(name.strip(), quantity);
     }
 }

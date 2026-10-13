@@ -110,8 +110,8 @@ class OrderAnalyticsIntegrationTests extends RedisListenerIsolatedIntegrationTes
     void acceptsSubsequentTransitionsOfExistingOrdersWithoutInventingCreation() {
         var orderId = UUID.randomUUID();
         owner.update("""
-                INSERT INTO orders (id,location_id,tracking_reference,label,status,created_at,updated_at)
-                VALUES (?,?,?,'Existing','READY',?,?)
+                INSERT INTO orders (id,location_id,tracking_reference,number,business_date,label,status,created_at,updated_at)
+                VALUES (?,?,?,1000,CURRENT_DATE,'Existing','READY',?,?)
                 """, orderId, tenant.firstLocationId(), UUID.randomUUID(),
                 Timestamp.from(CREATED.minusSeconds(300)), Timestamp.from(CREATED.minusSeconds(90)));
         orders.updateStatus(tenant.administrator(), orderId, OrderStatus.COMPLETED);

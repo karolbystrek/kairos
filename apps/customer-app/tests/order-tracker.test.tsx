@@ -31,7 +31,7 @@ function renderOrder(status?: OrderStatus) {
           fallback: status
             ? {
                 [key]: {
-                  label: "A12",
+                  number: 12, label: "A12",
                   status,
                   updatedAt: "2026-10-09T20:00:00Z",
                 },

@@ -63,6 +63,6 @@ class StaffOrderSseEmitterRegistryTests {
 
     private OrderStatusChangedEvent event(UUID tenantId, UUID locationId) {
         return new OrderStatusChangedEvent(UUID.randomUUID(), UUID.randomUUID(), OrderStatus.READY,
-                Instant.now(), "42", null, tenantId, locationId);
+                Instant.now(), 42L, "42", null, tenantId, locationId);
     }
 }

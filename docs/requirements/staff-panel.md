@@ -20,9 +20,9 @@ The staff panel must:
 * require an authenticated internal account;
 * show only locations and orders accessible to the account;
 * allow tenant administrators to switch between locations or view an aggregate queue;
-* create labeled orders for an accessible location and display their customer QR codes;
-* offer automatic labels by default and allow a custom label or items from the
-  location's active [menu](menus.md) before creation;
+* create numbered orders for an accessible location and display their customer QR codes;
+* allow an optional label and items from the location's active [menu](menus.md)
+  before creation;
 * allow tenant administrators to manage tenant menus and choose each location's
   active menu, and location managers to choose their own location's menu;
 * display only active queues by location or authorized tenant-wide scope,
@@ -98,14 +98,11 @@ tablet and desktop and the same two sections stacked vertically on mobile.
 These sections use headings, counts, whitespace, and a shared separator rather
 than large rounded lane containers. Order creation begins from one compact,
 icon-and-text creation action at the start of the active workspace. Its focused
-sheet contains one optional label field whose
-placeholder communicates the automatic default; leaving it empty requests an
-automatic label and entering text requests a custom label, without a separate
-mode selector. When the location has an active menu, the sheet also lists its
-items; tapping an item selects it with quantity 1, tapping it again removes
-it, and add and remove controls change the quantity, with a preview of the
-resulting label;
-choosing any item disables the custom label field. Successful creation continues directly into a large,
+sheet contains one optional label field. When the location has an active menu,
+the sheet also lists its items; tapping an item selects it with quantity 1,
+tapping it again removes it, and add and remove controls change the quantity.
+Changing items prefills the label as described in
+[menus](menus.md#ordering-from-a-menu); the label stays editable. Successful creation continues directly into a large,
 dismissible customer QR sheet; explicitly requesting an existing order's QR
 uses the same presentation. The underlying queue remains visible to preserve
 context. The Orders, Locations, Menu, Accounts, and Integrations creation actions
@@ -123,16 +120,17 @@ changing the selected workspace destination. Successful creation closes the
 modal, keeps Orders visible, and selects the new enabled location for the first
 order.
 
-The customer-QR sheet contains only the centered order label, a dominant QR
-code, and the essential close control. It does not repeat queue status, elapsed
+The customer-QR sheet contains only the centered order number with its label
+beneath when present, a dominant QR code, and the essential close control. It does not repeat queue status, elapsed
 time, explanatory copy, or a redundant footer action.
 
 Canceling an order requires a concise confirmation that identifies the order
 and distinguishes keeping it from the terminal destructive action.
 
 Each active-order card shows its elapsed waiting time, updated approximately
-once per minute. The duration is supporting information: order label and next
-valid action remain more prominent. Creator attribution is not shown. The
+once per minute. The duration is supporting information: the prominent order
+number beside its quieter label and the next valid action remain more
+prominent. Creator attribution is not shown. The
 complete compact card remains a direct target for opening its customer QR code,
 without a duplicate QR control. One trailing action group exposes two large
 controls directly: the next valid status, labeled **Ready** or **Complete**, and

@@ -26,7 +26,8 @@ export const reviewInvitationSchema = z.object({
 });
 
 export const customerOrderSchema = z.object({
-  label: z.string(),
+  number: z.number().int().positive(),
+  label: z.string().nullable(),
   status: orderStatusSchema,
   updatedAt: z.iso.datetime({ offset: true }),
   reviewInvitation: reviewInvitationSchema.nullish(),

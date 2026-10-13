@@ -41,7 +41,7 @@
   reduced-motion preferences retain non-spatial feedback without scaling.
 * New-order and customer-QR sheets preserve the queue as visible context,
   restore focus to their invoking control when dismissed, and do not lose
-  entered custom-label text after a recoverable failure.
+  entered label text after a recoverable failure.
 * Canceling an order requires an order-specific confirmation and remains
   visually and semantically distinct from its non-destructive alternative.
 * The complete staff interface adapts across tablet, desktop, and mobile widths
@@ -54,9 +54,9 @@
   `main` workflow repeats those checks before it may publish images.
 * Each frontend's handwritten request code and response types match the REST behavior covered by integration tests during the walking vertical slice.
 * REST-backed Client Components use keyed SWR state rather than effects for request orchestration, retain cached data during background revalidation, and do not apply order transitions before the Spring API accepts them.
-* New orders start in `IN_PREPARATION`, receive an immutable label, and create exactly one initial history entry for that resulting state.
-* Automatic labels use the one-based count of all orders at the location for the UTC date under concurrent creation; custom labels are validated, advance that ordinal, and may duplicate existing labels.
-* Menu-item orders store `<number> · <items>` in the label using the location's current active menu, reject stale items, combined custom labels and labels over 200 characters, and keep existing labels unchanged after menu edits.
+* New orders start in `IN_PREPARATION`, receive an immutable number, optional label and items, and create exactly one initial history entry for that resulting state.
+* Numbers are unique per location and local business day under concurrent creation, restart at 1 after the location's local midnight and are independent of labels; labels are validated, optional and may duplicate existing labels.
+* Menu items require the location's current active menu, reject stale or repeated items and locations without a menu, and stay unchanged after menu edits; changing items in the panel regenerates the editable label.
 * Only tenant administrators manage menus; only administrators or the location's manager choose its active menu; a menu in use cannot be deleted.
 * Staff order-list operations return only `IN_PREPARATION` and `READY` orders.
 ### Authentication, accounts and locations

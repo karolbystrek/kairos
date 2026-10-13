@@ -85,8 +85,8 @@ class TrackedOrderApiIntegrationTests extends RedisListenerIsolatedIntegrationTe
         jdbcTemplate.update(
                 """
                 INSERT INTO orders (
-                    id, location_id, tracking_reference, label, status, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    id, location_id, tracking_reference, number, business_date, label, status, created_at, updated_at
+                ) VALUES (?, ?, ?, 1, CURRENT_DATE, ?, ?, ?, ?)
                 """,
                 orderId,
                 locationId,

@@ -5,8 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import org.hibernate.validator.constraints.CodePointLength;
-
-import pl.karolbystrek.kairos.api.order.application.model.OrderItemSelection;
+import pl.karolbystrek.kairos.api.order.domain.OrderItem;
 
 import java.util.List;
 import java.util.UUID;
@@ -15,11 +14,10 @@ public record CreateOrderRequest(
         @NotNull(message = "Location is required")
         UUID locationId,
 
-        @Size(min = 1, message = "Custom label must not be blank")
-        @CodePointLength(max = 32, message = "Custom label must contain at most 32 characters")
+        @CodePointLength(max = 80, message = "Label must contain at most 80 characters")
         @Pattern(
                 regexp = "^[^\\p{Cc}\\p{Zl}\\p{Zp}]*$",
-                message = "Custom label must be single-line text without control characters"
+                message = "Label must be single-line text without control characters"
         )
         String label,
 
@@ -27,12 +25,10 @@ public record CreateOrderRequest(
         List<@NotNull(message = "Menu item is required") @Valid OrderItemRequest> items
 ) {
     public CreateOrderRequest {
-        label = label == null ? null : label.strip();
+        label = label == null || label.isBlank() ? null : label.strip();
     }
 
-    public List<OrderItemSelection> itemSelections() {
-        return items == null
-                ? List.of()
-                : items.stream().map(OrderItemRequest::toSelection).toList();
+    public List<OrderItem> orderItems() {
+        return items == null ? List.of() : items.stream().map(OrderItemRequest::toItem).toList();
     }
 }

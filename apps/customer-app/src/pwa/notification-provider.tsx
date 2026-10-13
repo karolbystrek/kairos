@@ -25,7 +25,6 @@ import {
   requiresNotificationInstallation,
   shouldShowNotificationGuide,
 } from "@/src/pwa/notification-onboarding";
-import { migrateLegacyRecentlyTrackedOrders } from "@/src/pwa/recently-tracked-orders";
 import { updateApplicationBadge } from "@/src/pwa/badge";
 import {
   pruneTerminalTrackedOrders,
@@ -170,7 +169,6 @@ export function CustomerPwaProvider({
           // Core tracking remains available when service-worker registration fails.
         }
       }
-      await migrateLegacyRecentlyTrackedOrders();
       await pruneTerminalTrackedOrders();
       await updateApplicationBadge();
       if (active) {

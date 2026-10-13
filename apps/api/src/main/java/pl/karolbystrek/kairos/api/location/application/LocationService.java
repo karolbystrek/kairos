@@ -35,6 +35,7 @@ import pl.karolbystrek.kairos.api.tenant.infrastructure.persistence.TenantReposi
 import java.net.URI;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
@@ -78,18 +79,24 @@ public class LocationService {
 
     @Transactional
     public LocationView create(StaffPrincipal principal, String candidateName) {
-        return create(principal, candidateName, null);
+        return create(principal, candidateName, null, "UTC");
     }
 
     @Transactional
-    public LocationView create(StaffPrincipal principal, String candidateName, String googleReviewUrl) {
+    public LocationView create(
+        StaffPrincipal principal,
+        String candidateName,
+        String googleReviewUrl,
+        String candidateTimeZone
+    ) {
         var access = requireAdministrator(principal, true);
         tenantRepository.findForUpdateById(access.tenantId())
             .orElseThrow(LocationNotFoundException::new);
         var name = parseName(candidateName);
+        var timeZone = parseTimeZone(candidateTimeZone);
         requireNameAvailable(access.tenantId(), name, null);
         var now = clock.instant();
-        var location = Location.create(access.tenantId(), name, now);
+        var location = Location.create(access.tenantId(), name, timeZone, now);
         location.configureReviews(parseReviewUrl(googleReviewUrl), now);
         try {
             locationRepository.saveAndFlush(location);
@@ -107,6 +114,13 @@ public class LocationService {
         var location = requireMutableLocationForUpdate(locationId, access.tenantId());
         location.configureReviews(parseReviewUrl(candidateUrl), clock.instant());
         return LocationView.from(location);
+    }
+
+    private static ZoneId parseTimeZone(String candidate) {
+        if (candidate == null || !ZoneId.getAvailableZoneIds().contains(candidate)) {
+            throw new InvalidLocationRequestException("Location time zone must be an IANA time zone");
+        }
+        return ZoneId.of(candidate);
     }
 
     private static String parseReviewUrl(String candidate) {

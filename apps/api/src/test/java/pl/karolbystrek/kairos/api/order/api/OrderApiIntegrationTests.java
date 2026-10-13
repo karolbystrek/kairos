@@ -98,7 +98,8 @@ class OrderApiIntegrationTests extends RedisListenerIsolatedIntegrationTest {
                                 locationId
                         )))))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.label").value("1"))
+                .andExpect(jsonPath("$.number").value(1))
+                .andExpect(jsonPath("$.label").doesNotExist())
                 .andExpect(jsonPath("$.status").value("IN_PREPARATION"));
 
         mockMvc.perform(withAuthenticationAndCsrf(apiPost(
@@ -112,6 +113,7 @@ class OrderApiIntegrationTests extends RedisListenerIsolatedIntegrationTest {
                                 "  Table 4  "
                         )))))
                 .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.number").value(2))
                 .andExpect(jsonPath("$.label").value("Table 4"))
                 .andExpect(jsonPath("$.status").value("IN_PREPARATION"));
     }

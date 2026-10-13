@@ -20,7 +20,9 @@
 
 An order follows a controlled lifecycle:
 
-1. **In preparation:** staff or an authorized External Integration creates an accepted order for an accessible location. The API immediately places it in preparation and returns its customer-visible label and QR-code tracking reference.
+1. **In preparation:** staff or an authorized External Integration creates an accepted order for an accessible location. The API immediately places it in preparation and returns its daily number, optional label and items, and QR-code tracking reference.
+
+Every order receives a stable, non-editable number unique per location and local business day. Numbering starts at 1 after each midnight in the location's time zone, has no upper limit and never duplicates under concurrent creation; labels, items and cancellations do not affect it. The label is optional single-line text of up to 80 characters that need not be unique; blank input means no label. Neither number, label nor items can change after creation.
 2. **Ready for pickup:** staff or an External Integration marks the order ready and connected customer pages refresh their visible state.
 3. **Completed:** the order is collected, the live session ends, and later scans show a terminal state.
 4. **Canceled:** the order is canceled before completion, connected customer pages refresh, and the live session ends.
@@ -40,8 +42,8 @@ The customer application must:
 * rely on native `EventSource` reconnection and receive the current state directly on every stream opening or reopening and after Redis subscription recovery;
 * poll REST approximately every 15 seconds while the event stream is disconnected, and stop fallback polling when it reconnects;
 * reconcile through REST on focus and browser connectivity restoration;
-* make an active order's current status the dominant content and its immutable
-  label a quieter identifier, express the current state once as a centered
+* make an active order's current status the dominant content, its number the
+  primary identifier and its label, when present, a quieter secondary line, express the current state once as a centered
   message without a duplicate status label, decorative status symbol, or
   explanatory paragraph, show a status timestamp only when the displayed data
   is explicitly stale, and rely on automatic reconciliation rather than an
@@ -109,7 +111,7 @@ unavailable or inaccessible.
 
 IndexedDB retains distinct active `IN_PREPARATION` or `READY` snapshots for
 explicit offline display and notification enrollment, without exposing a local
-collection. Reopening an order refreshes its stored label, status, and
+collection. Reopening an order refreshes its stored number, label, status, and
 server-provided `updatedAt`. A terminal REST response or accepted push removes
 its active snapshot, while a short-lived terminal tombstone prevents an older
 response or push from resurrecting it. This cleanup does not clear the current

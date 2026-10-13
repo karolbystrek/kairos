@@ -21,6 +21,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -75,7 +76,8 @@ class OrderServiceIntegrationTests extends RedisListenerIsolatedIntegrationTest 
         var created = orderService.createOrder(principal, locationId, null);
 
         assertThat(created.status()).isEqualTo(OrderStatus.IN_PREPARATION);
-        assertThat(created.label()).isEqualTo("1");
+        assertThat(created.number()).isEqualTo(1);
+        assertThat(created.label()).isNull();
         assertThat(created.trackingReference()).isNotNull();
 
         var ready = orderService.updateStatus(principal, created.id(), OrderStatus.READY);
@@ -84,7 +86,7 @@ class OrderServiceIntegrationTests extends RedisListenerIsolatedIntegrationTest 
 
         assertThat(ready.status()).isEqualTo(OrderStatus.READY);
         assertThat(completed.status()).isEqualTo(OrderStatus.COMPLETED);
-        assertThat(tracked.label()).isEqualTo("1");
+        assertThat(tracked.number()).isEqualTo(1);
         assertThat(tracked.status()).isEqualTo(OrderStatus.COMPLETED);
         assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM order_history", Long.class)).isEqualTo(3);
         assertThat(jdbcTemplate.queryForList(
@@ -108,16 +110,16 @@ class OrderServiceIntegrationTests extends RedisListenerIsolatedIntegrationTest 
     }
 
     @Test
-    void derivesAutomaticLabelsFromEveryOrderCreatedThatUtcDay() {
+    void numbersEveryOrderIndependentlyOfItsLabel() {
         var first = orderService.createOrder(principal, locationId, null);
         var custom = orderService.createOrder(principal, locationId, "Table 4");
         orderService.updateStatus(principal, first.id(), OrderStatus.CANCELED);
         var second = orderService.createOrder(principal, locationId, null);
         var duplicate = orderService.createOrder(principal, locationId, "3");
 
-        assertThat(first.label()).isEqualTo("1");
+        assertThat(List.of(first.number(), custom.number(), second.number(), duplicate.number()))
+                .containsExactly(1L, 2L, 3L, 4L);
         assertThat(custom.label()).isEqualTo("Table 4");
-        assertThat(second.label()).isEqualTo("3");
         assertThat(duplicate.label()).isEqualTo("3");
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM orders WHERE location_id = ?",
@@ -127,25 +129,26 @@ class OrderServiceIntegrationTests extends RedisListenerIsolatedIntegrationTest 
     }
 
     @Test
-    void allocatesNumbersIndependentlyPerLocationAndUtcDate() {
-        var secondLocationId = UUID.randomUUID();
+    void restartsNumbersAtEachLocationsLocalMidnight() {
+        var warsawLocationId = UUID.randomUUID();
         var tenantId = principal.tenantId();
         jdbcTemplate.update(
-                "INSERT INTO locations (id, tenant_id, name, normalized_name) VALUES (?, ?, ?, ?)",
-                secondLocationId,
+                "INSERT INTO locations (id, tenant_id, name, normalized_name, time_zone) VALUES (?, ?, ?, ?, ?)",
+                warsawLocationId,
                 tenantId,
-                "Second location",
-                "second location"
+                "Warsaw location",
+                "warsaw location",
+                "Europe/Warsaw"
         );
 
-        var firstLocationOrder = orderService.createOrder(principal, locationId, null);
-        var secondLocationOrder = orderService.createOrder(principal, secondLocationId, null);
+        var utcOrder = orderService.createOrder(principal, locationId, null);
+        var warsawOrder = orderService.createOrder(principal, warsawLocationId, null);
         clock.setInstant(Instant.parse("2026-07-25T00:01:00Z"));
-        var nextUtcDateOrder = orderService.createOrder(principal, locationId, null);
+        var nextUtcDayOrder = orderService.createOrder(principal, locationId, null);
+        var sameWarsawDayOrder = orderService.createOrder(principal, warsawLocationId, null);
 
-        assertThat(firstLocationOrder.label()).isEqualTo("1");
-        assertThat(secondLocationOrder.label()).isEqualTo("1");
-        assertThat(nextUtcDateOrder.label()).isEqualTo("1");
+        assertThat(List.of(utcOrder.number(), warsawOrder.number(), nextUtcDayOrder.number(), sameWarsawDayOrder.number()))
+                .containsExactly(1L, 1L, 1L, 2L);
     }
 
     @TestConfiguration

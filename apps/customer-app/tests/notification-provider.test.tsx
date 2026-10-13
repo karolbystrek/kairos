@@ -39,9 +39,6 @@ vi.mock("@/src/pwa/storage", () => ({
   readNotificationTrackingReferences: async () => ["order"],
   pruneTerminalTrackedOrders: vi.fn(),
 }));
-vi.mock("@/src/pwa/recently-tracked-orders", () => ({
-  migrateLegacyRecentlyTrackedOrders: vi.fn(),
-}));
 vi.mock("@/src/pwa/badge", () => ({ updateApplicationBadge: vi.fn() }));
 vi.mock("@/src/pwa/notification-onboarding", () => ({
   requiresNotificationInstallation: () => false,

@@ -42,7 +42,7 @@ describe("last stable destination", () => {
 });
 
 it("does not let stale REST persistence undo a ready Push or stream state", async () => {
-  const order = { trackingReference: TRACKING_REFERENCE, label: "A12", updatedAt: "2026-10-12T10:00:00Z" };
+  const order = { trackingReference: TRACKING_REFERENCE, number: 12, label: "A12", updatedAt: "2026-10-12T10:00:00Z" };
   await rememberTrackedOrder({ ...order, status: "READY" });
   await rememberTrackedOrder({ ...order, status: "IN_PREPARATION" });
   expect((await readTrackedOrder(TRACKING_REFERENCE))?.status).toBe("READY");
