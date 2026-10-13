@@ -64,6 +64,8 @@ function workspace(kind = "account-management", collections = {}) {
     if (name === "@/src/api/usage-analytics") return { recordPanelAction() {} };
     if (name === "@/src/api/api-fetch") return { ApiError };
     if (name.startsWith("@/")) return new Proxy({}, { get: (_, key) => String(key) });
+    // Phosphor's CommonJS build does not load under Node's require; icons are inert here.
+    if (name === "@phosphor-icons/react") return new Proxy({}, { get: (_, key) => String(key) });
     return require(name);
   };
   const source = ts.transpileModule(readFileSync(new URL(`../components/${kind}.tsx`, import.meta.url), "utf8"),

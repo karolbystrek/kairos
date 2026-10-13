@@ -13,10 +13,10 @@ import {
   Tooltip,
 } from "@heroui/react";
 import {
-  Check as SaveIcon,
-  Plus as PlusIcon,
-  Trash2 as DeleteIcon,
-} from "lucide-react";
+  CheckIcon as SaveIcon,
+  PlusIcon,
+  TrashIcon as DeleteIcon,
+} from "@phosphor-icons/react";
 import { useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
 import { ZodError } from "zod";

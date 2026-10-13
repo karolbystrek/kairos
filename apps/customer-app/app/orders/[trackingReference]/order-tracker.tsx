@@ -1,7 +1,7 @@
 "use client";
 
 import { Alert, Button, Spinner } from "@heroui/react";
-import { ScanLine, X } from "lucide-react";
+import { ScanIcon, XIcon } from "@phosphor-icons/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import useSWR, { unstable_serialize, useSWRConfig } from "swr";
@@ -303,7 +303,7 @@ export function OrderTracker({
 
   if ((isLoading || (error && !offlineLookupComplete)) && !displayedOrder) {
     return (
-      <section className="flex min-h-[calc(100svh-3rem)] flex-col">
+      <section className="flex flex-1 flex-col">
         <CustomerToolbar />
         <div className="flex flex-1 items-center justify-center">
           <Spinner aria-label="Wczytywanie zamówienia" />
@@ -314,7 +314,7 @@ export function OrderTracker({
 
   if (!displayedOrder) {
     return (
-      <section className="flex min-h-[calc(100svh-3rem)] flex-col">
+      <section className="flex flex-1 flex-col">
         <CustomerToolbar />
         <div className="flex flex-1 items-center justify-center">
           <Alert className="w-full" status="danger">
@@ -332,7 +332,7 @@ export function OrderTracker({
                   variant="secondary"
                   onPress={() => void closeOrder()}
                 >
-                  <ScanLine aria-hidden="true" size={18} />
+                  <ScanIcon aria-hidden="true" size={18} />
                   Wróć do skanera
                 </Button>
               )}
@@ -344,7 +344,7 @@ export function OrderTracker({
   }
 
   return (
-    <section className="flex min-h-[calc(100svh-3rem)] flex-col">
+    <section className="flex flex-1 flex-col">
       <CustomerToolbar />
       {(error || isOfflineSnapshot) && (
         <Alert className="mt-4" status="warning">
@@ -378,7 +378,7 @@ export function OrderTracker({
             variant="secondary"
             onPress={() => void closeOrder()}
           >
-            <X aria-hidden="true" size={20} />
+            <XIcon aria-hidden="true" size={20} />
             Zamknij zamówienie
           </Button>
         )}

@@ -1,7 +1,7 @@
 "use client";
 
 import { Button, Link, Spinner } from "@heroui/react";
-import { QrCode } from "lucide-react";
+import { QrCodeIcon } from "@phosphor-icons/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -65,9 +65,9 @@ export function CustomerHome({
   }, [installationTrackingReference, router]);
 
   return (
-    <section className="relative min-h-[calc(100svh-3rem)]">
+    <section className="relative flex flex-1 flex-col">
       <CustomerToolbar className="absolute right-0 top-0 z-10" />
-      <div className="flex min-h-[calc(100svh-3rem)] items-center justify-center">
+      <div className="flex flex-1 items-center justify-center">
         {isReady ? (
           <Button
             aria-label="Zeskanuj kod QR"
@@ -76,7 +76,7 @@ export function CustomerHome({
             onPress={() => router.push("/scan")}
           >
             <span className="empty-scan-action-label">Zeskanuj kod QR</span>
-            <QrCode className="empty-scan-action-icon" size={128} />
+            <QrCodeIcon className="empty-scan-action-icon" size={128} />
           </Button>
         ) : (
           <Spinner aria-label="Otwieranie Kairos" />

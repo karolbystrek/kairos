@@ -3,7 +3,11 @@
 import type QrScanner from "qr-scanner";
 
 import { Alert, Button, Spinner, Tooltip } from "@heroui/react";
-import { RefreshCw, SwitchCamera, X } from "lucide-react";
+import {
+  ArrowsClockwiseIcon,
+  CameraRotateIcon,
+  XIcon,
+} from "@phosphor-icons/react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -191,7 +195,7 @@ export function OrderScanner() {
 
   if (view === "camera-unavailable") {
     return (
-      <section className="flex min-h-[60vh] flex-col justify-center gap-6">
+      <section className="flex flex-1 flex-col justify-center gap-6">
         <Alert status="warning">
           <Alert.Indicator />
           <Alert.Content>
@@ -203,7 +207,7 @@ export function OrderScanner() {
           </Alert.Content>
         </Alert>
         <Button variant="secondary" onPress={cancel}>
-          <X aria-hidden="true" size={18} /> Wróć do skanera
+          <XIcon aria-hidden="true" size={18} /> Wróć do skanera
         </Button>
       </section>
     );
@@ -211,7 +215,7 @@ export function OrderScanner() {
 
   if (view === "waiting-for-connectivity" && pendingOrder) {
     return (
-      <section className="flex min-h-[60vh] flex-col justify-center gap-6">
+      <section className="flex flex-1 flex-col justify-center gap-6">
         <Alert status="warning">
           <Alert.Indicator />
           <Alert.Content>
@@ -227,7 +231,7 @@ export function OrderScanner() {
             variant="primary"
             onPress={() => navigateToOrder(pendingOrder.href)}
           >
-            <RefreshCw aria-hidden="true" size={18} />
+            <ArrowsClockwiseIcon aria-hidden="true" size={18} />
             {isOnline ? "Spróbuj ponownie" : "Oczekiwanie na połączenie…"}
           </Button>
           <Button aria-label="Anuluj" variant="secondary" onPress={cancel}>
@@ -256,7 +260,7 @@ export function OrderScanner() {
               variant="tertiary"
               onPress={cancel}
             >
-              <X aria-hidden="true" size={20} />
+              <XIcon aria-hidden="true" size={20} />
             </Button>
           </Tooltip.Trigger>
           <Tooltip.Content>Zamknij skaner</Tooltip.Content>
@@ -303,7 +307,7 @@ export function OrderScanner() {
                   void switchCamera();
                 }}
               >
-                <SwitchCamera aria-hidden="true" size={20} />
+                <CameraRotateIcon aria-hidden="true" size={20} />
               </Button>
             </Tooltip.Trigger>
             <Tooltip.Content>Przełącz aparat</Tooltip.Content>

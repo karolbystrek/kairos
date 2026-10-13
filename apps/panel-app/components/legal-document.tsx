@@ -12,7 +12,7 @@ export function LegalDocument({
   children: ReactNode;
 }) {
   return (
-    <article className="legal-document mx-auto max-w-2xl px-5 py-10 sm:px-6">
+    <article className="legal-document mx-auto w-full max-w-2xl px-5 py-10 sm:px-6">
       <Link className="app-name min-h-11 text-2xl" href="/">
         Kairos
       </Link>

@@ -1,5 +1,5 @@
 import { Alert, Button, Input, Label, TextField, Tooltip } from "@heroui/react";
-import { Check as CheckIcon, Copy as CopyIcon } from "lucide-react";
+import { CheckIcon, CopyIcon } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 
 export type SecretOperation = {

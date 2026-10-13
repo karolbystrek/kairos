@@ -55,7 +55,7 @@ export default function RootLayout({
   return (
     <html suppressHydrationWarning lang="pl">
       <head />
-      <body className="min-h-screen bg-background text-foreground antialiased">
+      <body className="flex min-h-dvh flex-col bg-background text-foreground antialiased">
         <Providers
           themeProps={{
             attribute: "class",
@@ -63,7 +63,7 @@ export default function RootLayout({
             enableSystem: true,
           }}
         >
-          <main className="mx-auto min-h-svh max-w-[var(--content-customer)] px-5 pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-6 sm:pt-6">
+          <main className="mx-auto flex w-full flex-1 flex-col max-w-[var(--content-customer)] px-5 pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-6 sm:pt-6">
             {children}
           </main>
         </Providers>

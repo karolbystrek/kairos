@@ -44,6 +44,8 @@ function workspace({ delayMutation = false } = {}) {
     } });
     if (["@/components/integrations/api-key-management", "@/components/integrations/webhook-subscription-management"].includes(name)) return load(name.replace("@/", ""));
     if (name.startsWith("@/")) return new Proxy({}, { get: (_, key) => String(key) });
+    // Phosphor's CommonJS build does not load under Node's require; icons are inert here.
+    if (name === "@phosphor-icons/react") return new Proxy({}, { get: (_, key) => String(key) });
     return require(name);
   };
   function load(path) {

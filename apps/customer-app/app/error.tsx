@@ -1,7 +1,7 @@
 "use client";
 
 import { Alert, Button } from "@heroui/react";
-import { RefreshCw } from "lucide-react";
+import { ArrowsClockwiseIcon } from "@phosphor-icons/react";
 import { useEffect } from "react";
 
 export default function Error({
@@ -18,13 +18,14 @@ export default function Error({
   }, [error]);
 
   return (
-    <div className="flex min-h-[60vh] items-center justify-center">
+    <div className="flex flex-1 items-center justify-center">
       <Alert className="max-w-lg" status="danger">
         <Alert.Indicator />
         <Alert.Content>
           <Alert.Title>Nie udało się otworzyć tego widoku</Alert.Title>
           <Button className="mt-4" size="sm" variant="danger" onPress={reset}>
-            <RefreshCw aria-hidden="true" size={18} /> Spróbuj ponownie
+            <ArrowsClockwiseIcon aria-hidden="true" size={18} /> Spróbuj
+            ponownie
           </Button>
         </Alert.Content>
       </Alert>

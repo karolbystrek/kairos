@@ -32,6 +32,8 @@ function queue() {
     if (name === "@/src/api/usage-analytics") return { recordPanelAction: (...args) => actions.push(args) };
     if (name === "@/src/api/orders") return { subscribeToOrderQueue: () => () => {} };
     if (name.startsWith("@/")) return new Proxy({}, { get: (_, key) => String(key) });
+    // Phosphor's CommonJS build does not load under Node's require; icons are inert here.
+    if (name === "@phosphor-icons/react") return new Proxy({}, { get: (_, key) => String(key) });
     return require(name);
   };
   const exports = {};

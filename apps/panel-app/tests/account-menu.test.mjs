@@ -62,6 +62,8 @@ function panel(screen = "dashboard", loginResult) {
     if (name === "@/src/api/auth-state") return { subscribeToAuthenticationRequired(callback) { expireSession = callback; return () => {}; } };
     if (name === "@/src/api/cache-keys") return { currentAccountKey: ["authentication", "current-account"], staffLocationsKey: () => [], isStaffCacheKey: () => true };
     if (name.startsWith("@/")) return new Proxy({}, { get: (_, key) => String(key) });
+    // Phosphor's CommonJS build does not load under Node's require; icons are inert here.
+    if (name === "@phosphor-icons/react") return new Proxy({}, { get: (_, key) => String(key) });
     return require(name);
   };
   const exports = {};

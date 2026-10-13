@@ -3,7 +3,7 @@
 import type { FormEvent } from "react";
 import type { TenantAccount } from "@/src/api/authentication";
 
-import { RefreshCw } from "lucide-react";
+import { ArrowsClockwiseIcon } from "@phosphor-icons/react";
 import {
   Alert,
   Button,
@@ -15,11 +15,11 @@ import {
   Tooltip,
 } from "@heroui/react";
 import {
-  Ban as DisableIcon,
-  Check as CheckIcon,
-  Plus as PlusIcon,
-  Trash2 as DeleteIcon,
-} from "lucide-react";
+  ProhibitIcon as DisableIcon,
+  CheckIcon,
+  PlusIcon,
+  TrashIcon as DeleteIcon,
+} from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 import useSWR from "swr";
 import useSWRMutation from "swr/mutation";
@@ -462,7 +462,8 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
               variant="danger"
               onPress={() => void mutateInvitations()}
             >
-              <RefreshCw aria-hidden="true" size={18} /> Spróbuj ponownie
+              <ArrowsClockwiseIcon aria-hidden="true" size={18} /> Spróbuj
+              ponownie
             </Button>
           </Alert.Content>
         </Alert>
@@ -568,6 +569,13 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
               <PanelPopup.Body className="pb-6 pt-12">
                 <PanelDetailHeader
                   eyebrow="Konto"
+                  status={{
+                    isEnabled: selectedAccount.status === "ENABLED",
+                    label:
+                      selectedAccount.status === "ENABLED"
+                        ? "Włączone"
+                        : "Wyłączone",
+                  }}
                   title={selectedAccount.email}
                   trailingActions={
                     <>
@@ -599,14 +607,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
                     </>
                   }
                 />
-
                 <p className="mt-4 text-sm text-muted">
-                  Status:{" "}
-                  {selectedAccount.status === "ENABLED"
-                    ? "Włączone"
-                    : "Wyłączone"}
-                </p>
-                <p className="mt-3 text-sm text-muted">
                   Wyłączenie wyloguje konto i unieważni zaproszenia. Usunięcie
                   trwale odbierze dostęp.
                 </p>
@@ -871,7 +872,8 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
                       isPending={isResending}
                       onConfirm={() => resendInvitation(selectedInvitation)}
                     >
-                      <RefreshCw size={18} /> Przytrzymaj, aby wysłać ponownie
+                      <ArrowsClockwiseIcon size={18} /> Przytrzymaj, aby wysłać
+                      ponownie
                     </HoldToConfirmButton>
                   </>
                 ) : undefined

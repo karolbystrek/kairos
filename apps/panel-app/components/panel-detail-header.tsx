@@ -1,13 +1,17 @@
 import type { ReactNode } from "react";
 
+import { Chip } from "@heroui/react";
+
 export function PanelDetailHeader({
   eyebrow,
+  status,
   title,
   titleEditor,
   titleAction,
   trailingActions,
 }: {
   eyebrow: string;
+  status?: { isEnabled: boolean; label: string };
   title: string;
   titleEditor?: ReactNode;
   titleAction?: ReactNode;
@@ -26,6 +30,16 @@ export function PanelDetailHeader({
                 {title}
               </h2>
               {titleAction}
+              {status && (
+                <Chip
+                  className="shrink-0"
+                  color={status.isEnabled ? "success" : "default"}
+                  size="sm"
+                  variant="soft"
+                >
+                  {status.label}
+                </Chip>
+              )}
             </div>
           )}
         </div>

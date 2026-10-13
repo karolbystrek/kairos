@@ -2,7 +2,11 @@
 
 import type { FormEvent } from "react";
 
-import { RefreshCw, LogIn, LogOut } from "lucide-react";
+import {
+  ArrowsClockwiseIcon,
+  SignInIcon,
+  SignOutIcon,
+} from "@phosphor-icons/react";
 import {
   Alert,
   Button,
@@ -13,16 +17,16 @@ import {
   Tooltip,
 } from "@heroui/react";
 import {
-  Activity as PlatformIcon,
-  ChartColumn as AnalyticsIcon,
-  ClipboardList as OrdersIcon,
-  UserRound as AccountIcon,
-  MapPin as LocationsIcon,
-  UtensilsCrossed as MenuIcon,
-  Users as TeamIcon,
-  Workflow as IntegrationIcon,
-  X as CloseIcon,
-} from "lucide-react";
+  PulseIcon as PlatformIcon,
+  ChartBarIcon as AnalyticsIcon,
+  ClipboardTextIcon as OrdersIcon,
+  UserCircleIcon as AccountIcon,
+  MapPinIcon as LocationsIcon,
+  ForkKnifeIcon as MenuIcon,
+  UsersIcon as TeamIcon,
+  FlowArrowIcon as IntegrationIcon,
+  XIcon as CloseIcon,
+} from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import useSWR, { useSWRConfig } from "swr";
@@ -44,7 +48,7 @@ import { LocationCreationModal } from "@/components/location-creation-modal";
 import { LocationManagement } from "@/components/location-management";
 import { MenuManagement } from "@/components/menu-management";
 import { PasswordChangeDialog } from "@/components/password-change-dialog";
-import { PanelAppearanceMenu } from "@/components/panel-appearance-menu";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { subscribeToAuthenticationRequired } from "@/src/api/auth-state";
 import { ApiError } from "@/src/api/api-fetch";
 import {
@@ -205,7 +209,7 @@ function LoginForm({
         />
 
         <Button isPending={isPending} type="submit">
-          <LogIn aria-hidden="true" size={18} />
+          <SignInIcon aria-hidden="true" size={18} />
           {isPending ? "Logowanie…" : "Zaloguj się"}
         </Button>
       </form>
@@ -367,7 +371,7 @@ export function StaffPanel({
 
   if (screen === "login" && checkingVerification) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center">
+      <div className="flex flex-1 items-center justify-center">
         <Spinner aria-label="Sprawdzanie weryfikacji" />
       </div>
     );
@@ -421,7 +425,7 @@ export function StaffPanel({
     (screen === "dashboard" && (isUnauthorized || isSignedOut))
   ) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center">
+      <div className="flex flex-1 items-center justify-center">
         <Spinner aria-label="Sprawdzanie sesji" />
       </div>
     );
@@ -429,7 +433,7 @@ export function StaffPanel({
 
   if (!account) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center">
+      <div className="flex flex-1 items-center justify-center">
         <Alert className="max-w-xl" status="danger">
           <Alert.Indicator />
           <Alert.Content>
@@ -443,7 +447,8 @@ export function StaffPanel({
                 variant="danger"
                 onPress={() => void mutateAccount()}
               >
-                <RefreshCw aria-hidden="true" size={18} /> Spróbuj ponownie
+                <ArrowsClockwiseIcon aria-hidden="true" size={18} /> Spróbuj
+                ponownie
               </Button>
             </div>
           </Alert.Content>
@@ -477,7 +482,7 @@ export function StaffPanel({
       <div className="flex flex-col gap-4 py-12">
         <p role="alert">Nie udało się wczytać lokali. Spróbuj ponownie.</p>
         <Button onPress={() => void mutateLocations()}>
-          <RefreshCw aria-hidden="true" size={18} /> Spróbuj ponownie
+          <ArrowsClockwiseIcon aria-hidden="true" size={18} /> Spróbuj ponownie
         </Button>
       </div>
     ) : (
@@ -487,7 +492,7 @@ export function StaffPanel({
   const needsFirstLocation = canManageLocations && hasNoLocations;
   const utilities = (
     <div className="panel-workspace-utilities flex shrink-0 items-center gap-2">
-      <PanelAppearanceMenu />
+      <ThemeToggle className="theme-toggle--touch" />
       <Dropdown>
         <Tooltip delay={500}>
           <Tooltip.Trigger>
@@ -777,7 +782,7 @@ export function StaffPanel({
             variant="danger"
             onPress={() => void signOut(signOutScope === "everywhere")}
           >
-            <LogOut aria-hidden="true" size={18} />
+            <SignOutIcon aria-hidden="true" size={18} />
             {signOutScope === "everywhere"
               ? "Wyloguj ze wszystkich urządzeń"
               : "Wyloguj się"}

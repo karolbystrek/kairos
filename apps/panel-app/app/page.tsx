@@ -20,7 +20,7 @@ export const metadata: Metadata = {
 
 export default function Welcome() {
   return (
-    <div className="welcome-page mx-auto flex min-h-dvh max-w-5xl flex-col">
+    <div className="welcome-page mx-auto flex w-full max-w-5xl flex-1 flex-col">
       <LandingSessionRedirect />
       <header className="flex items-center justify-between gap-6 py-6">
         <p className="app-name text-2xl">Kairos</p>
@@ -33,7 +33,7 @@ export default function Welcome() {
 
       <section
         aria-labelledby="welcome-title"
-        className="flex flex-1 flex-col items-center justify-center py-20 text-center sm:py-28"
+        className="flex flex-1 flex-col items-center justify-center py-10 text-center"
       >
         <h1 className="welcome-title max-w-3xl" id="welcome-title">
           <span className="block">Telefony Twoich gości.</span>
