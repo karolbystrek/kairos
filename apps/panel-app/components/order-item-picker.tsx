@@ -1,9 +1,24 @@
 import type { Menu } from "@/src/api/menus";
 
 import { Button } from "@heroui/react";
-import { MinusIcon, PlusIcon } from "@phosphor-icons/react";
+import { MinusIcon } from "@phosphor-icons/react";
+import { useState } from "react";
+
+import { FormTextField } from "@/components/form-controls";
 
 export type ItemQuantities = Record<string, number>;
+
+const maximumQuantity = 99;
+const searchThreshold = 12;
+
+// Case- and diacritic-insensitive; "ł" has no Unicode decomposition.
+function searchable(text: string): string {
+  return text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("pl-PL")
+    .replaceAll("ł", "l");
+}
 
 export function OrderItemPicker({
   isDisabled,
@@ -16,8 +31,21 @@ export function OrderItemPicker({
   onChange: (quantities: ItemQuantities) => void;
   quantities: ItemQuantities;
 }) {
+  const [query, setQuery] = useState("");
+  // Touch keyboards would cover the tiles, so focus search only with a precise pointer.
+  const [hasFinePointer] = useState(
+    () => window.matchMedia("(pointer: fine)").matches,
+  );
+  const needle = searchable(query.trim());
+  const items = needle
+    ? menu.items.filter((item) => searchable(item).includes(needle))
+    : menu.items;
+
   function change(item: string, delta: number) {
-    const quantity = Math.min(99, Math.max(0, (quantities[item] ?? 0) + delta));
+    const quantity = Math.min(
+      maximumQuantity,
+      Math.max(0, (quantities[item] ?? 0) + delta),
+    );
     const next = { ...quantities };
 
     if (quantity === 0) delete next[item];
@@ -26,60 +54,83 @@ export function OrderItemPicker({
   }
 
   return (
-    <section aria-label={`Pozycje z menu ${menu.name}`}>
-      <p className="pb-2 text-sm secondary-text">{menu.name}</p>
-      <ul className="flex max-h-72 flex-col overflow-y-auto">
-        {menu.items.map((item) => {
-          const quantity = quantities[item] ?? 0;
+    <section
+      aria-label={`Pozycje z menu ${menu.name}`}
+      className="flex flex-col gap-3"
+    >
+      {menu.items.length > searchThreshold && (
+        <FormTextField
+          fullWidth
+          // eslint-disable-next-line jsx-a11y/no-autofocus -- desktop staff type item names straight away; touch devices are excluded above.
+          autoFocus={hasFinePointer}
+          inputProps={{
+            type: "search",
+            onKeyDown: (event) => {
+              if (event.key !== "Enter") return;
+              event.preventDefault();
+              if (items.length !== 1 || isDisabled) return;
+              change(items[0], 1);
+              setQuery("");
+            },
+          }}
+          label="Szukaj w menu"
+          name="menu-search"
+          value={query}
+          onChange={setQuery}
+        />
+      )}
+      {items.length === 0 ? (
+        <p className="py-6 text-sm secondary-text">Brak pasujących pozycji.</p>
+      ) : (
+        <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+          {items.map((item) => {
+            const quantity = quantities[item] ?? 0;
 
-          return (
-            <li
-              key={item}
-              className="flex min-h-12 items-center gap-3 border-t border-separator py-1"
-            >
-              <Button
-                aria-pressed={quantity > 0}
-                className="h-auto min-h-11 min-w-0 flex-1 justify-start whitespace-normal break-words text-left"
-                isDisabled={isDisabled}
-                variant={quantity > 0 ? "secondary" : "tertiary"}
-                onPress={() => change(item, quantity > 0 ? -quantity : 1)}
+            return (
+              <li
+                key={item}
+                className="order-item-tile relative"
+                data-selected={quantity > 0 || undefined}
               >
-                {item}
-              </Button>
-              {quantity > 0 && (
-                <>
-                  <Button
-                    isIconOnly
-                    aria-label={`Usuń jedną pozycję ${item}`}
-                    className="rounded-md"
-                    isDisabled={isDisabled}
-                    variant="tertiary"
-                    onPress={() => change(item, -1)}
-                  >
-                    <MinusIcon size={18} />
-                  </Button>
-                  <span
-                    aria-label={`Liczba: ${quantity}`}
-                    className="w-6 text-center tabular-nums"
-                  >
-                    {quantity}
-                  </span>
-                </>
-              )}
-              <Button
-                isIconOnly
-                aria-label={`Dodaj pozycję ${item}`}
-                className="rounded-md"
-                isDisabled={isDisabled || quantity >= 99}
-                variant="tertiary"
-                onPress={() => change(item, 1)}
-              >
-                <PlusIcon size={18} />
-              </Button>
-            </li>
-          );
-        })}
-      </ul>
+                <Button
+                  aria-label={
+                    quantity > 0
+                      ? `${item}, wybrano ${quantity}. Dodaj jedną`
+                      : `Dodaj ${item}`
+                  }
+                  className="order-item-tile__button"
+                  isDisabled={isDisabled || quantity >= maximumQuantity}
+                  variant="tertiary"
+                  onPress={() => change(item, 1)}
+                >
+                  <span className="break-words">{item}</span>
+                </Button>
+                {quantity > 0 && (
+                  <>
+                    <span
+                      aria-hidden="true"
+                      className="order-item-tile__quantity tabular-nums"
+                    >
+                      {quantity}
+                    </span>
+                    <Button
+                      isIconOnly
+                      aria-label={`Usuń jedną pozycję ${item}`}
+                      className="order-item-tile__decrease"
+                      isDisabled={isDisabled}
+                      size="sm"
+                      variant="secondary"
+                      onPress={() => change(item, -1)}
+                    >
+                      <MinusIcon size={16} />
+                    </Button>
+                  </>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </section>
   );
 }

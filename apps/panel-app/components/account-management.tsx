@@ -25,6 +25,7 @@ import useSWR from "swr";
 import useSWRMutation from "swr/mutation";
 
 import { HoldToConfirmButton } from "@/components/hold-to-confirm-button";
+import { CardDensityControl } from "@/components/card-density";
 import { PanelPopup } from "@/components/panel-popup";
 import { FormSelect, FormTextField } from "@/components/form-controls";
 import { PanelCard } from "@/components/panel-card";
@@ -433,6 +434,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
             </Tooltip.Content>
           </Tooltip>
         </div>
+        <CardDensityControl />
       </div>
 
       {collectionError && (
@@ -562,6 +564,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
               key={selectedAccount.id}
               isOpen
               aria-label={`Konto ${selectedAccount.email}`}
+              size="lg"
               onOpenChange={(open) => {
                 if (!open) setSelectedAccountId(undefined);
               }}
@@ -681,7 +684,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
       <PanelPopup
         className="min-w-0"
         isOpen={isCreateOpen}
-        size="lg"
+        size="md"
         onOpenChange={setIsCreateOpen}
       >
         <PanelPopup.Header>
@@ -848,6 +851,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
           key={selectedInvitation.id}
           isOpen
           aria-label={`Zaproszenie dla ${selectedInvitation.email}`}
+          size="lg"
           onOpenChange={(open) => {
             if (!open) setSelectedInvitationId(undefined);
           }}

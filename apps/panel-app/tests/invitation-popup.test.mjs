@@ -28,7 +28,7 @@ function workspace(kind = "account-management", collections = {}) {
     };
     if (name === "@heroui/react") return new Proxy({}, { get: (_, key) => new Proxy(() => {}, { get: (_, part) => `${String(key)}.${String(part)}` }) });
     if (name === "swr") return { useSWRConfig: () => ({ mutate: async () => {} }), default: key => ({
-      data: key === "locations" ? (collections.locations ?? [{ id: "location", status: "ENABLED", name: "Location" }, { id: "other", status: "ENABLED", name: "Other" }]) : key === "invitations" ? (collections.invitations ?? []).map(invitation => ({ state: "PENDING", deliveryState: "QUEUED", ...invitation })) : (collections[key] ?? []),
+      data: key === "locations" ? (collections.locations ?? [{ id: "location", status: "ENABLED", name: "Location" }, { id: "other", status: "ENABLED", name: "Other" }]) : key === "invitations" ? (collections.invitations ?? []).map(invitation => ({ state: "PENDING", deliveryState: "QUEUED", ...invitation })) : (key in collections ? collections[key] : []),
       error: collections.errors?.[key],
       isLoading: collections.loading?.[key] ?? false,
       mutate: async () => { requests.push({ retry: key }); },
@@ -53,6 +53,7 @@ function workspace(kind = "account-management", collections = {}) {
     };
     if (name === "@/src/api/orders") return {
       createOrderInputSchema: { safeParse: data => ({ success: true, data }) },
+      describeOrderItems: () => "",
       createOrder(locationId) { requests.push(locationId); return new Promise(resolve => { complete = resolve; }); },
     };
     if (name === "@/src/api/account-input") {
@@ -79,7 +80,7 @@ function workspace(kind = "account-management", collections = {}) {
   function render() {
     cursor = 0;
     if (kind === "account-management") return exports.AccountManagement({ account: { accountId: "staff", tenantRole: "ADMIN" } });
-    if (kind === "location-management") return exports.LocationManagement({ accountId: "staff", onViewOrders() {} });
+    if (kind === "location-management") return exports.LocationManagement({ accountId: "staff", canManageLocations: true, onViewOrders() {} });
     return exports.OrderManagement({ accountId: "staff", canViewTenantOrders: true, canManageLocations: false });
   }
   function find(predicate) {
@@ -94,7 +95,7 @@ function workspace(kind = "account-management", collections = {}) {
     nodes: () => elements(render()),
     email: () => find(node => node.props?.name === "invitation-email"),
     open: () => find(node => node.props?.["aria-label"] === (kind === "account-management" ? "Nowe konto" : "Nowe zamówienie")).onPress(),
-    popup: () => find(node => node.type === "PanelPopup" && node.props.size === "lg"),
+    popup: () => find(node => node.type === "PanelPopup" && node.props.size === (kind === "account-management" ? "md" : "xl")),
     submit: () => find(node => node.type === "form").onSubmit({ preventDefault() {} }),
     filter: () => find(node => node.props?.label === "Lokal kolejki"),
     secret: () => find(node => node.type === "OneTimeSecret"),
@@ -127,7 +128,8 @@ test("dismiss and reopen preserves pending creation and shows queued email witho
 
 
 test("dismiss and reopen cannot duplicate order creation by switching the queue filter", async () => {
-  const view = workspace("order-management");
+  // A location without a menu opens directly at the label step.
+  const view = workspace("order-management", { "location-menu": null });
   view.open();
   const submission = view.submit();
   view.popup().onOpenChange(false);

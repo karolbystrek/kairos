@@ -33,13 +33,13 @@
   selection, and actions remain operable with touch, pointer, and keyboard.
 * Queue cards expose an approximately minute-granularity elapsed waiting time
   without making an absolute timestamp or continuously animated timer primary.
-* Selecting an active-order card opens its customer QR code. The card keeps only
-  the inline **Ready** or **Complete** and cancel controls, with no duplicate QR
-  button or narrow-width action stack.
+* Selecting an active-order card opens its details with the customer QR code.
+  The card keeps only the inline **Ready** or **Complete** and cancel controls,
+  with no duplicate QR button or narrow-width action stack.
 * Routine controls, menus, selection rows, and cards in both frontends use the
   same short hover lift, held-press compression, and spring-like release, while
   reduced-motion preferences retain non-spatial feedback without scaling.
-* New-order and customer-QR sheets preserve the queue as visible context,
+* New-order and order-details popups preserve the queue as visible context,
   restore focus to their invoking control when dismissed, and do not lose
   entered label text after a recoverable failure.
 * Canceling an order requires an order-specific confirmation and remains

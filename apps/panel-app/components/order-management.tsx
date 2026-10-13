@@ -2,6 +2,8 @@ import type { FormEvent } from "react";
 
 import { Alert, Button, ListBox, Spinner, Tooltip } from "@heroui/react";
 import {
+  ArrowCounterClockwiseIcon,
+  ArrowLeftIcon,
   ArrowRightIcon,
   ClockIcon,
   PlusIcon,
@@ -230,7 +232,7 @@ function OrderQrCode({
       <Image
         unoptimized
         alt={`Kod QR do śledzenia zamówienia #${order.number}`}
-        className="h-auto w-full max-w-[30rem]"
+        className="h-auto w-full max-w-[min(30rem,60dvh)]"
         height={640}
         src={qrCode}
         width={640}
@@ -244,7 +246,7 @@ function OrderCard({
   locationName,
   now,
   onCancel,
-  onShowQr,
+  onShowDetails,
   onTransition,
   order,
   showLocation,
@@ -253,7 +255,7 @@ function OrderCard({
   locationName?: string;
   now: number;
   onCancel: (order: StaffOrder) => void;
-  onShowQr: (order: StaffOrder) => void;
+  onShowDetails: (order: StaffOrder) => void;
   onTransition: (order: StaffOrder, status: OrderStatus) => void;
   order: StaffOrder;
   showLocation: boolean;
@@ -267,7 +269,7 @@ function OrderCard({
 
   return (
     <PanelCard
-      accessibilityLabel={`Pokaż kod QR zamówienia #${order.number}`}
+      accessibilityLabel={`Pokaż szczegóły zamówienia #${order.number}`}
       metadata={
         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 secondary-text">
           {showLocation && locationName && (
@@ -321,7 +323,7 @@ function OrderCard({
           </Tooltip>
         </>
       }
-      onPress={() => onShowQr(order)}
+      onPress={() => onShowDetails(order)}
     />
   );
 }
@@ -345,8 +347,12 @@ export function OrderManagement({
   const [selectedLocationId, setSelectedLocationId] = useState<string>();
   const [createLocationId, setCreateLocationId] = useState<string>();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [createStep, setCreateStep] = useState<"items" | "label">("items");
   const [isCreateLocationOpen, setIsCreateLocationOpen] = useState(false);
-  const [qrOrder, setQrOrder] = useState<StaffOrder>();
+  const [detailsOrder, setDetailsOrder] = useState<StaffOrder>();
+  // Kept separate so the closing popup keeps its content and width while it animates out.
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const stepChangedAt = useRef(-Infinity);
   const [cancelOrder, setCancelOrder] = useState<StaffOrder>();
   const [label, setLabel] = useState("");
   const [labelError, setLabelError] = useState<string>();
@@ -468,6 +474,17 @@ export function OrderManagement({
   const selectedItems = (createMenu?.items ?? [])
     .filter((item) => itemQuantities[item])
     .map((item) => ({ name: item, quantity: itemQuantities[item] }));
+  const selectedQuantity = selectedItems.reduce(
+    (total, item) => total + item.quantity,
+    0,
+  );
+  const generatedLabel = describeOrderItems(selectedItems);
+  const isCreateMenuLoading =
+    Boolean(createLocationId) &&
+    createMenu === undefined &&
+    createMenuError === undefined;
+  // Without a menu (or when it cannot load) the flow starts at the label step.
+  const isItemsStep = Boolean(createMenu) && createStep === "items";
 
   // Changing items regenerates the label and replaces manual edits.
   function changeItems(quantities: ItemQuantities) {
@@ -515,13 +532,34 @@ export function OrderManagement({
     setItemQuantities({});
     setLabel("");
     setLabelError(undefined);
+    setCreateStep("items");
     setCreateLocationId(locationId ?? enabledLocations[0]?.id);
     setIsCreateOpen(true);
   }
 
+  function showDetails(order: StaffOrder) {
+    setDetailsOrder(order);
+    setIsDetailsOpen(true);
+  }
+
+  // Proceed and Create share a position, so the second tap of a double-tap must not create.
+  function changeCreateStep(step: "items" | "label") {
+    stepChangedAt.current = performance.now();
+    setCreateStep(step);
+  }
+
+  function isCreateStepSettling() {
+    return performance.now() - stepChangedAt.current < 400;
+  }
+
   async function createOrder(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!createLocationId || isCreatingOrder) return;
+    if (isItemsStep) {
+      changeCreateStep("label");
+
+      return;
+    }
+    if (!createLocationId || isCreatingOrder || isCreateStepSettling()) return;
 
     const validation = createOrderInputSchema.safeParse({
       label,
@@ -549,8 +587,9 @@ export function OrderManagement({
 
     setLabel("");
     setItemQuantities({});
+    setCreateStep("items");
     setIsCreateOpen(false);
-    setQrOrder(order);
+    showDetails(order);
     void mutateOrders().catch(() => undefined);
   }
 
@@ -568,7 +607,7 @@ export function OrderManagement({
     const isTerminal =
       updated.status === "COMPLETED" || updated.status === "CANCELED";
 
-    if (isTerminal && qrOrder?.id === updated.id) setQrOrder(undefined);
+    if (isTerminal && detailsOrder?.id === updated.id) setIsDetailsOpen(false);
     void mutateOrders().catch(() => undefined);
 
     return true;
@@ -688,7 +727,7 @@ export function OrderManagement({
                               resetUpdateOrder();
                               setCancelOrder(selectedOrder);
                             }}
-                            onShowQr={setQrOrder}
+                            onShowDetails={showDetails}
                             onTransition={(selectedOrder, nextStatus) => {
                               void updateStatus(selectedOrder, nextStatus);
                             }}
@@ -705,8 +744,9 @@ export function OrderManagement({
       )}
 
       <PanelPopup
+        className="order-create-popup"
         isOpen={isCreateOpen}
-        size="lg"
+        size="xl"
         onOpenChange={setIsCreateOpen}
       >
         <PanelPopup.Header>
@@ -727,6 +767,7 @@ export function OrderManagement({
             )}
             {canViewTenantOrders && (
               <LocationSelect
+                isDisabled={isCreatingOrder}
                 label="Lokal"
                 locations={enabledLocations}
                 selectedId={createLocationId}
@@ -736,46 +777,110 @@ export function OrderManagement({
                   setItemQuantities({});
                   setLabel("");
                   setLabelError(undefined);
+                  setCreateStep("items");
                 }}
               />
             )}
-            {createMenu && (
-              <OrderItemPicker
-                isDisabled={isCreatingOrder}
-                menu={createMenu}
-                quantities={itemQuantities}
-                onChange={changeItems}
-              />
+            {isCreateMenuLoading ? (
+              <div className="flex min-h-40 items-center justify-center">
+                <Spinner aria-label="Wczytywanie menu" />
+              </div>
+            ) : isItemsStep && createMenu ? (
+              <div key="items" className="order-create-step">
+                <OrderItemPicker
+                  isDisabled={isCreatingOrder}
+                  menu={createMenu}
+                  quantities={itemQuantities}
+                  onChange={changeItems}
+                />
+              </div>
+            ) : (
+              <div
+                key="label"
+                className="order-create-step flex flex-col gap-3"
+              >
+                {createMenuError && (
+                  <p className="text-sm text-danger" role="alert">
+                    Nie udało się wczytać menu lokalu. Możesz utworzyć
+                    zamówienie z etykietą.
+                  </p>
+                )}
+                <FormTextField
+                  fullWidth
+                  isDisabled={isCreatingOrder}
+                  isInvalid={Boolean(labelError)}
+                  label="Etykieta zamówienia (opcjonalnie)"
+                  maxLength={maximumOrderLabelLength}
+                  name="order-label"
+                  placeholder="Etykieta zamówienia (opcjonalnie)"
+                  value={label}
+                  onChange={(value) => {
+                    setLabel(value);
+                    setLabelError(undefined);
+                  }}
+                />
+                {labelError && (
+                  <p className="text-sm text-danger">{labelError}</p>
+                )}
+                {selectedItems.length > 0 && label !== generatedLabel && (
+                  <Button
+                    className="self-start"
+                    isDisabled={isCreatingOrder}
+                    size="sm"
+                    variant="tertiary"
+                    onPress={() => {
+                      setLabel(generatedLabel);
+                      setLabelError(undefined);
+                    }}
+                  >
+                    <ArrowCounterClockwiseIcon aria-hidden="true" size={16} />
+                    Przywróć z pozycji
+                  </Button>
+                )}
+              </div>
             )}
-            {createMenuError && (
-              <p className="text-sm text-danger" role="alert">
-                Nie udało się wczytać menu lokalu. Możesz utworzyć zamówienie z
-                etykietą.
-              </p>
-            )}
-            <FormTextField
-              fullWidth
-              isDisabled={isCreatingOrder}
-              isInvalid={Boolean(labelError)}
-              label="Etykieta zamówienia (opcjonalnie)"
-              maxLength={maximumOrderLabelLength}
-              name="order-label"
-              placeholder="Etykieta zamówienia (opcjonalnie)"
-              value={label}
-              onChange={(value) => {
-                setLabel(value);
-                setLabelError(undefined);
-              }}
-            />
-            {labelError && <p className="text-sm text-danger">{labelError}</p>}
           </PanelPopup.Body>
           <PanelPopup.Footer>
-            <Button aria-label="Anuluj" slot="close" variant="tertiary">
-              Anuluj
-            </Button>
-            <Button isPending={isCreatingOrder} type="submit">
-              <PlusIcon size={18} />
-              {isCreatingOrder ? "Tworzenie…" : "Utwórz"}
+            {createMenu && !isItemsStep ? (
+              <Button
+                isDisabled={isCreatingOrder}
+                variant="tertiary"
+                onPress={() => changeCreateStep("items")}
+              >
+                <ArrowLeftIcon aria-hidden="true" size={18} />
+                Wstecz
+              </Button>
+            ) : (
+              <Button
+                aria-label="Anuluj"
+                variant="tertiary"
+                onPress={() => {
+                  if (!isCreateStepSettling()) setIsCreateOpen(false);
+                }}
+              >
+                Anuluj
+              </Button>
+            )}
+            {/* One button keeps Proceed and Create in the same place. */}
+            <Button
+              isDisabled={isCreateMenuLoading}
+              isPending={isCreatingOrder}
+              type="submit"
+            >
+              {isItemsStep ? (
+                <>
+                  Dalej
+                  {selectedQuantity > 0 && (
+                    <span className="tabular-nums">({selectedQuantity})</span>
+                  )}
+                  <ArrowRightIcon aria-hidden="true" size={18} />
+                </>
+              ) : (
+                <>
+                  <PlusIcon aria-hidden="true" size={18} />
+                  {isCreatingOrder ? "Tworzenie…" : "Utwórz"}
+                </>
+              )}
             </Button>
           </PanelPopup.Footer>
         </form>
@@ -794,31 +899,59 @@ export function OrderManagement({
       )}
 
       <PanelPopup
-        isOpen={Boolean(qrOrder)}
-        size="lg"
+        aria-label={
+          detailsOrder ? `Zamówienie #${detailsOrder.number}` : undefined
+        }
+        isOpen={isDetailsOpen}
+        size={detailsOrder?.items.length ? "xl" : "lg"}
         onOpenChange={(open) => {
-          if (!open) setQrOrder(undefined);
+          if (!open) setIsDetailsOpen(false);
         }}
       >
         <PanelPopup.Header className="flex-col items-center justify-center px-16 pb-2">
           <PanelPopup.Heading className="text-center text-3xl font-semibold tabular-nums">
-            #{qrOrder?.number}
+            #{detailsOrder?.number}
           </PanelPopup.Heading>
-          {qrOrder?.label && (
+          {detailsOrder?.label && (
             <p className="break-words text-center text-lg secondary-text">
-              {qrOrder.label}
+              {detailsOrder.label}
             </p>
           )}
         </PanelPopup.Header>
-        <PanelPopup.Body className="flex items-center justify-center px-6 pb-8 pt-2 sm:px-10">
-          {qrOrder && <OrderQrCode accountId={accountId} order={qrOrder} />}
+        <PanelPopup.Body className="grid items-center gap-6 px-6 pb-8 pt-2 sm:px-10 md:auto-cols-fr md:grid-flow-col">
+          {detailsOrder && (
+            <>
+              <OrderQrCode accountId={accountId} order={detailsOrder} />
+              {detailsOrder.items.length > 0 && (
+                <section
+                  aria-label="Pozycje zamówienia"
+                  className="md:order-first"
+                >
+                  <h3 className="pb-2 text-sm secondary-text">Pozycje</h3>
+                  <ul className="flex flex-col">
+                    {detailsOrder.items.map((item) => (
+                      <li
+                        key={item.name}
+                        className="flex gap-3 border-t border-separator py-2 text-base text-foreground"
+                      >
+                        <span className="w-8 shrink-0 text-right font-semibold tabular-nums">
+                          {item.quantity}×
+                        </span>
+                        <span className="min-w-0 break-words">{item.name}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+            </>
+          )}
         </PanelPopup.Body>
       </PanelPopup>
 
       <PanelPopup
-        className="sm:max-w-[420px]"
         isOpen={Boolean(cancelOrder)}
         role="alertdialog"
+        size="sm"
         onOpenChange={(open) => {
           if (!open) setCancelOrder(undefined);
         }}

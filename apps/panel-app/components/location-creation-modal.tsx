@@ -94,7 +94,7 @@ export function LocationCreationModal({
     <PanelPopup
       isOpen={isOpen}
       isRequired={isRequired}
-      size="lg"
+      size="md"
       onOpenChange={changeOpen}
     >
       <PanelPopup.Header>
