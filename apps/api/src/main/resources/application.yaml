@@ -65,6 +65,7 @@ kairos:
     panel: "${PANEL_APP_URL}"
     api: "${NEXT_PUBLIC_API_BASE_URL}"
   authentication:
+    email-verification-enabled: ${EMAIL_VERIFICATION_ENABLED:true}
     base-url: "${ZITADEL_API_URL:http://zitadel:8080}"
     token-location: "${ZITADEL_TOKEN_LOCATION:file:/run/zitadel/kairos.pat}"
   webhooks:

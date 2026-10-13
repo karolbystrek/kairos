@@ -83,8 +83,10 @@ public class AuthenticationController {
         return finish(registration.principal(), registration.session(), request, response);
     }
 
-    private RegistrationVerificationService.State begin(RegistrationVerificationService.Pending pending,
+    private Object begin(RegistrationVerificationService.Pending pending,
             HttpServletRequest request, HttpServletResponse response) {
+        if (!verification.verificationRequired())
+            return finish(verification.verify(pending, null), pending.identity(), request, response);
         var old = request.getSession(false);
         if (old != null) old.invalidate();
         request.getSession(true).setAttribute("kairos.pendingRegistration", pending);
