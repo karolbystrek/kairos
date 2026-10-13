@@ -2,7 +2,7 @@
 
 import type { FormEvent } from "react";
 
-import { Alert, Button, ListBox, Spinner, Tooltip } from "@heroui/react";
+import { Alert, Button, ListBox, Spinner, Tooltip, toast } from "@heroui/react";
 import {
   ArrowUpRightIcon,
   ProhibitIcon as DisableIcon,
@@ -234,6 +234,7 @@ export function LocationManagement({
 
       await updateCachedLocation(updated);
       setEditName(undefined);
+      toast.success("Zapisano nazwę lokalu");
       void mutateLocations();
     } catch (caught) {
       setError(caught);
@@ -255,6 +256,7 @@ export function LocationManagement({
 
       await updateCachedLocation(updated);
       setEditReviewUrl(undefined);
+      toast.success("Zapisano link do opinii");
       void mutateLocations();
     } catch (caught) {
       setError(caught);
@@ -281,6 +283,7 @@ export function LocationManagement({
           { revalidate: false },
         );
         selectLocation();
+        toast.success(`Usunięto lokal „${confirmation.location.name}”`);
       } else {
         const updated = await updateLocationStatus(
           confirmation.location.id,
@@ -288,6 +291,9 @@ export function LocationManagement({
         );
 
         await updateCachedLocation(updated);
+        toast.success(
+          `${updated.status === "ENABLED" ? "Włączono" : "Wyłączono"} lokal „${updated.name}”`,
+        );
       }
       await revalidateCascadeState();
     } catch (caught) {
@@ -320,13 +326,13 @@ export function LocationManagement({
         <CardDensityControl />
       </div>
 
-      {(locationsError || error) && (
+      {locationsError && (
         <Alert status="danger">
           <Alert.Indicator />
           <Alert.Content>
-            <Alert.Title>Nie udało się wykonać operacji na lokalu</Alert.Title>
+            <Alert.Title>Nie udało się wczytać lokali</Alert.Title>
             <Alert.Description>
-              {getErrorMessage(error ?? locationsError)}
+              {getErrorMessage(locationsError)}
             </Alert.Description>
           </Alert.Content>
         </Alert>

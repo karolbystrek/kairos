@@ -13,6 +13,7 @@ import {
   Spinner,
   Label,
   Tooltip,
+  toast,
 } from "@heroui/react";
 import {
   ProhibitIcon as DisableIcon,
@@ -306,6 +307,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
       setReplacementInput(undefined);
       setCreatedInvitation(created);
       setIsCreateOpen(true);
+      toast.success(`Utworzono zaproszenie dla ${created.email}`);
       await mutateInvitations(undefined, { throwOnError: false });
 
       return true;
@@ -326,6 +328,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
 
     if (!revoked) return;
     setSelectedInvitationId(undefined);
+    toast.success(`Unieważniono zaproszenie dla ${invitationToRevoke.email}`);
     await mutateInvitations(undefined, { throwOnError: false });
   }
 
@@ -340,6 +343,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
     setSelectedInvitationId(undefined);
     setCreatedInvitation(replacement);
     setIsCreateOpen(true);
+    toast.success(`Wysłano ponownie zaproszenie dla ${replacement.email}`);
     await mutateInvitations(undefined, { throwOnError: false });
 
     return true;
@@ -357,6 +361,9 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
     });
 
     if (!updated) return false;
+    toast.success(
+      `${updated.status === "ENABLED" ? "Włączono" : "Wyłączono"} konto ${updated.email}`,
+    );
     await mutateAccounts(
       (current) =>
         (current ?? [updated]).map((candidate) =>
@@ -380,6 +387,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
     const deleted = await triggerDeletion(accountToDelete.id);
 
     if (!deleted) return false;
+    toast.success(`Usunięto konto ${accountToDelete.email}`);
     await mutateAccounts(
       (current) =>
         (current ?? []).filter(
@@ -441,7 +449,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
         <Alert status="danger">
           <Alert.Indicator />
           <Alert.Content>
-            <Alert.Title>Nie udało się wykonać operacji na koncie</Alert.Title>
+            <Alert.Title>Nie udało się wczytać kont</Alert.Title>
             <Alert.Description>
               {getErrorMessage(collectionError)}
             </Alert.Description>

@@ -1,6 +1,6 @@
 import type { FormEvent } from "react";
 
-import { Alert, Button, ListBox, Spinner, Tooltip } from "@heroui/react";
+import { Alert, Button, ListBox, Spinner, Tooltip, toast } from "@heroui/react";
 import {
   ArrowCounterClockwiseIcon,
   ArrowLeftIcon,
@@ -45,6 +45,7 @@ import {
 } from "@/src/api/orders";
 import { customerAppUrl } from "@/src/config/public-environment";
 import { recordPanelAction } from "@/src/api/usage-analytics";
+import { toastError } from "@/src/toast";
 
 const tenantOrderScope = "tenant";
 
@@ -512,8 +513,7 @@ export function OrderManagement({
     () => new Map(locations.map((location) => [location.id, location.name])),
     [locations],
   );
-  const error =
-    locationsError ?? ordersError ?? createOrderError ?? updateOrderError;
+  const loadError = locationsError ?? ordersError;
 
   function openCreate() {
     if (!isCreateOpen)
@@ -589,6 +589,7 @@ export function OrderManagement({
     setItemQuantities({});
     setCreateStep("items");
     setIsCreateOpen(false);
+    toast.success(`Utworzono zamówienie #${order.number}`);
     showDetails(order);
     void mutateOrders().catch(() => undefined);
   }
@@ -600,9 +601,23 @@ export function OrderManagement({
     if (isUpdatingOrder) return false;
 
     resetUpdateOrder();
-    const updated = await triggerUpdateOrder({ orderId: order.id, status });
+    // Cancellation reports failures inside its confirmation dialog.
+    const updated = await triggerUpdateOrder(
+      { orderId: order.id, status },
+      status === "CANCELED"
+        ? undefined
+        : {
+            onError: (error) =>
+              toastError(
+                "Nie udało się zmienić statusu zamówienia",
+                getErrorMessage(error),
+              ),
+          },
+    );
 
     if (!updated) return false;
+    if (status === "CANCELED")
+      toast.success(`Anulowano zamówienie #${order.number}`);
 
     const isTerminal =
       updated.status === "COMPLETED" || updated.status === "CANCELED";
@@ -643,12 +658,12 @@ export function OrderManagement({
         )}
       </div>
 
-      {error && (
+      {loadError && (
         <Alert status="danger">
           <Alert.Indicator />
           <Alert.Content>
-            <Alert.Title>Nie udało się wykonać operacji</Alert.Title>
-            <Alert.Description>{getErrorMessage(error)}</Alert.Description>
+            <Alert.Title>Nie udało się wczytać zamówień</Alert.Title>
+            <Alert.Description>{getErrorMessage(loadError)}</Alert.Description>
           </Alert.Content>
         </Alert>
       )}

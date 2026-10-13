@@ -6,7 +6,7 @@ import type {
   SecretOperation,
 } from "./integrations/one-time-secret";
 
-import { Alert, Button, Spinner, Tabs, Tooltip } from "@heroui/react";
+import { Alert, Button, Spinner, Tabs, Tooltip, toast } from "@heroui/react";
 import {
   ProhibitIcon as DisableIcon,
   CheckIcon,
@@ -75,6 +75,7 @@ function IntegrationDetails({
       await onUpdated(updated);
       setName(updated.name);
       setIsEditingName(false);
+      toast.success("Zapisano nazwę integracji");
     } catch (caught) {
       setActionError(caught);
     } finally {
@@ -93,6 +94,9 @@ function IntegrationDetails({
     try {
       await onUpdated(
         await updateExternalIntegrationStatus(integration.id, status),
+      );
+      toast.success(
+        `${status === "ENABLED" ? "Włączono" : "Wyłączono"} integrację „${integration.name}”`,
       );
 
       return true;
@@ -114,6 +118,7 @@ function IntegrationDetails({
     try {
       await archiveExternalIntegration(integration.id);
       await onDeleted(integration.id);
+      toast.success(`Usunięto integrację „${integration.name}”`);
 
       return true;
     } catch (caught) {
@@ -376,6 +381,7 @@ export function IntegrationManagement({ accountId }: { accountId: string }) {
       setSelectedIntegrationId(created.id);
       setName("");
       setIsCreateOpen(false);
+      toast.success(`Utworzono integrację „${created.name}”`);
     } catch (caught) {
       setCreateError(caught);
     } finally {
