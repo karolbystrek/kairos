@@ -111,6 +111,7 @@ else:
             self.assertEqual(result.returncode, 0, result.stderr)
         release = self.remote / 'releases' / REVISION
         self.assertEqual(json.loads((release / 'release.json').read_text()), self.manifest)
+        self.assertEqual(stat.S_IMODE((release / 'deployment/postgres/bootstrap.sh').stat().st_mode), 0o755)
         self.assertEqual((release.parent / 'invoked').read_text().strip(),
                          f'{release} {self.remote}/production.env')
         self.assertEqual(list(release.parent.glob('.incoming-*')), [])
