@@ -213,7 +213,6 @@ protected application keys and TLS material outside the VPS to rebuild a fresh
 installation. This is not database restoration.
 Acceptance of data loss does not authorize automatic deletion, resets or key
 regeneration; existing runtime approval and data-safety rules still apply.
-The fresh-development V1 policy remains until explicitly changed at launch.
 
 Current alerting uses AWS-native Lightsail email alarms for failed instance/system
 status checks, sustained high CPU and low remaining CPU burst capacity, plus

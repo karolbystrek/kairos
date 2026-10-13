@@ -84,11 +84,6 @@ The database schema must include tables covering the following concepts. Names a
 
 Tenant ownership may be direct or derived through an unambiguous relationship such as order to location to tenant. Tables must carry enough association for RLS enforcement and efficient access checks without duplicating ownership data by default. Passwords and External Integration bearer secrets must never be stored in plaintext. Standard Spring Session JDBC stores opaque session IDs and identity references; protect the database and backups as authentication-bearing data. Provider session bearer tokens are discarded, and provider service credentials remain in private mounted files.
 
-The current account model does not grandfather accounts without email.
-The consolidated initial migration requires a normalized email for every
-account; local development data is recreated manually when applying that
-initial schema change.
-
 Order labels are optional, trimmed, single-line text of at most 80 characters; blank input is stored as no label. Labels preserve casing, may contain ordinary Unicode text, and are not unique; the daily number identifies the order. Labels, numbers and items cannot be edited after order creation.
 
 Ownership columns and related order/location/tenant, event/order and webhook
@@ -117,9 +112,7 @@ capability aggregate/cancellation operations stay in persistence infrastructure.
 Registration and invitation redemption use exact new-identity/bearer scopes;
 they do not execute privileged database business workflows.
 
-Development edits the consolidated V1. The owner will recreate the disposable VPS
-database for this revision; no retained-data upgrade or automatic checksum repair
-is supplied. Fresh PostgreSQL entrypoint initialization provisions restricted
+Fresh PostgreSQL entrypoint initialization provisions restricted
 roles before Spring Flyway applies V1. See
 [database roles and initialization](../deployment/DATABASE.md). Volume resets are
 separately authorized operator actions.

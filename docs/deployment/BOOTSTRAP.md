@@ -216,8 +216,7 @@ the GitHub build variables. Deployment supplies the blank registry/release field
 Owner and runtime database roles must differ from each other and from the
 initial PostgreSQL administrator. Fresh PostgreSQL startup creates these roles
 through its standard entrypoint initialization script; see
-[database initialization](DATABASE.md). The disposable VPS database will be
-recreated by the operator for the revised V1.
+[database initialization](DATABASE.md).
 
 The template is safe to commit; the live environment, keys and certificates are
 not. No password generation, container start or deployment occurs in bootstrap.

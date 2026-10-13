@@ -103,9 +103,5 @@ service; existing explicit approval remains valid within its stated scope.
 - [Authentication operations](docs/authentication-setup.md): before provider
   setup, credential rotation, or live authentication acceptance.
 
-Kairos uses a fresh initial development schema until the user changes that policy:
-edit the initial V1 migration when appropriate; no compatibility for local data
-is required. This does not authorize container stops or data resets.
-
 Keep all repository documentation Markdown under `docs/`, except the root
 `AGENTS.md` and `README.md`. Deployment guides belong in `docs/deployment/`.
