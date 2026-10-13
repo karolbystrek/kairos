@@ -169,8 +169,6 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
     useState<CreatedAccountInvitation>();
   const [selectedLocationId, setSelectedLocationId] = useState<string>();
   const [role, setRole] = useState<AssignmentRole>("OPERATOR");
-  const [invitationPage, setInvitationPage] = useState(0);
-  const [invitationSort, setInvitationSort] = useState<"asc" | "desc">("desc");
   const [replacementInput, setReplacementInput] =
     useState<CreateAccountInvitationInput>();
   const [now, setNow] = useState(() => Date.now());
@@ -202,25 +200,21 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
     shouldRetryOnError,
   });
   const {
-    data: invitationHistory,
+    data: invitations = [],
     error: invitationsError,
     isLoading: areInvitationsLoading,
     mutate: mutateInvitations,
-  } = useSWR(
-    staffInvitationsKey(account.accountId, invitationPage, invitationSort),
-    () => listAccountInvitations(invitationPage, invitationSort),
-    {
-      errorRetryCount: 3,
-      shouldRetryOnError,
-    },
-  );
+  } = useSWR(staffInvitationsKey(account.accountId), listAccountInvitations, {
+    errorRetryCount: 3,
+    shouldRetryOnError,
+  });
   const {
     error: creationError,
     isMutating: isCreating,
     reset: resetCreation,
     trigger: triggerCreation,
   } = useSWRMutation(
-    staffInvitationsKey(account.accountId, invitationPage, invitationSort),
+    staffInvitationsKey(account.accountId),
     createInvitationMutation,
     { throwOnError: false },
   );
@@ -230,7 +224,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
     reset: resetRevocation,
     trigger: triggerRevocation,
   } = useSWRMutation(
-    staffInvitationsKey(account.accountId, invitationPage, invitationSort),
+    staffInvitationsKey(account.accountId),
     revokeInvitationMutation,
     { throwOnError: false },
   );
@@ -240,7 +234,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
     reset: resetResend,
     trigger: triggerResend,
   } = useSWRMutation(
-    staffInvitationsKey(account.accountId, invitationPage, invitationSort),
+    staffInvitationsKey(account.accountId),
     resendInvitationMutation,
     { throwOnError: false },
   );
@@ -274,7 +268,6 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
   const locationNames = new Map(
     locations.map((location) => [location.id, location.name]),
   );
-  const invitations = invitationHistory?.items ?? [];
   const selectedInvitation = invitations.find(
     (invitation) => invitation.id === selectedInvitationId,
   );
@@ -475,61 +468,6 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
           </Alert.Content>
         </Alert>
       )}
-      <div className="flex flex-wrap items-center gap-3">
-        <FormSelect
-          isDisabled={isCreating || isRevoking || isResending}
-          label="Kolejność zaproszeń"
-          selectedKey={invitationSort}
-          onSelectionChange={(key) => {
-            setInvitationSort(key === "asc" ? "asc" : "desc");
-            setInvitationPage(0);
-            setSelectedInvitationId(undefined);
-          }}
-        >
-          <ListBox>
-            <ListBox.Item id="desc">Od najnowszych</ListBox.Item>
-            <ListBox.Item id="asc">Od najstarszych</ListBox.Item>
-          </ListBox>
-        </FormSelect>
-        <Button
-          isDisabled={
-            invitationPage === 0 ||
-            areInvitationsLoading ||
-            isCreating ||
-            isRevoking ||
-            isResending
-          }
-          variant="secondary"
-          onPress={() => {
-            setInvitationPage(invitationPage - 1);
-            setSelectedInvitationId(undefined);
-          }}
-        >
-          Poprzednia strona zaproszeń
-        </Button>
-        <span className="text-sm text-muted">
-          Strona {invitationPage + 1} · {invitationHistory?.totalElements ?? 0}{" "}
-          zaproszeń
-        </span>
-        <Button
-          isDisabled={
-            isCreating ||
-            isRevoking ||
-            isResending ||
-            !invitationHistory ||
-            (invitationPage + 1) * invitationHistory.size >=
-              invitationHistory.totalElements ||
-            areInvitationsLoading
-          }
-          variant="secondary"
-          onPress={() => {
-            setInvitationPage(invitationPage + 1);
-            setSelectedInvitationId(undefined);
-          }}
-        >
-          Następna strona zaproszeń
-        </Button>
-      </div>
       {areInvitationsLoading && (
         <div className="flex items-center gap-2 text-sm text-muted">
           <Spinner aria-label="Wczytywanie zaproszeń" size="sm" />

@@ -14,7 +14,7 @@ function client() {
   new Function("require", "exports", source)(name => {
     if (name === "./api-fetch") return { request: async (url, schema, options) => {
       requests.push({ url, body: options?.body && JSON.parse(options.body) });
-      return schema.parse(url.includes("?") ? { items: [], totalElements: 0, page: 2, size: 20 } : invitation);
+      return schema.parse(options?.body ? invitation : [invitation]);
     } };
     if (name === "./accounts") return { assignmentRoleSchema: require("zod").z.enum(["MANAGER", "OPERATOR"]) };
     if (name === "./authentication") return { currentAccountSchema: require("zod").z.object({}) };
@@ -26,11 +26,11 @@ function client() {
 const invitation = {
   id: "00000000-0000-4000-8000-000000000001", locationId: "00000000-0000-4000-8000-000000000002", email: "invitee@example.com", locationName: "Restaurant", role: "OPERATOR", issuedByEmail: "owner@example.com", createdAt: "2026-10-12T12:00:00Z", expiresAt: "2026-10-19T12:00:00Z", state: "PENDING", deliveryState: "QUEUED",
 };
-test("invitation history sends bounded pagination and ordering", async () => {
+test("invitation history requests the complete array without query parameters", async () => {
   const { api, requests } = client();
-  const result = await api.listAccountInvitations(2, "asc");
-  assert.equal(requests[0].url, "/api/account-invitations/v1?page=2&size=20&sort=asc");
-  assert.equal(result.page, 2);
+  const result = await api.listAccountInvitations();
+  assert.equal(requests[0].url, "/api/account-invitations/v1");
+  assert.deepEqual(result, [invitation]);
 });
 test("creating an invitation requires explicit opt-in to replacement and receives no bearer secret", async () => {
   const { api, requests } = client();

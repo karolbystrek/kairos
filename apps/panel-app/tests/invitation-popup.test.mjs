@@ -28,7 +28,7 @@ function workspace(kind = "account-management", collections = {}) {
     };
     if (name === "@heroui/react") return new Proxy({}, { get: (_, key) => new Proxy(() => {}, { get: (_, part) => `${String(key)}.${String(part)}` }) });
     if (name === "swr") return { useSWRConfig: () => ({ mutate: async () => {} }), default: key => ({
-      data: key === "locations" ? (collections.locations ?? [{ id: "location", status: "ENABLED", name: "Location" }, { id: "other", status: "ENABLED", name: "Other" }]) : key === "invitations" ? { items: (collections.invitations ?? []).map(invitation => ({ state: "PENDING", deliveryState: "QUEUED", ...invitation })), page: 0, size: 20, totalElements: collections.totalElements ?? (collections.invitations?.length ?? 0) } : (collections[key] ?? []),
+      data: key === "locations" ? (collections.locations ?? [{ id: "location", status: "ENABLED", name: "Location" }, { id: "other", status: "ENABLED", name: "Other" }]) : key === "invitations" ? (collections.invitations ?? []).map(invitation => ({ state: "PENDING", deliveryState: "QUEUED", ...invitation })) : (collections[key] ?? []),
       error: collections.errors?.[key],
       isLoading: collections.loading?.[key] ?? false,
       mutate: async () => { requests.push({ retry: key }); },
@@ -113,8 +113,6 @@ test("dismiss and reopen preserves pending creation and shows queued email witho
   assert.equal(view.requests.length, 1);
   assert.equal(view.requests[0].email, "invitee@example.com");
   assert.equal(view.requests[0].replaceExisting, false);
-  assert.equal(view.nodes().find(node => node.props?.label === "Kolejność zaproszeń").props.isDisabled, true);
-  assert.equal(view.nodes().find(node => node.props?.children === "Następna strona zaproszeń").props.isDisabled, true);
   view.popup().onOpenChange(false);
   view.complete({ id: "invitation", email: "invitee@example.com", role: "OPERATOR", locationName: "Location" });
   await submission;
@@ -241,11 +239,15 @@ for (const state of ["REDEEMED", "REVOKED", "REPLACED", "EXPIRED"]) {
     assert.equal(view.nodes().filter(node => node.type === "HoldToConfirmButton").length, 0);
   });
 }
-test("invitation history exposes pagination and creation date ordering", () => {
-  const view = workspace("account-management", { invitations: [invitation], totalElements: 21 });
-  const next = view.nodes().find(node => node.props?.children === "Następna strona zaproszeń");
-  assert.equal(next.props.isDisabled, false);
-  const previous = view.nodes().find(node => node.props?.children === "Poprzednia strona zaproszeń");
-  assert.equal(previous.props.isDisabled, true);
-  assert.ok(view.nodes().find(node => node.props?.label === "Kolejność zaproszeń"));
+test("full invitation history renders without sorting or paging controls", () => {
+  const invitations = Array.from({ length: 25 }, (_, index) => ({
+    id: `invite-${index}`, email: `invitee-${index}@example.com`, role: "OPERATOR",
+    locationName: "Location", issuedByEmail: "owner@example.com",
+    createdAt: "2026-01-01T00:00:00Z", expiresAt: "2099-01-01T00:00:00Z",
+  }));
+  const view = workspace("account-management", { invitations });
+  const nodes = view.nodes();
+  assert.equal(nodes.filter(node => node.type === "PanelCard").length, 25);
+  assert.equal(nodes.some(node => node.props?.label === "Kolejność zaproszeń"), false);
+  assert.equal(nodes.some(node => typeof node.props?.children === "string" && /strona zaproszeń/.test(node.props.children)), false);
 });

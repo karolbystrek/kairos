@@ -21,7 +21,7 @@ The current walking vertical slice is implemented for local development:
 * authenticated, tenant- and location-authorized staff operations;
 * backend-mediated self-hosted ZITADEL email/password authentication, email-verified
   public tenant registration, emailed recipient-bound manager/operator invitations with replacement and
-  paginated history,
+  full history,
   durable rolling browser sessions, password changes and local/global logout;
 * on-screen customer QR codes and anonymous tracking through REST;
 * state-carrying customer SSE and authenticated live staff queue snapshots on

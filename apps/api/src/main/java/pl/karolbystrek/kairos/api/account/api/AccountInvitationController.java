@@ -14,12 +14,11 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import pl.karolbystrek.kairos.api.account.api.model.AccountInvitationResponse;
 import pl.karolbystrek.kairos.api.account.api.model.CreateAccountInvitationRequest;
-import pl.karolbystrek.kairos.api.account.api.model.AccountInvitationPageResponse;
 import pl.karolbystrek.kairos.api.account.api.model.ResendAccountInvitationRequest;
-import org.springframework.web.bind.annotation.RequestParam;
 import pl.karolbystrek.kairos.api.account.application.AccountInvitationService;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -30,10 +29,8 @@ class AccountInvitationController {
     private final AccountInvitationService invitationService;
 
     @GetMapping
-    AccountInvitationPageResponse list(@AuthenticationPrincipal StaffPrincipal principal,
-        @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size,
-        @RequestParam(defaultValue = "desc") String sort) {
-        return AccountInvitationPageResponse.from(invitationService.history(principal, page, size, sort));
+    List<AccountInvitationResponse> list(@AuthenticationPrincipal StaffPrincipal principal) {
+        return invitationService.history(principal).stream().map(AccountInvitationResponse::from).toList();
     }
 
     @PostMapping

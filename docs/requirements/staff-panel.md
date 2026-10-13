@@ -154,10 +154,11 @@ invitation requires replacement confirmation. Resend also requires confirmation
 and replaces the old invitation with a new token and seven-day expiry. The caller
 must have authority over both old and new targets.
 
-Accounts includes non-archived created accounts and paginated invitation history,
+Accounts includes non-archived created accounts and full invitation history,
 showing recipient, role, location, creation/expiry and issuer, lifecycle state and
-email delivery state. Terminal invitations remain in history; sorting supports
-newest/oldest first. Managers see only operator invitations for their location;
+email delivery state. Terminal invitations remain in history; entries appear
+newest first without sorting or paging controls. Managers see only operator
+invitations for their location;
 administrators see the tenant. Active pending invitations expose Resend even
 when delivery failed; expired entries use the new-invitation form. Details retain
 a confirmed Revoke action. Accessible labels expose status and shared popup
