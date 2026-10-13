@@ -803,17 +803,19 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
                   </Radio>
                 </RadioGroup>
               )}
+              {replacementInput && (
+                <p role="alert">
+                  Dla tego adresu istnieje oczekujące zaproszenie. Zastąpienie
+                  unieważni poprzedni link i wyśle nową wiadomość.
+                </p>
+              )}
             </PanelPopup.Body>
             <PanelPopup.Footer className="max-w-full flex-wrap">
               <Button aria-label="Anuluj" slot="close" variant="tertiary">
                 Anuluj
               </Button>
               {replacementInput ? (
-                <div className="flex flex-col gap-3">
-                  <p role="alert">
-                    Dla tego adresu istnieje oczekujące zaproszenie. Zastąpienie
-                    unieważni poprzedni link i wyśle nową wiadomość.
-                  </p>
+                <>
                   <HoldToConfirmButton
                     isDisabled={isCreating}
                     isPending={isCreating}
@@ -835,7 +837,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
                   >
                     Wróć do formularza
                   </Button>
-                </div>
+                </>
               ) : (
                 <Button isPending={isCreating} type="submit">
                   <PlusIcon size={18} />

@@ -103,7 +103,7 @@ function workspace(kind = "account-management", collections = {}) {
     nodes: () => elements(render()),
     email: () => find(node => node.props?.name === "invitation-email"),
     open: () => find(node => node.props?.["aria-label"] === (kind === "account-management" ? "Nowe konto" : "Nowe zamówienie")).onPress(),
-    popup: () => find(node => node.type === "PanelPopup" && node.props.size === (kind === "account-management" ? "md" : "xl")),
+    popup: () => find(node => node.type === "PanelPopup" && elements(node).some(child => ["Nowe konto", "Zaproszenie wysłane do kolejki", "Nowe zamówienie"].includes(child.props?.children))),
     submit: () => find(node => node.type === "form").onSubmit({ preventDefault() {} }),
     filter: () => find(node => node.props?.label === "Lokal kolejki"),
     secret: () => find(node => node.type === "OneTimeSecret"),

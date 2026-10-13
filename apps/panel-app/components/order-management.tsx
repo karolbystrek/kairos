@@ -758,9 +758,9 @@ export function OrderManagement({
       )}
 
       <PanelPopup
-        className="order-create-popup"
+        className={createMenu ? "order-create-popup" : undefined}
         isOpen={isCreateOpen}
-        size="xl"
+        size={createMenu ? "xl" : "md"}
         onOpenChange={setIsCreateOpen}
       >
         <PanelPopup.Header>

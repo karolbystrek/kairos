@@ -315,6 +315,7 @@ export function MenuManagement({
           <PanelPopup.Footer className="flex-wrap">
             {draft?.menu && (
               <HoldToConfirmButton
+                className="sm:mr-auto"
                 isDisabled={Boolean(pendingAction)}
                 isPending={pendingAction === "delete"}
                 onConfirm={deleteDraftMenu}
