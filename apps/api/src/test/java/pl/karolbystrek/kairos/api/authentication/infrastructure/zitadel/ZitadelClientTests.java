@@ -82,6 +82,34 @@ class ZitadelClientTests {
     }
 
     @Test
+    void userLookupAcceptsOmittedAndEmptyResults() {
+        for (var response : new String[] {
+            "{\"details\":{\"timestamp\":\"2026-10-12T21:22:00.420627Z\"}}",
+            "{\"result\":[]}"
+        }) {
+            server.reset();
+            server.expect(requestTo("http://zitadel:8080/v2/users")).andExpect(method(HttpMethod.POST))
+                .andExpect(jsonPath("$.queries[0].emailQuery.emailAddress").value("email@example.com"))
+                .andRespond(withSuccess(response, MediaType.APPLICATION_JSON));
+            assertThat(client.findByEmail("email@example.com")).isEmpty();
+            server.verify();
+        }
+    }
+
+    @Test
+    void userLookupRejectsMalformedAndAmbiguousResults() {
+        for (var response : new String[] { "null", "[]", "{\"result\":null}", "{\"result\":{}}", "{\"result\":[{},{}]}" }) {
+            server.reset();
+            server.expect(requestTo("http://zitadel:8080/v2/users"))
+                .andRespond(withSuccess(response, MediaType.APPLICATION_JSON));
+            assertThatThrownBy(() -> client.findByEmail("email@example.com"))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                    error -> assertThat(error.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE));
+            server.verify();
+        }
+    }
+
+    @Test
     void registrationReturnsCodeForKairosDeliveryWithoutProviderMail() {
         server.expect(requestTo("http://zitadel:8080/management/v1/orgs/me"))
             .andRespond(withSuccess("{\"org\":{\"id\":\"org\"}}", MediaType.APPLICATION_JSON));

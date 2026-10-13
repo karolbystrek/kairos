@@ -130,7 +130,10 @@ public class ZitadelClient {
             .body(Map.of("query", Map.of("limit", 2), "queries", List.of(Map.of("emailQuery",
                 Map.of("emailAddress", email, "method", "TEXT_QUERY_METHOD_EQUALS_IGNORE_CASE")))))
             .retrieve().body(JsonNode.class));
-        if (result == null || !result.path("result").isArray()) throw unavailable();
+        if (result == null || !result.isObject()) throw unavailable();
+        // ZITADEL omits the repeated result field when no users match.
+        if (result.path("result").isMissingNode()) return Optional.empty();
+        if (!result.path("result").isArray()) throw unavailable();
         if (result.path("result").isEmpty()) return Optional.empty();
         if (result.path("result").size() != 1) throw unavailable();
         return Optional.of(userEmail(result.path("result").get(0)));
