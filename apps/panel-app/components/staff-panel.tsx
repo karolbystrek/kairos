@@ -518,7 +518,10 @@ export function StaffPanel({
           </Tooltip.Trigger>
           <Tooltip.Content>Konto</Tooltip.Content>
         </Tooltip>
-        <Dropdown.Popover placement="bottom end">
+        <Dropdown.Popover
+          className="max-w-[calc(100svw-2rem)]"
+          placement="bottom end"
+        >
           <Dropdown.Menu
             aria-label="Opcje konta"
             onAction={(key) => {

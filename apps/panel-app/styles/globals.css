@@ -1031,16 +1031,27 @@ body {
 }
 
 :is(.modal__footer, .alert-dialog__footer, .drawer__footer) {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 :is(.modal__footer, .alert-dialog__footer, .drawer__footer) > .button {
-  width: 100%;
+  max-width: 100%;
   height: auto;
   min-height: var(--control-regular);
   white-space: normal;
+}
+
+@media (max-width: 39.999rem) {
+  :is(.modal__footer, .alert-dialog__footer, .drawer__footer) {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  :is(.modal__footer, .alert-dialog__footer, .drawer__footer) > .button {
+    width: 100%;
+  }
 }
 
 .confirmation-actions {
