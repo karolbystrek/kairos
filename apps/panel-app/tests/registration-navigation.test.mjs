@@ -36,6 +36,8 @@ async function submitRegistration({ invited = false, fails = false, termsAccepte
     };
     if (name === "@/src/api/api-fetch") return { ApiError: class extends Error {} };
     if (name === "@heroui/react" || name.startsWith("@/") || name.startsWith("./")) return new Proxy({}, { get: (_, key) => String(key) });
+    // Phosphor's CommonJS build does not load under Node's require; icons are inert here.
+    if (name === "@phosphor-icons/react") return new Proxy({}, { get: (_, key) => String(key) });
     return require(name);
   }, exports, {
     location: { href: "https://panel.example.com/account-registration", assign: path => redirects.push(path) },

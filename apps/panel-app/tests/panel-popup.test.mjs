@@ -14,8 +14,11 @@ const source = ts.transpileModule(
   readFileSync(new URL("../components/panel-popup.tsx", import.meta.url), "utf8"),
   { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } },
 ).outputText;
-new Function("require", "exports", source)(name => name === "@heroui/react"
-  ? { Modal, AlertDialog: { Icon: "Icon" } } : require(name), exports);
+const stubs = {
+  "@heroui/react": { Modal, AlertDialog: { Icon: "Icon" } },
+  "@phosphor-icons/react": { XIcon: "XIcon" },
+};
+new Function("require", "exports", source)(name => stubs[name] ?? require(name), exports);
 
 // Verify the app's dismissal policy at its HeroUI boundary; HeroUI owns DOM events/focus.
 for (const role of ["dialog", "alertdialog"]) {

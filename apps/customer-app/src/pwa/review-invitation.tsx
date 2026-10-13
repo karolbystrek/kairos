@@ -1,7 +1,7 @@
 "use client";
 
 import { Button, Modal } from "@heroui/react";
-import { Star, X } from "lucide-react";
+import { StarIcon, XIcon } from "@phosphor-icons/react";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import useSWR from "swr";
 
@@ -103,7 +103,7 @@ export function ReviewInvitation() {
         >
           <Modal.Dialog>
             <Modal.CloseTrigger aria-label="Zamknij zaproszenie do wystawienia opinii">
-              <X aria-hidden="true" size={20} />
+              <XIcon aria-hidden="true" size={20} />
             </Modal.CloseTrigger>
             <Modal.Header className="pr-8">
               <Modal.Heading>
@@ -129,7 +129,7 @@ export function ReviewInvitation() {
                   consume("review_link_clicked");
                 }}
               >
-                <Star aria-hidden="true" size={18} />
+                <StarIcon aria-hidden="true" size={18} />
                 Wystaw opinię w Google
               </Button>
             </Modal.Footer>

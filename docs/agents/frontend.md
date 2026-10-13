@@ -12,7 +12,7 @@
 
 Use installed skills when useful, respecting their invocation scope.
 Project requirements and conventions take precedence over generic skill advice:
-retain HeroUI, Lucide, shared tokens and existing state/API patterns. Apply only
+retain HeroUI, Phosphor Icons, shared tokens and existing state/API patterns. Apply only
 task-relevant rules; do not add dependencies, abstractions or animations solely
 because a skill suggests them. Before using view transitions, verify support in
 the installed React/Next.js versions and configuration, preserve reduced-motion
@@ -21,8 +21,9 @@ handling and provide a usable fallback.
 ## Components and effects
 
 - Always use HeroUI (`@heroui/react`) for UI components.
-- Use Lucide React for interface icons; do not add handwritten inline SVG icon
-  components.
+- Use Phosphor Icons (`@phosphor-icons/react`, `*Icon` exports) for interface
+  icons: regular weight by default and fill for "on" states. Do not add
+  handwritten inline SVG icon components.
 - Reserve React effects for synchronization with external systems such as
   EventSource or browser APIs; do not use effects for routine REST request
   orchestration.

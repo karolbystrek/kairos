@@ -8,12 +8,12 @@ import type {
 
 import { Alert, Button, Spinner, Tabs, Tooltip } from "@heroui/react";
 import {
-  Ban as DisableIcon,
-  Check as CheckIcon,
-  Pencil as EditIcon,
-  Plus as PlusIcon,
-  Trash2 as TrashIcon,
-} from "lucide-react";
+  ProhibitIcon as DisableIcon,
+  CheckIcon,
+  PencilSimpleIcon as EditIcon,
+  PlusIcon,
+  TrashIcon,
+} from "@phosphor-icons/react";
 import { useRef, useState } from "react";
 import useSWR from "swr";
 
@@ -147,6 +147,10 @@ function IntegrationDetails({
 
       <PanelDetailHeader
         eyebrow="Integracja"
+        status={{
+          isEnabled: integration.status === "ENABLED",
+          label: integration.status === "ENABLED" ? "Włączona" : "Wyłączona",
+        }}
         title={integration.name}
         titleAction={
           !isEditingName ? (
@@ -243,14 +247,8 @@ function IntegrationDetails({
           </>
         }
       />
-
-      <p className="text-sm text-muted">
-        Status: {integration.status === "ENABLED" ? "Włączona" : "Wyłączona"}
-      </p>
-
       <p className="text-sm text-muted">
         Wyłączenie zablokuje klucze API i nowe webhooki do ponownego włączenia.
-        Usunięcie jest nieodwracalne.
       </p>
 
       <Tabs>

@@ -4,6 +4,7 @@ import type { ThemeProviderProps } from "next-themes";
 
 import * as React from "react";
 import { I18nProvider } from "@heroui/react";
+import { IconContext } from "@phosphor-icons/react";
 import { ThemeProvider as NextThemesProvider } from "next-themes";
 
 import { ReviewInvitation } from "@/src/pwa/review-invitation";
@@ -14,15 +15,20 @@ export interface ProvidersProps {
   themeProps?: ThemeProviderProps;
 }
 
+// Icons are decorative by default; controls carry the accessible name.
+const iconDefaults = { "aria-hidden": true } as const;
+
 export function Providers({ children, themeProps }: ProvidersProps) {
   return (
     <I18nProvider locale="pl-PL">
-      <NextThemesProvider {...themeProps}>
-        <CustomerPwaProvider>
-          {children}
-          <ReviewInvitation />
-        </CustomerPwaProvider>
-      </NextThemesProvider>
+      <IconContext.Provider value={iconDefaults}>
+        <NextThemesProvider {...themeProps}>
+          <CustomerPwaProvider>
+            {children}
+            <ReviewInvitation />
+          </CustomerPwaProvider>
+        </NextThemesProvider>
+      </IconContext.Provider>
     </I18nProvider>
   );
 }

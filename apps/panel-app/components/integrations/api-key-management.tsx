@@ -12,7 +12,7 @@ import {
   Spinner,
   TextField,
 } from "@heroui/react";
-import { Plus, Trash2 as TrashIcon } from "lucide-react";
+import { PlusIcon, TrashIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 import useSWR from "swr";
 
@@ -269,7 +269,7 @@ export function ApiKeyManagement({
             isPending={pendingAction === "issue"}
             type="submit"
           >
-            <Plus size={18} />
+            <PlusIcon size={18} />
             {pendingAction === "issue" ? "Tworzenie…" : "Utwórz"}
           </Button>
         </form>

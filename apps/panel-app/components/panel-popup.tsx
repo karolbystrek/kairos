@@ -3,7 +3,7 @@
 import type { ComponentProps, ReactNode } from "react";
 
 import { AlertDialog, Modal } from "@heroui/react";
-import { X } from "lucide-react";
+import { XIcon } from "@phosphor-icons/react";
 
 type PanelPopupProps = Pick<
   ComponentProps<typeof Modal>,
@@ -47,7 +47,7 @@ export function PanelPopup({
           >
             {!isRequired && (
               <Modal.CloseTrigger aria-label="Zamknij">
-                <X aria-hidden="true" size={20} />
+                <XIcon aria-hidden="true" size={20} />
               </Modal.CloseTrigger>
             )}
             {children}

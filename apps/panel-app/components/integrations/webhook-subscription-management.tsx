@@ -9,13 +9,13 @@ import type {
 
 import { Alert, Button, Spinner, Tooltip } from "@heroui/react";
 import {
-  Ban as DisableIcon,
-  Check as CheckIcon,
-  Pencil as EditIcon,
-  Trash2 as TrashIcon,
-  Plus,
-  RefreshCw,
-} from "lucide-react";
+  ProhibitIcon as DisableIcon,
+  CheckIcon,
+  PencilSimpleIcon as EditIcon,
+  TrashIcon,
+  PlusIcon,
+  ArrowsClockwiseIcon,
+} from "@phosphor-icons/react";
 import { useState } from "react";
 import useSWR from "swr";
 
@@ -568,7 +568,7 @@ export function WebhookSubscriptionManagement({
             isPending={pendingAction === "create"}
             type="submit"
           >
-            <Plus size={18} />
+            <PlusIcon size={18} />
             {pendingAction === "create" ? "Tworzenie…" : "Utwórz"}
           </Button>
         </form>
@@ -687,7 +687,7 @@ export function WebhookSubscriptionManagement({
                     variant="secondary"
                     onPress={() => rotate(subscription)}
                   >
-                    <RefreshCw size={18} />
+                    <ArrowsClockwiseIcon size={18} />
                     Zmień sekret
                   </Button>
                   <Tooltip delay={500}>
@@ -759,23 +759,18 @@ export function WebhookSubscriptionManagement({
                         key={version.id}
                         className="flex flex-wrap items-center justify-between gap-3"
                       >
-                        <div>
-                          <p className="text-xs text-muted">
-                            Utworzono{" "}
-                            {formatIntegrationDateTime(version.issuedAt)}
-                          </p>
-                          <p className="text-xs text-muted">
-                            {version.retiredAt
-                              ? `Wycofano ${formatIntegrationDateTime(
-                                  version.retiredAt,
+                        <p className="text-xs text-muted">
+                          {formatIntegrationDateTime(version.issuedAt)} ·{" "}
+                          {version.retiredAt
+                            ? `wycofana ${formatIntegrationDateTime(
+                                version.retiredAt,
+                              )}`
+                            : version.validUntil
+                              ? `ważna do ${formatIntegrationDateTime(
+                                  version.validUntil,
                                 )}`
-                              : version.validUntil
-                                ? `Ważna do ${formatIntegrationDateTime(
-                                    version.validUntil,
-                                  )}`
-                                : "Aktualna"}
-                          </p>
-                        </div>
+                              : "aktualna"}
+                        </p>
                         {version.validUntil && !version.retiredAt && (
                           <Button
                             isPending={pendingAction === `retire-${version.id}`}

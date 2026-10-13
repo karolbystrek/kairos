@@ -70,7 +70,7 @@ service; existing explicit approval remains valid within its stated scope.
 - `apps/customer-app/`: Next.js customer PWA, Serwist, IndexedDB, Web Push.
 - `apps/panel-app/`: Next.js authenticated staff panel.
 - Both frontends: Next.js 16, React 19, TypeScript, Tailwind CSS 4, HeroUI 3,
-  Lucide React, Zod, native `fetch`, and SWR.
+  Phosphor Icons, Zod, native `fetch`, and SWR.
 - `apps/api/`: Java 25, Spring Boot 4, Spring Security/MVC; PostgreSQL is
   authoritative, Redis Pub/Sub distributes customer events, ZITADEL owns identity.
 - `compose.yaml`: shared Docker Compose topology with NGINX HTTPS ingress.

@@ -4,7 +4,7 @@ import { Alert, Link } from "@heroui/react";
 
 export default function NotFound() {
   return (
-    <div className="flex min-h-[60vh] items-center justify-center">
+    <div className="flex flex-1 items-center justify-center">
       <Alert className="max-w-lg" status="warning">
         <Alert.Indicator />
         <Alert.Content>

@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { Button } from "@heroui/react";
-import { KeyRound } from "lucide-react";
+import { KeyIcon } from "@phosphor-icons/react";
 
 import { PanelPopup } from "@/components/panel-popup";
 import { FormTextField } from "@/components/form-controls";
@@ -108,7 +108,7 @@ export function PasswordChangeDialog({
             Anuluj
           </Button>
           <Button isPending={pending} type="submit">
-            <KeyRound aria-hidden="true" size={18} /> Zmień hasło
+            <KeyIcon aria-hidden="true" size={18} /> Zmień hasło
           </Button>
         </PanelPopup.Footer>
       </form>

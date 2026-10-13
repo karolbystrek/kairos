@@ -51,7 +51,7 @@ export function OfflineNavigationFallback() {
 
   if (snapshot === undefined) {
     return (
-      <section className="flex min-h-[calc(100svh-3rem)] flex-col">
+      <section className="flex flex-1 flex-col">
         <CustomerToolbar />
         <div className="flex flex-1 items-center justify-center">
           <Spinner aria-label="Wczytywanie zapisanego statusu zamówienia" />
@@ -62,7 +62,7 @@ export function OfflineNavigationFallback() {
 
   if (!snapshot) {
     return (
-      <section className="flex min-h-[calc(100svh-3rem)] flex-col">
+      <section className="flex flex-1 flex-col">
         <CustomerToolbar />
         <div className="flex flex-1 items-center justify-center">
           <Alert className="w-full" status="warning">
@@ -81,7 +81,7 @@ export function OfflineNavigationFallback() {
   }
 
   return (
-    <section className="flex min-h-[calc(100svh-3rem)] flex-col">
+    <section className="flex flex-1 flex-col">
       <CustomerToolbar />
       <Alert className="mt-4" status="warning">
         <Alert.Indicator />
