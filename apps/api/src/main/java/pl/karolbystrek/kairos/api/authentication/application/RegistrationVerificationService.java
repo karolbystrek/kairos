@@ -45,6 +45,10 @@ public class RegistrationVerificationService {
     private final PlatformTransactionManager transactions;
     private final Clock clock;
     private Semaphore nestedFlows;
+    @Value("${kairos.authentication.email-verification-enabled:true}")
+    private boolean emailVerificationEnabled;
+
+    public boolean verificationRequired() { return emailVerificationEnabled; }
 
     // Nested flows hold one connection while opening a REQUIRES_NEW one; staying below the pool size guarantees progress.
     @Value("${spring.datasource.hikari.maximum-pool-size:10}")
@@ -78,6 +82,7 @@ public class RegistrationVerificationService {
             try {
                 identity = provider.signIn(email, password);
                 if (!user.id().equals(identity.userId())) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+                if (!emailVerificationEnabled) return new Pending(identity, email);
                 access.verification(user.id());
                 var delivery = send(email, user.code());
                 database.update("INSERT INTO pending_registrations(subject,email,attempts,resend_available_at,delivery_id) VALUES (?,?,0,?,?)",
@@ -101,6 +106,7 @@ public class RegistrationVerificationService {
             access.verification(identity.userId());
             if (database.queryForObject("SELECT COUNT(*) FROM pending_registrations WHERE subject = ?", Integer.class, identity.userId()) == 0) {
                 if (user.verified()) throw conflict();
+                if (!emailVerificationEnabled) return new Pending(identity, email);
                 var delivery = send(email, provider.resendEmailCode(identity.userId()));
                 database.update("INSERT INTO pending_registrations(subject,email,attempts,resend_available_at,delivery_id) VALUES (?,?,0,?,?)",
                     identity.userId(), email, Timestamp.from(clock.instant().plusSeconds(60)), delivery);
@@ -145,6 +151,14 @@ public class RegistrationVerificationService {
                 return new Completion(authentication.authenticate(pending.identity(), clock.instant()), null);
             validate(pending);
             access.verification(pending.identity().userId());
+            if (!emailVerificationEnabled) {
+                provider.markEmailVerified(pending.identity().userId(), pending.email());
+                var principal = tenants.register(pending.email(), pending.identity().userId());
+                for (var row : database.queryForList("SELECT delivery_id FROM pending_registrations WHERE subject=?", pending.identity().userId()))
+                    mail.cancel((UUID) row.get("delivery_id"));
+                database.update("DELETE FROM pending_registrations WHERE subject=?", pending.identity().userId());
+                return new Completion(principal, null);
+            }
             var row = pendingRow(pending);
             if (((Number) row.get("attempts")).intValue() >= 5)
                 return new Completion(null, new RegistrationValidationException(HttpStatus.BAD_REQUEST, "code", "Request a new code before trying again."));

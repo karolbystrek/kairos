@@ -30,6 +30,13 @@ account form. Submitting it validates and provisions an unverified identity, the
 until the correct code is confirmed. Confirmation commits the tenant and
 administrator, establishes the browser session and opens `/dashboard`. Registration does not collect or
 create a location.
+`EMAIL_VERIFICATION_ENABLED` defaults to `true`. Local `.env.example` sets it to
+`false`: registration and unverified sign-in then mark the provider email verified
+and complete tenant/admin onboarding without a code screen or new verification
+email. Existing pending code delivery is canceled on completion. Identity and
+Account eligibility checks still apply, and invitation redemption is unchanged.
+Re-enabling verification does not undo provider emails already marked verified.
+
 The registration form has no step counter, progress bar, Next/Back controls, or
 persistent password-requirement paragraph. Account fields retain submitted values
 on recoverable failure and show corrective errors beside the affected control.

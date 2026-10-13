@@ -45,6 +45,12 @@ policy, update the visible password guidance to match.
 
 ## Sessions and account flows
 
+For local development, set `EMAIL_VERIFICATION_ENABLED=false` in `.env` (as in
+`.env.example`) and rebuild/recreate the API service. Registration and unverified
+sign-in automatically mark the provider email verified and complete onboarding
+without sending a code. The API defaults to `true`; keep verification enabled
+for production. Re-enabling it does not undo emails already marked verified.
+
 Users register and log in on the Kairos panel with email/password. Registration
 sends a 6-digit provider verification code before creating a tenant/admin.
 Confirming ownership opens the existing first-location onboarding flow. Codes

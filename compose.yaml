@@ -67,6 +67,7 @@ services:
     image: kairos-api:local
     environment:
       EMAIL_DELIVERY_MODE:
+      EMAIL_VERIFICATION_ENABLED: "${EMAIL_VERIFICATION_ENABLED:-true}"
       RESEND_API_KEY:
       REVIEW_INVITATION_DELAY: "${REVIEW_INVITATION_DELAY:-30m}"
       ZITADEL_API_URL:
