@@ -84,8 +84,8 @@ service; existing explicit approval remains valid within its stated scope.
   the topic files together form the canonical specification.
 - [Architecture](docs/agents/architecture.md): before changes across application,
   API, security, persistence, or real-time boundaries.
-- [Frontend conventions](docs/agents/frontend.md): before frontend changes;
-  use its skill selection guidance for design, motion and React/Next.js work.
+- [Frontend conventions](docs/agents/frontend.md): before frontend changes,
+  including how generic skill advice yields to project conventions.
 - [Backend conventions](docs/agents/backend.md): before API/Java changes.
 - [Validation](docs/agents/validation.md): before selecting tests/checks and
   before declaring work complete.
