@@ -6,6 +6,7 @@ on:
     branches:
       - main
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
@@ -40,8 +41,6 @@ jobs:
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: apps/${{ matrix.app }}/package-lock.json
 
       - name: Validate build inputs
         shell: bash
@@ -67,7 +66,15 @@ jobs:
             exit 1
           fi
 
+      - name: Dependency cache
+        id: deps
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: apps/${{ matrix.app }}/node_modules
+          key: ${{ runner.os }}-node22-${{ matrix.app }}-${{ hashFiles(format('apps/{0}/package-lock.json', matrix.app)) }}
+
       - name: Install dependencies
+        if: steps.deps.outputs.cache-hit != 'true'
         run: npm ci
 
       - name: Lint & types
@@ -76,49 +83,15 @@ jobs:
       - name: Test
         run: npm run test --if-present
 
-      - name: Buildx
-        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
-
-      - name: Build image
-        id: image
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+      - name: Next.js cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          context: apps/${{ matrix.app }}
-          target: runner
-          platforms: linux/amd64
-          pull: true
-          tags: ghcr.io/${{ github.repository }}/${{ matrix.app }}:sha-${{ github.sha }}
-          outputs: type=oci,dest=${{ runner.temp }}/${{ matrix.app }}.tar
-          labels: |
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.version=sha-${{ github.sha }}
-          build-args: |
-            NEXT_PUBLIC_API_BASE_URL=${{ vars.NEXT_PUBLIC_API_BASE_URL }}
-            NEXT_PUBLIC_CUSTOMER_APP_URL=${{ vars.NEXT_PUBLIC_CUSTOMER_APP_URL }}
-            NEXT_PUBLIC_PANEL_APP_URL=${{ vars.NEXT_PUBLIC_PANEL_APP_URL }}
-            NEXT_TELEMETRY_DISABLED=1
-          cache-from: type=gha,scope=${{ matrix.app }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.app }}
-          provenance: mode=max
+          path: apps/${{ matrix.app }}/.next/cache
+          key: ${{ runner.os }}-next-${{ matrix.app }}-${{ hashFiles(format('apps/{0}/package-lock.json', matrix.app)) }}-${{ github.sha }}
+          restore-keys: ${{ runner.os }}-next-${{ matrix.app }}-${{ hashFiles(format('apps/{0}/package-lock.json', matrix.app)) }}-
 
-      - name: Record digest
-        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-        env:
-          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
-        run: printf '%s\n' "$IMAGE_DIGEST" > "${{ runner.temp }}/${{ matrix.app }}.digest"
-
-      - name: Upload image
-        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: image-${{ matrix.app }}
-          path: |
-            ${{ runner.temp }}/${{ matrix.app }}.tar
-            ${{ runner.temp }}/${{ matrix.app }}.digest
-          compression-level: 0
-          if-no-files-found: error
-          retention-days: 30
+      - name: Build
+        run: npm run build
 
   api:
     name: API
@@ -143,45 +116,6 @@ jobs:
 
       - name: Verify
         run: ./mvnw --batch-mode verify
-
-      - name: Buildx
-        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
-
-      - name: Build image
-        id: image
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
-        with:
-          context: apps/api
-          target: runner
-          platforms: linux/amd64
-          pull: true
-          tags: ghcr.io/${{ github.repository }}/api:sha-${{ github.sha }}
-          outputs: type=oci,dest=${{ runner.temp }}/api.tar
-          labels: |
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.version=sha-${{ github.sha }}
-          cache-from: type=gha,scope=api
-          cache-to: type=gha,mode=max,scope=api
-          provenance: mode=max
-
-      - name: Record digest
-        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-        env:
-          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
-        run: printf '%s\n' "$IMAGE_DIGEST" > "${{ runner.temp }}/api.digest"
-
-      - name: Upload image
-        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: image-api
-          path: |
-            ${{ runner.temp }}/api.tar
-            ${{ runner.temp }}/api.digest
-          compression-level: 0
-          if-no-files-found: error
-          retention-days: 30
 
   release-checks:
     name: Release checks
