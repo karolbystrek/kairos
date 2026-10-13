@@ -6,7 +6,6 @@ import {
   Alert,
   Button,
   Label,
-  Spinner,
   TextArea,
   TextField,
   Tooltip,
@@ -24,6 +23,7 @@ import { ZodError } from "zod";
 import { CardDensityControl } from "@/components/card-density";
 import { FormTextField } from "@/components/form-controls";
 import { HoldToConfirmButton } from "@/components/hold-to-confirm-button";
+import { CardGridSkeleton } from "@/components/loading-skeleton";
 import { PanelCard } from "@/components/panel-card";
 import { PanelPopup } from "@/components/panel-popup";
 import { ApiError } from "@/src/api/api-fetch";
@@ -218,9 +218,7 @@ export function MenuManagement({
       )}
 
       {areMenusLoading ? (
-        <div className="flex min-h-80 items-center justify-center">
-          <Spinner aria-label="Wczytywanie menu" />
-        </div>
+        <CardGridSkeleton metadata label="Wczytywanie menu" />
       ) : (
         <>
           {menus.length === 0 ? (

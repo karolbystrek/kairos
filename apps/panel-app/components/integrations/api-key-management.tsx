@@ -9,7 +9,6 @@ import {
   Label,
   Radio,
   RadioGroup,
-  Spinner,
   TextField,
   toast,
 } from "@heroui/react";
@@ -24,6 +23,7 @@ import {
   getIntegrationErrorMessage,
   shouldRetryIntegrationRequest,
 } from "@/components/integrations/integration-ui";
+import { RowListSkeleton } from "@/components/loading-skeleton";
 import {
   deleteApiKey,
   issueApiKey,
@@ -281,7 +281,7 @@ export function ApiKeyManagement({
         <h3 className="text-xl font-semibold">Klucze API</h3>
 
         {areApiKeysLoading ? (
-          <Spinner aria-label="Wczytywanie kluczy API" />
+          <RowListSkeleton apiKeys label="Wczytywanie kluczy API" />
         ) : apiKeys.length === 0 ? (
           <p className="text-muted">Brak kluczy API.</p>
         ) : (

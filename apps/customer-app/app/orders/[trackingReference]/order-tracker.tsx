@@ -1,6 +1,6 @@
 "use client";
 
-import { Alert, Button, Spinner } from "@heroui/react";
+import { Alert, Button } from "@heroui/react";
 import { ScanIcon, XIcon } from "@phosphor-icons/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -8,6 +8,7 @@ import useSWR, { unstable_serialize, useSWRConfig } from "swr";
 import useSWRSubscription from "swr/subscription";
 import { z } from "zod";
 
+import { OrderLoadingSkeleton } from "@/components/order-loading-skeleton";
 import { CustomerToolbar } from "@/components/customer-toolbar";
 import {
   ApiError,
@@ -306,9 +307,7 @@ export function OrderTracker({
     return (
       <section className="flex flex-1 flex-col">
         <CustomerToolbar />
-        <div className="flex flex-1 items-center justify-center">
-          <Spinner aria-label="Wczytywanie zamówienia" />
-        </div>
+        <OrderLoadingSkeleton label="Wczytywanie zamówienia" />
       </section>
     );
   }

@@ -6,7 +6,7 @@ import type {
   SecretOperation,
 } from "./integrations/one-time-secret";
 
-import { Alert, Button, Spinner, Tabs, Tooltip, toast } from "@heroui/react";
+import { Alert, Button, Tabs, Tooltip, toast } from "@heroui/react";
 import {
   ProhibitIcon as DisableIcon,
   CheckIcon,
@@ -28,6 +28,7 @@ import {
 } from "@/components/integrations/integration-ui";
 import { OneTimeSecret } from "@/components/integrations/one-time-secret";
 import { WebhookSubscriptionManagement } from "@/components/integrations/webhook-subscription-management";
+import { CardGridSkeleton } from "@/components/loading-skeleton";
 import { PanelCard } from "@/components/panel-card";
 import { PanelDetailHeader } from "@/components/panel-detail-header";
 import { staffIntegrationsKey, staffLocationsKey } from "@/src/api/cache-keys";
@@ -459,9 +460,7 @@ export function IntegrationManagement({ accountId }: { accountId: string }) {
       )}
 
       {areIntegrationsLoading || areLocationsLoading ? (
-        <div className="flex min-h-80 items-center justify-center">
-          <Spinner aria-label="Wczytywanie integracji" />
-        </div>
+        <CardGridSkeleton label="Wczytywanie integracji" />
       ) : integrations.length === 0 ? (
         <div className="py-12">
           <h2 className="section-title">Brak integracji</h2>

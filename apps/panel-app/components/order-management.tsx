@@ -1,6 +1,14 @@
 import type { FormEvent } from "react";
 
-import { Alert, Button, ListBox, Spinner, Tooltip, toast } from "@heroui/react";
+import {
+  Alert,
+  Button,
+  ListBox,
+  Skeleton,
+  Spinner,
+  Tooltip,
+  toast,
+} from "@heroui/react";
 import {
   ArrowCounterClockwiseIcon,
   ArrowLeftIcon,
@@ -15,6 +23,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 import useSWRMutation from "swr/mutation";
 
+import {
+  CardSkeleton,
+  FieldSkeleton,
+  LoadingStatus,
+} from "@/components/loading-skeleton";
 import { PanelPopup } from "@/components/panel-popup";
 import { FormSelect, FormTextField } from "@/components/form-controls";
 import { PanelCard } from "@/components/panel-card";
@@ -669,7 +682,9 @@ export function OrderManagement({
       )}
 
       {areLocationsLoading ? (
-        <Spinner aria-label="Wczytywanie lokali" />
+        <LoadingStatus label="Wczytywanie lokali">
+          <FieldSkeleton className="w-full sm:max-w-xs" />
+        </LoadingStatus>
       ) : enabledLocations.length === 0 ? (
         <div className="flex flex-col items-start gap-4 py-12">
           <div>
@@ -699,9 +714,7 @@ export function OrderManagement({
           )}
 
           {areOrdersLoading ? (
-            <div className="flex min-h-80 items-center justify-center">
-              <Spinner aria-label="Wczytywanie zamówień" />
-            </div>
+            <OrderQueueSkeleton />
           ) : (
             <div className="grid gap-10 md:grid-cols-2 md:gap-0 md:divide-x md:divide-separator">
               {(["IN_PREPARATION", "READY"] as const).map((status) => {
@@ -797,9 +810,19 @@ export function OrderManagement({
               />
             )}
             {isCreateMenuLoading ? (
-              <div className="flex min-h-40 items-center justify-center">
-                <Spinner aria-label="Wczytywanie menu" />
-              </div>
+              <LoadingStatus
+                className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4"
+                label="Wczytywanie menu"
+              >
+                {[0, 1, 2, 3].map((item) => (
+                  <Skeleton
+                    key={item}
+                    animationType="pulse"
+                    aria-hidden="true"
+                    className="h-22 rounded-[var(--radius-large)]"
+                  />
+                ))}
+              </LoadingStatus>
             ) : isItemsStep && createMenu ? (
               <div key="items" className="order-create-step">
                 <OrderItemPicker
@@ -1014,5 +1037,30 @@ export function OrderManagement({
         </PanelPopup.Footer>
       </PanelPopup>
     </div>
+  );
+}
+
+function OrderQueueSkeleton() {
+  return (
+    <LoadingStatus
+      className="grid gap-10 md:grid-cols-2 md:gap-0 md:divide-x md:divide-separator"
+      label="Wczytywanie zamówień"
+    >
+      {Object.values(laneDetails)
+        .map((lane) => lane.label)
+        .map((label) => (
+          <section
+            key={label}
+            className="border-t border-separator pt-5 md:border-t-0 md:px-6 md:first:pl-0 md:last:pr-0"
+          >
+            <header className="pb-3">
+              <h2 className="section-title">{label}</h2>
+            </header>
+            {[0, 1, 2].map((row) => (
+              <CardSkeleton key={row} metadata trailing />
+            ))}
+          </section>
+        ))}
+    </LoadingStatus>
   );
 }

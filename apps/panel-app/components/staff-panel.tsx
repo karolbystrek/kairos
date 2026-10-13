@@ -48,6 +48,7 @@ import { LocationCreationModal } from "@/components/location-creation-modal";
 import { LocationManagement } from "@/components/location-management";
 import { MenuManagement } from "@/components/menu-management";
 import { PasswordChangeDialog } from "@/components/password-change-dialog";
+import { CardGridSkeleton } from "@/components/loading-skeleton";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { subscribeToAuthenticationRequired } from "@/src/api/auth-state";
 import { ApiError } from "@/src/api/api-fetch";
@@ -486,7 +487,7 @@ export function StaffPanel({
         </Button>
       </div>
     ) : (
-      <Spinner aria-label="Wczytywanie lokali" />
+      <CardGridSkeleton label="Wczytywanie lokali" />
     );
   }
   const needsFirstLocation = canManageLocations && hasNoLocations;

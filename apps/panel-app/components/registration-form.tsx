@@ -1,5 +1,6 @@
 "use client";
 
+import { Skeleton } from "@heroui/react";
 import { SignOutIcon, UserPlusIcon } from "@phosphor-icons/react";
 import { useSyncExternalStore, useState, type FormEvent } from "react";
 import {
@@ -17,6 +18,7 @@ import { ZodError } from "zod";
 import { EmailVerification } from "./email-verification";
 import { AuthFormLayout } from "./auth-form-layout";
 
+import { LoadingStatus } from "@/components/loading-skeleton";
 import { FormTextField } from "@/components/form-controls";
 import {
   registrationInputSchema,
@@ -243,6 +245,28 @@ export function RegistrationForm({ invited = false }: { invited?: boolean }) {
       }
       title={invited ? "Dołącz do zespołu" : "Utwórz konto"}
     >
+      {invited && token && !invitation && !previewError && !terminalMessage && (
+        <LoadingStatus
+          className="mb-6 space-y-1"
+          label="Wczytywanie zaproszenia"
+        >
+          <Skeleton
+            animationType="pulse"
+            aria-hidden="true"
+            className="h-4 w-32"
+          />
+          <Skeleton
+            animationType="pulse"
+            aria-hidden="true"
+            className="h-7 w-2/3"
+          />
+          <Skeleton
+            animationType="pulse"
+            aria-hidden="true"
+            className="h-5 w-24"
+          />
+        </LoadingStatus>
+      )}
       {invitation && (
         <div className="mb-6 min-w-0 space-y-1">
           <p className="text-xs font-medium text-muted">

@@ -1164,3 +1164,12 @@ body {
   text-decoration: underline;
   text-underline-offset: 0.15em;
 }
+
+/* Skeletons pulse calmly and hold still when motion is reduced. */
+@media (prefers-reduced-motion: reduce) {
+	.skeleton,
+	.skeleton::before,
+	.skeleton::after {
+		animation: none;
+	}
+}

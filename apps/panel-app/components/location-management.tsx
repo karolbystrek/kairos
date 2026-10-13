@@ -2,7 +2,7 @@
 
 import type { FormEvent } from "react";
 
-import { Alert, Button, ListBox, Spinner, Tooltip, toast } from "@heroui/react";
+import { Alert, Button, ListBox, Tooltip, toast } from "@heroui/react";
 import {
   ArrowUpRightIcon,
   ProhibitIcon as DisableIcon,
@@ -20,6 +20,11 @@ import { HoldToConfirmButton } from "@/components/hold-to-confirm-button";
 import { PanelPopup } from "@/components/panel-popup";
 import { FormSelect, FormTextField } from "@/components/form-controls";
 import { LocationCreationModal } from "@/components/location-creation-modal";
+import {
+  CardGridSkeleton,
+  FieldSkeleton,
+  LoadingStatus,
+} from "@/components/loading-skeleton";
 import { PanelCard } from "@/components/panel-card";
 import { PanelDetailHeader } from "@/components/panel-detail-header";
 import { ApiError } from "@/src/api/api-fetch";
@@ -84,11 +89,14 @@ function LocationMenuSelect({
 }) {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<unknown>();
-  const { data: menus = [], error: menusError } = useSWR(
-    staffMenusKey(accountId),
-    listMenus,
-    { errorRetryCount: 3, shouldRetryOnError },
-  );
+  const {
+    data: menus = [],
+    error: menusError,
+    isLoading: areMenusLoading,
+  } = useSWR(staffMenusKey(accountId), listMenus, {
+    errorRetryCount: 3,
+    shouldRetryOnError,
+  });
   const {
     data: activeMenu,
     error: activeMenuError,
@@ -128,23 +136,29 @@ function LocationMenuSelect({
 
   return (
     <div className="mt-6 flex flex-col gap-2">
-      <FormSelect
-        className="w-full sm:max-w-xs"
-        isDisabled={isLoading || isSaving || Boolean(loadError)}
-        label="Menu lokalu"
-        selectedKey={loadError ? null : (activeMenu?.id ?? noMenuKey)}
-        onSelectionChange={(key) => {
-          if (key !== null) void select(String(key));
-        }}
-      >
-        <ListBox items={items}>
-          {(item) => (
-            <ListBox.Item id={item.id} textValue={item.name}>
-              {item.name}
-            </ListBox.Item>
-          )}
-        </ListBox>
-      </FormSelect>
+      {(isLoading || areMenusLoading) && !loadError ? (
+        <LoadingStatus label="Wczytywanie menu lokalu">
+          <FieldSkeleton className="w-full sm:max-w-xs" />
+        </LoadingStatus>
+      ) : (
+        <FormSelect
+          className="w-full sm:max-w-xs"
+          isDisabled={isLoading || isSaving || Boolean(loadError)}
+          label="Menu lokalu"
+          selectedKey={loadError ? null : (activeMenu?.id ?? noMenuKey)}
+          onSelectionChange={(key) => {
+            if (key !== null) void select(String(key));
+          }}
+        >
+          <ListBox items={items}>
+            {(item) => (
+              <ListBox.Item id={item.id} textValue={item.name}>
+                {item.name}
+              </ListBox.Item>
+            )}
+          </ListBox>
+        </FormSelect>
+      )}
       {loadError && (
         <p className="text-sm text-danger" role="alert">
           Nie udało się wczytać menu tego lokalu.
@@ -339,9 +353,7 @@ export function LocationManagement({
       )}
 
       {isLoading ? (
-        <div className="flex min-h-80 items-center justify-center">
-          <Spinner aria-label="Wczytywanie lokali" />
-        </div>
+        <CardGridSkeleton label="Wczytywanie lokali" />
       ) : locations.length === 0 ? (
         <div className="py-12">
           <h2 className="section-title">Brak lokali</h2>
