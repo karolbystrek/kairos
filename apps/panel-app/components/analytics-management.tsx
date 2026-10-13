@@ -12,7 +12,7 @@ import {
   Spinner,
   TextField,
 } from "@heroui/react";
-import { RefreshCw } from "lucide-react";
+import { ArrowsClockwiseIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
 
@@ -258,7 +258,8 @@ function StaleNotice({
         </Alert.Description>
         <div className="mt-3">
           <Button size="sm" variant="secondary" onPress={onRetry}>
-            <RefreshCw aria-hidden="true" size={18} /> Spróbuj ponownie
+            <ArrowsClockwiseIcon aria-hidden="true" size={18} /> Spróbuj
+            ponownie
           </Button>
         </div>
       </Alert.Content>
@@ -286,7 +287,8 @@ function LoadFailure({
         {!isAccessDenied(error) && (
           <div className="mt-3">
             <Button size="sm" variant="danger" onPress={onRetry}>
-              <RefreshCw aria-hidden="true" size={18} /> Spróbuj ponownie
+              <ArrowsClockwiseIcon aria-hidden="true" size={18} /> Spróbuj
+              ponownie
             </Button>
           </div>
         )}

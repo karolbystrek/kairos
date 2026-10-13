@@ -41,7 +41,7 @@ REST and SSE tracking remains the primary experience.
 ### 2.1 Frontend applications
 
 Both frontends use Next.js 16, React 19, TypeScript, Tailwind CSS 4, HeroUI 3,
-and Lucide React. They remain separate because they serve different audiences
+and Phosphor Icons. They remain separate because they serve different audiences
 and have different authentication, PWA, caching, and release concerns. The
 customer application uses a custom TypeScript service worker built with Serwist
 in configurator mode and owns its offline snapshots in IndexedDB.
@@ -158,11 +158,13 @@ available outside the field; placeholders do not replace essential instructions.
 Registration omits persistent password-guidance copy and shows the corrective
 requirement beside Password only after validation rejects the submitted value.
 
-Both frontends provide Light, Dark, and System appearance preferences, with
-System as the default. Each browser stores its own preference; appearance is
-not account data and does not synchronize between devices. The appearance
-trigger keeps the same rounded icon-control geometry while its menu is open and
-uses one valid interactive element rather than nested controls. The staff panel is
+Both frontends provide one Dark mode toggle. Until it is first pressed, the
+appearance follows the browser's color-scheme preference; pressing it stores an
+explicit Light or Dark choice. Each browser stores its own preference;
+appearance is not account data and does not synchronize between devices. The
+toggle shows a sun in Light appearance and a filled moon on the accent-soft
+surface in Dark appearance, exposes its pressed state, and cross-fades the icon
+without flashing before hydration. The staff panel is
 designed primarily for tablet use,
 especially 11- to 14-inch touch-and-pointer devices, while remaining complete
 and responsive on desktop and mobile. Mobile staff use is expected to be
@@ -210,7 +212,7 @@ a stable column on desktop and mobile.
 Action controls are icon-first where a familiar symbol communicates their
 meaning, including Home, Scan, Notifications, Appearance, QR, More, Close, and
 Switch camera. Major actions, including creation, editing, saving, disabling, enabling and
-deletion, pair a Lucide icon with visible Polish text. Secondary popup and prompt
+deletion, pair a Phosphor icon with visible Polish text. Secondary popup and prompt
 actions, including Cancel, Not now and Close, use explicit Polish text such as
 **Anuluj**, **Nie teraz** and **Zamknij**. Top-right Close, appearance and
 account-switching utilities remain compact icon-only controls. Entity name editing

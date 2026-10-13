@@ -1,6 +1,6 @@
 "use client";
 
-import { RefreshCw } from "lucide-react";
+import { ArrowsClockwiseIcon } from "@phosphor-icons/react";
 import { Alert, Button } from "@heroui/react";
 import { useEffect } from "react";
 
@@ -18,7 +18,7 @@ export default function Error({
   }, [error]);
 
   return (
-    <div className="flex min-h-[70vh] items-center justify-center">
+    <div className="flex flex-1 items-center justify-center">
       <Alert className="max-w-lg" status="danger">
         <Alert.Indicator />
         <Alert.Content>
@@ -28,7 +28,8 @@ export default function Error({
             panel.
           </Alert.Description>
           <Button className="mt-4" size="sm" variant="danger" onPress={reset}>
-            <RefreshCw aria-hidden="true" size={18} /> Spróbuj ponownie
+            <ArrowsClockwiseIcon aria-hidden="true" size={18} /> Spróbuj
+            ponownie
           </Button>
         </Alert.Content>
       </Alert>

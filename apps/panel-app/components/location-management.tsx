@@ -4,13 +4,13 @@ import type { FormEvent } from "react";
 
 import { Alert, Button, Spinner, Tooltip } from "@heroui/react";
 import {
-  ArrowUpRight,
-  Ban as DisableIcon,
-  Check as EnableIcon,
-  Pencil as EditIcon,
-  Plus as PlusIcon,
-  Trash2 as DeleteIcon,
-} from "lucide-react";
+  ArrowUpRightIcon,
+  ProhibitIcon as DisableIcon,
+  CheckIcon as EnableIcon,
+  PencilSimpleIcon as EditIcon,
+  PlusIcon,
+  TrashIcon as DeleteIcon,
+} from "@phosphor-icons/react";
 import { useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
 import { ZodError } from "zod";
@@ -273,6 +273,13 @@ export function LocationManagement({
               <PanelPopup.Body className="pb-6 pt-12">
                 <PanelDetailHeader
                   eyebrow="Lokal"
+                  status={{
+                    isEnabled: selectedLocation.status === "ENABLED",
+                    label:
+                      selectedLocation.status === "ENABLED"
+                        ? "Włączony"
+                        : "Wyłączony",
+                  }}
                   title={selectedLocation.name}
                   titleAction={
                     editName === undefined ? (
@@ -405,12 +412,6 @@ export function LocationManagement({
                   }
                 />
                 <p className="mt-4 text-sm text-muted">
-                  Status:{" "}
-                  {selectedLocation.status === "ENABLED"
-                    ? "Włączony"
-                    : "Wyłączony"}
-                </p>
-                <p className="mt-3 text-sm text-muted">
                   {selectedLocation.status === "ENABLED"
                     ? "Wyłączenie wyłączy i wyloguje przypisane konta oraz unieważni zaproszenia. Najpierw zakończ aktywne zamówienia."
                     : "Włączenie obejmie wszystkie przypisane konta, także wyłączone osobno. Usunięcie lokalu i kont jest nieodwracalne. Historia zamówień pozostanie dostępna."}
@@ -437,7 +438,7 @@ export function LocationManagement({
                       onViewOrders(selectedLocation.id);
                     }}
                   >
-                    <ArrowUpRight size={18} /> Pokaż zamówienia
+                    <ArrowUpRightIcon size={18} /> Pokaż zamówienia
                   </Button>
                 )}
                 {error !== undefined && (

@@ -1,7 +1,7 @@
 "use client";
 
 import { Alert, Button, Tooltip } from "@heroui/react";
-import { Bell, BellOff, X } from "lucide-react";
+import { BellIcon, BellSlashIcon, XIcon } from "@phosphor-icons/react";
 
 import { NotificationGuide } from "@/src/pwa/notification-guide";
 import {
@@ -16,8 +16,8 @@ export function NotificationIcon({ enabled }: { enabled: boolean }) {
       className="notification-icon"
       data-enabled={enabled}
     >
-      <Bell className="notification-icon-off" size={20} />
-      <BellOff className="notification-icon-on" size={20} />
+      <BellIcon className="notification-icon-off" size={20} />
+      <BellSlashIcon className="notification-icon-on" size={20} />
     </span>
   );
 }
@@ -104,7 +104,7 @@ export function NotificationControl() {
                     variant="tertiary"
                     onPress={dismissMessage}
                   >
-                    <X aria-hidden="true" size={18} />
+                    <XIcon aria-hidden="true" size={18} />
                   </Button>
                 </Tooltip.Trigger>
                 <Tooltip.Content>Zamknij</Tooltip.Content>

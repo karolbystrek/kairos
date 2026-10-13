@@ -2,11 +2,11 @@ import type { FormEvent } from "react";
 
 import { Alert, Button, ListBox, Spinner, Tooltip } from "@heroui/react";
 import {
-  ArrowRight as ArrowRightIcon,
-  Clock3 as ClockIcon,
-  Plus as PlusIcon,
-  X as CloseIcon,
-} from "lucide-react";
+  ArrowRightIcon,
+  ClockIcon,
+  PlusIcon,
+  XIcon as CloseIcon,
+} from "@phosphor-icons/react";
 import Image from "next/image";
 import QRCode from "qrcode";
 import { useEffect, useMemo, useRef, useState } from "react";

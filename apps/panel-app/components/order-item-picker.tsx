@@ -1,7 +1,7 @@
 import type { Menu } from "@/src/api/menus";
 
 import { Button } from "@heroui/react";
-import { Minus as MinusIcon, Plus as PlusIcon } from "lucide-react";
+import { MinusIcon, PlusIcon } from "@phosphor-icons/react";
 
 export type ItemQuantities = Record<string, number>;
 

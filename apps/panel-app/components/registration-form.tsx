@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOut, UserPlus } from "lucide-react";
+import { SignOutIcon, UserPlusIcon } from "@phosphor-icons/react";
 import { useSyncExternalStore, useState, type FormEvent } from "react";
 import {
   Alert,
@@ -274,7 +274,7 @@ export function RegistrationForm({ invited = false }: { invited?: boolean }) {
             kolejne konto.
           </p>
           <Button isPending={pending} onPress={() => void signOut()}>
-            <LogOut aria-hidden="true" size={18} /> Wyloguj się
+            <SignOutIcon aria-hidden="true" size={18} /> Wyloguj się
           </Button>
         </div>
       )}
@@ -388,7 +388,7 @@ export function RegistrationForm({ invited = false }: { invited?: boolean }) {
             isPending={pending}
             type="submit"
           >
-            <UserPlus aria-hidden="true" size={18} /> Utwórz konto
+            <UserPlusIcon aria-hidden="true" size={18} /> Utwórz konto
           </Button>
         </form>
       )}

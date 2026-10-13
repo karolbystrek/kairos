@@ -62,7 +62,7 @@ The customer application is installable as one globally branded **Kairos** web
 application while remaining fully usable without installation. Installation is
 browser- or operating-system-initiated; Kairos does not show its own install
 prompt in the current scope. The installed application uses standalone display
-mode, the shared Light, Dark, or System appearance preference, and no
+mode, the shared appearance preference, and no
 orientation lock. Android Chrome and iOS
 Safari are the required installation targets, while desktop browsers must
 continue to provide the ordinary web experience.

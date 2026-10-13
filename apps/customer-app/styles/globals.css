@@ -396,25 +396,63 @@ body {
 	flex: none;
 }
 
-.icon-menu-trigger {
-	display: inline-flex;
+/* Light and dark looks follow the `.dark` class, so the toggle never flashes before hydration. */
+.theme-toggle {
+	--toggle-button-bg: var(--surface-secondary);
+	--toggle-button-bg-hover: var(--surface-secondary);
+	--toggle-button-bg-pressed: var(--surface-secondary);
+	position: relative;
 	height: var(--control-regular);
 	width: var(--control-regular);
-	flex: none;
-	align-items: center;
-	justify-content: center;
-	background: var(--surface-secondary);
 	border-radius: var(--radius-medium);
-	outline: none;
 }
 
-.icon-menu-trigger--touch {
+.theme-toggle--touch {
 	height: var(--control-touch);
 	width: var(--control-touch);
 }
 
-.icon-menu-trigger:focus-visible {
-	box-shadow: var(--focus-ring);
+.dark .theme-toggle {
+	--toggle-button-bg: var(--accent-soft);
+	--toggle-button-bg-hover: var(--accent-soft);
+	--toggle-button-bg-pressed: var(--accent-soft);
+	--toggle-button-fg: var(--accent-soft-foreground);
+	--toggle-button-bg-selected: var(--accent-soft);
+	--toggle-button-bg-selected-hover: var(--accent-soft);
+	--toggle-button-bg-selected-pressed: var(--accent-soft);
+	--toggle-button-fg-selected: var(--accent-soft-foreground);
+}
+
+.theme-toggle svg {
+	position: absolute;
+	inset: 0;
+	margin: auto;
+	width: 1.25rem;
+	height: 1.25rem;
+	transition:
+		opacity 150ms cubic-bezier(0.23, 1, 0.32, 1),
+		filter 150ms cubic-bezier(0.23, 1, 0.32, 1),
+		scale 150ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.theme-toggle__moon,
+.dark .theme-toggle__sun {
+	opacity: 0;
+	filter: blur(2px);
+	scale: 0.8;
+}
+
+.dark .theme-toggle__moon {
+	opacity: 1;
+	filter: none;
+	scale: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.theme-toggle svg {
+		filter: none !important;
+		scale: 1 !important;
+	}
 }
 
 :is(
@@ -682,9 +720,6 @@ body {
   background-color: var(--default);
 }
 
-.icon-menu-trigger:is(:hover, [data-hovered="true"]):not(:active, [data-pressed="true"]) {
-  background-color: var(--surface-secondary);
-}
 
 :is(.tabs__tab, .tabs__list-container__scroll-prev, .tabs__list-container__scroll-next, .link):is(:hover, [data-hovered="true"]):not(:disabled, [aria-disabled="true"], [data-disabled="true"]) {
   opacity: 1;

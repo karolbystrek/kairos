@@ -3,7 +3,7 @@
 import type { FormEvent } from "react";
 
 import { Alert, Button } from "@heroui/react";
-import { Plus as PlusIcon } from "lucide-react";
+import { PlusIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 import { useSWRConfig } from "swr";
 import { ZodError } from "zod";

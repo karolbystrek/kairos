@@ -1,7 +1,12 @@
 "use client";
 
 import { Button, Link, Modal, Tooltip } from "@heroui/react";
-import { Bell, Share, SquarePlus, X } from "lucide-react";
+import {
+  BellIcon,
+  ExportIcon,
+  PlusSquareIcon,
+  XIcon,
+} from "@phosphor-icons/react";
 
 import { useCustomerNotifications } from "@/src/pwa/notification-provider";
 
@@ -26,7 +31,7 @@ export function NotificationGuide() {
             <Tooltip delay={500}>
               <Tooltip.Trigger>
                 <Modal.CloseTrigger aria-label="Zamknij instrukcję powiadomień">
-                  <X aria-hidden="true" size={20} />
+                  <XIcon aria-hidden="true" size={20} />
                 </Modal.CloseTrigger>
               </Tooltip.Trigger>
               <Tooltip.Content>Zamknij</Tooltip.Content>
@@ -54,7 +59,7 @@ export function NotificationGuide() {
                 <ol className="notification-installation-steps">
                   <li>
                     <span className="notification-installation-icon">
-                      <Share aria-hidden="true" size={24} />
+                      <ExportIcon aria-hidden="true" size={24} />
                     </span>
                     <div>
                       <span className="text-muted text-sm">1</span>
@@ -63,7 +68,7 @@ export function NotificationGuide() {
                   </li>
                   <li>
                     <span className="notification-installation-icon">
-                      <SquarePlus aria-hidden="true" size={24} />
+                      <PlusSquareIcon aria-hidden="true" size={24} />
                     </span>
                     <div>
                       <span className="text-muted text-sm">2</span>
@@ -72,7 +77,7 @@ export function NotificationGuide() {
                   </li>
                   <li>
                     <span className="notification-installation-icon">
-                      <Bell aria-hidden="true" size={24} />
+                      <BellIcon aria-hidden="true" size={24} />
                     </span>
                     <div>
                       <span className="text-muted text-sm">3</span>
@@ -101,7 +106,7 @@ export function NotificationGuide() {
                     void enable();
                   }}
                 >
-                  <Bell aria-hidden="true" size={18} />
+                  <BellIcon aria-hidden="true" size={18} />
                   Włącz powiadomienia
                 </Button>
               )}
