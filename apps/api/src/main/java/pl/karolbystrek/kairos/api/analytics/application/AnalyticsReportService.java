@@ -99,8 +99,10 @@ public class AnalyticsReportService {
             }
         }
 
-        var actions = zeros(EVENTS);
-        reports.usage(tenantId, locationId, from, to).forEach(row -> actions.put(row.event(), row.actions()));
+        var actions = zeros(tenantId == null ? EVENTS : List.of("review_link_clicked", "review_prompt_dismissed"));
+        reports.usage(tenantId, locationId, from, to).forEach(row -> {
+            if (actions.containsKey(row.event())) actions.put(row.event(), row.actions());
+        });
 
         List<LocationTotals> locations = null;
         if (byLocation) {
