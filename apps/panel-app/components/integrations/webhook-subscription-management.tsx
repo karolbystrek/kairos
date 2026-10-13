@@ -26,7 +26,7 @@ import {
   getIntegrationErrorMessage,
   shouldRetryIntegrationRequest,
 } from "@/components/integrations/integration-ui";
-import { RowListSkeleton } from "@/components/loading-skeleton";
+import { LoadingIndicator } from "@/components/loading-indicator";
 import { staffWebhookSubscriptionsKey } from "@/src/api/cache-keys";
 import {
   archiveWebhookSubscription,
@@ -584,7 +584,7 @@ export function WebhookSubscriptionManagement({
         <h3 className="text-xl font-semibold">Webhooki</h3>
 
         {areSubscriptionsLoading ? (
-          <RowListSkeleton label="Wczytywanie subskrypcji webhooków" />
+          <LoadingIndicator label="Wczytywanie subskrypcji webhooków" />
         ) : subscriptions.length === 0 ? (
           <p className="text-muted">Brak skonfigurowanych webhooków.</p>
         ) : (

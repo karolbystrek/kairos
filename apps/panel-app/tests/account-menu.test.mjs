@@ -7,7 +7,18 @@ import ts from "typescript";
 const require = createRequire(import.meta.url);
 
 // Render the panel's event flow without a browser; UI and request boundaries are stubs.
-function panel(screen = "dashboard", loginResult) {
+function panel(screen = "dashboard", loginResult, initialHash = "") {
+  const listeners = new Set();
+  let currentHash = initialHash;
+  const browser = {
+    location: {
+      get hash() { return currentHash; },
+      set hash(value) { currentHash = value.startsWith("#") ? value : "#" + value; },
+    },
+    addEventListener: (_, callback) => listeners.add(callback),
+    removeEventListener: (_, callback) => listeners.delete(callback),
+  };
+  let locations = [{ id: "location" }];
   const state = [];
   let cursor = 0;
   let pending = false;
@@ -36,10 +47,11 @@ function panel(screen = "dashboard", loginResult) {
         return [state[index], value => { state[index] = value; }];
       },
       useEffect(effect) { effect(); },
+      useSyncExternalStore(subscribe, snapshot) { subscribe(() => {}); return snapshot(); },
     };
     if (name === "@heroui/react") return ui;
     if (name === "swr") return {
-      default: key => key?.[1] === "verification" || key === null ? { data: verification, mutate: async value => { verification = value; } } : ({ data: account, error: accountError, isLoading: loading, mutate: async value => {
+      default: key => key?.[0] === "locations" ? { data: locations, mutate: async () => {} } : key?.[1] === "verification" || key === null ? { data: verification, mutate: async value => { verification = value; } } : ({ data: account, error: accountError, isLoading: loading, mutate: async value => {
         cacheClears.push("account");
         account = value;
         accountError = undefined;
@@ -60,7 +72,7 @@ function panel(screen = "dashboard", loginResult) {
     if (name === "@/src/api/usage-analytics") return { recordPanelAction: event => actions.push(event) };
     if (name === "@/src/api/api-fetch") return { ApiError };
     if (name === "@/src/api/auth-state") return { subscribeToAuthenticationRequired(callback) { expireSession = callback; return () => {}; } };
-    if (name === "@/src/api/cache-keys") return { currentAccountKey: ["authentication", "current-account"], staffLocationsKey: () => [], isStaffCacheKey: () => true };
+    if (name === "@/src/api/cache-keys") return { currentAccountKey: ["authentication", "current-account"], staffLocationsKey: () => ["locations"], isStaffCacheKey: () => true };
     if (name.startsWith("@/")) return new Proxy({}, { get: (_, key) => String(key) });
     // Phosphor's CommonJS build does not load under Node's require; icons are inert here.
     if (name === "@phosphor-icons/react") return new Proxy({}, { get: (_, key) => String(key) });
@@ -71,7 +83,7 @@ function panel(screen = "dashboard", loginResult) {
     readFileSync(new URL("../components/staff-panel.tsx", import.meta.url), "utf8"),
     { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } },
   ).outputText;
-  new Function("require", "exports", source)(dependencies, exports);
+  new Function("require", "exports", "window", source)(dependencies, exports, browser);
   function render() { cursor = 0; return exports.StaffPanel({ screen }); }
   function elements(node) {
     if (!node || typeof node !== "object") return [];
@@ -85,6 +97,9 @@ function panel(screen = "dashboard", loginResult) {
   }
   return {
     requests, actions, cacheClears, redirects, render, ApiError,
+    hash: () => browser.location.hash,
+    navigate(hash) { browser.location.hash = hash; listeners.forEach(callback => callback()); },
+    locations(value) { locations = value; },
     workspace: key => find(node => node.type === ui.Tabs).onSelectionChange(key),
     tabs: () => elements(render()).filter(node => node.type === "Tabs.Tab").map(node => node.props.id),
     selected: () => find(node => node.type === ui.Tabs).selectedKey,
@@ -193,7 +208,7 @@ test("expired authentication closes account dialogs before a later sign-in", () 
 
 test("workspace entries count once without counting rerenders or the selected tab", () => {
   const view = panel();
-  view.session({ accountId: "staff", capabilities: ["MANAGE_LOCATIONS", "MANAGE_MENUS", "MANAGE_INTEGRATIONS", "CHOOSE_LOCATION_MENU"] });
+  view.session({ accountId: "staff", capabilities: ["MANAGE_LOCATIONS", "MANAGE_MENUS", "MANAGE_EXTERNAL_INTEGRATIONS", "CHOOSE_LOCATION_MENU"] });
   view.workspace("menus");
   view.render();
   view.workspace("menus");
@@ -230,4 +245,37 @@ test("login restores a pending verification after reload", () => {
   view.verification({ verificationRequired: true, email: "staff@example.com", resendAvailableAt: "2026-10-12T12:00:00Z" });
   assert.equal(view.render().type, "EmailVerification");
   assert.deepEqual(view.redirects, []);
+});
+
+
+test("direct links and reload preserve the workspace while locations load", () => {
+  const account = { accountId: "staff", capabilities: ["MANAGE_LOCATIONS", "MANAGE_EXTERNAL_INTEGRATIONS"] };
+  const view = panel("dashboard", undefined, "#integrations");
+  view.session(account);
+  view.locations(undefined);
+  assert.equal(view.selected(), "integrations");
+  assert.ok(view.tabs().includes("integrations"));
+  view.workspace("locations");
+  assert.equal(view.hash(), "#locations");
+  const reloaded = panel("dashboard", undefined, view.hash());
+  reloaded.session(account);
+  assert.equal(reloaded.selected(), "locations");
+  view.navigate("#integrations");
+  assert.equal(view.selected(), "integrations");
+  view.navigate("#locations");
+  assert.equal(view.selected(), "locations");
+});
+
+test("unknown, inaccessible and onboarding-disabled fragments fall back to orders", () => {
+  const view = panel("dashboard", undefined, "#unknown");
+  view.session({ accountId: "staff", capabilities: ["MANAGE_LOCATIONS"] });
+  assert.equal(view.selected(), "orders");
+  for (const hash of ["#menus", "#accounts", "#integrations", "#analytics", "#platform"]) {
+    view.navigate(hash);
+    assert.equal(view.selected(), "orders");
+  }
+  view.session({ accountId: "staff", capabilities: ["MANAGE_LOCATIONS", "MANAGE_EXTERNAL_INTEGRATIONS"] });
+  view.navigate("#integrations");
+  view.locations([]);
+  assert.equal(view.selected(), "orders");
 });

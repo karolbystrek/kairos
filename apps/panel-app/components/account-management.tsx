@@ -24,13 +24,8 @@ import { useEffect, useState } from "react";
 import useSWR from "swr";
 import useSWRMutation from "swr/mutation";
 
-import {
-  CardGridSkeleton,
-  CardSkeleton,
-  LoadingStatus,
-} from "@/components/loading-skeleton";
+import { LoadingIndicator } from "@/components/loading-indicator";
 import { HoldToConfirmButton } from "@/components/hold-to-confirm-button";
-import { CardDensityControl } from "@/components/card-density";
 import { PanelPopup } from "@/components/panel-popup";
 import { FormSelect, FormTextField } from "@/components/form-controls";
 import { PanelCard } from "@/components/panel-card";
@@ -446,7 +441,6 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
             </Tooltip.Content>
           </Tooltip>
         </div>
-        <CardDensityControl />
       </div>
 
       {collectionError && (
@@ -492,7 +486,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
       {areAccountsLoading &&
       accounts.length === 0 &&
       invitations.length === 0 ? (
-        <CardGridSkeleton metadata label="Wczytywanie kont" />
+        <LoadingIndicator label="Wczytywanie kont" />
       ) : accounts.length === 0 &&
         invitations.length === 0 &&
         !areInvitationsLoading &&
@@ -537,9 +531,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
               />
             ))}
             {areInvitationsLoading && invitations.length === 0 && (
-              <LoadingStatus label="Wczytywanie zaproszeń">
-                <CardSkeleton metadata />
-              </LoadingStatus>
+              <LoadingIndicator label="Wczytywanie zaproszeń" />
             )}
             {invitations.map((invitation) => (
               <PanelCard

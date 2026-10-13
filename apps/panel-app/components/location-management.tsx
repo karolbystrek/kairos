@@ -15,16 +15,11 @@ import { useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
 import { ZodError } from "zod";
 
-import { CardDensityControl } from "@/components/card-density";
 import { HoldToConfirmButton } from "@/components/hold-to-confirm-button";
 import { PanelPopup } from "@/components/panel-popup";
 import { FormSelect, FormTextField } from "@/components/form-controls";
 import { LocationCreationModal } from "@/components/location-creation-modal";
-import {
-  CardGridSkeleton,
-  FieldSkeleton,
-  LoadingStatus,
-} from "@/components/loading-skeleton";
+import { LoadingIndicator } from "@/components/loading-indicator";
 import { PanelCard } from "@/components/panel-card";
 import { PanelDetailHeader } from "@/components/panel-detail-header";
 import { ApiError } from "@/src/api/api-fetch";
@@ -137,9 +132,7 @@ function LocationMenuSelect({
   return (
     <div className="mt-6 flex flex-col gap-2">
       {(isLoading || areMenusLoading) && !loadError ? (
-        <LoadingStatus label="Wczytywanie menu lokalu">
-          <FieldSkeleton className="w-full sm:max-w-xs" />
-        </LoadingStatus>
+        <LoadingIndicator label="Wczytywanie menu lokalu" />
       ) : (
         <FormSelect
           className="w-full sm:max-w-xs"
@@ -337,7 +330,6 @@ export function LocationManagement({
             <Tooltip.Content>Nowy lokal</Tooltip.Content>
           </Tooltip>
         )}
-        <CardDensityControl />
       </div>
 
       {locationsError && (
@@ -353,7 +345,7 @@ export function LocationManagement({
       )}
 
       {isLoading ? (
-        <CardGridSkeleton label="Wczytywanie lokali" />
+        <LoadingIndicator label="Wczytywanie lokali" />
       ) : locations.length === 0 ? (
         <div className="py-12">
           <h2 className="section-title">Brak lokali</h2>

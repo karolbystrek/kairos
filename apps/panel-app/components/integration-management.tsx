@@ -18,7 +18,6 @@ import { useRef, useState } from "react";
 import useSWR from "swr";
 
 import { HoldToConfirmButton } from "@/components/hold-to-confirm-button";
-import { CardDensityControl } from "@/components/card-density";
 import { PanelPopup } from "@/components/panel-popup";
 import { FormTextField } from "@/components/form-controls";
 import { ApiKeyManagement } from "@/components/integrations/api-key-management";
@@ -28,7 +27,7 @@ import {
 } from "@/components/integrations/integration-ui";
 import { OneTimeSecret } from "@/components/integrations/one-time-secret";
 import { WebhookSubscriptionManagement } from "@/components/integrations/webhook-subscription-management";
-import { CardGridSkeleton } from "@/components/loading-skeleton";
+import { LoadingIndicator } from "@/components/loading-indicator";
 import { PanelCard } from "@/components/panel-card";
 import { PanelDetailHeader } from "@/components/panel-detail-header";
 import { staffIntegrationsKey, staffLocationsKey } from "@/src/api/cache-keys";
@@ -444,7 +443,6 @@ export function IntegrationManagement({ accountId }: { accountId: string }) {
           </Tooltip.Trigger>
           <Tooltip.Content>Nowa integracja</Tooltip.Content>
         </Tooltip>
-        <CardDensityControl />
       </div>
 
       {Boolean(error) && (
@@ -460,7 +458,7 @@ export function IntegrationManagement({ accountId }: { accountId: string }) {
       )}
 
       {areIntegrationsLoading || areLocationsLoading ? (
-        <CardGridSkeleton label="Wczytywanie integracji" />
+        <LoadingIndicator label="Wczytywanie integracji" />
       ) : integrations.length === 0 ? (
         <div className="py-12">
           <h2 className="section-title">Brak integracji</h2>

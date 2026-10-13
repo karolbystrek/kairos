@@ -8,7 +8,7 @@ import useSWR, { unstable_serialize, useSWRConfig } from "swr";
 import useSWRSubscription from "swr/subscription";
 import { z } from "zod";
 
-import { OrderLoadingSkeleton } from "@/components/order-loading-skeleton";
+import { OrderLoadingIndicator } from "@/components/order-loading-indicator";
 import { CustomerToolbar } from "@/components/customer-toolbar";
 import {
   ApiError,
@@ -307,7 +307,7 @@ export function OrderTracker({
     return (
       <section className="flex flex-1 flex-col">
         <CustomerToolbar />
-        <OrderLoadingSkeleton label="Wczytywanie zamówienia" />
+        <OrderLoadingIndicator label="Wczytywanie zamówienia" />
       </section>
     );
   }
