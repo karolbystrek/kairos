@@ -1,54 +1,41 @@
 @import "tailwindcss";
+
+/* Only design tokens become colour utilities; Tailwind's palette would bypass them. */
+@theme inline {
+	--color-*: initial;
+	--color-black: var(--black);
+	--color-white: var(--white);
+}
+
 @import "@heroui/styles";
 
 @custom-variant dark (&:is(.dark *));
 
 @theme {
-	--font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
-	--font-brand: "SFMono-Regular", "SF Mono", ui-monospace, "Cascadia Mono", monospace;
-	--font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+	--font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+	--font-brand: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", monospace;
+	--font-mono: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", monospace;
 }
 
 :root,
 .light {
 	color-scheme: light;
-	--background: #ffffff;
-	--foreground: #111113;
-	--surface: #ffffff;
-	--surface-foreground: #111113;
-	--surface-secondary: #f5f5f7;
-	--surface-tertiary: #e8e8ed;
-	--background-secondary: #f5f5f7;
-	--background-tertiary: #e8e8ed;
-	--accent: #0071e3;
-	--accent-foreground: #ffffff;
-	--accent-hover: #0068d1;
-	--accent-soft: #e8f3ff;
-	--accent-soft-foreground: #0058ad;
-	--success: #0a84ff;
-	--invitation-status: #b97900;
-	--warning: #eab308;
-	--warning-foreground: #1c1c1e;
-	--warning-soft: #fff8d6;
-	--warning-soft-foreground: #8a6500;
-	--danger: #d70015;
-	--danger-foreground: #ffffff;
-	--danger-soft: #fff0f1;
-	--danger-soft-foreground: #a60010;
-	--separator: #d9d9de;
-	--text-secondary: #626268;
-	--selection: #e8f3ff;
-	--selection-hover: #d9ecff;
-	--muted: var(--text-secondary);
-	--default: #f5f5f7;
-	--default-foreground: #111113;
-	--border: var(--separator);
-	--field-background: #f5f5f7;
-	--field-foreground: #111113;
-	--field-placeholder: #74747a;
-	--overlay: #ffffff;
-	--overlay-foreground: #111113;
-	--segment: #ffffff;
+	/* Apple system colours: developer.apple.com/design/human-interface-guidelines/color#Specifications */
+	--white: #ffffff;
+	--black: #000000;
+	--system-background: var(--white);
+	--label: var(--black);
+	--secondary-label: rgb(60 60 67 / 60%);
+	--system-blue: #0088ff;
+	--system-green: #34c759;
+	--system-orange: #ff8d28;
+	--system-red: #ff383c;
+	--system-gray: #8e8e93;
+	--system-gray-2: #aeaeb2;
+	--system-gray-3: #c7c7cc;
+	--system-gray-4: #d1d1d6;
+	--system-gray-5: #e5e5ea;
+	--system-gray-6: #f2f2f7;
 
 	--space-1: 0.25rem;
 	--space-2: 0.5rem;
@@ -94,44 +81,101 @@
 
 .dark {
 	color-scheme: dark;
-	--background: #000000;
-	--foreground: #f5f5f7;
-	--surface: #000000;
-	--surface-foreground: #f5f5f7;
-	--surface-secondary: #1c1c1e;
-	--surface-tertiary: #2c2c2e;
-	--background-secondary: #1c1c1e;
-	--background-tertiary: #2c2c2e;
-	--accent: #0071e3;
-	--accent-foreground: #ffffff;
-	--accent-hover: #248fff;
-	--accent-soft: #082c50;
-	--accent-soft-foreground: #64b5ff;
-	--success: #0071e3;
-	--invitation-status: #ffd60a;
-	--warning: #ffd60a;
-	--warning-foreground: #1c1c1e;
-	--warning-soft: #332b08;
-	--warning-soft-foreground: #ffd60a;
-	--danger: #d70015;
-	--danger-foreground: #ffffff;
-	--danger-soft: #3a1110;
-	--danger-soft-foreground: #ff6961;
-	--separator: #38383a;
-	--text-secondary: #a1a1a6;
-	--selection: #082c50;
-	--selection-hover: #0d3b67;
-	--muted: var(--text-secondary);
-	--default: #1c1c1e;
-	--default-foreground: #f5f5f7;
-	--border: var(--separator);
-	--field-background: #2c2c2e;
-	--field-foreground: #f5f5f7;
-	--field-placeholder: #8e8e93;
-	--overlay: #1c1c1e;
-	--overlay-foreground: #f5f5f7;
-	--segment: #2c2c2e;
+	--system-background: var(--black);
+	--label: var(--white);
+	--secondary-label: rgb(235 235 245 / 60%);
+	--system-blue: #0091ff;
+	--system-green: #30d158;
+	--system-orange: #ff9230;
+	--system-red: #ff4245;
+	--system-gray: #8e8e93;
+	--system-gray-2: #636366;
+	--system-gray-3: #48484a;
+	--system-gray-4: #3a3a3c;
+	--system-gray-5: #2c2c2e;
+	--system-gray-6: #1c1c1e;
 	--shadow-floating: 0 18px 48px rgb(0 0 0 / 55%);
+}
+
+@media (prefers-contrast: more) {
+	:root,
+	.light {
+		--secondary-label: rgb(60 60 67 / 80%);
+		--system-blue: #1e6ef4;
+		--system-green: #008932;
+		--system-orange: #c55300;
+		--system-red: #e9152d;
+		--system-gray: #6c6c70;
+		--system-gray-2: #8e8e93;
+		--system-gray-3: #aeaeb2;
+		--system-gray-4: #bcbcc0;
+		--system-gray-5: #d8d8dc;
+		--system-gray-6: #ebebf0;
+	}
+
+	.dark {
+		--secondary-label: rgb(235 235 245 / 80%);
+		--system-blue: #5cb8ff;
+		--system-green: #4ad968;
+		--system-orange: #ffa056;
+		--system-red: #ff6165;
+		--system-gray: #aeaeb2;
+		--system-gray-2: #7c7c80;
+		--system-gray-3: #545456;
+		--system-gray-4: #444446;
+		--system-gray-5: #363638;
+		--system-gray-6: #242426;
+	}
+}
+
+/* Semantic tokens reference only primitives; declared on every theme scope so they resolve per theme. */
+:root,
+.light,
+.dark {
+	--background: var(--system-background);
+	--foreground: var(--label);
+	--surface: var(--system-background);
+	--surface-foreground: var(--label);
+	--surface-secondary: var(--system-gray-6);
+	--surface-tertiary: var(--system-gray-5);
+	--background-secondary: var(--system-gray-6);
+	--background-tertiary: var(--system-gray-5);
+	--accent: var(--system-blue);
+	--accent-foreground: var(--white);
+	--accent-soft: color-mix(in srgb, var(--system-blue) 15%, var(--system-background));
+	--accent-soft-foreground: var(--system-blue);
+	--success: var(--system-green);
+	--success-foreground: var(--white);
+	--invitation-status: var(--system-orange);
+	--warning: var(--system-orange);
+	--warning-foreground: var(--black);
+	--warning-soft: color-mix(in srgb, var(--system-orange) 15%, var(--system-background));
+	--warning-soft-foreground: var(--system-orange);
+	--danger: var(--system-red);
+	--danger-foreground: var(--white);
+	--danger-soft: color-mix(in srgb, var(--system-red) 15%, var(--system-background));
+	--danger-soft-foreground: var(--system-red);
+	--separator: var(--system-gray-4);
+	--text-secondary: var(--secondary-label);
+	--selection: color-mix(in srgb, var(--system-blue) 15%, var(--system-background));
+	--selection-hover: color-mix(in srgb, var(--system-blue) 25%, var(--system-background));
+	--muted: var(--text-secondary);
+	--default: var(--system-gray-6);
+	--default-foreground: var(--label);
+	--border: var(--separator);
+	--field-background: var(--system-gray-6);
+	--field-foreground: var(--label);
+	--field-placeholder: var(--system-gray);
+	--overlay: var(--system-background);
+	--overlay-foreground: var(--label);
+	--segment: var(--system-background);
+}
+
+/* Elevated surfaces lighten in dark mode, as on iOS. */
+.dark {
+	--field-background: var(--system-gray-5);
+	--overlay: var(--system-gray-6);
+	--segment: var(--system-gray-5);
 }
 
 html {
@@ -862,19 +906,6 @@ body {
 	.panel-navigation .tabs__indicator {
 		border-radius: calc(var(--radius-large) - 0.25rem);
 		box-shadow: none;
-	}
-}
-
-@media (prefers-contrast: more) {
-	:root,
-	.light {
-		--separator: #a8a8ad;
-		--text-secondary: #48484d;
-	}
-
-	.dark {
-		--separator: #6e6e73;
-		--text-secondary: #d1d1d6;
 	}
 }
 
