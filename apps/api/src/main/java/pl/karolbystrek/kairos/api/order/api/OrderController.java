@@ -62,7 +62,7 @@ class OrderController {
                 principal,
                 request.locationId(),
                 request.label(),
-                request.itemSelections()
+                request.orderItems()
         );
         return StaffOrderResponse.from(order);
     }

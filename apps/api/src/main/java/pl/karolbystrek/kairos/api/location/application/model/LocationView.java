@@ -9,6 +9,7 @@ import java.util.UUID;
 public record LocationView(
         UUID id,
         String name,
+        String timeZone,
         LocationStatus status,
         Instant createdAt,
         Instant updatedAt,
@@ -18,6 +19,7 @@ public record LocationView(
         return new LocationView(
             location.getId(),
             location.getName(),
+            location.getTimeZone(),
             location.getStatus(),
             location.getCreatedAt(),
             location.getUpdatedAt(),

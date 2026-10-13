@@ -51,7 +51,7 @@ electronic service.
 | Email, password hash (ZITADEL), role, assignments, status | Staff | Account and service | Art. 6(1)(b) |
 | Invitation email, role, location | Invited staff | Team onboarding | Art. 6(1)(b)/(f) |
 | Session and CSRF cookies, IP, security events | Staff | Sign-in and abuse protection | Art. 6(1)(b)/(f) |
-| Tracking reference, order label, status | Customers | Order tracking (restaurant's purpose) | Processor |
+| Tracking reference, order number and label, status | Customers | Order tracking (restaurant's purpose) | Processor |
 | Encrypted push subscription and enrollments | Customers who opt in | Status notifications | Processor |
 | Anonymous tenant/location/hour order counts and duration summaries | No user identities | Restaurant business measurements | Engineering data inventory; legal review remains required |
 | Approximate tenant/location/hour panel and review action counts | No user identities in aggregates | Feature usage | Engineering data inventory; legal review remains required |

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createOrderState } from "@/src/orders/order-state";
 
 const order = (status: "IN_PREPARATION" | "READY" | "COMPLETED" | "CANCELED") => ({
-  label: "A12", status, updatedAt: "2026-10-12T10:00:00Z",
+  number: 12, label: "A12", status, updatedAt: "2026-10-12T10:00:00Z",
 });
 
 describe("customer state reconciliation", () => {

@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { apiFetch, request } from "./api-fetch";
+import { browserTimeZone } from "./report-range";
 
 export const managedLocationNameSchema = z
   .string()
@@ -18,6 +19,7 @@ export const managedLocationNameSchema = z
 export const locationSchema = z.object({
   id: z.uuid(),
   name: z.string(),
+  timeZone: z.string(),
   status: z.enum(["ENABLED", "DISABLED"]),
   createdAt: z.iso.datetime({ offset: true }),
   updatedAt: z.iso.datetime({ offset: true }),
@@ -65,6 +67,8 @@ export function createLocation(
   return locationMutation("/api/locations/v1", "POST", {
     name: managedLocationNameSchema.parse(name),
     googleReviewUrl: googleReviewUrl?.trim() || null,
+    // The location's business day follows the creating browser's time zone.
+    timeZone: browserTimeZone(),
   });
 }
 

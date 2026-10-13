@@ -14,12 +14,13 @@ public record OrderStatusRedisMessage(
         @NonNull UUID trackingReference,
         @NonNull OrderStatus status,
         @NonNull Instant updatedAt,
-        @NonNull String label,
+        long number,
+        String label,
         ReviewInvitationView reviewInvitation,
         @NonNull UUID tenantId,
         @NonNull UUID locationId
 ) {
-    public static final int CURRENT_VERSION = 1;
+    public static final int CURRENT_VERSION = 2;
 
     public static OrderStatusRedisMessage from(OrderStatusChangedEvent event) {
         return new OrderStatusRedisMessage(
@@ -27,7 +28,7 @@ public record OrderStatusRedisMessage(
                 event.eventId(),
                 event.trackingReference(),
                 event.status(),
-                event.updatedAt(), event.label(), event.reviewInvitation(), event.tenantId(), event.locationId()
+                event.updatedAt(), event.number(), event.label(), event.reviewInvitation(), event.tenantId(), event.locationId()
         );
     }
 
@@ -36,6 +37,6 @@ public record OrderStatusRedisMessage(
     }
 
     public OrderStatusChangedEvent toApplicationEvent() {
-        return new OrderStatusChangedEvent(eventId, trackingReference, status, updatedAt, label, reviewInvitation, tenantId, locationId);
+        return new OrderStatusChangedEvent(eventId, trackingReference, status, updatedAt, number, label, reviewInvitation, tenantId, locationId);
     }
 }

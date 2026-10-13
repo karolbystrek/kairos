@@ -34,7 +34,7 @@ class OrderSseEmitterRegistryTests {
         var reference = UUID.randomUUID();
         var orders = mock(OrderService.class);
         when(orders.findTrackedOrder(reference)).thenReturn(new TrackedOrderView(
-                "42", OrderStatus.COMPLETED, Instant.parse("2026-07-24T12:00:00Z"), null));
+                42L, "42", OrderStatus.COMPLETED, Instant.parse("2026-07-24T12:00:00Z"), null));
 
         var emitter = (RecordingEmitter) registry.subscribe(reference, orders);
 
@@ -50,7 +50,7 @@ class OrderSseEmitterRegistryTests {
         var reference = UUID.randomUUID();
         var orders = mock(OrderService.class);
         when(orders.findTrackedOrder(reference)).thenReturn(new TrackedOrderView(
-                "42", OrderStatus.READY, Instant.parse("2026-07-24T12:00:00Z"), null));
+                42L, "42", OrderStatus.READY, Instant.parse("2026-07-24T12:00:00Z"), null));
         var first = (RecordingEmitter) registry.register(reference);
         var second = (RecordingEmitter) registry.register(reference);
 
@@ -73,7 +73,7 @@ class OrderSseEmitterRegistryTests {
                 UUID.randomUUID(),
                 matchingReference,
                 OrderStatus.READY,
-                Instant.parse("2026-07-24T12:00:00Z"), "42", null, UUID.randomUUID(), UUID.randomUUID());
+                Instant.parse("2026-07-24T12:00:00Z"), 42L, "42", null, UUID.randomUUID(), UUID.randomUUID());
         registry.forward(event);
 
         assertThat(first.events).containsExactly(CustomerOrderEventResponse.from(event));
@@ -98,7 +98,7 @@ class OrderSseEmitterRegistryTests {
                 UUID.randomUUID(),
                 matchingReference,
                 OrderStatus.CANCELED,
-                Instant.parse("2026-07-24T12:00:00Z"), "42", null, UUID.randomUUID(), UUID.randomUUID());
+                Instant.parse("2026-07-24T12:00:00Z"), 42L, "42", null, UUID.randomUUID(), UUID.randomUUID());
         registry.forward(event);
 
         assertThat(first.events).containsExactly(CustomerOrderEventResponse.from(event));
@@ -135,7 +135,7 @@ class OrderSseEmitterRegistryTests {
                 UUID.randomUUID(),
                 trackingReference,
                 OrderStatus.READY,
-                Instant.parse("2026-07-24T12:00:00Z"), "42", null, UUID.randomUUID(), UUID.randomUUID()));
+                Instant.parse("2026-07-24T12:00:00Z"), 42L, "42", null, UUID.randomUUID(), UUID.randomUUID()));
 
         assertThat(failingRegistry.connectionCount(trackingReference)).isZero();
         assertThat(emitter.completeWithErrorCalled).isFalse();
@@ -182,9 +182,9 @@ class OrderSseEmitterRegistryTests {
                 concurrent.register(blocked);
                 concurrent.register(other);
                 concurrent.forward(new OrderStatusChangedEvent(UUID.randomUUID(), blocked, OrderStatus.READY,
-                        Instant.parse("2026-07-24T12:00:00Z"), "41", null, UUID.randomUUID(), UUID.randomUUID()));
+                        Instant.parse("2026-07-24T12:00:00Z"), 42L, "41", null, UUID.randomUUID(), UUID.randomUUID()));
                 concurrent.forward(new OrderStatusChangedEvent(UUID.randomUUID(), other, OrderStatus.READY,
-                        Instant.parse("2026-07-24T12:00:00Z"), "42", null, UUID.randomUUID(), UUID.randomUUID()));
+                        Instant.parse("2026-07-24T12:00:00Z"), 42L, "42", null, UUID.randomUUID(), UUID.randomUUID()));
                 assertThat(delivered.await(5, TimeUnit.SECONDS)).isTrue();
             });
         } finally {

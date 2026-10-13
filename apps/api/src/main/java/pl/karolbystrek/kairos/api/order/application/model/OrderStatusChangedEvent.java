@@ -12,7 +12,8 @@ public record OrderStatusChangedEvent(
         @NonNull UUID trackingReference,
         @NonNull OrderStatus status,
         @NonNull Instant updatedAt,
-        @NonNull String label,
+        long number,
+        String label,
         ReviewInvitationView reviewInvitation,
         UUID tenantId,
         UUID locationId
@@ -20,12 +21,12 @@ public record OrderStatusChangedEvent(
     public static OrderStatusChangedEvent from(UUID eventId, CustomerOrder order) {
         var tracked = TrackedOrderView.from(order);
         return new OrderStatusChangedEvent(eventId, order.getTrackingReference(), order.getStatus(),
-                order.getUpdatedAt(), tracked.label(), tracked.reviewInvitation(),
+                order.getUpdatedAt(), tracked.number(), tracked.label(), tracked.reviewInvitation(),
                 order.getLocation().getTenantId(), order.getLocation().getId());
     }
 
     public static OrderStatusChangedEvent snapshot(UUID reference, TrackedOrderView order) {
         return new OrderStatusChangedEvent(UUID.randomUUID(), reference, order.status(), order.updatedAt(),
-                order.label(), order.reviewInvitation(), null, null);
+                order.number(), order.label(), order.reviewInvitation(), null, null);
     }
 }

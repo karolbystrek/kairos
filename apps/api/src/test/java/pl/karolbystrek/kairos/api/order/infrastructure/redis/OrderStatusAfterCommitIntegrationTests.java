@@ -63,7 +63,7 @@ class OrderStatusAfterCommitIntegrationTests {
                 UUID.fromString("00000000-0000-0000-0000-000000000002"),
                 UUID.fromString("00000000-0000-0000-0000-000000000001"),
                 OrderStatus.READY,
-                Instant.parse("2026-07-24T12:00:00Z"), "42", null, UUID.randomUUID(), UUID.randomUUID());
+                Instant.parse("2026-07-24T12:00:00Z"), 42L, "42", null, UUID.randomUUID(), UUID.randomUUID());
     }
 
     @Configuration(proxyBeanMethods = false)

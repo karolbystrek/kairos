@@ -103,7 +103,7 @@ class CommittedOrderWorkersIntegrationTests {
 
     private OrderStatusChangedEvent event(OrderStatus status) {
         return new OrderStatusChangedEvent(UUID.randomUUID(), UUID.randomUUID(), status,
-                Instant.now(), "Order", null, UUID.randomUUID(), UUID.randomUUID());
+                Instant.now(), 42L, "Order", null, UUID.randomUUID(), UUID.randomUUID());
     }
 
     @Configuration(proxyBeanMethods = false)

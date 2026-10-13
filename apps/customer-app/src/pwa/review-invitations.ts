@@ -26,6 +26,7 @@ export async function readInvitations() {
         if (await readTrackedOrder(trackingReference)) {
           await rememberTrackedOrder({
             trackingReference,
+            number: order.number,
             label: order.label,
             status: order.status,
             updatedAt: order.updatedAt,

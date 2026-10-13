@@ -61,12 +61,17 @@ class DatabaseIsolationIntegrationTests extends RedisListenerIsolatedIntegration
         var first = orders.createOrder(own.administrator(),own.firstLocationId(),null);
         var second = orders.createOrder(own.administrator(),own.secondLocationId(),null);
         var foreign = orders.createOrder(other.administrator(),other.firstLocationId(),null);
+        for (var order : List.of(first, foreign)) {
+            PostgresTestDatabase.ownerDatabase().update("INSERT INTO order_items(order_id,position,name,quantity) VALUES(?,0,'Burger',1)",order.id());
+        }
         assertThat(repository.findAll()).isEmpty();
         var transaction = new TransactionTemplate(transactionManager);
         transaction.executeWithoutResult(status -> {
             context.staff(own.manager());
             assertThat(repository.findAll()).extracting(CustomerOrder::getId).containsExactly(first.id());
             assertThat(runtime.queryForObject("SELECT count(*) FROM order_history",Integer.class)).isEqualTo(1);
+            assertThat(runtime.queryForObject("SELECT count(*) FROM order_items",Integer.class)).isEqualTo(1);
+            assertThat(runtime.queryForObject("SELECT count(*) FROM order_number_counters",Integer.class)).isEqualTo(1);
             assertThat(runtime.update("UPDATE orders SET status='READY' WHERE id=?",foreign.id())).isZero();
             assertThat(runtime.update("DELETE FROM orders WHERE id=?",second.id())).isZero();
         });
@@ -76,13 +81,14 @@ class DatabaseIsolationIntegrationTests extends RedisListenerIsolatedIntegration
         })).isInstanceOf(DataAccessException.class);
         assertThatThrownBy(() -> transaction.executeWithoutResult(status -> {
             context.staff(own.manager());
-            runtime.update("INSERT INTO orders(id,location_id,tracking_reference,label,status,created_at,updated_at) VALUES(?,?,?,'x','READY',now(),now())",
+            runtime.update("INSERT INTO orders(id,location_id,tracking_reference,number,business_date,status,created_at,updated_at) VALUES(?,?,?,1,CURRENT_DATE,'READY',now(),now())",
                     UUID.randomUUID(),own.secondLocationId(),UUID.randomUUID());
         })).isInstanceOf(DataAccessException.class);
         transaction.executeWithoutResult(status -> {
             context.trackedOrders(List.of(first.trackingReference()));
             assertThat(runtime.queryForObject("SELECT count(*) FROM orders",Integer.class)).isEqualTo(1);
             assertThat(runtime.queryForObject("SELECT count(*) FROM order_history",Integer.class)).isZero();
+            assertThat(runtime.queryForObject("SELECT count(*) FROM order_items",Integer.class)).isZero();
         });
         assertThatThrownBy(() -> transaction.executeWithoutResult(status -> {
             context.trackedOrders(List.of(first.trackingReference()));

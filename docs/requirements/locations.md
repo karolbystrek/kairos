@@ -14,7 +14,7 @@ administrator completes mandatory first-location onboarding. After that, its
 last non-archived location cannot be deleted. A tenant may have no enabled
 locations after all its locations are disabled.
 Only a tenant administrator manages the location lifecycle. The editable
-location properties are its display name and optional Google review link; its IANA time zone remains fixed at `UTC`. Enabled and disabled
+location properties are its display name and optional Google review link. Its IANA time zone is set at creation from the creating browser's time zone, shown read-only in location details, and defines the local business day used for [order numbers](orders-customer.md#31-order-lifecycle). Enabled and disabled
 location names are unique within a tenant after trimming and case
 normalization. An archived location releases its name for reuse.
 

@@ -24,7 +24,6 @@ CREATE TABLE locations
         TRIM(normalized_name) <> '' AND normalized_name = TRIM(normalized_name)
         ),
     CONSTRAINT locations_time_zone_not_blank_check CHECK (TRIM(time_zone) <> ''),
-    CONSTRAINT locations_time_zone_utc_check CHECK (time_zone = 'UTC'),
     CONSTRAINT locations_status_check CHECK (status IN ('ENABLED', 'DISABLED', 'ARCHIVED')),
     CONSTRAINT locations_archive_check CHECK (
         (status = 'ARCHIVED' AND archived_at IS NOT NULL)
@@ -402,13 +401,17 @@ CREATE TABLE orders
     id                           UUID PRIMARY KEY,
     location_id                  UUID                     NOT NULL REFERENCES locations (id),
     tracking_reference           UUID                     NOT NULL UNIQUE,
-    label                        VARCHAR(200)             NOT NULL,
+    number                       BIGINT                   NOT NULL,
+    business_date                DATE                     NOT NULL,
+    label                        VARCHAR(80),
     status                       VARCHAR(32)              NOT NULL,
     external_integration_id      UUID REFERENCES external_integrations (id),
     external_idempotency_key     VARCHAR(255),
     external_request_fingerprint VARCHAR(64),
     created_at                   TIMESTAMP WITH TIME ZONE NOT NULL,
     updated_at                   TIMESTAMP WITH TIME ZONE NOT NULL,
+    CONSTRAINT orders_number_check CHECK (number > 0),
+    CONSTRAINT orders_daily_number_key UNIQUE (location_id, business_date, number),
     CONSTRAINT orders_label_not_blank_check CHECK (TRIM(label) <> ''),
     CONSTRAINT orders_label_stripped_check CHECK (label = TRIM(label)),
     CONSTRAINT orders_status_check CHECK (
@@ -432,6 +435,30 @@ CREATE TABLE orders
 );
 
 CREATE INDEX orders_location_created_at_idx ON orders (location_id, created_at DESC);
+
+-- Selected menu items are a snapshot; later menu edits never change them.
+CREATE TABLE order_items
+(
+    order_id UUID        NOT NULL REFERENCES orders (id) ON DELETE CASCADE,
+    position INTEGER     NOT NULL,
+    name     VARCHAR(60) NOT NULL,
+    quantity INTEGER     NOT NULL,
+    PRIMARY KEY (order_id, position),
+    CONSTRAINT order_items_position_check CHECK (position >= 0),
+    CONSTRAINT order_items_name_not_blank_check CHECK (TRIM(name) <> ''),
+    CONSTRAINT order_items_name_stripped_check CHECK (name = TRIM(name)),
+    CONSTRAINT order_items_quantity_check CHECK (quantity BETWEEN 1 AND 99)
+);
+
+-- One row per location and local business day allocates daily order numbers atomically.
+CREATE TABLE order_number_counters
+(
+    location_id   UUID   NOT NULL REFERENCES locations (id) ON DELETE CASCADE,
+    business_date DATE   NOT NULL,
+    last_number   BIGINT NOT NULL,
+    PRIMARY KEY (location_id, business_date),
+    CONSTRAINT order_number_counters_last_number_check CHECK (last_number > 0)
+);
 
 CREATE TABLE order_history
 (
@@ -981,17 +1008,19 @@ CREATE POLICY scoped_select ON locations FOR SELECT USING (kairos_security.invit
 CREATE POLICY scoped_insert ON locations FOR INSERT WITH CHECK (kairos_security.staff_tenant(tenant_id,true));
 CREATE POLICY scoped_update ON locations FOR UPDATE USING (kairos_security.invitation_access(location=>id) OR kairos_security.staff_location(id) OR kairos_security.integration_location(id,false) OR EXISTS(SELECT 1 FROM orders o WHERE o.location_id=locations.id AND kairos_security.order_access(o.id,false,true))) WITH CHECK (kairos_security.staff_tenant(tenant_id,true));
 ALTER TABLE menus ENABLE ROW LEVEL SECURITY;
-CREATE POLICY scoped_select ON menus FOR SELECT USING (kairos_security.staff_tenant(tenant_id));
+CREATE POLICY scoped_select ON menus FOR SELECT USING (kairos_security.staff_tenant(tenant_id)
+    OR EXISTS(SELECT 1 FROM location_menus x WHERE x.menu_id=menus.id AND kairos_security.integration_location(x.location_id,false)));
 CREATE POLICY scoped_insert ON menus FOR INSERT WITH CHECK (kairos_security.staff_tenant(tenant_id,true));
 CREATE POLICY scoped_update ON menus FOR UPDATE USING (kairos_security.staff_tenant(tenant_id,true)) WITH CHECK (kairos_security.staff_tenant(tenant_id,true));
 CREATE POLICY scoped_delete ON menus FOR DELETE USING (kairos_security.staff_tenant(tenant_id,true));
 ALTER TABLE menu_items ENABLE ROW LEVEL SECURITY;
-CREATE POLICY scoped_select ON menu_items FOR SELECT USING (EXISTS(SELECT 1 FROM menus m WHERE m.id=menu_id AND kairos_security.staff_tenant(m.tenant_id)));
+CREATE POLICY scoped_select ON menu_items FOR SELECT USING (EXISTS(SELECT 1 FROM menus m WHERE m.id=menu_id AND kairos_security.staff_tenant(m.tenant_id))
+    OR EXISTS(SELECT 1 FROM location_menus x WHERE x.menu_id=menu_items.menu_id AND kairos_security.integration_location(x.location_id,false)));
 CREATE POLICY scoped_insert ON menu_items FOR INSERT WITH CHECK (EXISTS(SELECT 1 FROM menus m WHERE m.id=menu_id AND kairos_security.staff_tenant(m.tenant_id,true)));
 CREATE POLICY scoped_update ON menu_items FOR UPDATE USING (EXISTS(SELECT 1 FROM menus m WHERE m.id=menu_id AND kairos_security.staff_tenant(m.tenant_id,true))) WITH CHECK (EXISTS(SELECT 1 FROM menus m WHERE m.id=menu_id AND kairos_security.staff_tenant(m.tenant_id,true)));
 CREATE POLICY scoped_delete ON menu_items FOR DELETE USING (EXISTS(SELECT 1 FROM menus m WHERE m.id=menu_id AND kairos_security.staff_tenant(m.tenant_id,true)));
 ALTER TABLE location_menus ENABLE ROW LEVEL SECURITY;
-CREATE POLICY scoped_select ON location_menus FOR SELECT USING (kairos_security.staff_location(location_id));
+CREATE POLICY scoped_select ON location_menus FOR SELECT USING (kairos_security.staff_location(location_id) OR kairos_security.integration_location(location_id,false));
 CREATE POLICY scoped_insert ON location_menus FOR INSERT WITH CHECK (kairos_security.staff_location(location_id,true));
 CREATE POLICY scoped_update ON location_menus FOR UPDATE USING (kairos_security.staff_location(location_id,true)) WITH CHECK (kairos_security.staff_location(location_id,true));
 CREATE POLICY scoped_delete ON location_menus FOR DELETE USING (kairos_security.staff_location(location_id,true));
@@ -1058,6 +1087,13 @@ ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
 CREATE POLICY scoped_select ON orders FOR SELECT USING (kairos_security.order_access(id,false,true));
 CREATE POLICY scoped_insert ON orders FOR INSERT WITH CHECK (kairos_security.staff_location(location_id) OR kairos_security.integration_location(location_id,true));
 CREATE POLICY scoped_update ON orders FOR UPDATE USING (kairos_security.order_access(id,false,true)) WITH CHECK (kairos_security.staff_location(location_id) OR kairos_security.integration_location(location_id,true));
+ALTER TABLE order_items ENABLE ROW LEVEL SECURITY;
+CREATE POLICY scoped_select ON order_items FOR SELECT USING (kairos_security.order_access(order_id,false,false));
+CREATE POLICY scoped_insert ON order_items FOR INSERT WITH CHECK (kairos_security.order_access(order_id,true,false));
+ALTER TABLE order_number_counters ENABLE ROW LEVEL SECURITY;
+CREATE POLICY scoped_select ON order_number_counters FOR SELECT USING (kairos_security.staff_location(location_id) OR kairos_security.integration_location(location_id,true));
+CREATE POLICY scoped_insert ON order_number_counters FOR INSERT WITH CHECK (kairos_security.staff_location(location_id) OR kairos_security.integration_location(location_id,true));
+CREATE POLICY scoped_update ON order_number_counters FOR UPDATE USING (kairos_security.staff_location(location_id) OR kairos_security.integration_location(location_id,true)) WITH CHECK (kairos_security.staff_location(location_id) OR kairos_security.integration_location(location_id,true));
 ALTER TABLE order_history ENABLE ROW LEVEL SECURITY;
 CREATE POLICY scoped_select ON order_history FOR SELECT USING (kairos_security.order_access(order_id,false,false));
 CREATE POLICY scoped_insert ON order_history FOR INSERT WITH CHECK (kairos_security.order_access(order_id,true,false));
@@ -1478,7 +1514,7 @@ GRANT USAGE ON SCHEMA public,kairos_security TO "${runtimeUser}";
 GRANT SELECT,INSERT,UPDATE,DELETE ON tenants,locations,menus,menu_items,location_menus,accounts,location_assignments,account_invitations,
     external_integrations,api_keys,api_key_scopes,api_key_location_access,
     webhook_subscriptions,webhook_subscription_location_access,webhook_subscription_event_types,webhook_signing_secret_versions,
-    order_measurements,order_hourly_analytics,usage_hourly_analytics,platform_administrators,orders,order_history,order_outbox_events,webhook_deliveries,webhook_delivery_signing_versions,
+    order_measurements,order_hourly_analytics,usage_hourly_analytics,platform_administrators,orders,order_items,order_number_counters,order_history,order_outbox_events,webhook_deliveries,webhook_delivery_signing_versions,
     customer_push_subscriptions,customer_push_enrollments,customer_push_deliveries,email_deliveries,
     spring_session,spring_session_attributes TO "${runtimeUser}";
 GRANT SELECT ON order_hourly_reports TO "${runtimeUser}";

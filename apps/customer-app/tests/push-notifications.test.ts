@@ -65,6 +65,7 @@ beforeEach(async () => {
     notificationsEnabled: true,
   });
   await rememberTrackedOrder({
+    number: 12,
     label: "Private order label",
     status: "IN_PREPARATION",
     trackingReference: REFERENCE,
@@ -113,12 +114,14 @@ it.each(["READY", "COMPLETED", "CANCELED"] as const)(
   "shows %s once when REST stores the transition before Push arrives",
   async (status) => {
     await rememberTrackedOrder({
+      number: 12,
       label: "Private order label",
       status,
       trackingReference: REFERENCE,
       updatedAt: TRANSITION_TIME,
     });
     await rememberTrackedOrder({
+      number: 12,
       label: "Private order label",
       status,
       trackingReference: REFERENCE,
@@ -149,6 +152,7 @@ it.each(["COMPLETED", "CANCELED"] as const)(
   "suppresses an older Ready push after a %s REST transition",
   async (status) => {
     await rememberTrackedOrder({
+      number: 12,
       label: "Private order label",
       status,
       trackingReference: REFERENCE,
@@ -170,6 +174,7 @@ it("does not notify after opt-out", async () => {
 
 it("does not restore a pending final notification after disabling and re-enabling", async () => {
   await rememberTrackedOrder({
+    number: 12,
     label: "Private order label",
     status: "COMPLETED",
     trackingReference: REFERENCE,

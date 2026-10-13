@@ -11,6 +11,8 @@ import pl.karolbystrek.kairos.api.account.application.exception.StaffAccessDenie
 import pl.karolbystrek.kairos.api.account.application.model.StaffAccessContext;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
 import pl.karolbystrek.kairos.api.account.domain.assignment.AssignmentRole;
+import pl.karolbystrek.kairos.api.integration.application.model.ApiKeyPrincipal;
+import pl.karolbystrek.kairos.api.integration.domain.ApiKeyScope;
 import pl.karolbystrek.kairos.api.location.infrastructure.persistence.LocationRepository;
 import pl.karolbystrek.kairos.api.menu.application.exception.InvalidMenuRequestException;
 import pl.karolbystrek.kairos.api.menu.application.exception.MenuConflictException;
@@ -21,6 +23,7 @@ import pl.karolbystrek.kairos.api.menu.domain.Menu;
 import pl.karolbystrek.kairos.api.menu.domain.MenuDefinition;
 import pl.karolbystrek.kairos.api.menu.infrastructure.persistence.LocationMenuRepository;
 import pl.karolbystrek.kairos.api.menu.infrastructure.persistence.MenuRepository;
+import pl.karolbystrek.kairos.api.persistence.infrastructure.DatabaseAccessContext;
 
 import java.time.Clock;
 import java.util.List;
@@ -37,6 +40,7 @@ public class MenuService {
     private final LocationRepository locationRepository;
     private final StaffAccessService staffAccessService;
     private final Clock clock;
+    private final DatabaseAccessContext databaseAccess;
 
     @Transactional(readOnly = true)
     public List<MenuView> list(StaffPrincipal principal) {
@@ -108,6 +112,17 @@ public class MenuService {
     public Optional<MenuView> findLocationMenu(StaffPrincipal principal, UUID locationId) {
         var access = staffAccessService.resolve(principal);
         requireLocation(access, locationId);
+        return activeMenu(locationId).map(MenuView::from);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<MenuView> findLocationMenu(ApiKeyPrincipal principal, UUID locationId) {
+        databaseAccess.integration(principal);
+        principal.requireScope(ApiKeyScope.ORDERS_READ);
+        principal.requireLocationAccess(locationId);
+        locationRepository.findById(locationId)
+            .filter(location -> location.getTenantId().equals(principal.tenantId()) && !location.isArchived())
+            .orElseThrow(() -> new MenuNotFoundException("Location was not found"));
         return activeMenu(locationId).map(MenuView::from);
     }
 

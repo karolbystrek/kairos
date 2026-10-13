@@ -52,7 +52,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 const snapshot = (status: CustomerOrder["status"]) => ({
   eventId: "060f9c9d-1762-4fd2-a5a8-c11ddc00ff21", trackingReference: reference,
-  label: "A12", status, updatedAt: "2026-10-12T10:00:00Z", reviewInvitation: null,
+  number: 12, label: "A12", status, updatedAt: "2026-10-12T10:00:00Z", reviewInvitation: null,
 });
 beforeEach(() => {
   vi.clearAllMocks();

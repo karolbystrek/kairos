@@ -89,7 +89,7 @@ Details with a `fieldErrors` object mapping `email`, `password`, or
 `passwordConfirmation` to safe corrective messages; identity conflicts return
 `409` with an Email field error. First-location onboarding uses the ordinary
 `POST /api/locations/v1` contract and its name validation, enabled initial state,
-and fixed `UTC` time zone.
+and required IANA `timeZone`, taken from the browser and immutable afterwards.
 Anonymous login, local logout and both registration families remain CSRF
 protected. Current Account, password changes and global logout require eligible
 authentication. Successful password changes and logout return
@@ -183,10 +183,14 @@ and `PUT /api/locations/v1/{locationId}/menu`; the request carries a nullable
 
 Staff order listing accepts an optional `locationId` and active `status`.
 External listing accepts an opaque cursor plus optional authorized
-`locationId` and `status`. Order creation carries `locationId` and an optional
-custom label in its validated body; staff creation may instead carry `items`,
-each with a menu-item `name` and `quantity`. External creation additionally requires
-`Idempotency-Key`. Desired-state updates use idempotent `PUT`; a same-state
+`locationId` and `status`. Order creation carries `locationId`, an optional
+`label` and optional `items`, each with a menu-item `name` and `quantity`.
+External creation additionally requires `Idempotency-Key`. Staff, external and
+webhook order representations include the integer `number`, nullable `label`
+and `items`; customer representations include `number` and nullable `label`
+but not items. External integrations read a location's active menu through
+`GET /api/external/locations/v1/{locationId}/menu` with the staff menu
+response shape. Desired-state updates use idempotent `PUT`; a same-state
 request returns the unchanged representation without another history, customer
 event, or outbox event.
 

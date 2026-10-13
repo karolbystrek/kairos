@@ -6,7 +6,6 @@ import jakarta.validation.constraints.Size;
 public record LocationNameRequest(
     @NotBlank(message = "Location name is required")
     @Size(max = 120, message = "Location name must not exceed 120 characters")
-    String name,
-    @Size(max = 2048) String googleReviewUrl
+    String name
 ) {
 }

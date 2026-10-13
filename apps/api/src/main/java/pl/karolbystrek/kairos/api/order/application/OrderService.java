@@ -10,11 +10,10 @@ import pl.karolbystrek.kairos.api.location.domain.Location;
 import pl.karolbystrek.kairos.api.location.infrastructure.persistence.LocationRepository;
 import pl.karolbystrek.kairos.api.order.application.exception.InvalidOrderRequestException;
 import pl.karolbystrek.kairos.api.order.application.exception.ResourceNotFoundException;
-import pl.karolbystrek.kairos.api.menu.application.MenuService;
 import pl.karolbystrek.kairos.api.order.application.model.OrderInitiator;
-import pl.karolbystrek.kairos.api.order.application.model.OrderItemSelection;
 import pl.karolbystrek.kairos.api.order.application.model.StaffOrderView;
 import pl.karolbystrek.kairos.api.order.application.model.TrackedOrderView;
+import pl.karolbystrek.kairos.api.order.domain.OrderItem;
 import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
 import pl.karolbystrek.kairos.api.order.infrastructure.persistence.CustomerOrderRepository;
 import pl.karolbystrek.kairos.api.persistence.infrastructure.DatabaseAccessContext;
@@ -32,7 +31,6 @@ public class OrderService {
     private final CustomerOrderRepository orderRepository;
     private final StaffAccessService staffAccessService;
     private final OrderCommandService commandService;
-    private final MenuService menuService;
     private final Clock clock;
     private final DatabaseAccessContext databaseAccess;
 
@@ -72,29 +70,21 @@ public class OrderService {
     }
 
     @Transactional
-    public StaffOrderView createOrder(StaffPrincipal principal, UUID locationId, String customLabel) {
-        return createOrder(principal, locationId, customLabel, List.of());
+    public StaffOrderView createOrder(StaffPrincipal principal, UUID locationId, String label) {
+        return createOrder(principal, locationId, label, List.of());
     }
 
     @Transactional
     public StaffOrderView createOrder(
             StaffPrincipal principal,
             UUID locationId,
-            String customLabel,
-            List<OrderItemSelection> items
+            String label,
+            List<OrderItem> items
     ) {
         var access = staffAccessService.resolveForUpdate(principal);
         var location = requireAccessibleLocationForUpdate(access, locationId);
-        var now = clock.instant();
         var initiator = OrderInitiator.user(access.accountId());
-        if (items.isEmpty()) {
-            return StaffOrderView.from(commandService.create(location, customLabel, initiator, null, now));
-        }
-        if (customLabel != null) {
-            throw new InvalidOrderRequestException("Choose menu items or enter a custom label, not both");
-        }
-        var itemSummary = OrderItemSummary.describe(items, menuService.activeMenuItems(location.getId()));
-        return StaffOrderView.from(commandService.createWithItems(location, itemSummary, initiator, now));
+        return StaffOrderView.from(commandService.create(location, label, items, initiator, null, clock.instant()));
     }
 
     @Transactional

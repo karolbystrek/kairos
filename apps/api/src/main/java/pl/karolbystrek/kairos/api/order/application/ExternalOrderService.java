@@ -20,6 +20,7 @@ import pl.karolbystrek.kairos.api.order.application.model.ExternalOrderPage;
 import pl.karolbystrek.kairos.api.order.application.model.ExternalOrderView;
 import pl.karolbystrek.kairos.api.order.application.model.OrderInitiator;
 import pl.karolbystrek.kairos.api.order.domain.CustomerOrder;
+import pl.karolbystrek.kairos.api.order.domain.OrderItem;
 import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
 import pl.karolbystrek.kairos.api.order.infrastructure.persistence.CustomerOrderRepository;
 import pl.karolbystrek.kairos.api.persistence.infrastructure.DatabaseAccessContext;
@@ -30,8 +31,11 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -109,14 +113,15 @@ public class ExternalOrderService {
     public ExternalOrderCreationResult create(
             ApiKeyPrincipal principal,
             UUID locationId,
-            String customLabel,
+            String label,
+            List<OrderItem> items,
             String idempotencyKey
     ) {
         databaseAccess.integrationCommand(principal);
         principal.requireScope(ApiKeyScope.ORDERS_WRITE);
         principal.requireLocationAccess(locationId);
         var validatedIdempotencyKey = validateIdempotencyKey(idempotencyKey);
-        var requestFingerprint = creationFingerprint(locationId, customLabel);
+        var requestFingerprint = creationFingerprint(locationId, label, items);
         var location = locationRepository.findForUpdateById(locationId)
                 .filter(candidate -> candidate.getTenantId().equals(principal.tenantId()))
                 .filter(candidate -> candidate.isEnabled())
@@ -141,7 +146,8 @@ public class ExternalOrderService {
         var now = clock.instant();
         var order = commandService.create(
                 location,
-                customLabel,
+                label,
+                items,
                 integrationInitiator(principal),
                 new ExternalOrderCreation(
                         principal.integrationId(),
@@ -235,10 +241,14 @@ public class ExternalOrderService {
         return idempotencyKey;
     }
 
-    private static String creationFingerprint(UUID locationId, String customLabel) {
-        var canonicalInput = customLabel == null
-                ? locationId + "\nAUTO"
-                : locationId + "\nCUSTOM\n" + customLabel;
+    // Items are sorted by name so equal selections in a different order replay the same order.
+    private static String creationFingerprint(UUID locationId, String label, List<OrderItem> items) {
+        var canonicalItems = items.stream()
+                .sorted(Comparator.comparing(OrderItem::name))
+                .map(item -> item.quantity() + "\t" + item.name())
+                .collect(Collectors.joining("\n"));
+        var canonicalInput = locationId + "\n" + (label == null ? "NO_LABEL" : "LABEL\n" + label)
+                + "\nITEMS\n" + canonicalItems;
         try {
             var digest = MessageDigest.getInstance("SHA-256")
                     .digest(canonicalInput.getBytes(StandardCharsets.UTF_8));

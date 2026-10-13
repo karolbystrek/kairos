@@ -30,7 +30,7 @@ beforeEach(async () => {
 it("preserves review recovery after completion cleanup without changing the current destination", async () => {
   await rememberLastStableDestination({ kind: "home" });
   await updateNotificationMetadata({ notificationsEnabled: true, enrolledTrackingReferences: [reference] });
-  await rememberTrackedOrder({ trackingReference: reference, label: "42", status: "READY", updatedAt: "2026-10-10T10:00:00Z" });
+  await rememberTrackedOrder({ trackingReference: reference, number: 12, label: "42", status: "READY", updatedAt: "2026-10-10T10:00:00Z" });
   await applyPushTransition({ eventId, trackingReference: reference, status: "COMPLETED", transitionedAt: "2026-10-10T10:01:00Z" });
   expect(await readTrackedOrder(reference)).toBeNull();
   expect(await readReviewReferences()).toContain(reference);
@@ -51,12 +51,12 @@ it("recovers completion through REST on return and keeps invitations hidden unti
   const { readInvitations } = await import("@/src/pwa/review-invitations");
   const now = vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-10-10T10:00:00Z"));
   const fetchMock = vi.fn().mockImplementation(async () => new Response(JSON.stringify({
-    label: "42", status: "COMPLETED", updatedAt: "2026-10-10T10:00:00Z",
+    number: 12, label: "42", status: "COMPLETED", updatedAt: "2026-10-10T10:00:00Z",
     reviewInvitation: { dueAt: "2026-10-10T10:30:00Z", locationName: "Cafe", googleReviewUrl: "https://g.page/r/example/review" },
   })));
   vi.stubGlobal("fetch", fetchMock);
   try {
-    await rememberTrackedOrder({ trackingReference: reference, label: "42", status: "READY", updatedAt: "2026-10-10T09:55:00Z" });
+    await rememberTrackedOrder({ trackingReference: reference, number: 12, label: "42", status: "READY", updatedAt: "2026-10-10T09:55:00Z" });
     expect((await readInvitations())[0]?.isDue).toBe(false);
     expect(await readTrackedOrder(reference)).toBeNull();
     now.mockReturnValue(Date.parse("2026-10-10T10:30:00Z"));
@@ -76,7 +76,7 @@ it("suppresses revoked invitations and never shows cached eligibility when offli
   const { readInvitations } = await import("@/src/pwa/review-invitations");
   await rememberReviewReference(reference);
   const fetchMock = vi.fn().mockRejectedValueOnce(new Error("offline"))
-    .mockResolvedValue(new Response(JSON.stringify({ label: "42", status: "COMPLETED", updatedAt: "2026-10-10T10:00:00Z", reviewInvitation: null })));
+    .mockResolvedValue(new Response(JSON.stringify({ number: 12, label: "42", status: "COMPLETED", updatedAt: "2026-10-10T10:00:00Z", reviewInvitation: null })));
   vi.stubGlobal("fetch", fetchMock);
   try {
     expect(await readInvitations()).toEqual([]);

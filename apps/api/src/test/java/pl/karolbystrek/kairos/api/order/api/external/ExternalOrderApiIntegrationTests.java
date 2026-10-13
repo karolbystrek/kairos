@@ -96,6 +96,8 @@ class ExternalOrderApiIntegrationTests extends RedisListenerIsolatedIntegrationT
                 .content(creationBody);
         var response = mockMvc.perform(creation)
                 .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.number").value(1))
+                .andExpect(jsonPath("$.items").isEmpty())
                 .andExpect(jsonPath("$.status").value("IN_PREPARATION"))
                 .andReturn();
         var orderId = objectMapper.readTree(response.getResponse().getContentAsString())
@@ -159,6 +161,18 @@ class ExternalOrderApiIntegrationTests extends RedisListenerIsolatedIntegrationT
                                 "locationId",
                                 tenant.secondLocationId().toString()
                         )))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(authenticated(apiGet(
+                        "/external/locations/v1/{locationId}/menu",
+                        tenant.firstLocationId()
+                )))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.menu").doesNotExist());
+        mockMvc.perform(authenticated(apiGet(
+                        "/external/locations/v1/{locationId}/menu",
+                        tenant.secondLocationId()
+                )))
                 .andExpect(status().isForbidden());
     }
 

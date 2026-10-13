@@ -48,7 +48,13 @@ order for an exact replay or `409` when the same value is reused with different
 creation input. The value is opaque, case-sensitive, and limited to 255 UTF-8
 bytes. Lists use an opaque cursor over descending creation time and order
 identity, default to 50 results, and accept at most 100. A same-state status
-request changes no history and emits no event.
+request changes no history and emits no event. Creation accepts the same
+optional label and [menu items](menus.md#ordering-from-a-menu) as staff
+creation; items are part of the replay comparison. Every external order
+representation carries its daily number, nullable label and items. A key with
+`orders:read` for a location can read that location's active menu, so the
+integration can choose valid item names; locations outside the key return `403`
+as for other location-scoped requests.
 
 Webhook subscriptions independently select at least one location and supported
 order event type. Creation starts with every supported event type selected so

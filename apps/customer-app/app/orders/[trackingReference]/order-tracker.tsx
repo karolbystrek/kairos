@@ -217,6 +217,7 @@ export function OrderTracker({
     previousTransition.current = transitionIdentity;
     void rememberTrackedOrder({
       trackingReference,
+      number: order.number,
       label: order.label,
       status: order.status,
       updatedAt: order.updatedAt,
@@ -366,9 +367,14 @@ export function OrderTracker({
         aria-live="polite"
         className="flex flex-1 flex-col items-center justify-center py-12 text-center sm:py-16"
       >
-        <p className="max-w-md break-words text-sm secondary-text">
-          Zamówienie {displayedOrder.label}
+        <p className="text-4xl font-semibold tabular-nums">
+          <span className="sr-only">Zamówienie </span>#{displayedOrder.number}
         </p>
+        {displayedOrder.label && (
+          <p className="mt-1 max-w-md break-words text-sm secondary-text">
+            {displayedOrder.label}
+          </p>
+        )}
         <h1 className="status-title mt-4 max-w-[14ch]">
           {statusCopy[displayedOrder.status]}
         </h1>

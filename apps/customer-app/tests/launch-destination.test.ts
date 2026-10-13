@@ -49,7 +49,7 @@ describe("customer launch restoration", () => {
         trackingReference: TRACKING_REFERENCE,
       });
       await rememberTrackedOrder({
-        label: "A12",
+        number: 12, label: "A12",
         status,
         trackingReference: TRACKING_REFERENCE,
         updatedAt: "2026-10-09T20:00:00Z",

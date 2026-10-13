@@ -16,7 +16,7 @@ import pl.karolbystrek.kairos.api.menu.application.exception.MenuNotFoundExcepti
 import pl.karolbystrek.kairos.api.menu.application.model.MenuView;
 import pl.karolbystrek.kairos.api.order.application.OrderService;
 import pl.karolbystrek.kairos.api.order.application.exception.InvalidOrderRequestException;
-import pl.karolbystrek.kairos.api.order.application.model.OrderItemSelection;
+import pl.karolbystrek.kairos.api.order.domain.OrderItem;
 import pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase;
 import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
 
@@ -125,42 +125,38 @@ class MenuServiceIntegrationTests extends RedisListenerIsolatedIntegrationTest {
     }
 
     @Test
-    void ordersStoreChosenMenuItemsOnlyInTheirImmutableLabel() {
+    void ordersStoreChosenMenuItemsAsASnapshotBesideTheirLabel() {
         var tenantId = insertTenant();
         var administrator = insertAccount(tenantId, TenantRole.ADMIN);
         var kitchen = locationService.create(administrator, "Kitchen");
         var operator = insertMember(tenantId, kitchen.id(), AssignmentRole.OPERATOR);
-        var items = List.of(new OrderItemSelection("Frytki", 1), new OrderItemSelection("Burger", 2));
+        var items = List.of(new OrderItem("Frytki", 1), new OrderItem("Burger", 2));
 
         assertThatThrownBy(() -> orderService.createOrder(operator, kitchen.id(), null, items))
             .isInstanceOf(InvalidOrderRequestException.class);
         var lunch = menuService.create(administrator, "Lunch", List.of("Burger", "Frytki", "Cola"));
         menuService.selectLocationMenu(administrator, kitchen.id(), lunch.id());
 
-        var first = orderService.createOrder(operator, kitchen.id(), null, items);
-        assertThat(first.label()).isEqualTo("1 · 2× Burger, Frytki");
-        assertThat(orderService.createOrder(operator, kitchen.id(), "Stolik 4", List.of()).label())
-            .isEqualTo("Stolik 4");
-        assertThatThrownBy(() -> orderService.createOrder(operator, kitchen.id(), "Stolik 4", items))
-            .isInstanceOf(InvalidOrderRequestException.class);
+        var first = orderService.createOrder(operator, kitchen.id(), "Stolik 4", items);
+        assertThat(first.label()).isEqualTo("Stolik 4");
+        assertThat(first.items()).isEqualTo(items);
+        var second = orderService.createOrder(operator, kitchen.id(), null, List.of());
+        assertThat(second.label()).isNull();
+        assertThat(second.items()).isEmpty();
+        assertThat(List.of(first.number(), second.number())).containsExactly(1L, 2L);
         assertThatThrownBy(() -> orderService.createOrder(
-            operator, kitchen.id(), null, List.of(new OrderItemSelection("Pizza", 1))
+            operator, kitchen.id(), null, List.of(new OrderItem("Pizza", 1))
         )).isInstanceOf(InvalidOrderRequestException.class);
         assertThatThrownBy(() -> orderService.createOrder(
-            operator, kitchen.id(), null, List.of(new OrderItemSelection("Cola", 1), new OrderItemSelection("Cola", 2))
-        )).isInstanceOf(InvalidOrderRequestException.class);
-
-        var longItems = List.of("A".repeat(60), "B".repeat(60), "C".repeat(60), "D".repeat(60));
-        var large = menuService.create(administrator, "Large", longItems);
-        menuService.selectLocationMenu(administrator, kitchen.id(), large.id());
-        assertThatThrownBy(() -> orderService.createOrder(
-            operator, kitchen.id(), null, longItems.stream().map(item -> new OrderItemSelection(item, 1)).toList()
+            operator, kitchen.id(), null, List.of(new OrderItem("Cola", 1), new OrderItem("Cola", 2))
         )).isInstanceOf(InvalidOrderRequestException.class);
 
         menuService.update(administrator, lunch.id(), "Lunch", List.of("Zupa"));
-        assertThat(jdbcTemplate.queryForObject(
-            "SELECT label FROM orders WHERE id = ?", String.class, first.id()
-        )).isEqualTo("1 · 2× Burger, Frytki");
+        assertThat(jdbcTemplate.queryForList(
+            "SELECT name || ':' || quantity FROM order_items WHERE order_id = ? ORDER BY position",
+            String.class,
+            first.id()
+        )).containsExactly("Frytki:1", "Burger:2");
     }
 
     private UUID insertTenant() {

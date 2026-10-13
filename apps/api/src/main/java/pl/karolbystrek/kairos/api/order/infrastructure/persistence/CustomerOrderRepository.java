@@ -4,10 +4,11 @@ import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
 import pl.karolbystrek.kairos.api.order.domain.CustomerOrder;
 import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
 
-import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -36,11 +37,15 @@ public interface CustomerOrderRepository
             String idempotencyKey
     );
 
-    long countByLocationIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
-            UUID locationId,
-            Instant startInclusive,
-            Instant endExclusive
-    );
+    // The counter row lock serializes concurrent creation for one location and business day.
+    @Query(value = """
+            INSERT INTO order_number_counters (location_id, business_date, last_number)
+            VALUES (:locationId, :businessDate, 1)
+            ON CONFLICT (location_id, business_date)
+            DO UPDATE SET last_number = order_number_counters.last_number + 1
+            RETURNING last_number
+            """, nativeQuery = true)
+    long allocateNumber(UUID locationId, LocalDate businessDate);
 
     boolean existsByLocationIdAndStatusIn(
         UUID locationId,
