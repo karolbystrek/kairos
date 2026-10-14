@@ -169,6 +169,7 @@
 	--overlay: var(--system-background);
 	--overlay-foreground: var(--label);
 	--segment: var(--system-background);
+	--toast: var(--overlay);
 }
 
 /* Elevated surfaces lighten in dark mode, as on iOS. */
@@ -176,6 +177,7 @@
 	--field-background: var(--system-gray-5);
 	--overlay: var(--system-gray-6);
 	--segment: var(--system-gray-5);
+	--toast: var(--system-gray-5);
 }
 
 /* Keep utility classes and HeroUI surfaces on the same rectangular radius. */
@@ -339,6 +341,16 @@ body {
 	.panel-popup.panel-popup--xl {
 		width: min(48rem, 100vw - 5rem);
 		max-width: none;
+	}
+}
+
+/* The scrolling body spans the dialog's side padding, so its scrollbar sits at the edge, not over content.
+   Layered so per-popup padding utilities still apply. */
+@layer components {
+	.modal__body--scroll-inside {
+		margin-inline: calc(-1 * var(--space-6));
+		padding-inline: var(--space-6);
+		scrollbar-gutter: stable;
 	}
 }
 
@@ -770,6 +782,12 @@ body {
 	box-shadow: none;
 }
 
+/* Toasts float over the page, so they need an edge the page background lacks. */
+.toast {
+	background: var(--toast);
+	border: 1px solid var(--separator);
+}
+
 .toast-region--top {
 	top: max(1rem, env(safe-area-inset-top));
 }
@@ -1088,6 +1106,20 @@ body {
 
   :is(.modal__footer, .alert-dialog__footer, .drawer__footer) > .button {
     width: 100%;
+  }
+}
+
+/* Two actions share one row at every width, as in Apple's two-button alerts. */
+:is(.modal__footer, .alert-dialog__footer, .drawer__footer):has(> .button:nth-child(2):last-child) {
+  flex-direction: row;
+  flex-wrap: nowrap;
+}
+
+@media (max-width: 39.999rem) {
+  :is(.modal__footer, .alert-dialog__footer, .drawer__footer):has(> .button:nth-child(2):last-child) > .button {
+    width: auto;
+    flex: 1 1 auto;
+    white-space: nowrap;
   }
 }
 

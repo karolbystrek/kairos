@@ -382,7 +382,7 @@ export function LocationManagement({
             >
               <PanelPopup.Body className="pb-6 pt-12">
                 <PanelDetailHeader
-                  eyebrow="Lokal"
+                  kind="Lokal"
                   status={{
                     isEnabled: selectedLocation.status === "ENABLED",
                     label:
@@ -523,8 +523,8 @@ export function LocationManagement({
                 {canManageLocations && (
                   <p className="mt-4 text-sm text-muted">
                     {selectedLocation.status === "ENABLED"
-                      ? "Wyłączenie wyłączy i wyloguje przypisane konta oraz unieważni zaproszenia. Najpierw zakończ aktywne zamówienia."
-                      : "Włączenie obejmie wszystkie przypisane konta, także wyłączone osobno. Usunięcie lokalu i kont jest nieodwracalne. Historia zamówień pozostanie dostępna."}
+                      ? "Wyłączenie wyloguje przypisane konta i unieważni zaproszenia."
+                      : "Usunięcia lokalu i jego kont nie można cofnąć."}
                   </p>
                 )}
                 {actionError !== undefined && (
@@ -562,10 +562,6 @@ export function LocationManagement({
                     </Alert.Content>
                   </Alert>
                 )}
-                <p className="mt-6 text-sm">
-                  <span className="secondary-text">Strefa czasowa: </span>
-                  {selectedLocation.timeZone}
-                </p>
                 <LocationMenuSelect
                   accountId={accountId}
                   location={selectedLocation}
@@ -582,16 +578,14 @@ export function LocationManagement({
                       label="Link do opinii Google"
                       maxLength={2048}
                       name="google-review-url"
-                      placeholder="Link do opinii Google (puste pole wyłącza zaproszenia)"
                       value={
                         editReviewUrl ?? selectedLocation.googleReviewUrl ?? ""
                       }
                       onChange={setEditReviewUrl}
                     />
                     <p className="secondary-text">
-                      Zaproszenie do opinii pokazujemy klientowi raz w
-                      aplikacji, po odebraniu zamówienia, bez powiadomienia
-                      push.
+                      Klient zobaczy prośbę o opinię po odebraniu zamówienia.
+                      Puste pole wyłącza prośby.
                     </p>
                     <Button
                       className="self-start"

@@ -152,7 +152,7 @@ function IntegrationDetails({
       )}
 
       <PanelDetailHeader
-        eyebrow="Integracja"
+        kind="Integracja"
         status={{
           isEnabled: integration.status === "ENABLED",
           label: integration.status === "ENABLED" ? "Włączona" : "Wyłączona",

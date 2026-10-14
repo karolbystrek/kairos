@@ -822,7 +822,6 @@ export function OrderManagement({
                   label="Etykieta zamówienia (opcjonalnie)"
                   maxLength={maximumOrderLabelLength}
                   name="order-label"
-                  placeholder="Etykieta zamówienia (opcjonalnie)"
                   value={label}
                   onChange={(value) => {
                     setLabel(value);
@@ -987,12 +986,8 @@ export function OrderManagement({
           )}
         </PanelPopup.Body>
         <PanelPopup.Footer>
-          <Button
-            aria-label="Zachowaj zamówienie"
-            slot="close"
-            variant="tertiary"
-          >
-            Zachowaj zamówienie
+          <Button slot="close" variant="tertiary">
+            Wróć
           </Button>
           <Button
             isPending={isUpdatingOrder}
