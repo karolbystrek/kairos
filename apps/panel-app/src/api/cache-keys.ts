@@ -4,9 +4,6 @@ export const currentAccountKey = ["authentication", "current-account"] as const;
 export const staffLocationsKey = (accountId: string) =>
   [staffCachePrefix, accountId, "locations"] as const;
 
-export const staffMenusKey = (accountId: string) =>
-  [staffCachePrefix, accountId, "menus"] as const;
-
 export const staffLocationMenuKey = (accountId: string, locationId: string) =>
   [staffCachePrefix, accountId, "location-menu", locationId] as const;
 

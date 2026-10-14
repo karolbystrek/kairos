@@ -1,8 +1,12 @@
 package pl.karolbystrek.kairos.api.menu.domain;
 
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OrderColumn;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -10,6 +14,8 @@ import lombok.NoArgsConstructor;
 import lombok.NonNull;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -25,33 +31,46 @@ public class LocationMenu {
     @Column(name = "tenant_id", nullable = false)
     private UUID tenantId;
 
-    @Column(name = "menu_id", nullable = false)
-    private UUID menuId;
+    @ElementCollection
+    @CollectionTable(name = "menu_items", joinColumns = @JoinColumn(name = "location_id"))
+    @OrderColumn(name = "position")
+    @Column(name = "name", nullable = false, length = 60)
+    private List<String> items = new ArrayList<>();
+
+    @Column(name = "created_at", nullable = false)
+    private Instant createdAt;
 
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    public static LocationMenu assign(
+    public static LocationMenu create(
         @NonNull UUID locationId,
-        @NonNull Menu menu,
+        @NonNull UUID tenantId,
+        @NonNull MenuDefinition definition,
         @NonNull Instant now
     ) {
-        var locationMenu = new LocationMenu();
-        locationMenu.locationId = locationId;
-        locationMenu.tenantId = menu.getTenantId();
-        locationMenu.menuId = menu.getId();
-        locationMenu.updatedAt = now;
-        return locationMenu;
+        var menu = new LocationMenu();
+        menu.locationId = locationId;
+        menu.tenantId = tenantId;
+        menu.createdAt = now;
+        menu.define(definition, now);
+        return menu;
     }
 
-    public void change(@NonNull Menu menu, @NonNull Instant now) {
-        if (!tenantId.equals(menu.getTenantId())) {
-            throw new IllegalArgumentException("A location can use only its own tenant's menu");
-        }
-        if (menuId.equals(menu.getId())) {
+    public void update(@NonNull MenuDefinition definition, @NonNull Instant now) {
+        if (items.equals(definition.items())) {
             return;
         }
-        menuId = menu.getId();
+        define(definition, now);
+    }
+
+    public List<String> getItems() {
+        return List.copyOf(items);
+    }
+
+    private void define(MenuDefinition definition, Instant now) {
+        items.clear();
+        items.addAll(definition.items());
         updatedAt = now;
     }
 }

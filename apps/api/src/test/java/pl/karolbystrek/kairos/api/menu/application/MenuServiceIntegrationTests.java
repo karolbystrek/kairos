@@ -11,7 +11,6 @@ import pl.karolbystrek.kairos.api.account.domain.assignment.AssignmentRole;
 import pl.karolbystrek.kairos.api.location.application.LocationService;
 import pl.karolbystrek.kairos.api.location.domain.LocationStatus;
 import pl.karolbystrek.kairos.api.menu.application.exception.InvalidMenuRequestException;
-import pl.karolbystrek.kairos.api.menu.application.exception.MenuConflictException;
 import pl.karolbystrek.kairos.api.menu.application.exception.MenuNotFoundException;
 import pl.karolbystrek.kairos.api.menu.application.model.MenuView;
 import pl.karolbystrek.kairos.api.order.application.OrderService;
@@ -43,85 +42,51 @@ class MenuServiceIntegrationTests extends RedisListenerIsolatedIntegrationTest {
     private final JdbcTemplate jdbcTemplate = PostgresTestDatabase.ownerDatabase();
 
     @Test
-    void onlyTheOwningAdministratorManagesMenusAndEveryTenantMemberCanReadThem() {
-        var tenantId = insertTenant();
-        var administrator = insertAccount(tenantId, TenantRole.ADMIN);
-        var location = locationService.create(administrator, "Kitchen");
-        var manager = insertMember(tenantId, location.id(), AssignmentRole.MANAGER);
-        var operator = insertMember(tenantId, location.id(), AssignmentRole.OPERATOR);
-        var otherAdministrator = insertAccount(insertTenant(), TenantRole.ADMIN);
-
-        var lunch = menuService.create(administrator, "  Lunch  ", List.of(" Burger ", "Frytki"));
-        assertThat(lunch.name()).isEqualTo("Lunch");
-        assertThat(lunch.items()).containsExactly("Burger", "Frytki");
-        assertThatThrownBy(() -> menuService.create(administrator, "lunch", List.of("Zupa")))
-            .isInstanceOf(MenuConflictException.class);
-        for (var invalidItems : List.of(List.<String>of(), List.of("Burger", "burger"), List.of("Line\u2028break"))) {
-            assertThatThrownBy(() -> menuService.create(administrator, "Invalid", invalidItems))
-                .isInstanceOf(InvalidMenuRequestException.class);
-        }
-        for (var member : List.of(manager, operator)) {
-            assertThatThrownBy(() -> menuService.create(member, "Breakfast", List.of("Jajecznica")))
-                .isInstanceOf(StaffAccessDeniedException.class);
-            assertThatThrownBy(() -> menuService.update(member, lunch.id(), "Lunch", List.of("Zupa")))
-                .isInstanceOf(StaffAccessDeniedException.class);
-            assertThat(menuService.list(member)).extracting(MenuView::id).containsExactly(lunch.id());
-        }
-        assertThat(menuService.list(otherAdministrator)).isEmpty();
-        assertThatThrownBy(() -> menuService.update(otherAdministrator, lunch.id(), "Lunch", List.of("Zupa")))
-            .isInstanceOf(MenuNotFoundException.class);
-        assertThatThrownBy(() -> menuService.delete(otherAdministrator, lunch.id()))
-            .isInstanceOf(MenuNotFoundException.class);
-
-        var updated = menuService.update(administrator, lunch.id(), "Lunch", List.of("Zupa", "Burger"));
-        assertThat(updated.items()).containsExactly("Zupa", "Burger");
-        menuService.delete(administrator, lunch.id());
-        assertThat(menuService.list(administrator)).isEmpty();
-        assertThat(jdbcTemplate.queryForObject(
-            "SELECT COUNT(*) FROM menu_items WHERE menu_id = ?", Integer.class, lunch.id()
-        )).isZero();
-    }
-
-    @Test
-    void managersChooseOnlyTheirLocationMenuAndAMenuInUseCannotBeDeleted() {
+    void administratorsAndTheLocationManagerOwnIndependentLocationMenus() {
         var tenantId = insertTenant();
         var administrator = insertAccount(tenantId, TenantRole.ADMIN);
         var kitchen = locationService.create(administrator, "Kitchen");
         var bar = locationService.create(administrator, "Bar");
         var manager = insertMember(tenantId, kitchen.id(), AssignmentRole.MANAGER);
         var operator = insertMember(tenantId, kitchen.id(), AssignmentRole.OPERATOR);
-        var lunch = menuService.create(administrator, "Lunch", List.of("Burger"));
-        var dinner = menuService.create(administrator, "Dinner", List.of("Stek"));
         var foreignAdministrator = insertAccount(insertTenant(), TenantRole.ADMIN);
-        var foreignMenu = menuService.create(foreignAdministrator, "Foreign", List.of("Sushi"));
 
         assertThat(menuService.findLocationMenu(operator, kitchen.id())).isEmpty();
-        assertThat(menuService.selectLocationMenu(manager, kitchen.id(), lunch.id()))
-            .map(MenuView::id).contains(lunch.id());
+        assertThat(menuService.saveLocationMenu(manager, kitchen.id(), List.of(" Burger ", "Frytki")).items())
+            .containsExactly("Burger", "Frytki");
         assertThat(menuService.findLocationMenu(operator, kitchen.id()))
-            .map(MenuView::id).contains(lunch.id());
-        assertThatThrownBy(() -> menuService.selectLocationMenu(manager, bar.id(), lunch.id()))
-            .isInstanceOf(MenuNotFoundException.class);
-        assertThatThrownBy(() -> menuService.selectLocationMenu(operator, kitchen.id(), dinner.id()))
+            .map(MenuView::items).contains(List.of("Burger", "Frytki"));
+        for (var invalidItems : List.of(List.<String>of(), List.of("Burger", "burger"), List.of("Line break"))) {
+            assertThatThrownBy(() -> menuService.saveLocationMenu(manager, kitchen.id(), invalidItems))
+                .isInstanceOf(InvalidMenuRequestException.class);
+        }
+        assertThatThrownBy(() -> menuService.saveLocationMenu(operator, kitchen.id(), List.of("Zupa")))
             .isInstanceOf(StaffAccessDeniedException.class);
-        assertThatThrownBy(() -> menuService.selectLocationMenu(manager, kitchen.id(), foreignMenu.id()))
+        assertThatThrownBy(() -> menuService.deleteLocationMenu(operator, kitchen.id()))
+            .isInstanceOf(StaffAccessDeniedException.class);
+        assertThatThrownBy(() -> menuService.saveLocationMenu(manager, bar.id(), List.of("Piwo")))
+            .isInstanceOf(MenuNotFoundException.class);
+        assertThatThrownBy(() -> menuService.saveLocationMenu(foreignAdministrator, kitchen.id(), List.of("Sushi")))
             .isInstanceOf(MenuNotFoundException.class);
         assertThatThrownBy(() -> menuService.findLocationMenu(foreignAdministrator, kitchen.id()))
             .isInstanceOf(MenuNotFoundException.class);
 
-        menuService.selectLocationMenu(administrator, bar.id(), lunch.id());
-        menuService.selectLocationMenu(manager, kitchen.id(), dinner.id());
-        assertThatThrownBy(() -> menuService.delete(administrator, lunch.id()))
-            .isInstanceOf(MenuConflictException.class)
-            .extracting(exception -> ((MenuConflictException) exception).getReason())
-            .isEqualTo(MenuConflictException.Reason.IN_USE);
+        // A copied menu is independent of its source.
+        var copied = menuService.findLocationMenu(administrator, kitchen.id()).orElseThrow().items();
+        menuService.saveLocationMenu(administrator, bar.id(), copied);
+        menuService.saveLocationMenu(manager, kitchen.id(), List.of("Zupa", "Burger"));
+        assertThat(menuService.findLocationMenu(administrator, bar.id()))
+            .map(MenuView::items).contains(List.of("Burger", "Frytki"));
+
+        menuService.deleteLocationMenu(manager, kitchen.id());
+        assertThat(menuService.findLocationMenu(operator, kitchen.id())).isEmpty();
+        menuService.deleteLocationMenu(manager, kitchen.id());
 
         locationService.updateStatus(administrator, bar.id(), LocationStatus.DISABLED);
         locationService.delete(administrator, bar.id());
-        menuService.delete(administrator, lunch.id());
-        assertThat(menuService.selectLocationMenu(manager, kitchen.id(), null)).isEmpty();
-        menuService.delete(administrator, dinner.id());
-        assertThat(menuService.list(administrator)).isEmpty();
+        assertThat(jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM menu_items WHERE location_id IN (?, ?)", Integer.class, kitchen.id(), bar.id()
+        )).isZero();
     }
 
     @Test
@@ -134,8 +99,7 @@ class MenuServiceIntegrationTests extends RedisListenerIsolatedIntegrationTest {
 
         assertThatThrownBy(() -> orderService.createOrder(operator, kitchen.id(), null, items))
             .isInstanceOf(InvalidOrderRequestException.class);
-        var lunch = menuService.create(administrator, "Lunch", List.of("Burger", "Frytki", "Cola"));
-        menuService.selectLocationMenu(administrator, kitchen.id(), lunch.id());
+        menuService.saveLocationMenu(administrator, kitchen.id(), List.of("Burger", "Frytki", "Cola"));
 
         var first = orderService.createOrder(operator, kitchen.id(), "Stolik 4", items);
         assertThat(first.label()).isEqualTo("Stolik 4");
@@ -151,7 +115,8 @@ class MenuServiceIntegrationTests extends RedisListenerIsolatedIntegrationTest {
             operator, kitchen.id(), null, List.of(new OrderItem("Cola", 1), new OrderItem("Cola", 2))
         )).isInstanceOf(InvalidOrderRequestException.class);
 
-        menuService.update(administrator, lunch.id(), "Lunch", List.of("Zupa"));
+        menuService.saveLocationMenu(administrator, kitchen.id(), List.of("Zupa"));
+        menuService.deleteLocationMenu(administrator, kitchen.id());
         assertThat(jdbcTemplate.queryForList(
             "SELECT name || ':' || quantity FROM order_items WHERE order_id = ? ORDER BY position",
             String.class,

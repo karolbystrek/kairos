@@ -2,7 +2,7 @@
 
 import type { FormEvent } from "react";
 
-import { Alert, Button, ListBox, Tooltip, toast } from "@heroui/react";
+import { Alert, Button, Tooltip, toast } from "@heroui/react";
 import {
   ArrowUpRightIcon,
   ProhibitIcon as DisableIcon,
@@ -16,18 +16,15 @@ import { ZodError } from "zod";
 
 import { HoldToConfirmButton } from "@/components/hold-to-confirm-button";
 import { PanelPopup } from "@/components/panel-popup";
-import { FormSelect, FormTextField } from "@/components/form-controls";
+import { FormTextField } from "@/components/form-controls";
 import { LocationCreationModal } from "@/components/location-creation-modal";
 import { LoadingIndicator } from "@/components/loading-indicator";
 import { PanelCard } from "@/components/panel-card";
 import { PanelDetailHeader } from "@/components/panel-detail-header";
 import { lifecycleStatus } from "@/components/status-chip";
 import { ApiError } from "@/src/api/api-fetch";
-import {
-  staffLocationMenuKey,
-  staffLocationsKey,
-  staffMenusKey,
-} from "@/src/api/cache-keys";
+import { itemCount } from "@/components/menu-management";
+import { staffLocationMenuKey, staffLocationsKey } from "@/src/api/cache-keys";
 import {
   deleteLocation,
   googleReviewUrlSchema,
@@ -39,12 +36,7 @@ import {
   updateLocationReviewLink,
   type Location,
 } from "@/src/api/locations";
-import {
-  getLocationMenu,
-  listMenus,
-  setLocationMenu,
-  type Menu,
-} from "@/src/api/menus";
+import { getLocationMenu } from "@/src/api/menus";
 
 const activeOrdersProblemType = "urn:kairos:problem:location-active-orders";
 
@@ -79,70 +71,38 @@ function shouldRetryOnError(error: Error): boolean {
   );
 }
 
-const noMenuKey = "none";
-
-function LocationMenuSelect({
+function LocationMenuSummary({
   accountId,
-  activeMenu,
-  isActiveMenuLoading,
-  isDisabled,
-  loadError,
-  selectedKey,
-  onSelectionChange,
+  locationId,
+  onEditMenu,
 }: {
   accountId: string;
-  activeMenu: Menu | null | undefined;
-  isActiveMenuLoading: boolean;
-  isDisabled: boolean;
-  loadError: unknown;
-  selectedKey: string;
-  onSelectionChange: (menuId: string) => void;
+  locationId: string;
+  onEditMenu: () => void;
 }) {
-  const {
-    data: menus = [],
-    error: menusError,
-    isLoading,
-  } = useSWR(staffMenusKey(accountId), listMenus, {
-    errorRetryCount: 3,
-    shouldRetryOnError,
-  });
-  const error = menusError ?? loadError;
-  const items = [
-    { id: noMenuKey, name: "Bez menu" },
-    ...menus,
-    ...(activeMenu && !menus.some((menu) => menu.id === activeMenu.id)
-      ? [activeMenu]
-      : []),
-  ];
-
-  if ((isLoading || isActiveMenuLoading) && !error) {
-    return <LoadingIndicator label="Wczytywanie menu lokalu" />;
-  }
+  const { data: menu, error } = useSWR(
+    staffLocationMenuKey(accountId, locationId),
+    ([, , , id]) => getLocationMenu(id),
+    { errorRetryCount: 3, shouldRetryOnError },
+  );
 
   return (
-    <div className="flex flex-col gap-2">
-      <FormSelect
-        className="w-full sm:max-w-xs"
-        isDisabled={isDisabled || Boolean(error)}
-        label="Menu lokalu"
-        selectedKey={error ? null : selectedKey}
-        onSelectionChange={(key) => {
-          if (key !== null) onSelectionChange(String(key));
-        }}
-      >
-        <ListBox items={items}>
-          {(item) => (
-            <ListBox.Item id={item.id} textValue={item.name}>
-              {item.name}
-            </ListBox.Item>
-          )}
-        </ListBox>
-      </FormSelect>
-      {error !== undefined && (
-        <p className="text-sm text-danger" role="alert">
-          Nie udało się wczytać menu tego lokalu.
-        </p>
-      )}
+    <div className="flex items-center justify-between gap-4">
+      <div className="flex min-w-0 flex-col">
+        <span className="text-sm secondary-text">Menu</span>
+        {error ? (
+          <span className="text-danger" role="alert">
+            Nie udało się wczytać menu tego lokalu.
+          </span>
+        ) : menu === undefined ? (
+          <LoadingIndicator label="Wczytywanie menu lokalu" />
+        ) : (
+          <span>{menu ? itemCount(menu.items.length) : "Brak menu"}</span>
+        )}
+      </div>
+      <Button variant="secondary" onPress={onEditMenu}>
+        <ArrowUpRightIcon size={18} /> Edytuj
+      </Button>
     </div>
   );
 }
@@ -150,10 +110,12 @@ function LocationMenuSelect({
 export function LocationManagement({
   accountId,
   canManageLocations,
+  onEditMenu,
   onViewOrders,
 }: {
   accountId: string;
   canManageLocations: boolean;
+  onEditMenu: (locationId: string) => void;
   onViewOrders: (locationId: string) => void;
 }) {
   const { mutate: mutateCache } = useSWRConfig();
@@ -161,7 +123,6 @@ export function LocationManagement({
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editName, setEditName] = useState<string>();
   const [editReviewUrl, setEditReviewUrl] = useState<string>();
-  const [editMenuId, setEditMenuId] = useState<string>();
   const [error, setError] = useState<unknown>();
   const [actionError, setActionError] = useState<unknown>();
   const [pendingAction, setPendingAction] = useState<string>();
@@ -179,27 +140,12 @@ export function LocationManagement({
   const selectedLocation = locations.find(
     (location) => location.id === selectedLocationId,
   );
-  const {
-    data: activeMenu,
-    error: activeMenuError,
-    isLoading: isActiveMenuLoading,
-    mutate: mutateActiveMenu,
-  } = useSWR(
-    selectedLocationId
-      ? staffLocationMenuKey(accountId, selectedLocationId)
-      : null,
-    () => getLocationMenu(selectedLocationId!),
-    { errorRetryCount: 3, shouldRetryOnError },
-  );
-  const savedMenuId = activeMenu?.id ?? noMenuKey;
   const name = editName ?? selectedLocation?.name ?? "";
   const reviewUrl = editReviewUrl ?? selectedLocation?.googleReviewUrl ?? "";
-  const menuId = editMenuId ?? savedMenuId;
   const isNameChanged = name.trim() !== selectedLocation?.name;
   const isReviewUrlChanged =
     reviewUrl.trim() !== (selectedLocation?.googleReviewUrl ?? "");
-  const isMenuChanged = menuId !== savedMenuId;
-  const hasChanges = isNameChanged || isReviewUrlChanged || isMenuChanged;
+  const hasChanges = isNameChanged || isReviewUrlChanged;
   const hasActiveOrdersConflict =
     actionError instanceof ApiError &&
     actionError.problem?.type === activeOrdersProblemType;
@@ -208,7 +154,6 @@ export function LocationManagement({
     setSelectedLocationId(locationId);
     setEditName(undefined);
     setEditReviewUrl(undefined);
-    setEditMenuId(undefined);
     setError(undefined);
     setActionError(undefined);
   }
@@ -251,15 +196,6 @@ export function LocationManagement({
       if (isReviewUrlChanged) {
         await updateCachedLocation(
           await updateLocationReviewLink(selectedLocation.id, reviewUrl),
-        );
-      }
-      if (isMenuChanged) {
-        await mutateActiveMenu(
-          await setLocationMenu(
-            selectedLocation.id,
-            menuId === noMenuKey ? null : menuId,
-          ),
-          { revalidate: false },
         );
       }
       selectLocation();
@@ -408,14 +344,13 @@ export function LocationManagement({
                       onChange={setEditName}
                     />
                   )}
-                  <LocationMenuSelect
+                  <LocationMenuSummary
                     accountId={accountId}
-                    activeMenu={activeMenu}
-                    isActiveMenuLoading={isActiveMenuLoading}
-                    isDisabled={Boolean(pendingAction)}
-                    loadError={activeMenuError}
-                    selectedKey={menuId}
-                    onSelectionChange={setEditMenuId}
+                    locationId={selectedLocation.id}
+                    onEditMenu={() => {
+                      selectLocation();
+                      onEditMenu(selectedLocation.id);
+                    }}
                   />
                   {canManageLocations && (
                     <div className="flex flex-col gap-2">
@@ -471,9 +406,9 @@ export function LocationManagement({
                     </p>
                   )}
                 </PanelPopup.Body>
-                <PanelPopup.Footer className="flex-wrap">
+                <PanelPopup.Footer className="popup-action-grid">
                   {canManageLocations && (
-                    <div className="flex flex-wrap gap-2 sm:mr-auto">
+                    <>
                       {selectedLocation.status === "ENABLED" ? (
                         <HoldToConfirmButton
                           isDisabled={Boolean(pendingAction)}
@@ -524,7 +459,7 @@ export function LocationManagement({
                       >
                         <DeleteIcon size={18} /> Przytrzymaj, aby usunąć
                       </HoldToConfirmButton>
-                    </div>
+                    </>
                   )}
                   <Button
                     isDisabled={Boolean(pendingAction)}

@@ -369,6 +369,23 @@ body {
 }
 
 /* Corner room is reserved up front so selecting a tile never reflows its name. */
+/* Popup footer actions form one grid of equal-width buttons: lifecycle actions above Cancel/Save. */
+.popup-action-grid {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: var(--space-2);
+}
+
+@media (min-width: 640px) {
+	.popup-action-grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+
+.popup-action-grid > .button {
+	width: 100%;
+}
+
 .order-item-tile__button {
 	width: 100%;
 	height: 100%;

@@ -200,7 +200,7 @@ test("password change opens its page and ends on login with a confirmation", asy
 
 test("workspace entries count once without counting rerenders or the selected tab", () => {
   const view = panel();
-  view.session({ accountId: "staff", capabilities: ["MANAGE_LOCATIONS", "MANAGE_MENUS", "MANAGE_EXTERNAL_INTEGRATIONS", "CHOOSE_LOCATION_MENU"] });
+  view.session({ accountId: "staff", capabilities: ["MANAGE_LOCATIONS", "MANAGE_MENUS", "MANAGE_EXTERNAL_INTEGRATIONS"] });
   view.workspace("menus");
   view.render();
   view.workspace("menus");

@@ -52,7 +52,7 @@ request changes no history and emits no event. Creation accepts the same
 optional label and [menu items](menus.md#ordering-from-a-menu) as staff
 creation; items are part of the replay comparison. Every external order
 representation carries its daily number, nullable label and items. A key with
-`orders:read` for a location can read that location's active menu, so the
+`orders:read` for a location can read that location's menu, so the
 integration can choose valid item names; locations outside the key return `403`
 as for other location-scoped requests.
 

@@ -6,6 +6,4 @@ import pl.karolbystrek.kairos.api.menu.domain.LocationMenu;
 import java.util.UUID;
 
 public interface LocationMenuRepository extends JpaRepository<LocationMenu, UUID> {
-
-    boolean existsByMenuId(UUID menuId);
 }

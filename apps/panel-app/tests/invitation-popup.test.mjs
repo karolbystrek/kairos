@@ -102,7 +102,7 @@ function workspace(kind = "account-management", collections = {}) {
     cursor = 0;
     if (kind === "account-management") return exports.AccountManagement({ account: { accountId: "staff", tenantRole: "ADMIN" } });
     if (kind === "location-creation-modal") return exports.LocationCreationModal({ accountId: "staff", isOpen: true, isRequired: true, onCreated() {}, onOpenChange() {} });
-    if (kind === "location-management") return exports.LocationManagement({ accountId: "staff", canManageLocations: true, onViewOrders() {} });
+    if (kind === "location-management") return exports.LocationManagement({ accountId: "staff", canManageLocations: true, onEditMenu() {}, onViewOrders() {} });
     return exports.OrderManagement({ accountId: "staff", canViewTenantOrders: true, canManageLocations: false });
   }
   function find(predicate) {

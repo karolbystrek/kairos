@@ -175,10 +175,11 @@ POST   /api/external/orders/v1
 PUT    /api/external/orders/v1/{orderId}/status
 ```
 
-Tenant menus use `/api/menus/v1` with list, create, `PUT /{menuId}` and
-`DELETE /{menuId}`; a location's active menu is read and replaced with `GET`
-and `PUT /api/locations/v1/{locationId}/menu`; the request carries a nullable
-`menuId` and the response a nullable `menu`. See [menus](menus.md).
+A location's menu uses `GET`, `PUT` and `DELETE
+/api/locations/v1/{locationId}/menu`; `PUT` carries the complete `items` list
+and creates or replaces the menu, `DELETE` returns `204` whether or not a menu
+existed, and responses carry a nullable `menu` with `items` and `updatedAt`.
+See [menus](menus.md).
 
 Staff order listing accepts an optional `locationId` and active `status`.
 External listing accepts an opaque cursor plus optional authorized
@@ -187,7 +188,7 @@ External listing accepts an opaque cursor plus optional authorized
 External creation additionally requires `Idempotency-Key`. Staff, external and
 webhook order representations include the integer `number`, nullable `label`
 and `items`; customer representations include `number` and nullable `label`
-but not items. External integrations read a location's active menu through
+but not items. External integrations read a location's menu through
 `GET /api/external/locations/v1/{locationId}/menu` with the staff menu
 response shape. Desired-state updates use idempotent `PUT`; a same-state
 request returns the unchanged representation without another history, customer

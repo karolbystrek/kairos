@@ -54,10 +54,7 @@ export function OrderItemPicker({
   }
 
   return (
-    <section
-      aria-label={`Pozycje z menu ${menu.name}`}
-      className="flex flex-col gap-3"
-    >
+    <section aria-label="Pozycje z menu" className="flex flex-col gap-3">
       {menu.items.length > searchThreshold && (
         <FormTextField
           fullWidth
@@ -119,7 +116,7 @@ export function OrderItemPicker({
                       className="order-item-tile__decrease"
                       isDisabled={isDisabled}
                       size="sm"
-                      variant="secondary"
+                      variant="danger-soft"
                       onPress={() => change(item, -1)}
                     >
                       <MinusIcon size={16} />

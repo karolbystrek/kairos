@@ -61,7 +61,6 @@ public class SecurityConfig {
         source.registerCorsConfiguration("/usage-analytics/**", panelConfiguration);
         source.registerCorsConfiguration("/analytics/**", panelConfiguration);
         source.registerCorsConfiguration("/platform-analytics/**", panelConfiguration);
-        source.registerCorsConfiguration("/menus/**", panelConfiguration);
         source.registerCorsConfiguration("/external-integrations/**", panelConfiguration);
         source.registerCorsConfiguration("/api-keys/**", panelConfiguration);
         source.registerCorsConfiguration("/webhook-subscriptions/**", panelConfiguration);
@@ -158,7 +157,6 @@ public class SecurityConfig {
                         ).authenticated()
                         .requestMatchers(
                                 "/locations/v1/**",
-                                "/menus/v1/**",
                                 "/accounts/v1/**",
                                 "/account-invitations/v1/**",
                                 "/usage-analytics/v1/**",
