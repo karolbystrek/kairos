@@ -1,6 +1,9 @@
 import type { ReactNode } from "react";
+import type { EntityStatus } from "@/components/status-chip";
 
-import { Button, Chip } from "@heroui/react";
+import { Button } from "@heroui/react";
+
+import { StatusChip } from "@/components/status-chip";
 
 export function PanelCard({
   accessibilityLabel,
@@ -16,14 +19,13 @@ export function PanelCard({
   metadata?: ReactNode;
   onPress?: () => void;
   title: ReactNode;
-  status?: "ENABLED" | "DISABLED" | "PENDING";
+  status?: EntityStatus;
   trailing?: ReactNode;
 }) {
   return (
     <article
       className="panel-card relative px-3 py-2"
       data-selected={isSelected || undefined}
-      data-status={status}
     >
       {onPress && accessibilityLabel && (
         <Button
@@ -44,16 +46,7 @@ export function PanelCard({
             {title}
           </p>
           {metadata && <div className="mt-1 min-w-0 text-sm">{metadata}</div>}
-          {(status === "ENABLED" || status === "DISABLED") && (
-            <Chip
-              className="mt-2"
-              color={status === "ENABLED" ? "success" : "default"}
-              size="sm"
-              variant="soft"
-            >
-              {status === "ENABLED" ? "Włączone" : "Wyłączone"}
-            </Chip>
-          )}
+          {status && <StatusChip className="mt-2" status={status} />}
         </div>
         {trailing && (
           <div className="panel-card-trailing flex max-w-full flex-wrap items-center justify-end gap-2">

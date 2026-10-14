@@ -62,9 +62,9 @@ function workspace(kind = "account-management", collections = {}) {
       new Function("require", "exports", inputSource)(require, inputExports);
       return inputExports;
     }
-    if (name === "@/components/loading-indicator") {
+    if (["@/components/loading-indicator", "@/components/status-chip"].includes(name)) {
       const loadingExports = {};
-      const loadingSource = ts.transpileModule(readFileSync(new URL("../components/loading-indicator.tsx", import.meta.url), "utf8"),
+      const loadingSource = ts.transpileModule(readFileSync(new URL(`../${name.slice(2)}.tsx`, import.meta.url), "utf8"),
         { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
       new Function("require", "exports", loadingSource)(dependencies, loadingExports);
       return loadingExports;
@@ -74,6 +74,13 @@ function workspace(kind = "account-management", collections = {}) {
       googleReviewUrlSchema: { safeParse: () => ({ success: true }) },
       sortLocations: locations => locations,
       async createLocation(locationName, googleReviewUrl) { requests.push({ locationName, googleReviewUrl }); throw new ApiError(409); },
+    };
+    if (name === "@/src/api/locations" && kind === "location-management") return {
+      managedLocationNameSchema: { parse: value => value.trim() },
+      googleReviewUrlSchema: { parse: value => value.trim() },
+      sortLocations: locations => locations,
+      async renameLocation(id, locationName) { requests.push({ rename: locationName }); return { ...collections.locations[0], name: locationName }; },
+      async updateLocationReviewLink(id, url) { requests.push({ reviewUrl: url }); throw new ApiError(500); },
     };
     if (name === "@/src/api/usage-analytics") return { recordPanelAction() {} };
     if (name === "@/src/api/api-fetch") return { ApiError };
@@ -89,7 +96,7 @@ function workspace(kind = "account-management", collections = {}) {
     if (!node || typeof node !== "object") return [];
     if (Array.isArray(node)) return node.flatMap(elements);
     if (typeof node.type === "function" && node.type.name === "LoadingIndicator") return elements(node.type(node.props));
-    return [node, ...elements(node.props?.children), ...elements(node.props?.trailingActions), ...elements(node.props?.titleEditor), ...elements(node.props?.titleAction)];
+    return [node, ...elements(node.props?.children)];
   }
   function render() {
     cursor = 0;
@@ -203,7 +210,6 @@ test("dismissed location drafts cannot carry into a newly created location", () 
   const view = workspace("location-management", { locations });
   const find = predicate => { const node = view.nodes().find(predicate); assert.ok(node); return node.props; };
   find(node => node.type === "PanelCard").onPress();
-  find(node => node.props?.["aria-label"] === "Edytuj nazwę lokalu").onPress();
   find(node => node.props?.name === "location-name").onChange("Draft A");
   find(node => node.props?.name === "google-review-url").onChange("https://example.com/draft-a");
   find(node => node.type === "PanelPopup" && node.props?.["aria-label"]).onOpenChange(false);
@@ -211,7 +217,7 @@ test("dismissed location drafts cannot carry into a newly created location", () 
   locations.push(created);
   find(node => node.type === "LocationCreationModal").onCreated(created);
   assert.equal(find(node => node.type === "PanelDetailHeader").title, "Location B");
-  assert.equal(find(node => node.type === "PanelDetailHeader").titleEditor, undefined);
+  assert.equal(find(node => node.props?.name === "location-name").value, "Location B");
   assert.equal(find(node => node.props?.name === "google-review-url").value, "https://example.com/b");
 });
 
@@ -274,7 +280,21 @@ test("pending failed delivery can be resent only through confirmation", async ()
   await confirm.props.onConfirm();
   assert.deepEqual(view.requests[0], { resend: "invite" });
 });
-for (const state of ["REDEEMED", "REVOKED", "REPLACED", "EXPIRED"]) {
+test("location Save sends only changed fields and keeps the draft when one fails", async () => {
+  const locations = [{ id: "a", name: "Location A", status: "ENABLED", googleReviewUrl: "https://example.com/a" }];
+  const view = workspace("location-management", { locations });
+  const find = predicate => { const node = view.nodes().find(predicate); assert.ok(node); return node.props; };
+  find(node => node.type === "PanelCard").onPress();
+  find(node => node.props?.name === "google-review-url").onChange("https://example.com/draft");
+  await find(node => node.type === "form").onSubmit({ preventDefault() {} });
+  assert.deepEqual(view.requests, [{ reviewUrl: "https://example.com/draft" }]);
+  assert.equal(find(node => node.props?.name === "google-review-url").value, "https://example.com/draft");
+});
+test("redeemed invitations are represented by their account, not listed", () => {
+  const view = workspace("account-management", { invitations: [{ ...invitation, state: "REDEEMED" }] });
+  assert.equal(view.nodes().filter(node => node.type === "PanelCard").length, 0);
+});
+for (const state of ["REVOKED", "REPLACED", "EXPIRED"]) {
   test(`${state} invitation remains in history without mutation controls`, () => {
     const view = workspace("account-management", { invitations: [{ ...invitation, state }] });
     view.nodes().find(node => node.type === "PanelCard").props.onPress();

@@ -17,6 +17,7 @@ function workspace({ delayMutation = false } = {}) {
   const subscription = { id: "webhook", name: "Webhook", status: "DISABLED", locationIds: [], eventTypes: [], signingSecretVersions: [] };
   const dependencies = name => {
     if (name === "react") return {
+      useId: () => "id",
       useState(initial) {
         const state = hooks.get(scope);
         const index = cursor++;
@@ -42,7 +43,7 @@ function workspace({ delayMutation = false } = {}) {
       requests.push(key);
       return new Promise(resolve => { completions.push(resolve); });
     } });
-    if (["@/components/integrations/api-key-management", "@/components/integrations/webhook-subscription-management"].includes(name)) return load(name.replace("@/", ""));
+    if (["@/components/integrations/api-key-management", "@/components/integrations/webhook-subscription-management", "@/components/status-chip"].includes(name)) return load(name.replace("@/", ""));
     if (name.startsWith("@/")) return new Proxy({}, { get: (_, key) => String(key) });
     // Phosphor's CommonJS build does not load under Node's require; icons are inert here.
     if (name === "@phosphor-icons/react") return new Proxy({}, { get: (_, key) => String(key) });

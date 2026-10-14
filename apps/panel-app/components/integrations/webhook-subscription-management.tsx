@@ -26,6 +26,7 @@ import {
   getIntegrationErrorMessage,
   shouldRetryIntegrationRequest,
 } from "@/components/integrations/integration-ui";
+import { lifecycleStatus, StatusChip } from "@/components/status-chip";
 import { LoadingIndicator } from "@/components/loading-indicator";
 import { staffWebhookSubscriptionsKey } from "@/src/api/cache-keys";
 import {
@@ -595,17 +596,9 @@ export function WebhookSubscriptionManagement({
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <h4 className="font-semibold">{subscription.name}</h4>
-                  <span
-                    className={
-                      subscription.status === "ENABLED"
-                        ? "text-sm font-medium text-accent"
-                        : "text-sm secondary-text"
-                    }
-                  >
-                    {subscription.status === "ENABLED"
-                      ? "Włączony"
-                      : "Wyłączony"}
-                  </span>
+                  <StatusChip
+                    status={lifecycleStatus(subscription.status, "y")}
+                  />
                 </div>
 
                 <div>

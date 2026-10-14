@@ -30,6 +30,7 @@ import { PanelPopup } from "@/components/panel-popup";
 import { FormSelect, FormTextField } from "@/components/form-controls";
 import { PanelCard } from "@/components/panel-card";
 import { PanelDetailHeader } from "@/components/panel-detail-header";
+import { lifecycleStatus, type EntityStatus } from "@/components/status-chip";
 import {
   createAccountInvitation,
   listAccountInvitations,
@@ -139,18 +140,22 @@ function LocationSelect({
   );
 }
 
-const invitationStates = {
-  PENDING: "Oczekujące",
-  REDEEMED: "Wykorzystane",
-  REVOKED: "Unieważnione",
-  REPLACED: "Zastąpione",
-  EXPIRED: "Wygasłe",
-};
-const deliveryStates = {
-  QUEUED: "E-mail w kolejce",
-  SENT: "E-mail wysłany",
-  FAILED: "Wysyłka nieudana",
-};
+// Staff see one status; queued or sent delivery is just "pending", and every dead link is "expired".
+function invitationStatus(
+  invitation: AccountInvitation,
+  now: number,
+): EntityStatus {
+  if (
+    invitation.state !== "PENDING" ||
+    new Date(invitation.expiresAt).getTime() <= now
+  ) {
+    return { color: "default", label: "Wygasłe" };
+  }
+
+  return invitation.deliveryState === "FAILED"
+    ? { color: "warning", label: "Nie wysłano" }
+    : { color: "success", label: "Oczekujące" };
+}
 
 function formatDateTime(value: string): string {
   return new Intl.DateTimeFormat("pl-PL", {
@@ -201,7 +206,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
     shouldRetryOnError,
   });
   const {
-    data: invitations = [],
+    data: invitationHistory = [],
     error: invitationsError,
     isLoading: areInvitationsLoading,
     mutate: mutateInvitations,
@@ -209,6 +214,10 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
     errorRetryCount: 3,
     shouldRetryOnError,
   });
+  // A redeemed invitation is represented by its account card.
+  const invitations = invitationHistory.filter(
+    (invitation) => invitation.state !== "REDEEMED",
+  );
   const {
     error: creationError,
     isMutating: isCreating,
@@ -272,6 +281,9 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
   const selectedInvitation = invitations.find(
     (invitation) => invitation.id === selectedInvitationId,
   );
+  const isSelectedInvitationActive =
+    selectedInvitation?.state === "PENDING" &&
+    new Date(selectedInvitation.expiresAt).getTime() > now;
   const collectionError = locationsError ?? accountsError;
 
   async function submitInvitation(event: FormEvent<HTMLFormElement>) {
@@ -520,7 +532,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
                       "Niedostępny"}
                   </p>
                 }
-                status={managedAccount.status}
+                status={lifecycleStatus(managedAccount.status, "e")}
                 title={managedAccount.email}
                 onPress={() => {
                   setSelectedInvitationId(undefined);
@@ -536,19 +548,16 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
             {invitations.map((invitation) => (
               <PanelCard
                 key={invitation.id}
-                accessibilityLabel={`Pokaż zaproszenie dla ${invitation.email}, ${invitationStates[invitation.state]}`}
+                accessibilityLabel={`Pokaż zaproszenie dla ${invitation.email}, ${invitationStatus(invitation, now).label}`}
                 metadata={
                   <p className="mt-2 break-words text-sm text-muted">
                     {invitation.role === "MANAGER" ? "Kierownik" : "Pracownik"}{" "}
                     · {invitation.locationName}
                     <br />
-                    {invitationStates[invitation.state]} ·{" "}
-                    {deliveryStates[invitation.deliveryState]}
-                    <br />
                     {formatDateTime(invitation.createdAt)}
                   </p>
                 }
-                status={invitation.state === "PENDING" ? "PENDING" : undefined}
+                status={invitationStatus(invitation, now)}
                 title={invitation.email}
                 onPress={() => {
                   setSelectedAccountId(undefined);
@@ -570,51 +579,11 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
                 if (!open) setSelectedAccountId(undefined);
               }}
             >
-              <PanelPopup.Body className="pb-6 pt-12">
-                <PanelDetailHeader
-                  kind="Konto"
-                  status={{
-                    isEnabled: selectedAccount.status === "ENABLED",
-                    label:
-                      selectedAccount.status === "ENABLED"
-                        ? "Włączone"
-                        : "Wyłączone",
-                  }}
-                  title={selectedAccount.email}
-                  trailingActions={
-                    <>
-                      {selectedAccount.status === "ENABLED" ? (
-                        <HoldToConfirmButton
-                          isDisabled={isChangingStatus || isDeleting}
-                          isPending={isChangingStatus}
-                          onConfirm={() => changeStatus(selectedAccount)}
-                        >
-                          <DisableIcon size={18} /> Przytrzymaj, aby wyłączyć
-                        </HoldToConfirmButton>
-                      ) : (
-                        <Button
-                          isDisabled={isDeleting}
-                          isPending={isChangingStatus}
-                          variant="secondary"
-                          onPress={() => void changeStatus(selectedAccount)}
-                        >
-                          <CheckIcon size={18} /> Włącz
-                        </Button>
-                      )}
-                      <HoldToConfirmButton
-                        isDisabled={isDeleting || isChangingStatus}
-                        isPending={isDeleting}
-                        onConfirm={() => removeAccount(selectedAccount)}
-                      >
-                        <DeleteIcon size={18} /> Przytrzymaj, aby usunąć
-                      </HoldToConfirmButton>
-                    </>
-                  }
-                />
-                <p className="mt-4 text-sm text-muted">
-                  Wyłączenie wyloguje konto i unieważni zaproszenia. Usunięcie
-                  trwale odbierze dostęp.
-                </p>
+              <PanelDetailHeader
+                status={lifecycleStatus(selectedAccount.status, "e")}
+                title={selectedAccount.email}
+              />
+              <PanelPopup.Body className="flex flex-col gap-5">
                 {deletionError && (
                   <Alert status="danger">
                     <Alert.Content>
@@ -637,7 +606,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
                     </Alert.Content>
                   </Alert>
                 )}
-                <dl className="mt-8 grid gap-5 border-t border-separator pt-6 sm:grid-cols-2">
+                <dl className="grid gap-5 sm:grid-cols-2">
                   <div>
                     <dt className="text-sm text-muted">Rola</dt>
                     <dd className="mt-1 font-medium">
@@ -648,15 +617,9 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
                   </div>
                   <div>
                     <dt className="text-sm text-muted">Lokal</dt>
-                    <dd className="mt-1 font-medium">
+                    <dd className="mt-1 break-words font-medium">
                       {locationNames.get(selectedAccount.locationId) ??
                         "Niedostępny"}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-sm text-muted">E-mail</dt>
-                    <dd className="mt-1 break-words font-medium">
-                      {selectedAccount.email}
                     </dd>
                   </div>
                   <div>
@@ -668,7 +631,38 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
                     </dd>
                   </div>
                 </dl>
+                <p className="text-sm text-muted">
+                  Wyłączenie wyloguje konto i unieważni zaproszenia. Usunięcie
+                  trwale odbierze dostęp.
+                </p>
               </PanelPopup.Body>
+              <PanelPopup.Footer className="flex-wrap">
+                {selectedAccount.status === "ENABLED" ? (
+                  <HoldToConfirmButton
+                    isDisabled={isChangingStatus || isDeleting}
+                    isPending={isChangingStatus}
+                    onConfirm={() => changeStatus(selectedAccount)}
+                  >
+                    <DisableIcon size={18} /> Przytrzymaj, aby wyłączyć
+                  </HoldToConfirmButton>
+                ) : (
+                  <Button
+                    isDisabled={isDeleting}
+                    isPending={isChangingStatus}
+                    variant="secondary"
+                    onPress={() => void changeStatus(selectedAccount)}
+                  >
+                    <CheckIcon size={18} /> Włącz
+                  </Button>
+                )}
+                <HoldToConfirmButton
+                  isDisabled={isDeleting || isChangingStatus}
+                  isPending={isDeleting}
+                  onConfirm={() => removeAccount(selectedAccount)}
+                >
+                  <DeleteIcon size={18} /> Przytrzymaj, aby usunąć
+                </HoldToConfirmButton>
+              </PanelPopup.Footer>
             </PanelPopup>
           )}
         </>
@@ -851,38 +845,11 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
             if (!open) setSelectedInvitationId(undefined);
           }}
         >
-          <PanelPopup.Body className="pb-6 pt-12">
-            <PanelDetailHeader
-              kind="Zaproszenie"
-              title={selectedInvitation.email}
-              trailingActions={
-                selectedInvitation.state === "PENDING" &&
-                new Date(selectedInvitation.expiresAt).getTime() > now ? (
-                  <>
-                    <HoldToConfirmButton
-                      isDisabled={isRevoking || isResending}
-                      isPending={isRevoking}
-                      onConfirm={() => revokeInvitation(selectedInvitation)}
-                    >
-                      <DisableIcon size={18} /> Przytrzymaj, aby unieważnić
-                    </HoldToConfirmButton>
-                    <HoldToConfirmButton
-                      isDisabled={isRevoking || isResending}
-                      isPending={isResending}
-                      onConfirm={() => resendInvitation(selectedInvitation)}
-                    >
-                      <ArrowsClockwiseIcon size={18} /> Przytrzymaj, aby wysłać
-                      ponownie
-                    </HoldToConfirmButton>
-                  </>
-                ) : undefined
-              }
-            />
-            {selectedInvitation.state === "PENDING" && (
-              <p className="mt-3 text-sm text-muted">
-                Obie akcje unieważnią obecny link.
-              </p>
-            )}
+          <PanelDetailHeader
+            status={invitationStatus(selectedInvitation, now)}
+            title={selectedInvitation.email}
+          />
+          <PanelPopup.Body className="flex flex-col gap-5">
             {resendError && (
               <Alert status="danger">
                 <Alert.Content>
@@ -893,7 +860,6 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
                 </Alert.Content>
               </Alert>
             )}
-
             {revocationError && (
               <Alert status="danger">
                 <Alert.Content>
@@ -906,19 +872,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
                 </Alert.Content>
               </Alert>
             )}
-            <dl className="mt-6 grid gap-5 border-t border-separator pt-6 sm:grid-cols-2">
-              <div>
-                <dt className="text-sm text-muted">Status</dt>
-                <dd className="mt-1 font-medium">
-                  {invitationStates[selectedInvitation.state]}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-sm text-muted">Wysyłka</dt>
-                <dd className="mt-1 font-medium">
-                  {deliveryStates[selectedInvitation.deliveryState]}
-                </dd>
-              </div>
+            <dl className="grid gap-5 sm:grid-cols-2">
               <div>
                 <dt className="text-sm text-muted">Rola</dt>
                 <dd className="mt-1 font-medium">
@@ -934,25 +888,37 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
                 </dd>
               </div>
               <div>
-                <dt className="text-sm text-muted">Autor</dt>
-                <dd className="mt-1 break-words font-medium">
-                  {selectedInvitation.issuedByEmail}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-sm text-muted">Utworzono</dt>
-                <dd className="mt-1 font-medium">
-                  {formatDateTime(selectedInvitation.createdAt)}
-                </dd>
-              </div>
-              <div>
                 <dt className="text-sm text-muted">Wygasa</dt>
                 <dd className="mt-1 font-medium">
                   {formatDateTime(selectedInvitation.expiresAt)}
                 </dd>
               </div>
             </dl>
+            {isSelectedInvitationActive && (
+              <p className="text-sm text-muted">
+                Obie akcje unieważnią obecny link.
+              </p>
+            )}
           </PanelPopup.Body>
+          {isSelectedInvitationActive && (
+            <PanelPopup.Footer className="flex-wrap">
+              <HoldToConfirmButton
+                isDisabled={isRevoking || isResending}
+                isPending={isRevoking}
+                onConfirm={() => revokeInvitation(selectedInvitation)}
+              >
+                <DisableIcon size={18} /> Przytrzymaj, aby unieważnić
+              </HoldToConfirmButton>
+              <HoldToConfirmButton
+                isDisabled={isRevoking || isResending}
+                isPending={isResending}
+                onConfirm={() => resendInvitation(selectedInvitation)}
+              >
+                <ArrowsClockwiseIcon size={18} /> Przytrzymaj, aby wysłać
+                ponownie
+              </HoldToConfirmButton>
+            </PanelPopup.Footer>
+          )}
         </PanelPopup>
       )}
     </div>
