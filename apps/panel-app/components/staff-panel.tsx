@@ -2,16 +2,13 @@
 
 import type { FormEvent } from "react";
 
-import {
-  ArrowsClockwiseIcon,
-  SignInIcon,
-  SignOutIcon,
-} from "@phosphor-icons/react";
+import { ArrowsClockwiseIcon, SignInIcon } from "@phosphor-icons/react";
 import {
   Alert,
   Button,
   Dropdown,
   Link,
+  Separator,
   Spinner,
   Tabs,
   Tooltip,
@@ -33,7 +30,6 @@ import useSWR, { useSWRConfig } from "swr";
 import useSWRMutation from "swr/mutation";
 import { ZodError } from "zod";
 
-import { PanelPopup } from "@/components/panel-popup";
 import { FormTextField } from "@/components/form-controls";
 import { OrderManagement } from "@/components/order-management";
 import { AccountManagement } from "@/components/account-management";
@@ -47,7 +43,7 @@ import { IntegrationManagement } from "@/components/integration-management";
 import { LocationCreationModal } from "@/components/location-creation-modal";
 import { LocationManagement } from "@/components/location-management";
 import { MenuManagement } from "@/components/menu-management";
-import { PasswordChangeDialog } from "@/components/password-change-dialog";
+import { PasswordChangeForm } from "@/components/password-change-form";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { subscribeToAuthenticationRequired } from "@/src/api/auth-state";
 import { ApiError } from "@/src/api/api-fetch";
@@ -113,11 +109,8 @@ function loginMutation(
   return loginRequest(arg);
 }
 
-function logoutMutation(
-  _key: typeof logoutKey,
-  { arg }: { arg: boolean },
-): Promise<boolean> {
-  return logoutRequest(arg);
+function logoutMutation(): Promise<boolean> {
+  return logoutRequest();
 }
 
 function shouldRetryOnError(error: Error): boolean {
@@ -220,14 +213,19 @@ function LoginForm({
 function SignedOutPanel({
   loginError,
   isLoggingIn,
+  passwordChanged,
   onDismissLoginError,
   onSignIn,
 }: {
   loginError?: Error;
   isLoggingIn: boolean;
+  passwordChanged: boolean;
   onDismissLoginError: () => void;
   onSignIn: (credentials: LoginCredentials) => Promise<void>;
 }) {
+  const [showPasswordChanged, setShowPasswordChanged] =
+    useState(passwordChanged);
+
   return (
     <AuthFormLayout
       footer={
@@ -237,6 +235,16 @@ function SignedOutPanel({
       }
       title="Witaj ponownie"
     >
+      {showPasswordChanged && (
+        <div className="mb-6">
+          <DismissibleNotice
+            description="Zaloguj się nowym hasłem."
+            status="success"
+            title="Hasło zostało zmienione"
+            onDismiss={() => setShowPasswordChanged(false)}
+          />
+        </div>
+      )}
       <LoginForm
         error={loginError}
         isPending={isLoggingIn}
@@ -262,9 +270,11 @@ function setSelectedWorkspace(workspace: string) {
 }
 
 export function StaffPanel({
+  passwordChanged = false,
   screen = "dashboard",
 }: {
-  screen?: "dashboard" | "login";
+  passwordChanged?: boolean;
+  screen?: "dashboard" | "login" | "password";
 } = {}) {
   const router = useRouter();
   const { mutate: mutateCache } = useSWRConfig();
@@ -275,10 +285,7 @@ export function StaffPanel({
   );
   const [requestedOrderLocationId, setRequestedOrderLocationId] =
     useState<string>();
-  const [signOutScope, setSignOutScope] = useState<
-    "device" | "everywhere" | null
-  >(null);
-  const [isPasswordChangeOpen, setIsPasswordChangeOpen] = useState(false);
+  const [hasChangedPassword, setHasChangedPassword] = useState(false);
   const {
     data: account,
     error: accountError,
@@ -339,8 +346,6 @@ export function StaffPanel({
   useEffect(
     () =>
       subscribeToAuthenticationRequired(() => {
-        setIsPasswordChangeOpen(false);
-        setSignOutScope(null);
         void mutateCache(isStaffCacheKey, undefined, { revalidate: false });
         void mutateAccount(undefined, { revalidate: false });
       }),
@@ -362,14 +367,14 @@ export function StaffPanel({
     await mutateAccount(currentAccount, { revalidate: false });
   }
 
-  async function signOut(everywhere = false) {
+  async function signOut() {
     if (isLoggingOut) return;
 
-    const didLogout = await triggerLogout(everywhere);
+    resetLogout();
+    const didLogout = await triggerLogout();
 
     if (!didLogout) return;
 
-    setSignOutScope(null);
     await mutateAccount(undefined, { revalidate: false });
     await mutateCache(isStaffCacheKey, undefined, { revalidate: false });
   }
@@ -382,10 +387,17 @@ export function StaffPanel({
     if (screen === "login" && account && !isUnauthorized) {
       router.replace("/dashboard");
     }
-    if (screen === "dashboard" && (isUnauthorized || isSignedOut)) {
-      router.replace("/login");
+    if (screen !== "login" && (isUnauthorized || isSignedOut)) {
+      router.replace(hasChangedPassword ? "/login?password-changed" : "/login");
     }
-  }, [account, isSignedOut, isUnauthorized, router, screen]);
+  }, [
+    account,
+    hasChangedPassword,
+    isSignedOut,
+    isUnauthorized,
+    router,
+    screen,
+  ]);
 
   if (screen === "login" && checkingVerification) {
     return (
@@ -430,6 +442,7 @@ export function StaffPanel({
         <SignedOutPanel
           isLoggingIn={isLoggingIn}
           loginError={loginError}
+          passwordChanged={passwordChanged}
           onDismissLoginError={resetLogin}
           onSignIn={signIn}
         />
@@ -440,7 +453,7 @@ export function StaffPanel({
   if (
     (isLoading && !account) ||
     (screen === "login" && account) ||
-    (screen === "dashboard" && (isUnauthorized || isSignedOut))
+    (screen !== "login" && (isUnauthorized || isSignedOut))
   ) {
     return (
       <div className="flex flex-1 items-center justify-center">
@@ -472,6 +485,19 @@ export function StaffPanel({
           </Alert.Content>
         </Alert>
       </div>
+    );
+  }
+
+  if (screen === "password") {
+    return (
+      <PasswordChangeForm
+        onChanged={async () => {
+          // Password change ends every session, including this one.
+          setHasChangedPassword(true);
+          await mutateAccount(undefined, { revalidate: false });
+          await mutateCache(isStaffCacheKey, undefined, { revalidate: false });
+        }}
+      />
     );
   }
 
@@ -526,17 +552,16 @@ export function StaffPanel({
             aria-label="Opcje konta"
             onAction={(key) => {
               if (key === "password") {
-                setIsPasswordChangeOpen(true);
+                router.push("/dashboard/password");
               } else {
-                resetLogout();
-                setSignOutScope(key === "everywhere" ? "everywhere" : "device");
+                void signOut();
               }
             }}
           >
             <Dropdown.Item id="password">Zmień hasło</Dropdown.Item>
-            <Dropdown.Item id="device">Wyloguj się</Dropdown.Item>
-            <Dropdown.Item id="everywhere">
-              Wyloguj ze wszystkich urządzeń
+            <Separator />
+            <Dropdown.Item id="logout" variant="danger">
+              Wyloguj się
             </Dropdown.Item>
           </Dropdown.Menu>
         </Dropdown.Popover>
@@ -546,6 +571,15 @@ export function StaffPanel({
 
   return (
     <div className="flex flex-col gap-6">
+      {logoutError && (
+        <DismissibleNotice
+          description={getErrorMessage(logoutError)}
+          status="danger"
+          title="Nie udało się wylogować"
+          onDismiss={resetLogout}
+        />
+      )}
+
       {accountError && (
         <Alert status="warning">
           <Alert.Indicator />
@@ -757,64 +791,6 @@ export function StaffPanel({
           onOpenChange={() => {}}
         />
       )}
-
-      <PasswordChangeDialog
-        isOpen={isPasswordChangeOpen}
-        onChanged={async () => {
-          await mutateAccount(undefined, { revalidate: false });
-          await mutateCache(isStaffCacheKey, undefined, { revalidate: false });
-        }}
-        onOpenChange={setIsPasswordChangeOpen}
-      />
-
-      <PanelPopup
-        isOpen={signOutScope !== null}
-        role="alertdialog"
-        size="sm"
-        onOpenChange={(open) => {
-          if (!open) {
-            setSignOutScope(null);
-            if (!isLoggingOut) resetLogout();
-          }
-        }}
-      >
-        <PanelPopup.Header>
-          <PanelPopup.Icon status="warning" />
-          <PanelPopup.Heading>
-            {signOutScope === "everywhere"
-              ? "Wyloguj ze wszystkich urządzeń?"
-              : "Wyloguj się?"}
-          </PanelPopup.Heading>
-        </PanelPopup.Header>
-        {logoutError && (
-          <PanelPopup.Body>
-            <Alert status="danger">
-              <Alert.Indicator />
-              <Alert.Content>
-                <Alert.Title>Nie udało się wylogować</Alert.Title>
-                <Alert.Description>
-                  {getErrorMessage(logoutError)}
-                </Alert.Description>
-              </Alert.Content>
-            </Alert>
-          </PanelPopup.Body>
-        )}
-        <PanelPopup.Footer>
-          <Button aria-label="Anuluj" slot="close" variant="tertiary">
-            Anuluj
-          </Button>
-          <Button
-            isPending={isLoggingOut}
-            variant="danger"
-            onPress={() => void signOut(signOutScope === "everywhere")}
-          >
-            <SignOutIcon aria-hidden="true" size={18} />
-            {signOutScope === "everywhere"
-              ? "Wyloguj ze wszystkich urządzeń"
-              : "Wyloguj się"}
-          </Button>
-        </PanelPopup.Footer>
-      </PanelPopup>
     </div>
   );
 }

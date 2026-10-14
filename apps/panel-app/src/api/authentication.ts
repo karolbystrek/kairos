@@ -102,9 +102,9 @@ export async function login(
 
   return result;
 }
-export async function logout(everywhere = false): Promise<boolean> {
+export async function logout(): Promise<boolean> {
   await apiFetch(
-    `/api/auth/v1/${everywhere ? "logout-all" : "logout"}`,
+    "/api/auth/v1/logout",
     { method: "POST" },
     { notifyUnauthorized: false },
   );

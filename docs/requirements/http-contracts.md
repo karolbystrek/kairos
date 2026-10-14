@@ -19,7 +19,6 @@ The implemented browser-facing contract consists of:
 GET    /api/auth/v1/csrf
 POST   /api/auth/v1/login
 POST   /api/auth/v1/logout
-POST   /api/auth/v1/logout-all
 POST   /api/auth/v1/password
 GET    /api/auth/v1/me
 POST   /api/tenant-registrations/v1
@@ -91,7 +90,7 @@ Details with a `fieldErrors` object mapping `email`, `password`, or
 `POST /api/locations/v1` contract and its name validation, enabled initial state,
 and required IANA `timeZone`, taken from the browser and immutable afterwards.
 Anonymous login, local logout and both registration families remain CSRF
-protected. Current Account, password changes and global logout require eligible
+protected. Current Account and password changes require eligible
 authentication. Successful password changes and logout return
 `204`; generic credentials failure is `401`, input errors `400`, eligibility
 or signed-in registration rejection `403`, and identity conflicts `409`.

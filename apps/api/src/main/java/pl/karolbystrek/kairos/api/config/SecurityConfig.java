@@ -153,7 +153,6 @@ public class SecurityConfig {
                         ).permitAll()
                         .requestMatchers(
                                 "/auth/v1/logout",
-                                "/auth/v1/logout-all",
                                 "/auth/v1/me",
                                 "/auth/v1/password"
                         ).authenticated()

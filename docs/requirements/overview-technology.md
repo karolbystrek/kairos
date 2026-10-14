@@ -82,8 +82,8 @@ tokens rather than the standalone authentication-page layout.
 #### Appearance and popup behavior
 
 Keep popups quick to read: use a clear title and direct actions, and omit
-secondary text that repeats the title or action. Routine confirmations such as
-logout omit explanatory captions; titles and buttons communicate the decision.
+secondary text that repeats the title or action. Routine confirmations
+omit explanatory captions; titles and buttons communicate the decision.
 Retain concise instructions only for non-obvious setup, irreversible effects,
 access/account cascades, recovery and one-time secrets. Confirmation headers
 place one compact warning icon alongside the title; they never repeat the

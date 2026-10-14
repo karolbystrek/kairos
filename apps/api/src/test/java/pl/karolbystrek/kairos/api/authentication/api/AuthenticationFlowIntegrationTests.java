@@ -142,16 +142,13 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
     }
 
     @Test
-    void ordinaryLogoutDoesNotAffectOtherDevicesButLogoutAllDoes() throws Exception {
+    void logoutDoesNotAffectOtherDevices() throws Exception {
         var email = email();
         var first = register(email);
         var second = login(email);
         mvc.perform(csrf(postApi("/auth/v1/logout").cookie(first))).andExpect(status().isNoContent());
         mvc.perform(getApi("/auth/v1/me").cookie(first)).andExpect(status().isUnauthorized());
         mvc.perform(getApi("/auth/v1/me").cookie(second)).andExpect(status().isOk());
-        var third = login(email);
-        mvc.perform(csrf(postApi("/auth/v1/logout-all").cookie(second))).andExpect(status().isNoContent());
-        mvc.perform(getApi("/auth/v1/me").cookie(third)).andExpect(status().isUnauthorized());
     }
 
     @Test
