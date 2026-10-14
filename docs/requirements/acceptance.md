@@ -118,12 +118,12 @@
   assignment and reserved identity, and removes it from ordinary account lists.
 * Accounts, Locations, and Integrations initially show responsive card collections
   without automatic selection or persistent detail panels. Selecting a card
-  opens its details and management actions in the shared popup. Cards visually
-  communicate status only through colour, with accessible status labels and
-  explicit status in details; no search or filters are included.
+  opens its details and management actions in the shared popup. Cards and
+  details show one status chip with accessible status labels; no search or
+  filters are included.
 * Accounts includes pending invitations alongside created accounts. Both show
   email, role, and location; Locations and Integrations show name. Invitation
-  details retain issuer, creation and expiry metadata and confirmed revocation.
+  details show role, location and expiry and retain confirmed revocation.
 * Public sign-in exposes Create account. Email verification and recovery are
   deferred; immutable ZITADEL identity binding and current local authorization
   gate protected work. Password changes are available after login.
@@ -150,9 +150,11 @@
   Creation, list, and preview expose it; invited registration displays it
   read-only beside clearly spaced location/role context. Mismatched redemption
   email is rejected before provider provisioning and rechecked atomically.
-  Details identify the fixed role and location, creator, creation time, and expiry. Its icon-and-text Revoke action
-  requires inline hold confirmation. Paginated, sorted history retains terminal
-  metadata, lifecycle state and queued/sent/failed email delivery state. Managers
+  Details identify the fixed role and location and the expiry. Its icon-and-text Revoke action
+  requires inline hold confirmation. The API history retains terminal metadata,
+  lifecycle state and queued/sent/failed email delivery state; the panel folds
+  them into one status (Pending, Not sent, Expired) and omits redeemed entries,
+  which their account represents. Managers
   see only operator invitations for their location; administrators see the
   tenant. Active pending invitations with failed delivery can be resent after
   confirmation; expired invitations use ordinary creation.

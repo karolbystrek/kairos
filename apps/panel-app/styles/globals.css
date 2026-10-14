@@ -1274,12 +1274,6 @@ body {
   border-radius: var(--radius-medium);
 }
 
-.entity-name-edit {
-	background: transparent;
-	border: 0;
-	box-shadow: none;
-}
-
 .legal-document-body {
   line-height: 1.65;
 }

@@ -72,9 +72,12 @@ existing account cannot redeem an invitation to gain another location or role.
 
 ### Invitation cards and synchronization
 
-Accounts presents created accounts and the full invitation history. History
-shows recipient, role, location, issuer, creation/expiry times, lifecycle state
+Accounts presents created accounts and the invitation history. The API history
+carries recipient, role, location, issuer, creation/expiry times, lifecycle state
 and delivery state (`QUEUED`, `SENT`, `FAILED`), including terminal entries.
+The panel shows one invitation status: **Pending** (active, queued or sent),
+**Not sent** (active, delivery failed) or **Expired** (expired, revoked or
+replaced). Redeemed invitations are not listed; their account represents them.
 Administrators see the tenant; managers see operator invitations for their own
 location. History is ordered newest first, with stable ordering for equal
 creation times.

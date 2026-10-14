@@ -10,11 +10,10 @@ import { Alert, Button, Tabs, Tooltip, toast } from "@heroui/react";
 import {
   ProhibitIcon as DisableIcon,
   CheckIcon,
-  PencilSimpleIcon as EditIcon,
   PlusIcon,
   TrashIcon,
 } from "@phosphor-icons/react";
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import useSWR from "swr";
 
 import { HoldToConfirmButton } from "@/components/hold-to-confirm-button";
@@ -30,6 +29,7 @@ import { WebhookSubscriptionManagement } from "@/components/integrations/webhook
 import { LoadingIndicator } from "@/components/loading-indicator";
 import { PanelCard } from "@/components/panel-card";
 import { PanelDetailHeader } from "@/components/panel-detail-header";
+import { lifecycleStatus } from "@/components/status-chip";
 import { staffIntegrationsKey, staffLocationsKey } from "@/src/api/cache-keys";
 import {
   archiveExternalIntegration,
@@ -48,34 +48,38 @@ function IntegrationDetails({
   onSecretIssued,
   secretOperation,
   onUpdated,
+  onClose,
+  hasEnabledLocation,
 }: {
   integration: ExternalIntegration;
   accountId: string;
+  hasEnabledLocation: boolean;
+  onClose: () => void;
   locations: Location[];
   onDeleted: (integrationId: string) => Promise<void>;
   onSecretIssued: (secret: PendingOneTimeSecret) => void;
   secretOperation: SecretOperation;
   onUpdated: (integration: ExternalIntegration) => Promise<void>;
 }) {
-  const [name, setName] = useState(integration.name);
-  const [isEditingName, setIsEditingName] = useState(false);
+  const [editName, setEditName] = useState<string>();
+  const name = editName ?? integration.name;
   const [pendingAction, setPendingAction] = useState<string>();
   const [actionError, setActionError] = useState<unknown>();
+  const formId = useId();
 
-  async function rename(event: FormEvent<HTMLFormElement>) {
+  const hasChanges = name.trim() !== integration.name;
+
+  async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (pendingAction) return;
+    if (!hasChanges || pendingAction) return;
 
     setActionError(undefined);
-    setPendingAction("rename");
+    setPendingAction("save");
 
     try {
-      const updated = await renameExternalIntegration(integration.id, name);
-
-      await onUpdated(updated);
-      setName(updated.name);
-      setIsEditingName(false);
-      toast.success("Zapisano nazwę integracji");
+      await onUpdated(await renameExternalIntegration(integration.id, name));
+      onClose();
+      toast.success("Zapisano zmiany integracji");
     } catch (caught) {
       setActionError(caught);
     } finally {
@@ -130,166 +134,127 @@ function IntegrationDetails({
     }
   }
 
-  function cancelRename() {
-    setName(integration.name);
-    setIsEditingName(false);
-  }
-
   return (
-    <div className="flex flex-col gap-6">
-      {Boolean(actionError) && (
-        <Alert status="danger">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Title>
-              Nie udało się wykonać operacji na integracji
-            </Alert.Title>
-            <Alert.Description>
-              {getIntegrationErrorMessage(actionError)}
-            </Alert.Description>
-          </Alert.Content>
-        </Alert>
-      )}
-
+    <>
       <PanelDetailHeader
-        kind="Integracja"
-        status={{
-          isEnabled: integration.status === "ENABLED",
-          label: integration.status === "ENABLED" ? "Włączona" : "Wyłączona",
-        }}
+        status={lifecycleStatus(integration.status, "a")}
         title={integration.name}
-        titleAction={
-          !isEditingName ? (
-            <Tooltip delay={500}>
-              <Tooltip.Trigger>
-                <Button
-                  isIconOnly
-                  aria-label="Edytuj nazwę"
-                  className="entity-name-edit shrink-0"
-                  variant="tertiary"
-                  onPress={() => setIsEditingName(true)}
-                >
-                  <EditIcon size={17} />
-                </Button>
-              </Tooltip.Trigger>
-              <Tooltip.Content>Edytuj nazwę</Tooltip.Content>
-            </Tooltip>
-          ) : undefined
-        }
-        titleEditor={
-          isEditingName ? (
-            <form
-              className="control-row control-row--touch min-w-0 w-full sm:max-w-xl"
-              onSubmit={rename}
-            >
-              <FormTextField
-                fullWidth
-                isRequired
-                isDisabled={pendingAction === "rename"}
-                label="Nazwa integracji"
-                maxLength={64}
-                name="integration-name"
-                value={name}
-                onChange={setName}
-              />
-              <Tooltip delay={500}>
-                <Tooltip.Trigger>
-                  <Button
-                    aria-label="Zatwierdź nazwę"
-                    className="shrink-0 rounded-md"
-                    isPending={pendingAction === "rename"}
-                    type="submit"
-                  >
-                    <CheckIcon size={19} />
-                    Zapisz
-                  </Button>
-                </Tooltip.Trigger>
-                <Tooltip.Content>Potwierdź</Tooltip.Content>
-              </Tooltip>
-              <Tooltip delay={500}>
-                <Tooltip.Trigger>
-                  <Button
-                    aria-label="Anuluj edycję nazwy"
-                    className="shrink-0 rounded-md"
-                    isDisabled={pendingAction === "rename"}
-                    variant="tertiary"
-                    onPress={cancelRename}
-                  >
-                    Anuluj
-                  </Button>
-                </Tooltip.Trigger>
-                <Tooltip.Content>Anuluj</Tooltip.Content>
-              </Tooltip>
-            </form>
-          ) : undefined
-        }
-        trailingActions={
-          <>
-            {integration.status === "ENABLED" ? (
-              <HoldToConfirmButton
-                isDisabled={Boolean(pendingAction)}
-                isPending={pendingAction === "status"}
-                onConfirm={changeStatus}
-              >
-                <DisableIcon size={18} /> Przytrzymaj, aby wyłączyć
-              </HoldToConfirmButton>
-            ) : (
-              <Button
-                isDisabled={Boolean(pendingAction)}
-                isPending={pendingAction === "status"}
-                variant="secondary"
-                onPress={() => void changeStatus()}
-              >
-                <CheckIcon size={18} /> Włącz
-              </Button>
-            )}
+      />
+      <PanelPopup.Body className="flex flex-col gap-6">
+        {Boolean(actionError) && (
+          <Alert status="danger">
+            <Alert.Indicator />
+            <Alert.Content>
+              <Alert.Title>
+                Nie udało się wykonać operacji na integracji
+              </Alert.Title>
+              <Alert.Description>
+                {getIntegrationErrorMessage(actionError)}
+              </Alert.Description>
+            </Alert.Content>
+          </Alert>
+        )}
+        {/* The keys and webhooks tabs hold their own forms, so the name form is linked by id instead of nesting. */}
+        <form id={formId} onSubmit={save}>
+          <FormTextField
+            fullWidth
+            isRequired
+            isDisabled={Boolean(pendingAction)}
+            label="Nazwa integracji"
+            maxLength={64}
+            name="integration-name"
+            value={name}
+            onChange={setEditName}
+          />
+        </form>
+        {!hasEnabledLocation && (
+          <p className="text-sm text-muted">
+            Włącz lokal w zakładce Lokale, aby dodać klucze API lub webhooki.
+          </p>
+        )}
+
+        <Tabs>
+          <Tabs.ListContainer>
+            <Tabs.List aria-label={`${integration.name} — klucze i webhooki`}>
+              <Tabs.Tab id="api-keys">
+                <span className="tab-motion-content">Klucze API</span>
+                <Tabs.Indicator />
+              </Tabs.Tab>
+              <Tabs.Tab id="webhooks">
+                <span className="tab-motion-content">Webhooki</span>
+                <Tabs.Indicator />
+              </Tabs.Tab>
+            </Tabs.List>
+          </Tabs.ListContainer>
+          <Tabs.Panel className="pt-5" id="api-keys">
+            <ApiKeyManagement
+              accountId={accountId}
+              integrationId={integration.id}
+              locations={locations}
+              secretOperation={secretOperation}
+              onSecretIssued={onSecretIssued}
+            />
+          </Tabs.Panel>
+          <Tabs.Panel className="pt-5" id="webhooks">
+            <WebhookSubscriptionManagement
+              accountId={accountId}
+              integrationId={integration.id}
+              locations={locations}
+              secretOperation={secretOperation}
+              onSecretIssued={onSecretIssued}
+            />
+          </Tabs.Panel>
+        </Tabs>
+        <p className="text-sm text-muted">
+          Wyłączenie zablokuje klucze API i nowe webhooki do ponownego
+          włączenia.
+        </p>
+      </PanelPopup.Body>
+      <PanelPopup.Footer className="flex-wrap">
+        <div className="flex flex-wrap gap-2 sm:mr-auto">
+          {integration.status === "ENABLED" ? (
             <HoldToConfirmButton
               isDisabled={Boolean(pendingAction)}
-              isPending={pendingAction === "delete"}
-              onConfirm={remove}
+              isPending={pendingAction === "status"}
+              onConfirm={changeStatus}
             >
-              <TrashIcon size={18} /> Przytrzymaj, aby usunąć
+              <DisableIcon size={18} /> Przytrzymaj, aby wyłączyć
             </HoldToConfirmButton>
-          </>
-        }
-      />
-      <p className="text-sm text-muted">
-        Wyłączenie zablokuje klucze API i nowe webhooki do ponownego włączenia.
-      </p>
-
-      <Tabs>
-        <Tabs.ListContainer>
-          <Tabs.List aria-label={`${integration.name} — klucze i webhooki`}>
-            <Tabs.Tab id="api-keys">
-              <span className="tab-motion-content">Klucze API</span>
-              <Tabs.Indicator />
-            </Tabs.Tab>
-            <Tabs.Tab id="webhooks">
-              <span className="tab-motion-content">Webhooki</span>
-              <Tabs.Indicator />
-            </Tabs.Tab>
-          </Tabs.List>
-        </Tabs.ListContainer>
-        <Tabs.Panel className="pt-5" id="api-keys">
-          <ApiKeyManagement
-            accountId={accountId}
-            integrationId={integration.id}
-            locations={locations}
-            secretOperation={secretOperation}
-            onSecretIssued={onSecretIssued}
-          />
-        </Tabs.Panel>
-        <Tabs.Panel className="pt-5" id="webhooks">
-          <WebhookSubscriptionManagement
-            accountId={accountId}
-            integrationId={integration.id}
-            locations={locations}
-            secretOperation={secretOperation}
-            onSecretIssued={onSecretIssued}
-          />
-        </Tabs.Panel>
-      </Tabs>
-    </div>
+          ) : (
+            <Button
+              isDisabled={Boolean(pendingAction)}
+              isPending={pendingAction === "status"}
+              variant="secondary"
+              onPress={() => void changeStatus()}
+            >
+              <CheckIcon size={18} /> Włącz
+            </Button>
+          )}
+          <HoldToConfirmButton
+            isDisabled={Boolean(pendingAction)}
+            isPending={pendingAction === "delete"}
+            onConfirm={remove}
+          >
+            <TrashIcon size={18} /> Przytrzymaj, aby usunąć
+          </HoldToConfirmButton>
+        </div>
+        <Button
+          isDisabled={Boolean(pendingAction)}
+          slot="close"
+          variant="tertiary"
+        >
+          Anuluj
+        </Button>
+        <Button
+          form={formId}
+          isDisabled={!hasChanges}
+          isPending={pendingAction === "save"}
+          type="submit"
+        >
+          {pendingAction === "save" ? "Zapisywanie…" : "Zapisz"}
+        </Button>
+      </PanelPopup.Footer>
+    </>
   );
 }
 
@@ -474,9 +439,7 @@ export function IntegrationManagement({ accountId }: { accountId: string }) {
                 key={integration.id}
                 accessibilityLabel={`Pokaż integrację ${integration.name}, ${integration.status === "ENABLED" ? "włączona" : "wyłączona"}`}
                 isSelected={integration.id === selectedIntegration?.id}
-                status={
-                  integration.status === "ENABLED" ? "ENABLED" : "DISABLED"
-                }
+                status={lifecycleStatus(integration.status, "a")}
                 title={integration.name}
                 onPress={() => setSelectedIntegrationId(integration.id)}
               />
@@ -492,24 +455,18 @@ export function IntegrationManagement({ accountId }: { accountId: string }) {
                 if (!open) setSelectedIntegrationId(undefined);
               }}
             >
-              <PanelPopup.Body className="pb-6 pt-12">
-                {enabledLocations.length === 0 && (
-                  <p className="mb-5 text-sm text-muted">
-                    Włącz lokal w zakładce Lokale, aby dodać klucze API lub
-                    webhooki.
-                  </p>
-                )}
-                <IntegrationDetails
-                  key={selectedIntegration.id}
-                  accountId={accountId}
-                  integration={selectedIntegration}
-                  locations={locations}
-                  secretOperation={secretOperation}
-                  onDeleted={removeIntegration}
-                  onSecretIssued={secretIssued}
-                  onUpdated={updateIntegration}
-                />
-              </PanelPopup.Body>
+              <IntegrationDetails
+                key={selectedIntegration.id}
+                accountId={accountId}
+                hasEnabledLocation={enabledLocations.length > 0}
+                integration={selectedIntegration}
+                locations={locations}
+                secretOperation={secretOperation}
+                onClose={() => setSelectedIntegrationId(undefined)}
+                onDeleted={removeIntegration}
+                onSecretIssued={secretIssued}
+                onUpdated={updateIntegration}
+              />
             </PanelPopup>
           )}
         </>

@@ -7,7 +7,6 @@ import {
   ArrowUpRightIcon,
   ProhibitIcon as DisableIcon,
   CheckIcon as EnableIcon,
-  PencilSimpleIcon as EditIcon,
   PlusIcon,
   TrashIcon as DeleteIcon,
 } from "@phosphor-icons/react";
@@ -22,6 +21,7 @@ import { LocationCreationModal } from "@/components/location-creation-modal";
 import { LoadingIndicator } from "@/components/loading-indicator";
 import { PanelCard } from "@/components/panel-card";
 import { PanelDetailHeader } from "@/components/panel-detail-header";
+import { lifecycleStatus } from "@/components/status-chip";
 import { ApiError } from "@/src/api/api-fetch";
 import {
   staffLocationMenuKey,
@@ -30,6 +30,7 @@ import {
 } from "@/src/api/cache-keys";
 import {
   deleteLocation,
+  googleReviewUrlSchema,
   listLocations,
   managedLocationNameSchema,
   renameLocation,
@@ -38,7 +39,12 @@ import {
   updateLocationReviewLink,
   type Location,
 } from "@/src/api/locations";
-import { getLocationMenu, listMenus, setLocationMenu } from "@/src/api/menus";
+import {
+  getLocationMenu,
+  listMenus,
+  setLocationMenu,
+  type Menu,
+} from "@/src/api/menus";
 
 const activeOrdersProblemType = "urn:kairos:problem:location-active-orders";
 
@@ -77,32 +83,30 @@ const noMenuKey = "none";
 
 function LocationMenuSelect({
   accountId,
-  location,
+  activeMenu,
+  isActiveMenuLoading,
+  isDisabled,
+  loadError,
+  selectedKey,
+  onSelectionChange,
 }: {
   accountId: string;
-  location: Location;
+  activeMenu: Menu | null | undefined;
+  isActiveMenuLoading: boolean;
+  isDisabled: boolean;
+  loadError: unknown;
+  selectedKey: string;
+  onSelectionChange: (menuId: string) => void;
 }) {
-  const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<unknown>();
   const {
     data: menus = [],
     error: menusError,
-    isLoading: areMenusLoading,
+    isLoading,
   } = useSWR(staffMenusKey(accountId), listMenus, {
     errorRetryCount: 3,
     shouldRetryOnError,
   });
-  const {
-    data: activeMenu,
-    error: activeMenuError,
-    isLoading,
-    mutate,
-  } = useSWR(
-    staffLocationMenuKey(accountId, location.id),
-    () => getLocationMenu(location.id),
-    { errorRetryCount: 3, shouldRetryOnError },
-  );
-  const loadError = menusError ?? activeMenuError;
+  const error = menusError ?? loadError;
   const items = [
     { id: noMenuKey, name: "Bez menu" },
     ...menus,
@@ -111,57 +115,32 @@ function LocationMenuSelect({
       : []),
   ];
 
-  async function select(menuId: string) {
-    if (isSaving) return;
-    setError(undefined);
-    setIsSaving(true);
-    try {
-      const updated = await setLocationMenu(
-        location.id,
-        menuId === noMenuKey ? null : menuId,
-      );
-
-      await mutate(updated, { revalidate: false });
-    } catch (caught) {
-      setError(caught);
-    } finally {
-      setIsSaving(false);
-    }
+  if ((isLoading || isActiveMenuLoading) && !error) {
+    return <LoadingIndicator label="Wczytywanie menu lokalu" />;
   }
 
   return (
-    <div className="mt-6 flex flex-col gap-2">
-      {(isLoading || areMenusLoading) && !loadError ? (
-        <LoadingIndicator label="Wczytywanie menu lokalu" />
-      ) : (
-        <FormSelect
-          className="w-full sm:max-w-xs"
-          isDisabled={isLoading || isSaving || Boolean(loadError)}
-          label="Menu lokalu"
-          selectedKey={loadError ? null : (activeMenu?.id ?? noMenuKey)}
-          onSelectionChange={(key) => {
-            if (key !== null) void select(String(key));
-          }}
-        >
-          <ListBox items={items}>
-            {(item) => (
-              <ListBox.Item id={item.id} textValue={item.name}>
-                {item.name}
-              </ListBox.Item>
-            )}
-          </ListBox>
-        </FormSelect>
-      )}
-      {loadError && (
-        <p className="text-sm text-danger" role="alert">
-          Nie udało się wczytać menu tego lokalu.
-        </p>
-      )}
+    <div className="flex flex-col gap-2">
+      <FormSelect
+        className="w-full sm:max-w-xs"
+        isDisabled={isDisabled || Boolean(error)}
+        label="Menu lokalu"
+        selectedKey={error ? null : selectedKey}
+        onSelectionChange={(key) => {
+          if (key !== null) onSelectionChange(String(key));
+        }}
+      >
+        <ListBox items={items}>
+          {(item) => (
+            <ListBox.Item id={item.id} textValue={item.name}>
+              {item.name}
+            </ListBox.Item>
+          )}
+        </ListBox>
+      </FormSelect>
       {error !== undefined && (
         <p className="text-sm text-danger" role="alert">
-          {error instanceof ApiError
-            ? error.message
-            : "Nie udało się zmienić menu lokalu. Sprawdź połączenie i spróbuj ponownie."}
+          Nie udało się wczytać menu tego lokalu.
         </p>
       )}
     </div>
@@ -182,6 +161,7 @@ export function LocationManagement({
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editName, setEditName] = useState<string>();
   const [editReviewUrl, setEditReviewUrl] = useState<string>();
+  const [editMenuId, setEditMenuId] = useState<string>();
   const [error, setError] = useState<unknown>();
   const [actionError, setActionError] = useState<unknown>();
   const [pendingAction, setPendingAction] = useState<string>();
@@ -199,6 +179,27 @@ export function LocationManagement({
   const selectedLocation = locations.find(
     (location) => location.id === selectedLocationId,
   );
+  const {
+    data: activeMenu,
+    error: activeMenuError,
+    isLoading: isActiveMenuLoading,
+    mutate: mutateActiveMenu,
+  } = useSWR(
+    selectedLocationId
+      ? staffLocationMenuKey(accountId, selectedLocationId)
+      : null,
+    () => getLocationMenu(selectedLocationId!),
+    { errorRetryCount: 3, shouldRetryOnError },
+  );
+  const savedMenuId = activeMenu?.id ?? noMenuKey;
+  const name = editName ?? selectedLocation?.name ?? "";
+  const reviewUrl = editReviewUrl ?? selectedLocation?.googleReviewUrl ?? "";
+  const menuId = editMenuId ?? savedMenuId;
+  const isNameChanged = name.trim() !== selectedLocation?.name;
+  const isReviewUrlChanged =
+    reviewUrl.trim() !== (selectedLocation?.googleReviewUrl ?? "");
+  const isMenuChanged = menuId !== savedMenuId;
+  const hasChanges = isNameChanged || isReviewUrlChanged || isMenuChanged;
   const hasActiveOrdersConflict =
     actionError instanceof ApiError &&
     actionError.problem?.type === activeOrdersProblemType;
@@ -207,6 +208,7 @@ export function LocationManagement({
     setSelectedLocationId(locationId);
     setEditName(undefined);
     setEditReviewUrl(undefined);
+    setEditMenuId(undefined);
     setError(undefined);
     setActionError(undefined);
   }
@@ -229,41 +231,39 @@ export function LocationManagement({
     );
   }
 
-  async function submitRename(event: FormEvent<HTMLFormElement>) {
+  // Each changed field has its own endpoint; a failure keeps the draft so Save can retry the rest.
+  async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!selectedLocation || editName === undefined || pendingAction) return;
+    if (!selectedLocation || !hasChanges || pendingAction) return;
 
     setError(undefined);
-    setPendingAction("rename");
+    setPendingAction("save");
     try {
-      const name = managedLocationNameSchema.parse(editName);
-      const updated = await renameLocation(selectedLocation.id, name);
+      // Validate every changed field before the first request.
+      if (isNameChanged) managedLocationNameSchema.parse(name);
+      if (isReviewUrlChanged) googleReviewUrlSchema.parse(reviewUrl);
 
-      await updateCachedLocation(updated);
-      setEditName(undefined);
-      toast.success("Zapisano nazwę lokalu");
-      void mutateLocations();
-    } catch (caught) {
-      setError(caught);
-    } finally {
-      setPendingAction(undefined);
-    }
-  }
-
-  async function submitReviews(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!selectedLocation || pendingAction) return;
-    setError(undefined);
-    setPendingAction("reviews");
-    try {
-      const updated = await updateLocationReviewLink(
-        selectedLocation.id,
-        editReviewUrl ?? selectedLocation.googleReviewUrl ?? "",
-      );
-
-      await updateCachedLocation(updated);
-      setEditReviewUrl(undefined);
-      toast.success("Zapisano link do opinii");
+      if (isNameChanged) {
+        await updateCachedLocation(
+          await renameLocation(selectedLocation.id, name),
+        );
+      }
+      if (isReviewUrlChanged) {
+        await updateCachedLocation(
+          await updateLocationReviewLink(selectedLocation.id, reviewUrl),
+        );
+      }
+      if (isMenuChanged) {
+        await mutateActiveMenu(
+          await setLocationMenu(
+            selectedLocation.id,
+            menuId === noMenuKey ? null : menuId,
+          ),
+          { revalidate: false },
+        );
+      }
+      selectLocation();
+      toast.success("Zapisano zmiany lokalu");
       void mutateLocations();
     } catch (caught) {
       setError(caught);
@@ -361,7 +361,7 @@ export function LocationManagement({
                 key={location.id}
                 accessibilityLabel={`Pokaż lokal ${location.name}, ${location.status === "ENABLED" ? "włączony" : "wyłączony"}`}
                 isSelected={location.id === selectedLocation?.id}
-                status={location.status}
+                status={lifecycleStatus(location.status, "y")}
                 title={location.name}
                 onPress={() => {
                   selectLocation(location.id);
@@ -380,229 +380,168 @@ export function LocationManagement({
                 if (!open) selectLocation();
               }}
             >
-              <PanelPopup.Body className="pb-6 pt-12">
-                <PanelDetailHeader
-                  kind="Lokal"
-                  status={{
-                    isEnabled: selectedLocation.status === "ENABLED",
-                    label:
-                      selectedLocation.status === "ENABLED"
-                        ? "Włączony"
-                        : "Wyłączony",
-                  }}
-                  title={selectedLocation.name}
-                  titleAction={
-                    canManageLocations && editName === undefined ? (
-                      <Tooltip delay={500}>
-                        <Tooltip.Trigger>
-                          <Button
-                            isIconOnly
-                            aria-label="Edytuj nazwę lokalu"
-                            className="entity-name-edit shrink-0"
-                            isDisabled={Boolean(pendingAction)}
-                            variant="secondary"
-                            onPress={() => setEditName(selectedLocation.name)}
-                          >
-                            <EditIcon size={18} />
-                          </Button>
-                        </Tooltip.Trigger>
-                        <Tooltip.Content>Edytuj nazwę lokalu</Tooltip.Content>
-                      </Tooltip>
-                    ) : undefined
-                  }
-                  titleEditor={
-                    editName === undefined ? undefined : (
-                      <form
-                        className="flex min-w-0 items-end gap-2"
-                        onSubmit={submitRename}
-                      >
-                        <FormTextField
-                          fullWidth
-                          isRequired
-                          isDisabled={pendingAction === "rename"}
-                          label="Nazwa lokalu"
-                          maxLength={120}
-                          name="location-name"
-                          value={editName}
-                          onChange={(value) => {
-                            setEditName(value);
-                            setError(undefined);
-                          }}
-                        />
-                        <Tooltip delay={500}>
-                          <Tooltip.Trigger>
-                            <Button
-                              aria-label="Zapisz nazwę lokalu"
-                              className="shrink-0 rounded-md"
-                              isPending={pendingAction === "rename"}
-                              type="submit"
-                            >
-                              Zapisz
-                            </Button>
-                          </Tooltip.Trigger>
-                          <Tooltip.Content>Zapisz</Tooltip.Content>
-                        </Tooltip>
-                        <Tooltip delay={500}>
-                          <Tooltip.Trigger>
-                            <Button
-                              aria-label="Anuluj edycję nazwy lokalu"
-                              className="shrink-0 rounded-md"
-                              isDisabled={pendingAction === "rename"}
-                              variant="tertiary"
-                              onPress={() => {
-                                setEditName(undefined);
-                                setEditReviewUrl(undefined);
-                                setError(undefined);
-                              }}
-                            >
-                              Anuluj
-                            </Button>
-                          </Tooltip.Trigger>
-                          <Tooltip.Content>Anuluj</Tooltip.Content>
-                        </Tooltip>
-                      </form>
-                    )
-                  }
-                  trailingActions={
-                    canManageLocations && editName === undefined ? (
-                      <>
-                        {selectedLocation.status === "ENABLED" ? (
-                          <HoldToConfirmButton
-                            isDisabled={Boolean(pendingAction)}
-                            isPending={
-                              pendingAction === `disable-${selectedLocation.id}`
-                            }
-                            onConfirm={() =>
-                              confirmAction({
-                                kind: "disable",
-                                location: selectedLocation,
-                              })
-                            }
-                          >
-                            <DisableIcon size={18} /> Przytrzymaj, aby wyłączyć
-                          </HoldToConfirmButton>
-                        ) : (
-                          <Button
-                            isDisabled={Boolean(pendingAction)}
-                            isPending={
-                              pendingAction === `enable-${selectedLocation.id}`
-                            }
-                            variant="secondary"
-                            onPress={() =>
-                              void confirmAction({
-                                kind: "enable",
-                                location: selectedLocation,
-                              })
-                            }
-                          >
-                            <EnableIcon size={18} /> Włącz
-                          </Button>
-                        )}
+              <PanelDetailHeader
+                status={lifecycleStatus(selectedLocation.status, "y")}
+                title={selectedLocation.name}
+              />
+              <form onSubmit={save}>
+                <PanelPopup.Body className="flex flex-col gap-5">
+                  {error !== undefined && (
+                    <Alert status="danger">
+                      <Alert.Content>
+                        <Alert.Title>Nie udało się zapisać zmian</Alert.Title>
+                        <Alert.Description>
+                          {getErrorMessage(error)}
+                        </Alert.Description>
+                      </Alert.Content>
+                    </Alert>
+                  )}
+                  {canManageLocations && (
+                    <FormTextField
+                      fullWidth
+                      isRequired
+                      isDisabled={Boolean(pendingAction)}
+                      label="Nazwa lokalu"
+                      maxLength={120}
+                      name="location-name"
+                      value={name}
+                      onChange={setEditName}
+                    />
+                  )}
+                  <LocationMenuSelect
+                    accountId={accountId}
+                    activeMenu={activeMenu}
+                    isActiveMenuLoading={isActiveMenuLoading}
+                    isDisabled={Boolean(pendingAction)}
+                    loadError={activeMenuError}
+                    selectedKey={menuId}
+                    onSelectionChange={setEditMenuId}
+                  />
+                  {canManageLocations && (
+                    <div className="flex flex-col gap-2">
+                      <FormTextField
+                        fullWidth
+                        inputProps={{ type: "url" }}
+                        isDisabled={Boolean(pendingAction)}
+                        label="Link do opinii Google"
+                        maxLength={2048}
+                        name="google-review-url"
+                        value={reviewUrl}
+                        onChange={setEditReviewUrl}
+                      />
+                      <p className="secondary-text">
+                        Klient zobaczy prośbę o opinię po odebraniu zamówienia.
+                        Puste pole wyłącza prośby.
+                      </p>
+                    </div>
+                  )}
+                  {actionError !== undefined && (
+                    <Alert status="danger">
+                      <Alert.Content>
+                        <Alert.Title>
+                          Nie udało się wykonać operacji na lokalu
+                        </Alert.Title>
+                        <Alert.Description>
+                          {hasActiveOrdersConflict
+                            ? "Najpierw zakończ lub anuluj aktywne zamówienia."
+                            : getErrorMessage(actionError)}
+                        </Alert.Description>
+                      </Alert.Content>
+                    </Alert>
+                  )}
+                  {hasActiveOrdersConflict && (
+                    <Button
+                      className="self-start"
+                      variant="secondary"
+                      onPress={() => {
+                        selectLocation();
+                        onViewOrders(selectedLocation.id);
+                      }}
+                    >
+                      <ArrowUpRightIcon size={18} /> Pokaż zamówienia
+                    </Button>
+                  )}
+                  {canManageLocations && (
+                    <p className="text-sm text-muted">
+                      {selectedLocation.status === "ENABLED"
+                        ? "Wyłączenie wyloguje przypisane konta i unieważni zaproszenia."
+                        : locations.length <= 1
+                          ? "Ostatni lokal można wyłączyć, ale nie można go usunąć."
+                          : "Usunięcia lokalu i jego kont nie można cofnąć."}
+                    </p>
+                  )}
+                </PanelPopup.Body>
+                <PanelPopup.Footer className="flex-wrap">
+                  {canManageLocations && (
+                    <div className="flex flex-wrap gap-2 sm:mr-auto">
+                      {selectedLocation.status === "ENABLED" ? (
                         <HoldToConfirmButton
-                          isDisabled={
-                            Boolean(pendingAction) ||
-                            locations.length <= 1 ||
-                            selectedLocation.status !== "DISABLED"
-                          }
+                          isDisabled={Boolean(pendingAction)}
                           isPending={
-                            pendingAction === `delete-${selectedLocation.id}`
+                            pendingAction === `disable-${selectedLocation.id}`
                           }
                           onConfirm={() =>
                             confirmAction({
-                              kind: "delete",
+                              kind: "disable",
                               location: selectedLocation,
                             })
                           }
                         >
-                          <DeleteIcon size={18} /> Przytrzymaj, aby usunąć
+                          <DisableIcon size={18} /> Przytrzymaj, aby wyłączyć
                         </HoldToConfirmButton>
-                      </>
-                    ) : null
-                  }
-                />
-                {canManageLocations && (
-                  <p className="mt-4 text-sm text-muted">
-                    {selectedLocation.status === "ENABLED"
-                      ? "Wyłączenie wyloguje przypisane konta i unieważni zaproszenia."
-                      : "Usunięcia lokalu i jego kont nie można cofnąć."}
-                  </p>
-                )}
-                {actionError !== undefined && (
-                  <Alert status="danger">
-                    <Alert.Content>
-                      <Alert.Title>
-                        Nie udało się wykonać operacji na lokalu
-                      </Alert.Title>
-                      <Alert.Description>
-                        {hasActiveOrdersConflict
-                          ? "Najpierw zakończ lub anuluj aktywne zamówienia."
-                          : getErrorMessage(actionError)}
-                      </Alert.Description>
-                    </Alert.Content>
-                  </Alert>
-                )}
-                {hasActiveOrdersConflict && (
+                      ) : (
+                        <Button
+                          isDisabled={Boolean(pendingAction)}
+                          isPending={
+                            pendingAction === `enable-${selectedLocation.id}`
+                          }
+                          variant="secondary"
+                          onPress={() =>
+                            void confirmAction({
+                              kind: "enable",
+                              location: selectedLocation,
+                            })
+                          }
+                        >
+                          <EnableIcon size={18} /> Włącz
+                        </Button>
+                      )}
+                      <HoldToConfirmButton
+                        isDisabled={
+                          Boolean(pendingAction) ||
+                          locations.length <= 1 ||
+                          selectedLocation.status !== "DISABLED"
+                        }
+                        isPending={
+                          pendingAction === `delete-${selectedLocation.id}`
+                        }
+                        onConfirm={() =>
+                          confirmAction({
+                            kind: "delete",
+                            location: selectedLocation,
+                          })
+                        }
+                      >
+                        <DeleteIcon size={18} /> Przytrzymaj, aby usunąć
+                      </HoldToConfirmButton>
+                    </div>
+                  )}
                   <Button
-                    variant="secondary"
-                    onPress={() => {
-                      selectLocation();
-                      onViewOrders(selectedLocation.id);
-                    }}
+                    isDisabled={Boolean(pendingAction)}
+                    slot="close"
+                    variant="tertiary"
                   >
-                    <ArrowUpRightIcon size={18} /> Pokaż zamówienia
+                    Anuluj
                   </Button>
-                )}
-                {error !== undefined && (
-                  <Alert status="danger">
-                    <Alert.Content>
-                      <Alert.Title>Nie udało się zapisać zmian</Alert.Title>
-                      <Alert.Description>
-                        {getErrorMessage(error)}
-                      </Alert.Description>
-                    </Alert.Content>
-                  </Alert>
-                )}
-                <LocationMenuSelect
-                  accountId={accountId}
-                  location={selectedLocation}
-                />
-                {canManageLocations && (
-                  <form
-                    className="mt-6 flex flex-col gap-3"
-                    onSubmit={submitReviews}
+                  <Button
+                    isDisabled={!hasChanges}
+                    isPending={pendingAction === "save"}
+                    type="submit"
                   >
-                    <FormTextField
-                      fullWidth
-                      inputProps={{ type: "url" }}
-                      isDisabled={Boolean(pendingAction)}
-                      label="Link do opinii Google"
-                      maxLength={2048}
-                      name="google-review-url"
-                      value={
-                        editReviewUrl ?? selectedLocation.googleReviewUrl ?? ""
-                      }
-                      onChange={setEditReviewUrl}
-                    />
-                    <p className="secondary-text">
-                      Klient zobaczy prośbę o opinię po odebraniu zamówienia.
-                      Puste pole wyłącza prośby.
-                    </p>
-                    <Button
-                      className="self-start"
-                      isDisabled={Boolean(pendingAction)}
-                      isPending={pendingAction === "reviews"}
-                      type="submit"
-                    >
-                      Zapisz ustawienia opinii
-                    </Button>
-                  </form>
-                )}
-                {canManageLocations && locations.length <= 1 && (
-                  <p className="mt-4 text-sm text-muted">
-                    Ostatni lokal można wyłączyć, ale nie można go usunąć.
-                  </p>
-                )}
-              </PanelPopup.Body>
+                    {pendingAction === "save" ? "Zapisywanie…" : "Zapisz"}
+                  </Button>
+                </PanelPopup.Footer>
+              </form>
             </PanelPopup>
           )}
         </>

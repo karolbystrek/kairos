@@ -180,9 +180,10 @@ invitation requires replacement confirmation. Resend also requires confirmation
 and replaces the old invitation with a new token and seven-day expiry. The caller
 must have authority over both old and new targets.
 
-Accounts includes non-archived created accounts and full invitation history,
-showing recipient, role, location, creation/expiry and issuer, lifecycle state and
-email delivery state. Terminal invitations remain in history; entries appear
+Accounts includes non-archived created accounts and invitation history,
+showing recipient, role, location, creation/expiry and one status chip as defined
+in [invitation cards](accounts-invitations.md#invitation-cards-and-synchronization).
+Revoked, replaced and expired invitations remain listed; entries appear
 newest first without sorting or paging controls. Managers see only operator
 invitations for their location;
 administrators see the tenant. Active pending invitations expose Resend even
@@ -196,18 +197,26 @@ hold confirmation; Delete uses hold confirmation. Both enabled and disabled
 manageable accounts can be deleted.
 
 Integration details retain the compact segmented control between API Keys and
-Webhooks and their one-time secret handling. Detail headers share the
-resource-type eyebrow, title or inline editor, and stable trailing action rail.
-Integration identity becomes editable only through Edit; direct confirm/cancel
-controls replace the title in edit mode. Contextual labels omit a repeated
+Webhooks and their one-time secret handling.
+
+Every entity detail popup uses one sheet layout. The header row holds the title
+and its status chip at the top left, level with Close. The body lists editable
+fields first, then read-only facts that are not already in the title. The footer
+holds immediate lifecycle actions (Disable or Enable, Delete, and invitation
+Revoke/Resend) and, for editable entities, one **Cancel**/**Save** pair that
+commits every changed field together. Save is unavailable until something
+changed and closes the popup on success; a failed save keeps the draft and
+shows the error. Locations, Accounts, External Integrations and Webhook
+Subscriptions show an Enabled or Disabled chip; Menus and API Keys have none.
+Contextual labels omit a repeated
 entity name when the popup makes the target unambiguous. The new-integration
 popup uses the direct **Integration name** placeholder with an accessible label.
 
 Location cards retain enabled-first display-name ordering with stable identity
-as a tie-breaker. The popup action rail contains Edit, Disable or Enable, and
+as a tie-breaker. Location details edit the name, active menu and Google review
+link and commit them with Save. The footer contains Disable or Enable, and
 Delete. Delete remains visible but unavailable until the location is disabled
-and another non-archived location exists. Details include the location's
-active-menu choice, saved as soon as it changes. Details explain that the last location
+and another non-archived location exists. Details explain that the last location
 can be disabled but cannot be deleted, and offer no time-zone editor or unrelated
 operational fields.
 

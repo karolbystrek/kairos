@@ -1,53 +1,22 @@
-import type { ReactNode } from "react";
+import type { EntityStatus } from "@/components/status-chip";
 
-import { Chip } from "@heroui/react";
+import { PanelPopup } from "@/components/panel-popup";
+import { StatusChip } from "@/components/status-chip";
 
+// Title and status share the top row with the popup's Close control.
 export function PanelDetailHeader({
-  kind,
   status,
   title,
-  titleEditor,
-  titleAction,
-  trailingActions,
 }: {
-  kind: string;
-  status?: { isEnabled: boolean; label: string };
+  status?: EntityStatus;
   title: string;
-  titleEditor?: ReactNode;
-  titleAction?: ReactNode;
-  trailingActions: ReactNode;
 }) {
   return (
-    <header className="min-w-0">
-      <div className="flex min-w-0 flex-wrap items-center gap-3">
-        <div className="min-w-0 flex-[1_1_14rem]">
-          {titleEditor ?? (
-            <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <h2 className="break-words text-2xl font-semibold tracking-tight">
-                {title}
-              </h2>
-              {titleAction}
-              {status && (
-                <Chip
-                  className="shrink-0"
-                  color={status.isEnabled ? "success" : "default"}
-                  size="sm"
-                  variant="soft"
-                >
-                  {status.label}
-                </Chip>
-              )}
-            </div>
-          )}
-        </div>
-        <div
-          aria-label={`${kind} — opcje`}
-          className="grid min-w-0 flex-[1_1_20rem] grid-cols-2 items-center gap-2 [&_.button]:w-full [&_.button]:h-auto [&_.button]:min-h-[var(--control-regular)] [&_.button]:whitespace-normal"
-          role="group"
-        >
-          {trailingActions}
-        </div>
-      </div>
-    </header>
+    <PanelPopup.Header className="flex-row flex-wrap items-center gap-x-3 gap-y-1">
+      <PanelPopup.Heading className="min-w-0 break-words text-2xl font-semibold tracking-tight">
+        {title}
+      </PanelPopup.Heading>
+      {status && <StatusChip status={status} />}
+    </PanelPopup.Header>
   );
 }
