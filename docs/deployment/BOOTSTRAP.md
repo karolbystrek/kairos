@@ -162,7 +162,7 @@ ssh -o StrictHostKeyChecking=yes -i "$HOME/.ssh/kairos-deploy" kairos-deploy@52.
 ```
 
 The playbook also verifies Docker access and the Compose options required by
-`deploy.sh`. Through administrator access, verify Docker is enabled for reboot:
+`deploy.py`. Through administrator access, verify Docker is enabled for reboot:
 
 ```sh
 systemctl is-enabled docker

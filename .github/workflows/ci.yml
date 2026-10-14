@@ -11,6 +11,12 @@ on:
 permissions:
   contents: read
 
+# Only pull requests share a group, so superseded PR pushes cancel; other runs
+# (including deploy.yml's call, which has no workflow-level group) never queue.
+concurrency:
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   frontend:
     name: Frontend (${{ matrix.app }})
@@ -44,27 +50,12 @@ jobs:
 
       - name: Validate build inputs
         shell: bash
+        env:
+          APP: ${{ matrix.app }}
         run: |
-          invalid=false
-
-          if [[ -z "${NEXT_PUBLIC_API_BASE_URL}" ]]; then
-            echo "::error::Set the NEXT_PUBLIC_API_BASE_URL repository variable."
-            invalid=true
-          fi
-
-          if [[ -z "${NEXT_PUBLIC_CUSTOMER_APP_URL}" ]]; then
-            echo "::error::Set the NEXT_PUBLIC_CUSTOMER_APP_URL repository variable."
-            invalid=true
-          fi
-
-          if [[ "${{ matrix.app }}" == "panel-app" && -z "${NEXT_PUBLIC_PANEL_APP_URL}" ]]; then
-            echo "::error::Set the NEXT_PUBLIC_PANEL_APP_URL repository variable."
-            invalid=true
-          fi
-
-          if [[ "${invalid}" == "true" ]]; then
-            exit 1
-          fi
+          : "${NEXT_PUBLIC_API_BASE_URL:?Set the NEXT_PUBLIC_API_BASE_URL repository variable.}"
+          : "${NEXT_PUBLIC_CUSTOMER_APP_URL:?Set the NEXT_PUBLIC_CUSTOMER_APP_URL repository variable.}"
+          [[ "$APP" != panel-app ]] || : "${NEXT_PUBLIC_PANEL_APP_URL:?Set the NEXT_PUBLIC_PANEL_APP_URL repository variable.}"
 
       - name: Dependency cache
         id: deps
@@ -134,13 +125,6 @@ jobs:
         run: |
           ansible-playbook -i deployment/inventory.example.ini deployment/bootstrap.yml --syntax-check
           sh tests/bootstrap-test.sh
-
-      - name: Verify gateway and setup prerequisites
-        run: |
-          docker info > /dev/null
-          docker compose version
-          openssl version
-          docker pull nginx:1.28-alpine
 
       - name: Test gateway and secret preservation
         run: |

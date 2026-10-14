@@ -37,7 +37,7 @@ requires an identical archive. For an authorized manual invocation, use that
 same verified, extracted artifact, not files from the moving main checkout:
 
 ```bash
-bash "/srv/kairos/releases/${KAIROS_REVISION}/deployment/deploy.sh" \
+python3 "/srv/kairos/releases/${KAIROS_REVISION}/deployment/deploy.py" \
   "/srv/kairos/releases/${KAIROS_REVISION}" /srv/kairos/production.env
 ```
 

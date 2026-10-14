@@ -9,7 +9,7 @@ import sys
 import tarfile
 import tempfile
 
-from deploy import inputs, failure_reason, ValidationError
+from deploy import inputs, failure_reason, ValidationError, REVISION
 from release_manifest import RUNTIME_FILES
 
 TEMPLATE = Path(__file__).with_name('production.env.example')
@@ -42,7 +42,7 @@ def main():
     stage = 'release validation'
     try:
         artifact, revision = Path(sys.argv[1]), sys.argv[2]
-        if not re.fullmatch(r'[0-9a-f]{40}', revision):
+        if not re.fullmatch(REVISION, revision):
             raise ValidationError('invalid workflow revision')
         with tempfile.TemporaryDirectory(prefix='kairos-actions-') as directory:
             scratch = Path(directory)
@@ -122,7 +122,7 @@ trap 'rm -f -- "$configuration"' EXIT
 cat > "$configuration" <<'KAIROS_PRODUCTION_ENV'
 ''' + configuration + '''KAIROS_PRODUCTION_ENV
 mv -f "$configuration" /srv/kairos/production.env
-bash "$release/deployment/deploy.sh" "$release" /srv/kairos/production.env
+python3 "$release/deployment/deploy.py" "$release" /srv/kairos/production.env
 ''', timeout=3600)
             finally:
                 # Only a validated temporary path is removed; activated releases persist.

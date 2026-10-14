@@ -1,25 +1,13 @@
 services:
   nginx:
-    environment:
-      KAIROS_NGINX_LISTEN: "443 ssl"
-      KAIROS_NGINX_REAL_IP_CONFIGURATION: ""
-      KAIROS_NGINX_TLS_CONFIGURATION: |-
-        ssl_certificate /run/secrets/tls/tls.crt;
-        ssl_certificate_key /run/secrets/tls/tls.key;
     ports:
       - "127.0.0.1:443:443"
-    volumes:
-      - type: bind
-        source: ./secrets/tls
-        target: /run/secrets/tls
-        read_only: true
-        bind:
-          create_host_path: false
 
   customer-app:
     build:
       context: ./apps/customer-app
-      dockerfile: Dockerfile
+      # Both frontends share one Next.js Dockerfile; each keeps its own context and .dockerignore.
+      dockerfile: ../panel-app/Dockerfile
       target: runner
       args:
         NEXT_PUBLIC_API_BASE_URL:
@@ -46,43 +34,3 @@ services:
       context: ./apps/api
       dockerfile: Dockerfile
       target: runner
-    volumes:
-      - type: bind
-        source: ./secrets/email-encryption.bin
-        target: /run/secrets/email-encryption.bin
-        read_only: true
-        bind:
-          create_host_path: false
-      - type: bind
-        source: ./secrets/webhook-encryption.bin
-        target: /run/secrets/webhook-encryption.bin
-        read_only: true
-        bind:
-          create_host_path: false
-      - type: bind
-        source: ./secrets/vapid-private.pem
-        target: /run/secrets/vapid-private.pem
-        read_only: true
-        bind:
-          create_host_path: false
-      - type: bind
-        source: ./secrets/vapid-public.pem
-        target: /run/secrets/vapid-public.pem
-        read_only: true
-        bind:
-          create_host_path: false
-      - type: bind
-        source: ./secrets/push-subscription-encryption.bin
-        target: /run/secrets/push-subscription-encryption.bin
-        read_only: true
-        bind:
-          create_host_path: false
-
-  zitadel:
-    volumes:
-      - type: bind
-        source: ./secrets/zitadel-masterkey
-        target: /run/secrets/zitadel-masterkey
-        read_only: true
-        bind:
-          create_host_path: false
