@@ -4,7 +4,7 @@ import { request } from "./api-fetch";
 
 import { apiBaseUrl } from "@/src/config/public-environment";
 
-export const orderStatusSchema = z.enum([
+const orderStatusSchema = z.enum([
   "IN_PREPARATION",
   "READY",
   "COMPLETED",
@@ -13,12 +13,12 @@ export const orderStatusSchema = z.enum([
 
 export const activeOrderStatusSchema = z.enum(["IN_PREPARATION", "READY"]);
 
-export const orderItemSchema = z.object({
+const orderItemSchema = z.object({
   name: z.string().min(1),
   quantity: z.number().int().min(1).max(99),
 });
 
-export const staffOrderSchema = z.object({
+const staffOrderSchema = z.object({
   id: z.uuid(),
   locationId: z.uuid(),
   trackingReference: z.uuid(),
@@ -56,7 +56,7 @@ export function subscribeToOrderQueue(
 
 export const maximumOrderLabelLength = 80;
 
-export const orderLabelSchema = z
+const orderLabelSchema = z
   .string()
   .trim()
   .refine(
@@ -68,7 +68,7 @@ export const orderLabelSchema = z
     "Użyj jednej linii tekstu.",
   );
 
-export type OrderItem = z.infer<typeof orderItemSchema>;
+type OrderItem = z.infer<typeof orderItemSchema>;
 
 // Prefills the editable label from chosen items, shortened to the label limit.
 export function describeOrderItems(items: OrderItem[]): string {
@@ -94,7 +94,7 @@ export const createOrderInputSchema = z.object({
 });
 
 export type OrderStatus = z.infer<typeof orderStatusSchema>;
-export type ActiveOrderStatus = z.infer<typeof activeOrderStatusSchema>;
+type ActiveOrderStatus = z.infer<typeof activeOrderStatusSchema>;
 export type StaffOrder = z.infer<typeof staffOrderSchema>;
 export type CreateOrderInput = z.infer<typeof createOrderInputSchema>;
 

@@ -43,13 +43,11 @@ const redemptionInputSchema = z.object({
 
 export type AccountInvitation = z.infer<typeof invitationSchema>;
 export type CreatedAccountInvitation = AccountInvitation;
-export type AccountInvitationPreview = z.infer<typeof previewSchema>;
+type AccountInvitationPreview = z.infer<typeof previewSchema>;
 export type CreateAccountInvitationInput = z.input<
   typeof createInvitationInputSchema
 >;
-export type RedeemAccountInvitationInput = z.input<
-  typeof redemptionInputSchema
->;
+type RedeemAccountInvitationInput = z.input<typeof redemptionInputSchema>;
 
 export function listAccountInvitations() {
   return request("/api/account-invitations/v1", invitationsSchema);

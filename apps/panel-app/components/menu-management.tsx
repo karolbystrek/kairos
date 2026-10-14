@@ -15,15 +15,13 @@ import {
 import { TrashIcon as DeleteIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 import useSWR from "swr";
-import { ZodError } from "zod";
 
 import { FormSelect } from "@/components/form-controls";
 import { HoldToConfirmButton } from "@/components/hold-to-confirm-button";
 import { LoadingIndicator } from "@/components/loading-indicator";
 import { LocationSelect } from "@/components/order-management";
-import { ApiError } from "@/src/api/api-fetch";
-import { staffLocationMenuKey, staffLocationsKey } from "@/src/api/cache-keys";
-import { listLocations } from "@/src/api/locations";
+import { staffLocationMenuKey } from "@/src/api/cache-keys";
+import { useStaffLocations } from "@/src/api/locations";
 import {
   deleteLocationMenu,
   getLocationMenu,
@@ -31,22 +29,13 @@ import {
   saveLocationMenu,
   type Menu,
 } from "@/src/api/menus";
+import { errorMessage } from "@/src/messages";
 import { toastError } from "@/src/toast";
 
 function getErrorMessage(error: unknown): string {
-  if (error instanceof ZodError) {
-    return error.issues[0]?.message ?? "Sprawdź pozycje menu.";
-  }
-  if (error instanceof ApiError) return error.message;
-
-  return "Nie udało się wykonać operacji na menu. Sprawdź połączenie i spróbuj ponownie.";
-}
-
-function shouldRetryOnError(error: Error): boolean {
-  return !(
-    error instanceof ApiError &&
-    error.status >= 400 &&
-    error.status < 500
+  return errorMessage(
+    error,
+    "Nie udało się wykonać operacji na menu. Sprawdź połączenie i spróbuj ponownie.",
   );
 }
 
@@ -67,27 +56,21 @@ export function itemCount(count: number): string {
 
 export function MenuManagement({
   accountId,
-  onRequestedLocationApplied,
-  requestedLocationId,
+  onSelectLocation,
+  selectedLocationId,
 }: {
   accountId: string;
-  onRequestedLocationApplied?: () => void;
-  requestedLocationId?: string;
+  onSelectLocation: (locationId?: string) => void;
+  selectedLocationId?: string;
 }) {
-  const [selectedLocationId, setSelectedLocationId] = useState<string>();
-
   const {
     data: locations = [],
     error: locationsError,
     isLoading: areLocationsLoading,
-  } = useSWR(staffLocationsKey(accountId), listLocations, {
-    errorRetryCount: 3,
-    shouldRetryOnError,
-  });
+  } = useStaffLocations(accountId);
 
-  const effectiveLocationId = requestedLocationId ?? selectedLocationId;
   const location =
-    locations.find((candidate) => candidate.id === effectiveLocationId) ??
+    locations.find((candidate) => candidate.id === selectedLocationId) ??
     locations[0];
 
   const {
@@ -98,7 +81,7 @@ export function MenuManagement({
     location ? staffLocationMenuKey(accountId, location.id) : null,
     ([, , , locationId]) => getLocationMenu(locationId),
     // A focus refresh with another editor's save would remount and drop the draft.
-    { errorRetryCount: 3, revalidateOnFocus: false, shouldRetryOnError },
+    { revalidateOnFocus: false },
   );
   const loadError = locationsError ?? menuError;
 
@@ -122,10 +105,7 @@ export function MenuManagement({
           locations={locations}
           selectedId={location.id}
           showAll={false}
-          onChange={(locationId) => {
-            setSelectedLocationId(locationId);
-            onRequestedLocationApplied?.();
-          }}
+          onChange={onSelectLocation}
         />
       )}
 

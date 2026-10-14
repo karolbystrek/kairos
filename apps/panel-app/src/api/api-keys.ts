@@ -3,9 +3,9 @@ import { z } from "zod";
 import { apiFetch, request } from "./api-fetch";
 import { managedIntegrationNameSchema } from "./integrations";
 
-export const apiKeyScopeSchema = z.enum(["orders:read", "orders:write"]);
+const apiKeyScopeSchema = z.enum(["orders:read", "orders:write"]);
 
-export const apiKeySchema = z.object({
+const apiKeySchema = z.object({
   id: z.uuid(),
   integrationId: z.uuid(),
   tenantId: z.uuid(),
@@ -31,10 +31,9 @@ const issuedApiKeySchema = z.object({
   secret: z.string().min(1),
 });
 
-export type ApiKeyScope = z.infer<typeof apiKeyScopeSchema>;
 export type ApiKey = z.infer<typeof apiKeySchema>;
-export type IssueApiKeyInput = z.input<typeof issueApiKeyInputSchema>;
-export type IssuedApiKey = z.infer<typeof issuedApiKeySchema>;
+type IssueApiKeyInput = z.input<typeof issueApiKeyInputSchema>;
+type IssuedApiKey = z.infer<typeof issuedApiKeySchema>;
 
 export function listApiKeys(integrationId: string): Promise<ApiKey[]> {
   const search = new URLSearchParams({ integrationId });

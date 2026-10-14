@@ -8,7 +8,7 @@ const meanSchema = z.object({
   meanMs: z.number().nonnegative().nullable(),
 });
 
-export const analyticsReportSchema = z.object({
+const analyticsReportSchema = z.object({
   from: z.iso.date(),
   to: z.iso.date(),
   zone: z.string(),
@@ -33,7 +33,7 @@ export const analyticsReportSchema = z.object({
 
 const statusSchema = z.enum(["UP", "DOWN", "UNKNOWN"]);
 
-export const platformHealthSchema = z.object({
+const platformHealthSchema = z.object({
   observedAt: z.iso.datetime({ offset: true }),
   database: statusSchema,
   redis: statusSchema,
@@ -50,7 +50,7 @@ export const platformHealthSchema = z.object({
 
 export type AnalyticsReport = z.infer<typeof analyticsReportSchema>;
 export type PlatformHealth = z.infer<typeof platformHealthSchema>;
-export type ReportQuery = {
+type ReportQuery = {
   from: string;
   to: string;
   zone: string;

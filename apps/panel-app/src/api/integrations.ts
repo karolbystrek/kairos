@@ -15,13 +15,13 @@ export const managedIntegrationNameSchema = z
     "Użyj jednej linii tekstu.",
   );
 
-export const externalIntegrationStatusSchema = z.enum([
+const externalIntegrationStatusSchema = z.enum([
   "ENABLED",
   "DISABLED",
   "ARCHIVED",
 ]);
 
-export const externalIntegrationSchema = z.object({
+const externalIntegrationSchema = z.object({
   id: z.uuid(),
   tenantId: z.uuid(),
   name: z.string(),
@@ -32,7 +32,7 @@ export const externalIntegrationSchema = z.object({
 
 const externalIntegrationsSchema = z.array(externalIntegrationSchema);
 
-export type ExternalIntegrationStatus = z.infer<
+type ExternalIntegrationStatus = z.infer<
   typeof externalIntegrationStatusSchema
 >;
 export type ExternalIntegration = z.infer<typeof externalIntegrationSchema>;

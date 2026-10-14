@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { TenantRegistration } from "@/components/tenant-registration";
+import { RegistrationForm } from "@/components/registration-form";
 import { NOT_INDEXED } from "@/src/seo/metadata";
 
 export const metadata: Metadata = {
@@ -9,5 +9,5 @@ export const metadata: Metadata = {
 };
 
 export default function TenantRegistrationPage() {
-  return <TenantRegistration />;
+  return <RegistrationForm />;
 }

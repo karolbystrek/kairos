@@ -1,4 +1,4 @@
-export const maximumReportDays = 90;
+const maximumReportDays = 90;
 
 export type RangePreset = "7" | "30" | "custom";
 export type ReportRange = { from: string; to: string };
@@ -17,7 +17,7 @@ export function localDate(instant: Date, zone: string): string {
   }).format(instant);
 }
 
-export function addDays(date: string, days: number): string {
+function addDays(date: string, days: number): string {
   const value = new Date(`${date}T00:00:00Z`);
 
   value.setUTCDate(value.getUTCDate() + days);

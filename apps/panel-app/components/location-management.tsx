@@ -12,7 +12,6 @@ import {
 } from "@phosphor-icons/react";
 import { useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
-import { ZodError } from "zod";
 
 import { HoldToConfirmButton } from "@/components/hold-to-confirm-button";
 import { PanelPopup } from "@/components/panel-popup";
@@ -24,19 +23,20 @@ import { PanelDetailHeader } from "@/components/panel-detail-header";
 import { lifecycleStatus } from "@/components/status-chip";
 import { ApiError } from "@/src/api/api-fetch";
 import { itemCount } from "@/components/menu-management";
-import { staffLocationMenuKey, staffLocationsKey } from "@/src/api/cache-keys";
+import { staffLocationMenuKey } from "@/src/api/cache-keys";
 import {
   deleteLocation,
   googleReviewUrlSchema,
-  listLocations,
   managedLocationNameSchema,
   renameLocation,
   sortLocations,
   updateLocationStatus,
   updateLocationReviewLink,
+  useStaffLocations,
   type Location,
 } from "@/src/api/locations";
 import { getLocationMenu } from "@/src/api/menus";
+import { errorMessage } from "@/src/messages";
 
 const activeOrdersProblemType = "urn:kairos:problem:location-active-orders";
 
@@ -46,9 +46,6 @@ type Confirmation =
   | { kind: "delete"; location: Location };
 
 function getErrorMessage(error: unknown): string {
-  if (error instanceof ZodError) {
-    return error.issues[0]?.message ?? "Podaj prawidłową nazwę lokalu.";
-  }
   if (
     error instanceof ApiError &&
     error.problem?.type === "urn:kairos:problem:location-last-location"
@@ -58,16 +55,10 @@ function getErrorMessage(error: unknown): string {
   if (error instanceof ApiError && error.status === 409) {
     return "Nie można wykonać tej operacji w obecnym stanie lokalu.";
   }
-  if (error instanceof ApiError) return error.message;
 
-  return "Nie udało się wykonać operacji na lokalu. Sprawdź połączenie i spróbuj ponownie.";
-}
-
-function shouldRetryOnError(error: Error): boolean {
-  return !(
-    error instanceof ApiError &&
-    error.status >= 400 &&
-    error.status < 500
+  return errorMessage(
+    error,
+    "Nie udało się wykonać operacji na lokalu. Sprawdź połączenie i spróbuj ponownie.",
   );
 }
 
@@ -83,7 +74,6 @@ function LocationMenuSummary({
   const { data: menu, error } = useSWR(
     staffLocationMenuKey(accountId, locationId),
     ([, , , id]) => getLocationMenu(id),
-    { errorRetryCount: 3, shouldRetryOnError },
   );
 
   return (
@@ -109,12 +99,10 @@ function LocationMenuSummary({
 
 export function LocationManagement({
   accountId,
-  canManageLocations,
   onEditMenu,
   onViewOrders,
 }: {
   accountId: string;
-  canManageLocations: boolean;
   onEditMenu: (locationId: string) => void;
   onViewOrders: (locationId: string) => void;
 }) {
@@ -132,10 +120,7 @@ export function LocationManagement({
     error: locationsError,
     isLoading,
     mutate: mutateLocations,
-  } = useSWR(staffLocationsKey(accountId), listLocations, {
-    errorRetryCount: 3,
-    shouldRetryOnError,
-  });
+  } = useStaffLocations(accountId);
 
   const selectedLocation = locations.find(
     (location) => location.id === selectedLocationId,
@@ -250,22 +235,20 @@ export function LocationManagement({
     <div className="flex flex-col gap-6">
       <div className="flex items-center gap-4">
         <h1 className="sr-only">Lokale</h1>
-        {canManageLocations && (
-          <Tooltip delay={500}>
-            <Tooltip.Trigger>
-              <Button
-                aria-label="Nowy lokal"
-                className="rounded-md"
-                size="lg"
-                onPress={() => setIsCreateOpen(true)}
-              >
-                <PlusIcon size={20} />
-                Nowy lokal
-              </Button>
-            </Tooltip.Trigger>
-            <Tooltip.Content>Nowy lokal</Tooltip.Content>
-          </Tooltip>
-        )}
+        <Tooltip delay={500}>
+          <Tooltip.Trigger>
+            <Button
+              aria-label="Nowy lokal"
+              className="rounded-md"
+              size="lg"
+              onPress={() => setIsCreateOpen(true)}
+            >
+              <PlusIcon size={20} />
+              Nowy lokal
+            </Button>
+          </Tooltip.Trigger>
+          <Tooltip.Content>Nowy lokal</Tooltip.Content>
+        </Tooltip>
       </div>
 
       {locationsError && (
@@ -332,18 +315,16 @@ export function LocationManagement({
                       </Alert.Content>
                     </Alert>
                   )}
-                  {canManageLocations && (
-                    <FormTextField
-                      fullWidth
-                      isRequired
-                      isDisabled={Boolean(pendingAction)}
-                      label="Nazwa lokalu"
-                      maxLength={120}
-                      name="location-name"
-                      value={name}
-                      onChange={setEditName}
-                    />
-                  )}
+                  <FormTextField
+                    fullWidth
+                    isRequired
+                    isDisabled={Boolean(pendingAction)}
+                    label="Nazwa lokalu"
+                    maxLength={120}
+                    name="location-name"
+                    value={name}
+                    onChange={setEditName}
+                  />
                   <LocationMenuSummary
                     accountId={accountId}
                     locationId={selectedLocation.id}
@@ -352,24 +333,22 @@ export function LocationManagement({
                       onEditMenu(selectedLocation.id);
                     }}
                   />
-                  {canManageLocations && (
-                    <div className="flex flex-col gap-2">
-                      <FormTextField
-                        fullWidth
-                        inputProps={{ type: "url" }}
-                        isDisabled={Boolean(pendingAction)}
-                        label="Link do opinii Google"
-                        maxLength={2048}
-                        name="google-review-url"
-                        value={reviewUrl}
-                        onChange={setEditReviewUrl}
-                      />
-                      <p className="secondary-text">
-                        Klient zobaczy prośbę o opinię po odebraniu zamówienia.
-                        Puste pole wyłącza prośby.
-                      </p>
-                    </div>
-                  )}
+                  <div className="flex flex-col gap-2">
+                    <FormTextField
+                      fullWidth
+                      inputProps={{ type: "url" }}
+                      isDisabled={Boolean(pendingAction)}
+                      label="Link do opinii Google"
+                      maxLength={2048}
+                      name="google-review-url"
+                      value={reviewUrl}
+                      onChange={setEditReviewUrl}
+                    />
+                    <p className="secondary-text">
+                      Klient zobaczy prośbę o opinię po odebraniu zamówienia.
+                      Puste pole wyłącza prośby.
+                    </p>
+                  </div>
                   {actionError !== undefined && (
                     <Alert status="danger">
                       <Alert.Content>
@@ -396,71 +375,65 @@ export function LocationManagement({
                       <ArrowUpRightIcon size={18} /> Pokaż zamówienia
                     </Button>
                   )}
-                  {canManageLocations && (
-                    <p className="text-sm text-muted">
-                      {selectedLocation.status === "ENABLED"
-                        ? "Wyłączenie wyloguje przypisane konta i unieważni zaproszenia."
-                        : locations.length <= 1
-                          ? "Ostatni lokal można wyłączyć, ale nie można go usunąć."
-                          : "Usunięcia lokalu i jego kont nie można cofnąć."}
-                    </p>
-                  )}
+                  <p className="text-sm text-muted">
+                    {selectedLocation.status === "ENABLED"
+                      ? "Wyłączenie wyloguje przypisane konta i unieważni zaproszenia."
+                      : locations.length <= 1
+                        ? "Ostatni lokal można wyłączyć, ale nie można go usunąć."
+                        : "Usunięcia lokalu i jego kont nie można cofnąć."}
+                  </p>
                 </PanelPopup.Body>
                 <PanelPopup.Footer className="popup-action-grid">
-                  {canManageLocations && (
-                    <>
-                      {selectedLocation.status === "ENABLED" ? (
-                        <HoldToConfirmButton
-                          isDisabled={Boolean(pendingAction)}
-                          isPending={
-                            pendingAction === `disable-${selectedLocation.id}`
-                          }
-                          onConfirm={() =>
-                            confirmAction({
-                              kind: "disable",
-                              location: selectedLocation,
-                            })
-                          }
-                        >
-                          <DisableIcon size={18} /> Przytrzymaj, aby wyłączyć
-                        </HoldToConfirmButton>
-                      ) : (
-                        <Button
-                          isDisabled={Boolean(pendingAction)}
-                          isPending={
-                            pendingAction === `enable-${selectedLocation.id}`
-                          }
-                          variant="secondary"
-                          onPress={() =>
-                            void confirmAction({
-                              kind: "enable",
-                              location: selectedLocation,
-                            })
-                          }
-                        >
-                          <EnableIcon size={18} /> Włącz
-                        </Button>
-                      )}
-                      <HoldToConfirmButton
-                        isDisabled={
-                          Boolean(pendingAction) ||
-                          locations.length <= 1 ||
-                          selectedLocation.status !== "DISABLED"
-                        }
-                        isPending={
-                          pendingAction === `delete-${selectedLocation.id}`
-                        }
-                        onConfirm={() =>
-                          confirmAction({
-                            kind: "delete",
-                            location: selectedLocation,
-                          })
-                        }
-                      >
-                        <DeleteIcon size={18} /> Przytrzymaj, aby usunąć
-                      </HoldToConfirmButton>
-                    </>
+                  {selectedLocation.status === "ENABLED" ? (
+                    <HoldToConfirmButton
+                      isDisabled={Boolean(pendingAction)}
+                      isPending={
+                        pendingAction === `disable-${selectedLocation.id}`
+                      }
+                      onConfirm={() =>
+                        confirmAction({
+                          kind: "disable",
+                          location: selectedLocation,
+                        })
+                      }
+                    >
+                      <DisableIcon size={18} /> Przytrzymaj, aby wyłączyć
+                    </HoldToConfirmButton>
+                  ) : (
+                    <Button
+                      isDisabled={Boolean(pendingAction)}
+                      isPending={
+                        pendingAction === `enable-${selectedLocation.id}`
+                      }
+                      variant="secondary"
+                      onPress={() =>
+                        void confirmAction({
+                          kind: "enable",
+                          location: selectedLocation,
+                        })
+                      }
+                    >
+                      <EnableIcon size={18} /> Włącz
+                    </Button>
                   )}
+                  <HoldToConfirmButton
+                    isDisabled={
+                      Boolean(pendingAction) ||
+                      locations.length <= 1 ||
+                      selectedLocation.status !== "DISABLED"
+                    }
+                    isPending={
+                      pendingAction === `delete-${selectedLocation.id}`
+                    }
+                    onConfirm={() =>
+                      confirmAction({
+                        kind: "delete",
+                        location: selectedLocation,
+                      })
+                    }
+                  >
+                    <DeleteIcon size={18} /> Przytrzymaj, aby usunąć
+                  </HoldToConfirmButton>
                   <Button
                     isDisabled={Boolean(pendingAction)}
                     slot="close"
@@ -482,14 +455,12 @@ export function LocationManagement({
         </>
       )}
 
-      {canManageLocations && (
-        <LocationCreationModal
-          accountId={accountId}
-          isOpen={isCreateOpen}
-          onCreated={(location) => selectLocation(location.id)}
-          onOpenChange={setIsCreateOpen}
-        />
-      )}
+      <LocationCreationModal
+        accountId={accountId}
+        isOpen={isCreateOpen}
+        onCreated={(location) => selectLocation(location.id)}
+        onOpenChange={setIsCreateOpen}
+      />
     </div>
   );
 }

@@ -22,10 +22,9 @@ import {
 } from "@/src/api/analytics";
 import {
   staffAnalyticsKey,
-  staffLocationsKey,
   staffPlatformHealthKey,
 } from "@/src/api/cache-keys";
-import { listLocations, sortLocations } from "@/src/api/locations";
+import { sortLocations, useStaffLocations } from "@/src/api/locations";
 import {
   browserTimeZone,
   localDate,
@@ -33,6 +32,7 @@ import {
   type RangePreset,
   type ReportRange,
 } from "@/src/api/report-range";
+import { errorMessage } from "@/src/messages";
 
 const statuses = [
   ["IN_PREPARATION", "Przyjęte"],
@@ -73,22 +73,15 @@ const dayFormat = new Intl.DateTimeFormat("pl-PL", {
   timeZone: "UTC",
 });
 
-function shouldRetryOnError(error: Error): boolean {
-  return !(
-    error instanceof ApiError &&
-    error.status >= 400 &&
-    error.status < 500
-  );
-}
-
 function isAccessDenied(error: unknown): boolean {
   return error instanceof ApiError && error.status === 403;
 }
 
-function errorMessage(error: unknown): string {
-  if (error instanceof ApiError) return error.message;
-
-  return "Nie udało się wczytać danych. Sprawdź połączenie i spróbuj ponownie.";
+function getErrorMessage(error: unknown): string {
+  return errorMessage(
+    error,
+    "Nie udało się wczytać danych. Sprawdź połączenie i spróbuj ponownie.",
+  );
 }
 
 function formatDuration(milliseconds: number | null): string {
@@ -254,7 +247,7 @@ function StaleNotice({
       <Alert.Content>
         <Alert.Title>Dane mogą być nieaktualne</Alert.Title>
         <Alert.Description>
-          {errorMessage(error)} Wyświetlane wyniki pochodzą z{" "}
+          {getErrorMessage(error)} Wyświetlane wyniki pochodzą z{" "}
           {timeFormat.format(new Date(since))}.
         </Alert.Description>
         <div className="mt-3">
@@ -270,7 +263,7 @@ function StaleNotice({
 
 function LoadFailure({
   error,
-  message = errorMessage(error),
+  message = getErrorMessage(error),
   title,
   onRetry,
 }: {
@@ -573,11 +566,7 @@ export function RestaurantAnalytics({
   const isAdministrator = account.tenantRole === "ADMIN";
   const range = useReportRange();
   const [selectedLocationId, setSelectedLocationId] = useState<string>();
-  const { data: locations } = useSWR(
-    staffLocationsKey(account.accountId),
-    listLocations,
-    { shouldRetryOnError },
-  );
+  const { data: locations } = useStaffLocations(account.accountId);
   const locationId = isAdministrator
     ? selectedLocationId
     : account.assignment?.locationId;
@@ -602,8 +591,6 @@ export function RestaurantAnalytics({
         locationId: location === "tenant" ? undefined : location,
       }),
     {
-      errorRetryCount: 3,
-      shouldRetryOnError,
       onError: (failure) => {
         if (!isAccessDenied(failure)) return;
         // A lost role must not keep earlier reports cached under this account.
@@ -770,7 +757,6 @@ export function PlatformAnalytics({
   };
   const health = useSWR(staffPlatformHealthKey(accountId), getPlatformHealth, {
     refreshInterval: 30_000,
-    shouldRetryOnError,
     onError,
   });
   const key =
@@ -786,7 +772,7 @@ export function PlatformAnalytics({
   const report = useSWR(
     key,
     ([, , , , , from, to, zone]) => getPlatformReport({ from, to, zone }),
-    { errorRetryCount: 3, shouldRetryOnError, onError },
+    { onError },
   );
 
   return (

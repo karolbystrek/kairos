@@ -5,6 +5,14 @@ import test from "node:test";
 import ts from "typescript";
 
 const require = createRequire(import.meta.url);
+
+// Loads a real source module, resolving its imports through the test's stubs.
+function loadModule(path, resolve) {
+  const exports = {};
+  const source = ts.transpileModule(readFileSync(new URL(`../${path}.ts`, import.meta.url), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
+  new Function("require", "exports", source)(name => resolve(name.startsWith("./") ? `@/src/api/${name.slice(2)}` : name), exports);
+  return exports;
+}
 function queue() {
   const state = [];
   let cursor = 0;
@@ -31,6 +39,7 @@ function queue() {
     if (name === "@/src/api/cache-keys") return { staffLocationsKey: () => ["staff", "account", "locations"], staffLocationMenuKey: () => null };
     if (name === "@/src/api/usage-analytics") return { recordPanelAction: (...args) => actions.push(args) };
     if (name === "@/src/api/orders") return { subscribeToOrderQueue: () => () => {}, describeOrderItems: () => "" };
+    if (name === "@/src/api/locations" || name === "@/src/messages") return loadModule(name.slice(2), dependencies);
     if (name.startsWith("@/")) return new Proxy({}, { get: (_, key) => String(key) });
     // Phosphor's CommonJS build does not load under Node's require; icons are inert here.
     if (name === "@phosphor-icons/react") return new Proxy({}, { get: (_, key) => String(key) });
@@ -41,9 +50,9 @@ function queue() {
     compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
   }).outputText;
   new Function("require", "exports", "window", source)(dependencies, exports, { setInterval() {}, clearInterval() {} });
-  function render(isActive = true) {
+  function render() {
     cursor = 0;
-    return exports.OrderManagement({ accountId: "staff", canManageLocations: true, canViewTenantOrders: true, isActive });
+    return exports.OrderManagement({ accountId: "staff", canManageLocations: true, canViewTenantOrders: true, onSelectLocation() {} });
   }
   function elements(node) {
     if (!node || typeof node !== "object") return [];
@@ -59,17 +68,14 @@ function queue() {
   };
 }
 
-test("initial visible queue counts once after location loading and again on returning", () => {
+test("an opened queue counts once after location loading, not on rerenders", () => {
   const view = queue();
   view.render();
   assert.deepEqual(view.actions, []);
   view.loaded();
   view.render();
   view.render();
-  view.render(false);
-  view.render(false);
-  view.render();
-  assert.deepEqual(view.actions, [["queue_opened", undefined], ["queue_opened", undefined]]);
+  assert.deepEqual(view.actions, [["queue_opened", undefined]]);
 });
 
 test("each real form opening counts its default location even from the tenant queue", () => {

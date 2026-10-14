@@ -5,6 +5,14 @@ import test from "node:test";
 import ts from "typescript";
 
 const require = createRequire(import.meta.url);
+
+// Loads a real source module, resolving its imports through the test's stubs.
+function loadModule(path, resolve) {
+  const exports = {};
+  const source = ts.transpileModule(readFileSync(new URL(`../${path}.ts`, import.meta.url), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
+  new Function("require", "exports", source)(name => resolve(name.startsWith("./") ? `@/src/api/${name.slice(2)}` : name), exports);
+  return exports;
+}
 const report = {
   from: "2026-10-11", to: "2026-10-13", zone: "Europe/Warsaw",
   generatedAt: "2026-10-13T12:00:00Z", firstRecordedHour: "2026-10-11T23:00:00Z",
@@ -25,7 +33,7 @@ function view(role = "ADMIN", response = report) {
     readFileSync(new URL("../components/analytics-management.tsx", import.meta.url), "utf8"),
     { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } },
   ).outputText;
-  new Function("require", "exports", source)(name => {
+  const dependencies = name => {
     if (name === "react") return { useState: initial => [typeof initial === "function" ? initial() : initial, () => {}] };
     if (name === "swr") return {
       default: key => ({ data: key === "locations" ? [] : key === "health" ? undefined : response }),
@@ -43,10 +51,11 @@ function view(role = "ADMIN", response = report) {
         { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText)(values);
       return values;
     }
-    if (name === "@/src/api/locations") return { sortLocations: values => values };
+    if (name === "@/src/api/locations" || name === "@/src/messages") return loadModule(name.slice(2), dependencies);
     if (name.startsWith("@/")) return new Proxy({}, { get: (_, key) => String(key) });
     return require(name);
-  }, exports);
+  };
+  new Function("require", "exports", source)(dependencies, exports);
   function expand(node) {
     if (Array.isArray(node)) return node.flatMap(expand);
     if (!node || typeof node !== "object") return [node];

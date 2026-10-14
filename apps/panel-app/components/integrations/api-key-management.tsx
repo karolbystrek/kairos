@@ -18,11 +18,7 @@ import useSWR from "swr";
 
 import { HoldToConfirmButton } from "@/components/hold-to-confirm-button";
 import { FormTextField } from "@/components/form-controls";
-import {
-  formatIntegrationDateTime,
-  getIntegrationErrorMessage,
-  shouldRetryIntegrationRequest,
-} from "@/components/integrations/integration-ui";
+import { getIntegrationErrorMessage } from "@/components/integrations/integration-ui";
 import { LoadingIndicator } from "@/components/loading-indicator";
 import {
   deleteApiKey,
@@ -32,6 +28,7 @@ import {
 } from "@/src/api/api-keys";
 import { ApiError } from "@/src/api/api-fetch";
 import { staffApiKeysKey } from "@/src/api/cache-keys";
+import { formatDateTime } from "@/src/messages";
 
 function apiKeyAccessLabel(apiKey: ApiKey): string {
   return apiKey.scopes.includes("orders:write")
@@ -76,10 +73,7 @@ export function ApiKeyManagement({
     error: apiKeysError,
     isLoading: areApiKeysLoading,
     mutate: mutateApiKeys,
-  } = useSWR(apiKeysCacheKey, () => listApiKeys(integrationId), {
-    errorRetryCount: 3,
-    shouldRetryOnError: shouldRetryIntegrationRequest,
-  });
+  } = useSWR(apiKeysCacheKey, () => listApiKeys(integrationId));
 
   const error = apiKeysError ?? actionError;
 
@@ -326,15 +320,15 @@ export function ApiKeyManagement({
                 </div>
 
                 <div className="text-sm text-muted">
-                  <p>Utworzono {formatIntegrationDateTime(apiKey.createdAt)}</p>
+                  <p>Utworzono {formatDateTime(apiKey.createdAt)}</p>
                   <p>
                     {apiKey.expiresAt
-                      ? `Wygasa ${formatIntegrationDateTime(apiKey.expiresAt)}`
+                      ? `Wygasa ${formatDateTime(apiKey.expiresAt)}`
                       : "Nie wygasa"}
                   </p>
                   <p>
                     {apiKey.lastUsedAt
-                      ? `Ostatnio użyty ${formatIntegrationDateTime(apiKey.lastUsedAt)}`
+                      ? `Ostatnio użyty ${formatDateTime(apiKey.lastUsedAt)}`
                       : "Nie był jeszcze użyty"}
                   </p>
                 </div>

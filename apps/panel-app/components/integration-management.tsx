@@ -20,17 +20,14 @@ import { HoldToConfirmButton } from "@/components/hold-to-confirm-button";
 import { PanelPopup } from "@/components/panel-popup";
 import { FormTextField } from "@/components/form-controls";
 import { ApiKeyManagement } from "@/components/integrations/api-key-management";
-import {
-  getIntegrationErrorMessage,
-  shouldRetryIntegrationRequest,
-} from "@/components/integrations/integration-ui";
+import { getIntegrationErrorMessage } from "@/components/integrations/integration-ui";
 import { OneTimeSecret } from "@/components/integrations/one-time-secret";
 import { WebhookSubscriptionManagement } from "@/components/integrations/webhook-subscription-management";
 import { LoadingIndicator } from "@/components/loading-indicator";
 import { PanelCard } from "@/components/panel-card";
 import { PanelDetailHeader } from "@/components/panel-detail-header";
 import { lifecycleStatus } from "@/components/status-chip";
-import { staffIntegrationsKey, staffLocationsKey } from "@/src/api/cache-keys";
+import { staffIntegrationsKey } from "@/src/api/cache-keys";
 import {
   archiveExternalIntegration,
   createExternalIntegration,
@@ -38,7 +35,7 @@ import {
   renameExternalIntegration,
   updateExternalIntegrationStatus,
 } from "@/src/api/integrations";
-import { listLocations } from "@/src/api/locations";
+import { useStaffLocations } from "@/src/api/locations";
 
 function IntegrationDetails({
   integration,
@@ -69,69 +66,58 @@ function IntegrationDetails({
 
   const hasChanges = name.trim() !== integration.name;
 
-  async function save(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!hasChanges || pendingAction) return;
+  // Runs one action at a time; resolves false when skipped or failed.
+  async function run(
+    action: string,
+    operation: () => Promise<void>,
+  ): Promise<boolean> {
+    if (pendingAction) return false;
 
     setActionError(undefined);
-    setPendingAction("save");
-
+    setPendingAction(action);
     try {
-      await onUpdated(await renameExternalIntegration(integration.id, name));
-      onClose();
-      toast.success("Zapisano zmiany integracji");
+      await operation();
+
+      return true;
     } catch (caught) {
       setActionError(caught);
+
+      return false;
     } finally {
       setPendingAction(undefined);
     }
   }
 
-  async function changeStatus(): Promise<boolean> {
-    if (pendingAction) return false;
+  async function save(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!hasChanges) return;
 
+    await run("save", async () => {
+      await onUpdated(await renameExternalIntegration(integration.id, name));
+      onClose();
+      toast.success("Zapisano zmiany integracji");
+    });
+  }
+
+  function changeStatus(): Promise<boolean> {
     const status = integration.status === "ENABLED" ? "DISABLED" : "ENABLED";
 
-    setActionError(undefined);
-    setPendingAction("status");
-
-    try {
+    return run("status", async () => {
       await onUpdated(
         await updateExternalIntegrationStatus(integration.id, status),
       );
       toast.success(
         `${status === "ENABLED" ? "Włączono" : "Wyłączono"} integrację „${integration.name}”`,
       );
-
-      return true;
-    } catch (caught) {
-      setActionError(caught);
-
-      return false;
-    } finally {
-      setPendingAction(undefined);
-    }
+    });
   }
 
-  async function remove(): Promise<boolean> {
-    if (pendingAction) return false;
-
-    setActionError(undefined);
-    setPendingAction("delete");
-
-    try {
+  function remove(): Promise<boolean> {
+    return run("delete", async () => {
       await archiveExternalIntegration(integration.id);
       await onDeleted(integration.id);
       toast.success(`Usunięto integrację „${integration.name}”`);
-
-      return true;
-    } catch (caught) {
-      setActionError(caught);
-
-      return false;
-    } finally {
-      setPendingAction(undefined);
-    }
+    });
   }
 
   return (
@@ -274,24 +260,16 @@ export function IntegrationManagement({ accountId }: { accountId: string }) {
     error: integrationsError,
     isLoading: areIntegrationsLoading,
     mutate: mutateIntegrations,
-  } = useSWR(staffIntegrationsKey(accountId), listExternalIntegrations, {
-    errorRetryCount: 3,
-    shouldRetryOnError: shouldRetryIntegrationRequest,
-  });
+  } = useSWR(staffIntegrationsKey(accountId), listExternalIntegrations);
   const {
     data: locations = [],
+    enabledLocations,
     error: locationsError,
     isLoading: areLocationsLoading,
-  } = useSWR(staffLocationsKey(accountId), listLocations, {
-    errorRetryCount: 3,
-    shouldRetryOnError: shouldRetryIntegrationRequest,
-  });
+  } = useStaffLocations(accountId);
 
   const selectedIntegration = integrations.find(
     (integration) => integration.id === selectedIntegrationId,
-  );
-  const enabledLocations = locations.filter(
-    (location) => location.status === "ENABLED",
   );
   const error = integrationsError ?? locationsError ?? createError;
 
