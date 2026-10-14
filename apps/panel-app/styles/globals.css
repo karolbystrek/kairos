@@ -65,7 +65,6 @@
 	--type-brand: clamp(2.5rem, 7vw, 3rem);
 
 	--content-panel: 90rem;
-	--focus-ring: 0 0 0 2px color-mix(in srgb, var(--foreground) 22%, transparent);
 	--popup-backdrop: color-mix(in srgb, var(--foreground) 20%, transparent);
 	--popup-backdrop-blur: 8px;
 	--shadow-floating: 0 18px 48px rgb(0 0 0 / 14%);
@@ -563,10 +562,6 @@ body {
 	width: var(--control-touch);
 }
 
-.icon-menu-trigger:focus-visible {
-	box-shadow: var(--focus-ring);
-}
-
 /* Light and dark looks follow the `.dark` class, so the toggle never flashes before hydration. */
 .theme-toggle {
 	--toggle-button-bg: var(--surface-secondary);
@@ -1037,8 +1032,7 @@ body {
   --field-hover: var(--field-background);
   --field-border-hover: var(--field-border);
   --field-focus: var(--field-background);
-  --field-border-focus: var(--field-border);
-  --focus: color-mix(in srgb, var(--foreground) 22%, transparent);
+  --focus: var(--accent);
 }
 
 .button {
@@ -1070,19 +1064,24 @@ body {
   opacity: 1;
 }
 
-/* HeroUI text fields otherwise add a ring for pointer focus as well. */
-:is(.input, .textarea):is(:focus, [data-focused="true"]):not([data-focus-visible="true"]) {
-  --tw-ring-shadow: 0 0 #0000;
-}
-
-:is(button, a[href], [role="button"], [role="tab"], .input, .textarea, .select__trigger, .radio__content):is(:focus-visible, [data-focus-visible="true"]) {
+/* Controls show focus only for keyboard navigation; shadows stay reserved for elevated surfaces. */
+:is(button, a[href], [role="button"], [role="tab"], .radio__content):is(:focus-visible, [data-focus-visible="true"]) {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
   --tw-ring-shadow: 0 0 #0000;
 }
 
-:is(.input, .textarea):focus-visible:not([data-focus-visible="true"]) {
-  outline: none;
+/* Fields show focus for any input, as a 2px accent edge flush with the borderless field. */
+:is(.input, .textarea, .select__trigger):is(:focus, :focus-visible, [data-focused="true"], [data-focus="true"], [data-focus-visible="true"]),
+:is(.input-group, .search-field__group):is(:focus-within, [data-focus-within="true"]) {
+  outline: 2px solid var(--focus);
+  outline-offset: 0;
+  --tw-ring-shadow: 0 0 #0000;
+}
+
+:is(.input, .textarea, .input-group, .search-field__group)[data-invalid="true"],
+.select[data-invalid="true"] .select__trigger {
+  --focus: var(--danger);
 }
 
 :is(.modal__footer, .alert-dialog__footer, .drawer__footer) {
@@ -1182,7 +1181,7 @@ body {
   --switch-control-bg-checked-hover: var(--switch-control-bg-checked);
 }
 
-:is(button, a[href], [role="button"], [role="tab"], [role="menuitem"], [role="option"]):focus:not(:focus-visible, [data-focus-visible="true"]) {
+:is(button, a[href], [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not(.select__trigger):focus:not(:focus-visible, [data-focus-visible="true"]) {
   outline: none;
   --tw-ring-shadow: 0 0 #0000;
 }
