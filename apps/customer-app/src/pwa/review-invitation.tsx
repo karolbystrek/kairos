@@ -2,9 +2,10 @@
 
 import { Button, Modal } from "@heroui/react";
 import { StarIcon, XIcon } from "@phosphor-icons/react";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 
+import { useOnline } from "@/src/pwa/use-online";
 import {
   readInvitations,
   selectReviewInvitation,
@@ -12,22 +13,7 @@ import {
 import { consumeReviewInvitation } from "@/src/pwa/storage";
 import { recordReviewAction } from "@/src/api/orders";
 
-function subscribeConnectivity(changed: () => void) {
-  window.addEventListener("online", changed);
-  window.addEventListener("offline", changed);
-
-  return () => {
-    window.removeEventListener("online", changed);
-    window.removeEventListener("offline", changed);
-  };
-}
-
 export function ReviewInvitation() {
-  const online = useSyncExternalStore(
-    subscribeConnectivity,
-    () => navigator.onLine,
-    () => false,
-  );
   const consumedActions = useRef(new Set<string>());
   const [consumed, setConsumed] = useState<Set<string>>(() => new Set());
   const {
@@ -52,7 +38,12 @@ export function ReviewInvitation() {
     refreshWhenHidden: false,
     shouldRetryOnError: false,
   });
-  const current = selectReviewInvitation(data, consumed, online && !error);
+  // A revalidation can finish after going offline, so gate on connectivity too.
+  const online = useOnline();
+  const current = selectReviewInvitation(
+    online && !error ? data : [],
+    consumed,
+  );
 
   useEffect(() => {
     const changed = () => {
@@ -79,10 +70,7 @@ export function ReviewInvitation() {
       return;
     consumedActions.current.add(current.trackingReference);
     recordReviewAction(current.trackingReference, event);
-    setConsumed(
-      (previous) =>
-        new Set([...Array.from(previous), current.trackingReference]),
-    );
+    setConsumed((previous) => new Set(previous).add(current.trackingReference));
     void consumeReviewInvitation(current.trackingReference).catch(() => {
       // Keep dismissal in memory if browser storage becomes unavailable.
     });

@@ -57,6 +57,9 @@ type CustomerNotificationContextValue = {
   showGuideForOrder: () => void;
 };
 
+const BLOCKED_MESSAGE =
+  "Powiadomienia są zablokowane. Włącz je w ustawieniach przeglądarki lub urządzenia.";
+
 const CustomerNotificationContext =
   createContext<CustomerNotificationContextValue | null>(null);
 
@@ -86,13 +89,7 @@ export function CustomerPwaProvider({
 
         return;
       }
-      if (!supportsWebPush()) {
-        setState("unsupported");
-        setMessage(null);
-
-        return;
-      }
-      if (process.env.NODE_ENV !== "production") {
+      if (!supportsWebPush() || process.env.NODE_ENV !== "production") {
         setState("unsupported");
         setMessage(null);
 
@@ -108,27 +105,16 @@ export function CustomerPwaProvider({
           // The blocked-permission guidance remains useful without IndexedDB.
         }
         setState("blocked");
-        setMessage(
-          "Powiadomienia są zablokowane. Włącz je w ustawieniach przeglądarki lub urządzenia.",
-        );
+        setMessage(BLOCKED_MESSAGE);
 
         return;
       }
       const metadata = await readNotificationMetadata();
 
-      if (metadata.notificationsEnabled === false) {
-        setState("disabled");
-        setMessage(null);
-
-        return;
-      }
-      if (Notification.permission !== "granted") {
-        setState("disabled");
-        setMessage(null);
-
-        return;
-      }
-      if (metadata.notificationsEnabled !== true) {
+      if (
+        Notification.permission !== "granted" ||
+        metadata.notificationsEnabled !== true
+      ) {
         setState("disabled");
         setMessage(null);
 
@@ -215,9 +201,7 @@ export function CustomerPwaProvider({
     }
     if (Notification.permission === "denied") {
       setState("blocked");
-      setMessage(
-        "Powiadomienia są zablokowane. Włącz je w ustawieniach przeglądarki lub urządzenia.",
-      );
+      setMessage(BLOCKED_MESSAGE);
 
       return;
     }
@@ -233,7 +217,7 @@ export function CustomerPwaProvider({
         setState(permission === "denied" ? "blocked" : "disabled");
         setMessage(
           permission === "denied"
-            ? "Powiadomienia są zablokowane. Włącz je w ustawieniach przeglądarki lub urządzenia."
+            ? BLOCKED_MESSAGE
             : "Nie udzielono zgody na powiadomienia.",
         );
 

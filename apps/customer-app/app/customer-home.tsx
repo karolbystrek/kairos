@@ -7,20 +7,9 @@ import { useEffect, useState } from "react";
 
 import { CustomerToolbar } from "@/components/customer-toolbar";
 import { resolveCustomerLaunchHref } from "@/src/pwa/launch-destination";
-import { isAppleMobile } from "@/src/pwa/notification-onboarding";
+import { isAppleMobile, isStandalone } from "@/src/pwa/notification-onboarding";
 import { consumeInstallationBootstrap } from "@/src/pwa/recently-tracked-orders";
 import { readLastStableDestination } from "@/src/pwa/storage";
-
-function isStandaloneDisplayMode(): boolean {
-  const navigatorWithStandalone = navigator as Navigator & {
-    standalone?: boolean;
-  };
-
-  return (
-    window.matchMedia("(display-mode: standalone)").matches ||
-    navigatorWithStandalone.standalone === true
-  );
-}
 
 export function CustomerHome({
   installationTrackingReference,
@@ -39,7 +28,7 @@ export function CustomerHome({
         return;
       }
       const launchHref = resolveCustomerLaunchHref({
-        installationTrackingReference: isStandaloneDisplayMode()
+        installationTrackingReference: isStandalone()
           ? consumeInstallationBootstrap(installationTrackingReference)
           : null,
         lastDestination,
@@ -53,9 +42,7 @@ export function CustomerHome({
       if (installationTrackingReference) {
         router.replace("/");
       }
-      setShowScanInAppHint(
-        isStandaloneDisplayMode() && isAppleMobile(navigator),
-      );
+      setShowScanInAppHint(isStandalone() && isAppleMobile(navigator));
       setIsReady(true);
     });
 

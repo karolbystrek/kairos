@@ -25,8 +25,6 @@ const notificationConfigurationSchema = z
 const notificationProblemSchema = z
   .object({
     code: z.string().optional(),
-    detail: z.string().optional(),
-    trackingReference: z.string().optional(),
     type: z.string().optional(),
   })
   .passthrough();
@@ -38,7 +36,6 @@ export class NotificationApiError extends Error {
   constructor(
     public readonly status: number,
     public readonly code?: string,
-    public readonly trackingReference?: string,
     public readonly type?: string,
   ) {
     super(`The customer notification API returned ${status}.`);
@@ -150,10 +147,6 @@ async function bootstrapCsrfToken(): Promise<string> {
   return csrfMetadataSchema.parse(await response.json()).token;
 }
 
-function resetCsrfToken(): void {
-  csrfToken = undefined;
-}
-
 export async function customerMutation(
   url: string,
   method: "DELETE" | "POST" | "PUT",
@@ -172,7 +165,7 @@ export async function customerMutation(
     if (!error.type || !CSRF_PROBLEM_TYPES.has(error.type)) {
       throw error;
     }
-    resetCsrfToken();
+    csrfToken = undefined;
     response = await sendNotificationMutation(
       url,
       method,
@@ -212,7 +205,6 @@ async function notificationApiError(
     return new NotificationApiError(
       response.status,
       result.success ? result.data.code : undefined,
-      result.success ? result.data.trackingReference : undefined,
       result.success ? result.data.type : undefined,
     );
   } catch {

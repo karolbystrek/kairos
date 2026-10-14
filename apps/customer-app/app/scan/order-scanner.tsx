@@ -11,22 +11,14 @@ import {
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { disposeCameraSession } from "@/src/scanner/camera-session";
 import {
-  resolveScanResult,
-  type ScanResultResolution,
-} from "@/src/scanner/scanner-state";
+  getTrackedOrderHref,
+  parseScannedOrderUrl,
+} from "@/src/orders/order-route";
+import { useOnline } from "@/src/pwa/use-online";
+import { disposeCameraSession } from "@/src/scanner/camera-session";
 
-type ScannerView =
-  | "camera-unavailable"
-  | "requesting-camera"
-  | "scanning"
-  | "waiting-for-connectivity";
-
-type PendingOrder = Extract<
-  ScanResultResolution,
-  { kind: "wait-for-connectivity" }
->;
+type ScannerView = "camera-unavailable" | "requesting-camera" | "scanning";
 
 export function OrderScanner() {
   const router = useRouter();
@@ -36,9 +28,10 @@ export function OrderScanner() {
   const [cameras, setCameras] = useState<QrScanner.Camera[]>([]);
   const [currentCameraId, setCurrentCameraId] = useState<string | null>(null);
   const [inlineError, setInlineError] = useState<string | null>(null);
-  const [isOnline, setIsOnline] = useState(true);
+  const isOnline = useOnline();
   const [isSwitchingCamera, setIsSwitchingCamera] = useState(false);
-  const [pendingOrder, setPendingOrder] = useState<PendingOrder | null>(null);
+  // Href of a scanned order waiting for connectivity before navigation.
+  const [pendingOrder, setPendingOrder] = useState<string | null>(null);
   const [view, setView] = useState<ScannerView>("requesting-camera");
 
   const stopCamera = useCallback(() => {
@@ -60,9 +53,9 @@ export function OrderScanner() {
       if (hasHandledResult.current) {
         return;
       }
-      const resolution = resolveScanResult(value, navigator.onLine);
+      const trackingReference = parseScannedOrderUrl(value);
 
-      if (resolution.kind === "invalid") {
+      if (!trackingReference) {
         setInlineError(
           "Ten kod QR nie prowadzi do zamówienia Kairos. Skanuj dalej.",
         );
@@ -70,33 +63,19 @@ export function OrderScanner() {
         return;
       }
       setInlineError(null);
-      if (resolution.kind === "wait-for-connectivity") {
+      const href = getTrackedOrderHref(trackingReference);
+
+      if (!navigator.onLine) {
         hasHandledResult.current = true;
         stopCamera();
-        setPendingOrder(resolution);
-        setView("waiting-for-connectivity");
+        setPendingOrder(href);
 
         return;
       }
-      navigateToOrder(resolution.href);
+      navigateToOrder(href);
     },
     [navigateToOrder, stopCamera],
   );
-
-  useEffect(() => {
-    const synchronizeConnectivity = () => {
-      setIsOnline(navigator.onLine);
-    };
-
-    synchronizeConnectivity();
-    window.addEventListener("online", synchronizeConnectivity);
-    window.addEventListener("offline", synchronizeConnectivity);
-
-    return () => {
-      window.removeEventListener("online", synchronizeConnectivity);
-      window.removeEventListener("offline", synchronizeConnectivity);
-    };
-  }, []);
 
   useEffect(() => {
     let active = true;
@@ -213,7 +192,7 @@ export function OrderScanner() {
     );
   }
 
-  if (view === "waiting-for-connectivity" && pendingOrder) {
+  if (pendingOrder !== null) {
     return (
       <section className="flex flex-1 flex-col justify-center gap-6">
         <Alert status="warning">
@@ -229,7 +208,7 @@ export function OrderScanner() {
           <Button
             isDisabled={!isOnline}
             variant="primary"
-            onPress={() => navigateToOrder(pendingOrder.href)}
+            onPress={() => navigateToOrder(pendingOrder)}
           >
             <ArrowsClockwiseIcon aria-hidden="true" size={18} />
             {isOnline ? "Spróbuj ponownie" : "Oczekiwanie na połączenie…"}

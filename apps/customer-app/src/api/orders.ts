@@ -4,7 +4,7 @@ import { customerMutation } from "@/src/api/customer-notifications";
 import { apiUrl } from "@/src/api/api-url";
 import { orderStatusSchema } from "@/src/orders/order-status";
 
-export const reviewInvitationSchema = z.object({
+const reviewInvitationSchema = z.object({
   dueAt: z.iso.datetime({ offset: true }),
   locationName: z.string(),
   googleReviewUrl: z.url().refine((value) => {
@@ -38,7 +38,6 @@ export const orderStatusChangedEventSchema = customerOrderSchema.extend({
   trackingReference: z.uuid(),
 });
 
-export type { OrderStatus } from "@/src/orders/order-status";
 export type CustomerOrder = z.infer<typeof customerOrderSchema>;
 
 export class ApiError extends Error {

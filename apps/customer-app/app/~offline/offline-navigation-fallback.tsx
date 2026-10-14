@@ -1,22 +1,29 @@
 "use client";
 
 import { Alert } from "@heroui/react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 import { OrderLoadingIndicator } from "@/components/order-loading-indicator";
 import { CustomerToolbar } from "@/components/customer-toolbar";
+import { OrderSummary } from "@/components/order-summary";
 import { CustomerHome } from "@/app/customer-home";
-import { orderStatusLabels } from "@/src/orders/order-status";
 import {
   readTrackedOrder,
   rememberLastStableDestination,
   type StoredTrackedOrder,
 } from "@/src/pwa/storage";
 
+// The fallback is served for whichever URL failed, so the path never changes.
+const subscribeToPathname = () => () => {};
+
 export function OfflineNavigationFallback() {
-  const [isOrderRoute, setIsOrderRoute] = useState<boolean | undefined>(
-    undefined,
+  const pathname = useSyncExternalStore(
+    subscribeToPathname,
+    () => window.location.pathname,
+    () => null,
   );
+  const match = pathname?.match(/^\/orders\/([^/]+)$/);
+  const trackingReference = match?.[1] ? decodeURIComponent(match[1]) : null;
   const [snapshot, setSnapshot] = useState<
     StoredTrackedOrder | null | undefined
   >(undefined);
@@ -30,23 +37,13 @@ export function OfflineNavigationFallback() {
   }, []);
 
   useEffect(() => {
-    const match = window.location.pathname.match(/^\/orders\/([^/]+)$/);
-    const trackingReference = match?.[1] ? decodeURIComponent(match[1]) : null;
-
-    if (!trackingReference) {
-      void Promise.resolve().then(() => setIsOrderRoute(false));
-
-      return;
-    }
+    if (!trackingReference) return;
     void rememberLastStableDestination({ kind: "order", trackingReference })
       .then(() => readTrackedOrder(trackingReference))
-      .then((savedOrder) => {
-        setIsOrderRoute(true);
-        setSnapshot(savedOrder);
-      });
-  }, []);
+      .then(setSnapshot);
+  }, [trackingReference]);
 
-  if (isOrderRoute === false) {
+  if (pathname !== null && !trackingReference) {
     return <CustomerHome installationTrackingReference={null} />;
   }
 
@@ -80,31 +77,9 @@ export function OfflineNavigationFallback() {
   }
 
   return (
-    <section className="flex flex-1 flex-col">
-      <CustomerToolbar />
-      <Alert className="mt-4" status="warning">
-        <Alert.Indicator />
-        <Alert.Content>
-          <Alert.Title>Brak połączenia z internetem</Alert.Title>
-          <Alert.Description>
-            Ostatni znany status z{" "}
-            {new Date(snapshot.updatedAt).toLocaleString("pl-PL")}.
-          </Alert.Description>
-        </Alert.Content>
-      </Alert>
-      <div className="flex flex-1 flex-col items-center justify-center py-12 text-center">
-        <p className="order-number">
-          <span className="sr-only">Zamówienie </span>#{snapshot.number}
-        </p>
-        {snapshot.label && (
-          <p className="mt-1 max-w-md break-words text-sm secondary-text">
-            {snapshot.label}
-          </p>
-        )}
-        <h1 className="status-title mt-4 max-w-[20ch]">
-          {orderStatusLabels[snapshot.status]}
-        </h1>
-      </div>
-    </section>
+    <OrderSummary
+      order={snapshot}
+      staleWarning="Brak połączenia z internetem"
+    />
   );
 }

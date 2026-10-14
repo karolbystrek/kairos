@@ -89,14 +89,19 @@ it("suppresses revoked invitations and never shows cached eligibility when offli
   }
 });
 
-it("hides a cached due invitation while offline", async () => {
+it("hides remembered invitations while offline without contacting the API", async () => {
   const { vi } = await import("vitest");
   vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "https://api.kairos.test");
-  const { selectReviewInvitation } = await import("@/src/pwa/review-invitations");
-  const cached = [{ trackingReference: reference, isDue: true, invitation: {
-    dueAt: "2026-10-10T10:30:00Z", locationName: "Cafe", googleReviewUrl: "https://g.page/r/example/review",
-  } }];
-  expect(selectReviewInvitation(cached, new Set(), false)).toBeUndefined();
-  expect(selectReviewInvitation(cached, new Set(), true)).toEqual(cached[0]);
-  vi.unstubAllEnvs();
+  const { readInvitations } = await import("@/src/pwa/review-invitations");
+  const fetchMock = vi.fn();
+  vi.stubGlobal("fetch", fetchMock);
+  vi.stubGlobal("navigator", { onLine: false });
+  try {
+    await rememberReviewReference(reference);
+    expect(await readInvitations()).toEqual([]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  } finally {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  }
 });

@@ -1,18 +1,21 @@
 /// <reference lib="webworker" />
 
-import type { OrderStatus } from "@/src/orders/order-status";
 import type { PrecacheEntry, SerwistGlobalConfig } from "serwist";
 
 import { NavigationRoute, NetworkOnly, Serwist } from "serwist";
 import * as z from "zod/mini";
 
-import { apiOrigin, apiUrl } from "@/src/api/api-url";
+import { apiOrigin } from "@/src/api/api-url";
+import {
+  replacePushSubscription,
+  serializePushSubscription,
+} from "@/src/api/customer-notifications";
+import { orderStatusSchema, type OrderStatus } from "@/src/orders/order-status";
 import { updateApplicationBadge } from "@/src/pwa/badge";
 import {
   applyPushTransition,
   readNotificationMetadata,
   updateNotificationMetadata,
-  type SerializedPushSubscription,
 } from "@/src/pwa/storage";
 
 declare global {
@@ -28,24 +31,11 @@ type PushSubscriptionChangeEvent = ExtendableEvent & {
   oldSubscription?: PushSubscription | null;
 };
 
-const CSRF_HEADER_NAME = "X-XSRF-TOKEN";
-const CSRF_PROBLEM_TYPES = new Set([
-  "urn:kairos:problem:csrf-token-missing",
-  "urn:kairos:problem:csrf-token-invalid",
-]);
-
-const csrfMetadataSchema = z.strictObject({
-  token: z.string().check(z.minLength(1)),
-});
-
-let csrfInitialization: Promise<string> | undefined;
-let csrfToken: string | undefined;
-
 const pushPayloadSchema = z.strictObject({
   version: z.literal(1),
   eventId: z.uuid(),
   trackingReference: z.uuid(),
-  status: z.enum(["IN_PREPARATION", "READY", "COMPLETED", "CANCELED"]),
+  status: orderStatusSchema,
   transitionedAt: z.iso.datetime({ offset: true }),
   orderUrl: z.string().check(z.startsWith("/orders/")),
 });
@@ -112,27 +102,17 @@ async function handlePush(event: PushEvent): Promise<void> {
     candidate = null;
   }
   const result = z.safeParse(pushPayloadSchema, candidate);
+  const payload = result.success ? result.data : null;
+  const transition = payload
+    ? await applyPushTransition({
+        eventId: payload.eventId,
+        trackingReference: payload.trackingReference,
+        status: payload.status,
+        transitionedAt: payload.transitionedAt,
+      }).catch(() => null)
+    : null;
 
-  if (!result.success) {
-    await self.registration.showNotification("Kairos", {
-      body: "Status zamówienia się zmienił. Otwórz Kairos, aby sprawdzić aktualny status.",
-      tag: "kairos-generic-order-update",
-      data: { orderUrl: "/" },
-    });
-
-    return;
-  }
-  const payload = result.data;
-  let transition;
-
-  try {
-    transition = await applyPushTransition({
-      eventId: payload.eventId,
-      trackingReference: payload.trackingReference,
-      status: payload.status,
-      transitionedAt: payload.transitionedAt,
-    });
-  } catch {
+  if (!payload || !transition) {
     await self.registration.showNotification("Kairos", {
       body: "Status zamówienia się zmienił. Otwórz Kairos, aby sprawdzić aktualny status.",
       tag: "kairos-generic-order-update",
@@ -208,34 +188,20 @@ async function replaceChangedSubscription(
     return;
   }
   const metadata = await readNotificationMetadata();
-  const previousSerialized = serializeInWorker(previous);
-  const currentSerialized = serializeInWorker(current);
   const pending = {
-    previous: previousSerialized,
-    current: currentSerialized,
+    previous: serializePushSubscription(previous),
+    current: serializePushSubscription(current),
   };
 
   await updateNotificationMetadata({
     pendingSubscriptionReplacement: pending,
   });
   try {
-    const body = JSON.stringify({
-      previousSubscription: previousSerialized,
-      currentSubscription: currentSerialized,
-      trackingReferences: metadata.enrolledTrackingReferences ?? [],
-    });
-    let response = await sendSubscriptionReplacement(
-      body,
-      await getCsrfToken(),
+    await replacePushSubscription(
+      pending.previous,
+      pending.current,
+      metadata.enrolledTrackingReferences ?? [],
     );
-
-    if (await isCsrfFailure(response)) {
-      resetCsrfToken();
-      response = await sendSubscriptionReplacement(body, await getCsrfToken());
-    }
-    if (!response.ok) {
-      return;
-    }
     await updateNotificationMetadata({
       pendingSubscriptionReplacement: undefined,
       registeredEndpoint: current.endpoint,
@@ -243,117 +209,6 @@ async function replaceChangedSubscription(
   } catch {
     // The next application start performs the idempotent reconciliation.
   }
-}
-
-async function getCsrfToken(): Promise<string> {
-  if (csrfToken) {
-    return csrfToken;
-  }
-  if (!csrfInitialization) {
-    csrfInitialization = bootstrapCsrfToken()
-      .then((token) => {
-        csrfToken = token;
-
-        return token;
-      })
-      .finally(() => {
-        csrfInitialization = undefined;
-      });
-  }
-
-  return csrfInitialization;
-}
-
-async function bootstrapCsrfToken(): Promise<string> {
-  const response = await fetch(apiUrl("/api/auth/v1/csrf"), {
-    credentials: "include",
-    headers: { Accept: "application/json" },
-  });
-
-  if (!response.ok) {
-    throw new Error(`CSRF bootstrap returned ${response.status}.`);
-  }
-  const result = z.safeParse(csrfMetadataSchema, await response.json());
-
-  if (!result.success) {
-    throw new Error("CSRF bootstrap returned an invalid response.");
-  }
-
-  return result.data.token;
-}
-
-function resetCsrfToken(): void {
-  csrfToken = undefined;
-}
-
-function sendSubscriptionReplacement(
-  body: string,
-  token: string,
-): Promise<Response> {
-  return fetch(
-    apiUrl("/api/customer-notifications/v1/subscription-replacement"),
-    {
-      method: "POST",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-        [CSRF_HEADER_NAME]: token,
-      },
-      body,
-    },
-  );
-}
-
-async function isCsrfFailure(response: Response): Promise<boolean> {
-  if (response.status !== 403) {
-    return false;
-  }
-  try {
-    const problem = (await response.json()) as { type?: unknown };
-
-    return (
-      typeof problem.type === "string" && CSRF_PROBLEM_TYPES.has(problem.type)
-    );
-  } catch {
-    return false;
-  }
-}
-
-function serializeInWorker(
-  subscription: PushSubscription,
-): SerializedPushSubscription {
-  const p256dh = subscription.getKey("p256dh");
-  const auth = subscription.getKey("auth");
-
-  if (!p256dh || !auth) {
-    throw new Error("The browser returned an incomplete Push subscription.");
-  }
-
-  return {
-    endpoint: subscription.endpoint,
-    expirationTime:
-      subscription.expirationTime === null
-        ? null
-        : new Date(subscription.expirationTime).toISOString(),
-    keys: {
-      p256dh: toBase64Url(p256dh),
-      auth: toBase64Url(auth),
-    },
-  };
-}
-
-function toBase64Url(value: ArrayBuffer): string {
-  const bytes = new Uint8Array(value);
-  let binary = "";
-
-  for (let index = 0; index < bytes.length; index++) {
-    binary += String.fromCharCode(bytes[index]);
-  }
-
-  return btoa(binary)
-    .replaceAll("+", "-")
-    .replaceAll("/", "_")
-    .replaceAll("=", "");
 }
 
 function notificationBody(status: OrderStatus): string {

@@ -10,6 +10,7 @@ import { z } from "zod";
 
 import { OrderLoadingIndicator } from "@/components/order-loading-indicator";
 import { CustomerToolbar } from "@/components/customer-toolbar";
+import { OrderSummary } from "@/components/order-summary";
 import {
   ApiError,
   getTrackedOrder,
@@ -19,16 +20,18 @@ import {
 } from "@/src/api/orders";
 import { apiUrl } from "@/src/api/api-url";
 import { createOrderState } from "@/src/orders/order-state";
-import { orderStatusSchema } from "@/src/orders/order-status";
-import { isActiveOrderStatus } from "@/src/orders/order-status";
+import {
+  isActiveOrderStatus,
+  orderStatusSchema,
+} from "@/src/orders/order-status";
 import { updateApplicationBadge } from "@/src/pwa/badge";
 import { useCustomerNotifications } from "@/src/pwa/notification-provider";
 import {
   readTrackedOrder,
   rememberTrackedOrder,
   rememberLastStableDestination,
-  type StoredTrackedOrder,
 } from "@/src/pwa/storage";
+import { useOnline } from "@/src/pwa/use-online";
 
 function shouldRetryOnError(error: Error): boolean {
   return !(
@@ -52,13 +55,6 @@ function getTrackingErrorMessage(error: unknown): string {
 function isActive(order: CustomerOrder | undefined): boolean {
   return isActiveOrderStatus(order?.status);
 }
-
-const statusCopy = {
-  IN_PREPARATION: "Przygotowujemy Twoje zamówienie",
-  READY: "Gotowe do odbioru",
-  COMPLETED: "Zamówienie zrealizowane",
-  CANCELED: "Zamówienie anulowane",
-} as const;
 
 function useOrderEventStream({
   enabled,
@@ -118,11 +114,7 @@ export function OrderTracker({
   const router = useRouter();
   const { enrollOrder, showGuideForOrder } = useCustomerNotifications();
   const [isStreamConnected, setIsStreamConnected] = useState(false);
-  const [offlineOrder, setOfflineOrder] = useState<StoredTrackedOrder | null>(
-    null,
-  );
-  const [offlineLookupComplete, setOfflineLookupComplete] = useState(false);
-  const [isOnline, setIsOnline] = useState(true);
+  const isOnline = useOnline();
   const destinationSaved = useRef<Promise<void>>(Promise.resolve());
   const previousTransition = useRef<string | null>(null);
   const { cache } = useSWRConfig();
@@ -159,6 +151,20 @@ export function OrderTracker({
   const isOrderActive = isActive(order);
   const isOrderUnavailable =
     error instanceof ApiError && (error.status === 400 || error.status === 404);
+  const { data: offlineOrder = null, isLoading: isOfflineLookupLoading } =
+    useSWR(
+      error && !order && !isOrderUnavailable
+        ? (["tracked-order-snapshot", trackingReference] as const)
+        : null,
+      ([, reference]) => readTrackedOrder(reference),
+      {
+        onSuccess: (snapshot) => {
+          if (snapshot) {
+            previousTransition.current = `${snapshot.status}:${snapshot.updatedAt}`;
+          }
+        },
+      },
+    );
   const displayedOrder = order ?? offlineOrder;
   const isOfflineSnapshot = !order && offlineOrder !== null;
   const closeOrder = async () => {
@@ -173,21 +179,6 @@ export function OrderTracker({
       trackingReference,
     });
   }, [trackingReference]);
-
-  useEffect(() => {
-    const synchronizeConnectivity = () => {
-      setIsOnline(navigator.onLine);
-    };
-
-    synchronizeConnectivity();
-    window.addEventListener("online", synchronizeConnectivity);
-    window.addEventListener("offline", synchronizeConnectivity);
-
-    return () => {
-      window.removeEventListener("online", synchronizeConnectivity);
-      window.removeEventListener("offline", synchronizeConnectivity);
-    };
-  }, []);
 
   const hasLoadedOrder = Boolean(order);
 
@@ -229,31 +220,6 @@ export function OrderTracker({
       }
     });
   }, [enrollOrder, order, trackingReference]);
-
-  useEffect(() => {
-    if (!error || order) {
-      return;
-    }
-    let active = true;
-
-    void (
-      isOrderUnavailable
-        ? Promise.resolve(null)
-        : readTrackedOrder(trackingReference)
-    ).then((snapshot) => {
-      if (active) {
-        setOfflineOrder(snapshot);
-        setOfflineLookupComplete(true);
-        if (snapshot) {
-          previousTransition.current = `${snapshot.status}:${snapshot.updatedAt}`;
-        }
-      }
-    });
-
-    return () => {
-      active = false;
-    };
-  }, [error, isOrderUnavailable, order, trackingReference]);
 
   useOrderEventStream({
     enabled: isOrderActive,
@@ -303,7 +269,7 @@ export function OrderTracker({
       navigator.serviceWorker.removeEventListener("message", receiveTransition);
   }, [mutate, orderState, trackingReference]);
 
-  if ((isLoading || (error && !offlineLookupComplete)) && !displayedOrder) {
+  if ((isLoading || isOfflineLookupLoading) && !displayedOrder) {
     return (
       <section className="flex flex-1 flex-col">
         <CustomerToolbar />
@@ -322,7 +288,7 @@ export function OrderTracker({
             <Alert.Content>
               <Alert.Title>Zamówienie niedostępne</Alert.Title>
               <Alert.Description>
-                {!isOnline && offlineLookupComplete
+                {!isOnline && error
                   ? "Brak połączenia i zapisanego statusu tego zamówienia. Połącz się z internetem, aby sprawdzić status."
                   : getTrackingErrorMessage(error)}
               </Alert.Description>
@@ -344,50 +310,26 @@ export function OrderTracker({
   }
 
   return (
-    <section className="flex flex-1 flex-col">
-      <CustomerToolbar />
-      {(error || isOfflineSnapshot) && (
-        <Alert className="mt-4" status="warning">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Title>
-              {isOnline
-                ? "Status może być nieaktualny"
-                : "Brak połączenia z internetem"}
-            </Alert.Title>
-            <Alert.Description>
-              Ostatni znany status z{" "}
-              {new Date(displayedOrder.updatedAt).toLocaleString("pl-PL")}.
-            </Alert.Description>
-          </Alert.Content>
-        </Alert>
+    <OrderSummary
+      order={displayedOrder}
+      staleWarning={
+        error || isOfflineSnapshot
+          ? isOnline
+            ? "Status może być nieaktualny"
+            : "Brak połączenia z internetem"
+          : null
+      }
+    >
+      {!isActiveOrderStatus(displayedOrder.status) && (
+        <Button
+          className="mt-8"
+          variant="secondary"
+          onPress={() => void closeOrder()}
+        >
+          <XIcon aria-hidden="true" size={20} />
+          Zamknij zamówienie
+        </Button>
       )}
-      <div
-        aria-live="polite"
-        className="flex flex-1 flex-col items-center justify-center py-12 text-center sm:py-16"
-      >
-        <p className="order-number">
-          <span className="sr-only">Zamówienie </span>#{displayedOrder.number}
-        </p>
-        {displayedOrder.label && (
-          <p className="mt-1 max-w-md break-words text-sm secondary-text">
-            {displayedOrder.label}
-          </p>
-        )}
-        <h1 className="status-title mt-4 max-w-[20ch]">
-          {statusCopy[displayedOrder.status]}
-        </h1>
-        {!isActiveOrderStatus(displayedOrder.status) && (
-          <Button
-            className="mt-8"
-            variant="secondary"
-            onPress={() => void closeOrder()}
-          >
-            <XIcon aria-hidden="true" size={20} />
-            Zamknij zamówienie
-          </Button>
-        )}
-      </div>
-    </section>
+    </OrderSummary>
   );
 }

@@ -9,7 +9,7 @@ import {
   useCustomerNotifications,
 } from "@/src/pwa/notification-provider";
 
-export function NotificationIcon({ enabled }: { enabled: boolean }) {
+function NotificationIcon({ enabled }: { enabled: boolean }) {
   return (
     <span
       aria-hidden="true"
