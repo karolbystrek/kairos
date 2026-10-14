@@ -135,7 +135,6 @@ export function LocationCreationModal({
             label="Link do opinii Google (opcjonalnie)"
             maxLength={2048}
             name="google-review-url"
-            placeholder="Link do opinii Google (puste pole wyłącza zaproszenia)"
             value={reviewUrl}
             onChange={setReviewUrl}
           />

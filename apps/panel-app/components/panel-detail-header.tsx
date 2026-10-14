@@ -3,14 +3,14 @@ import type { ReactNode } from "react";
 import { Chip } from "@heroui/react";
 
 export function PanelDetailHeader({
-  eyebrow,
+  kind,
   status,
   title,
   titleEditor,
   titleAction,
   trailingActions,
 }: {
-  eyebrow: string;
+  kind: string;
   status?: { isEnabled: boolean; label: string };
   title: string;
   titleEditor?: ReactNode;
@@ -19,8 +19,7 @@ export function PanelDetailHeader({
 }) {
   return (
     <header className="min-w-0">
-      <p className="text-sm secondary-text">{eyebrow}</p>
-      <div className="mt-1 flex min-w-0 flex-wrap items-center gap-3">
+      <div className="flex min-w-0 flex-wrap items-center gap-3">
         <div className="min-w-0 flex-[1_1_14rem]">
           {titleEditor ?? (
             <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -42,7 +41,7 @@ export function PanelDetailHeader({
           )}
         </div>
         <div
-          aria-label={`${eyebrow} — opcje`}
+          aria-label={`${kind} — opcje`}
           className="grid min-w-0 flex-[1_1_20rem] grid-cols-2 items-center gap-2 [&_.button]:w-full [&_.button]:h-auto [&_.button]:min-h-[var(--control-regular)] [&_.button]:whitespace-normal"
           role="group"
         >

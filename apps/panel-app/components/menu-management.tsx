@@ -304,7 +304,6 @@ export function MenuManagement({
             {draft?.menu && (
               <p className="secondary-text">
                 Zmiany od razu obejmą wszystkie lokale korzystające z tego menu.
-                Etykiety istniejących zamówień się nie zmienią.
               </p>
             )}
           </PanelPopup.Body>

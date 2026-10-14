@@ -572,7 +572,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
             >
               <PanelPopup.Body className="pb-6 pt-12">
                 <PanelDetailHeader
-                  eyebrow="Konto"
+                  kind="Konto"
                   status={{
                     isEnabled: selectedAccount.status === "ENABLED",
                     label:
@@ -853,7 +853,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
         >
           <PanelPopup.Body className="pb-6 pt-12">
             <PanelDetailHeader
-              eyebrow="Zaproszenie"
+              kind="Zaproszenie"
               title={selectedInvitation.email}
               trailingActions={
                 selectedInvitation.state === "PENDING" &&
@@ -880,9 +880,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
             />
             {selectedInvitation.state === "PENDING" && (
               <p className="mt-3 text-sm text-muted">
-                Unieważnienie lub ponowna wysyłka natychmiast unieważni
-                poprzedni link. Ponowna wysyłka utworzy nowe zaproszenie i wyśle
-                e-mail.
+                Obie akcje unieważnią obecny link.
               </p>
             )}
             {resendError && (

@@ -675,7 +675,7 @@ export function RestaurantAnalytics({
 const statusLabels: Record<PlatformHealth["redis"], string> = {
   UP: "Działa",
   DOWN: "Niedostępny",
-  UNKNOWN: "Nieznany (brak odpowiedzi na czas)",
+  UNKNOWN: "Nieznany",
 };
 
 function HealthView({
@@ -694,7 +694,7 @@ function HealthView({
         message={
           error instanceof ApiError
             ? undefined
-            : "API jest nieosiągalne. Przeglądarka nie odróżni awarii API od problemu z siecią."
+            : "Nie można połączyć się z API."
         }
         title="Stan systemu nieznany"
         onRetry={onRetry}
