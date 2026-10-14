@@ -422,6 +422,73 @@ body {
 	}
 }
 
+.step-progress {
+	display: flex;
+	gap: var(--space-1);
+}
+
+.step-progress__segment {
+	flex: 1;
+	height: 0.25rem;
+	overflow: hidden;
+	border-radius: 999px;
+	background: var(--default);
+}
+
+/* Segments fill along the direction of travel and empty along the same path. */
+.step-progress__segment::after {
+	content: "";
+	display: block;
+	height: 100%;
+	background: var(--accent);
+	transform: scaleX(0);
+	transform-origin: left;
+	transition: transform 250ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.step-progress__segment[data-lit]::after {
+	transform: scaleX(1);
+}
+
+.location-create-step {
+	animation: location-create-step-forward 200ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.location-create-step[data-direction="back"] {
+	animation-name: location-create-step-back;
+}
+
+@keyframes location-create-step-forward {
+	from {
+		opacity: 0;
+		transform: translateX(0.75rem);
+	}
+}
+
+@keyframes location-create-step-back {
+	from {
+		opacity: 0;
+		transform: translateX(-0.75rem);
+	}
+}
+
+@keyframes location-create-step-fade {
+	from {
+		opacity: 0;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.step-progress__segment::after {
+		transition: none;
+	}
+
+	.location-create-step,
+	.location-create-step[data-direction="back"] {
+		animation-name: location-create-step-fade;
+	}
+}
+
 /* Shared backdrop treatment for every modal, confirmation, and drawer. */
 .modal__backdrop,
 .alert-dialog__backdrop,

@@ -69,6 +69,12 @@ function workspace(kind = "account-management", collections = {}) {
       new Function("require", "exports", loadingSource)(dependencies, loadingExports);
       return loadingExports;
     }
+    if (name === "@/src/api/locations" && kind === "location-creation-modal") return {
+      managedLocationNameSchema: { safeParse: value => value.trim() ? { success: true, data: value.trim() } : { success: false, error: { issues: [{ message: "Podaj nazwę." }] } } },
+      googleReviewUrlSchema: { safeParse: () => ({ success: true }) },
+      sortLocations: locations => locations,
+      async createLocation(locationName, googleReviewUrl) { requests.push({ locationName, googleReviewUrl }); throw new ApiError(409); },
+    };
     if (name === "@/src/api/usage-analytics") return { recordPanelAction() {} };
     if (name === "@/src/api/api-fetch") return { ApiError };
     if (name.startsWith("@/")) return new Proxy({}, { get: (_, key) => String(key) });
@@ -88,6 +94,7 @@ function workspace(kind = "account-management", collections = {}) {
   function render() {
     cursor = 0;
     if (kind === "account-management") return exports.AccountManagement({ account: { accountId: "staff", tenantRole: "ADMIN" } });
+    if (kind === "location-creation-modal") return exports.LocationCreationModal({ accountId: "staff", isOpen: true, isRequired: true, onCreated() {}, onOpenChange() {} });
     if (kind === "location-management") return exports.LocationManagement({ accountId: "staff", canManageLocations: true, onViewOrders() {} });
     return exports.OrderManagement({ accountId: "staff", canViewTenantOrders: true, canManageLocations: false });
   }
@@ -206,6 +213,29 @@ test("dismissed location drafts cannot carry into a newly created location", () 
   assert.equal(find(node => node.type === "PanelDetailHeader").title, "Location B");
   assert.equal(find(node => node.type === "PanelDetailHeader").titleEditor, undefined);
   assert.equal(find(node => node.props?.name === "google-review-url").value, "https://example.com/b");
+});
+
+
+test("location creation keeps step input and creates only after the last step", async () => {
+  const view = workspace("location-creation-modal");
+  const field = name => view.nodes().find(node => node.props?.name === name)?.props;
+  // Proceed and Create share a position, so a submit right after a step change is ignored.
+  const settle = () => new Promise(resolve => setTimeout(resolve, 401));
+  await view.submit();
+  assert.ok(field("location-name").errorMessage);
+  field("location-name").onChange("Bistro");
+  await view.submit();
+  assert.equal(field("location-name"), undefined);
+  field("google-review-url").onChange("https://g.page/r/bistro/review");
+  view.nodes().find(node => [node.props?.children].flat().includes("Wstecz")).props.onPress();
+  assert.equal(field("location-name").value, "Bistro");
+  await view.submit();
+  assert.equal(field("google-review-url").value, "https://g.page/r/bistro/review");
+  assert.equal(view.requests.length, 0);
+  await settle();
+  await view.submit();
+  assert.deepEqual(view.requests, [{ locationName: "Bistro", googleReviewUrl: "https://g.page/r/bistro/review" }]);
+  assert.ok(field("location-name").errorMessage, "A duplicate name returns to the name step");
 });
 
 
