@@ -136,14 +136,6 @@ public class AuthenticationController {
         csrf.rotate(request, response);
     }
 
-    @PostMapping("/auth/v1/logout-all")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    void logoutAll(@AuthenticationPrincipal PanelPrincipal principal, HttpServletRequest request, HttpServletResponse response) {
-        sessions.logoutAll(principal);
-        sessions.logout(request);
-        csrf.rotate(request, response);
-    }
-
     @PostMapping("/auth/v1/password")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     void changePassword(@AuthenticationPrincipal PanelPrincipal principal, @Valid @RequestBody ChangePasswordRequest input,

@@ -22,7 +22,7 @@ The current walking vertical slice is implemented for local development:
 * backend-mediated self-hosted ZITADEL email/password authentication, email-verified
   public tenant registration, emailed recipient-bound manager/operator invitations with replacement and
   full history,
-  durable rolling browser sessions, password changes and local/global logout;
+  durable rolling browser sessions, password changes and logout;
 * on-screen customer QR codes and anonymous tracking through REST;
 * state-carrying customer SSE and authenticated live staff queue snapshots on
   one Redis Pub/Sub topic, subscription-recovery snapshots, monotonic customer

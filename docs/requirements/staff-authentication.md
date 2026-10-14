@@ -113,10 +113,10 @@ and database work to each protected request; optimize only when measured need
 justifies the revocation delay or added complexity.
 
 Ordinary logout invalidates the current browser session and attempts provider
-session termination. Sign out everywhere deletes all indexed Kairos sessions for
-the Account and records a cutoff to reject an in-flight stale session. Signed-in
-password changes supply the current password to ZITADEL; success invalidates all
-Kairos sessions, including the current one, and requires fresh login. Provider
+session termination. Signed-in password changes supply the current password to
+ZITADEL; success deletes all indexed Kairos sessions for the Account, including
+the current one, records a cutoff to reject an in-flight stale session, and
+requires fresh login. There is no separate sign-out-everywhere action. Provider
 sessions that have no remaining Kairos session grant no access to Kairos.
 
 #### Panel session behavior

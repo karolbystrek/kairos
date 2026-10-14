@@ -58,9 +58,10 @@ The panel application provides a public restaurant-owner landing page at
 `/`. It briefly explains QR-based order tracking and queue management
 without physical pagers or a customer app download. Its primary action links to
 public registration at `/registration`, while Sign in links to `/login` and the
-staff workspace lives at `/dashboard`. Signed-in visitors to `/` or `/login`
-are redirected to `/dashboard`; signed-out dashboard visitors go to `/login`
-after the session check. Authentication failures leave the public landing page
+staff workspace lives at `/dashboard`, with password change at
+`/dashboard/password`. Signed-in visitors to `/` or `/login` are redirected to
+`/dashboard`; signed-out visitors to staff routes go to `/login` after the
+session check. Authentication failures leave the public landing page
 usable and keep the existing recovery state on staff routes. The creator's email
 contact appears as secondary footer information; contacting the creator or
 receiving an invitation is not required to register. The page uses spacious typography and the shared
@@ -87,14 +88,15 @@ the workspace; a failed initial request shows Retry and does not permit skipping
 onboarding. A disabled location still counts as existing.
 The shell and visual treatment do not vary by role. Appearance and Account
 remain trailing icon-only utilities on the same level rather than peer workspace
-destinations. Account opens a menu containing Change password, Sign out, and
-Sign out everywhere. Ordinary Sign out requires a focused confirmation for the
-current device. Sign out everywhere requires its own destructive confirmation
-explaining that every device, including the current one, will be signed out;
-Cancel sends no request. Failed logout retains the confirmation for retry, and
-pending logout prevents repeat submissions without preventing popup dismissal. Change password uses
-the existing focused form, omits persistent password-length guidance, and retains
+destinations. Account opens a menu containing Change password and, separated
+and last, Sign out. Sign out signs out the current device immediately without a
+confirmation; a failure keeps the session, shows a dismissible error in the
+panel, and pending logout prevents repeat submissions. There is no separate
+sign-out-everywhere action: changing the password ends every session. Change
+password opens its own page in the authentication-page layout with a link back
+to the panel; it omits persistent password-length guidance, and retains
 validation errors and the explanation that success signs out every device.
+Success leads to `/login`, which confirms the password change.
 
 Locations appears between Orders and Accounts for tenant administrators and
 location managers and is absent for operators. Managers see only their assigned
@@ -253,8 +255,8 @@ Accounts, Integrations and Webhook Subscriptions; revoking Account Invitations;
 deleting API Keys; retiring overlapping webhook secrets; and deleting managed
 resources. The action stays within the existing detail popup or inline section,
 with consequence text identifying the affected resource. It never opens a second
-confirmation popup. Order cancellation and logout retain their existing focused
-confirmation flows.
+confirmation popup. Order cancellation retains its existing focused confirmation
+flow.
 
 Hold controls use Polish text such as **Przytrzymaj, aby usunąć** and require
 1.6 seconds of uninterrupted pointer, touch, Space or Enter input. The progress

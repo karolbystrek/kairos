@@ -63,7 +63,7 @@
 
 * Backend-mediated ZITADEL password authentication, email-verified registration,
   durable/rolling sessions, provider outage/revocation, current local access,
-  password change, local/global logout and cookie/CSRF behavior are covered by
+  password change, logout and cookie/CSRF behavior are covered by
   provider-isolated and HTTP contract tests. Live provider acceptance is separate.
 * Public registration rejects invalid email, a short password, and mismatched
   confirmation with errors attached to the correct fields before provider

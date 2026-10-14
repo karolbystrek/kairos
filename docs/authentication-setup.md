@@ -84,7 +84,7 @@ provider session bearer token is discarded; the creator service account can
 retrieve/terminate its sessions using its own private service credential.
 Protect the database and its backups as credential-bearing data. No browser JWT,
 refresh endpoint, custom tab coordination or authentication response-body tokens
-are used. Ordinary logout revokes the current browser; Sign out everywhere revokes
+are used. Ordinary logout revokes the current browser; a password change revokes
 all Kairos sessions, even if provider cleanup fails.
 
 ## Operations and limits

@@ -23,6 +23,7 @@ function panel(screen = "dashboard", loginResult, initialHash = "") {
   let cursor = 0;
   let pending = false;
   let failure;
+  let offline = false;
   let expireSession;
   const requests = [];
   const actions = [];
@@ -39,7 +40,7 @@ function panel(screen = "dashboard", loginResult, initialHash = "") {
     constructor(status) { super(); this.status = status; }
   }
   const dependencies = (name) => {
-    if (name === "next/navigation") return { useRouter: () => ({ replace: path => redirects.push(path) }) };
+    if (name === "next/navigation") return { useRouter: () => ({ push: path => redirects.push(path), replace: path => redirects.push(path) }) };
     if (name === "react") return {
       useState(initial) {
         const index = cursor++;
@@ -67,7 +68,11 @@ function panel(screen = "dashboard", loginResult, initialHash = "") {
     if (name === "@/src/api/authentication") return {
       pendingVerificationKey: ["authentication", "verification"],
       async login() { return loginResult ?? { accountId: "staff", capabilities: [] }; },
-      async logout(everywhere) { requests.push(everywhere); return !failure; },
+      async logout() {
+        requests.push("logout");
+        if (offline) failure = new Error("Offline");
+        return !offline;
+      },
     };
     if (name === "@/src/api/usage-analytics") return { recordPanelAction: event => actions.push(event) };
     if (name === "@/src/api/api-fetch") return { ApiError };
@@ -107,15 +112,14 @@ function panel(screen = "dashboard", loginResult, initialHash = "") {
     verification(value) { verification = value; },
     signIn: () => find(node => node.type?.name === "SignedOutPanel").onSignIn({ email: "staff@example.com", password: "password" }),
     expire: () => expireSession(),
-    passwordDialog: () => find(node => node.type === "PasswordChangeDialog"),
-    choose: key => find(node => node.props?.["aria-label"] === "Opcje konta").onAction(key),
-    dialog: () => find(node => node.props?.isOpen !== undefined && node.props?.onOpenChange && node.props?.role === "alertdialog"),
-    async confirm() {
-      find(node => node.props?.variant === "danger" && node.props?.onPress).onPress();
+    async choose(key) {
+      find(node => node.props?.["aria-label"] === "Opcje konta").onAction(key);
       await new Promise(resolve => setImmediate(resolve));
     },
+    changePassword: () => find(node => node.type === "PasswordChangeForm").onChanged(),
+    logoutError: () => elements(render()).find(node => node.type?.name === "DismissibleNotice")?.props.title,
     pending: value => { pending = value; },
-    fail: () => { failure = new Error("Offline"); },
+    fail: () => { offline = true; },
   };
 }
 
@@ -157,54 +161,42 @@ test("successful login navigates to the dashboard after updating the session", a
   assert.deepEqual(view.redirects, ["/dashboard"]);
 });
 
-for (const scope of ["device", "everywhere"]) {
-  test(`${scope} sign-out waits for confirmation and cancellation sends no request`, async () => {
-    const view = panel();
-    view.choose(scope);
-    assert.equal(view.dialog().isOpen, true);
-    assert.deepEqual(view.requests, []);
-    view.dialog().onOpenChange(false);
-    assert.equal(view.dialog().isOpen, false);
-    assert.deepEqual(view.requests, []);
-    view.choose(scope);
-    await view.confirm();
-    assert.deepEqual(view.requests, [scope === "everywhere"]);
-    view.render();
-    assert.deepEqual(view.redirects, ["/login"]);
-    assert.deepEqual(view.cacheClears, ["account", "staff"]);
-  });
-}
-
-test("global sign-out retains failure for retry, allows dismissal while pending, and prevents resubmission", async () => {
+test("sign-out happens without confirmation and clears the session", async () => {
   const view = panel();
-  view.choose("everywhere");
-  view.fail();
-  await view.confirm();
-  assert.equal(view.dialog().isOpen, true);
-  assert.deepEqual(view.cacheClears, []);
-  view.pending(true);
-  view.dialog().onOpenChange(false);
-  await view.confirm();
-  assert.equal(view.dialog().isOpen, false);
-  assert.deepEqual(view.requests, [true]);
-});
-
-
-test("expired authentication closes account dialogs before a later sign-in", () => {
-  const view = panel();
-  view.choose("password");
-  assert.equal(view.passwordDialog().isOpen, true);
-  view.expire();
+  await view.choose("logout");
+  assert.deepEqual(view.requests, ["logout"]);
   view.render();
   assert.deepEqual(view.redirects, ["/login"]);
-  view.session({ accountId: "staff", capabilities: [] });
-  assert.equal(view.passwordDialog().isOpen, false);
-  view.choose("everywhere");
-  view.expire();
-  view.session({ accountId: "staff", capabilities: [] });
-  assert.equal(view.dialog().isOpen, false);
+  assert.deepEqual(view.cacheClears, ["account", "staff"]);
 });
 
+test("failed sign-out keeps the session, shows the error and prevents resubmission while pending", async () => {
+  const view = panel();
+  view.fail();
+  await view.choose("logout");
+  assert.deepEqual(view.cacheClears, []);
+  assert.equal(view.logoutError(), "Nie udało się wylogować");
+  view.pending(true);
+  await view.choose("logout");
+  assert.deepEqual(view.requests, ["logout"]);
+});
+
+test("password change opens its page and ends on login with a confirmation", async () => {
+  const view = panel();
+  await view.choose("password");
+  assert.deepEqual(view.redirects, ["/dashboard/password"]);
+
+  const page = panel("password");
+  await page.changePassword();
+  page.render();
+  assert.deepEqual(page.redirects, ["/login?password-changed"]);
+  assert.deepEqual(page.cacheClears, ["account", "staff"]);
+
+  const signedOut = panel("password");
+  signedOut.session(undefined);
+  signedOut.render();
+  assert.deepEqual(signedOut.redirects, ["/login"]);
+});
 
 test("workspace entries count once without counting rerenders or the selected tab", () => {
   const view = panel();

@@ -5,6 +5,17 @@ import { NOT_INDEXED } from "@/src/seo/metadata";
 
 export const metadata: Metadata = { title: "Zaloguj się", robots: NOT_INDEXED };
 
-export default function Login() {
-  return <StaffPanel screen="login" />;
+export default async function Login({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const { "password-changed": passwordChanged } = await searchParams;
+
+  return (
+    <StaffPanel
+      passwordChanged={passwordChanged !== undefined}
+      screen="login"
+    />
+  );
 }
