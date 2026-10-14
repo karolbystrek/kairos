@@ -42,6 +42,7 @@ rm -f \
     "secrets/vapid-private.pem" \
     "secrets/vapid-public.pem" \
     "secrets/push-subscription-encryption.bin" \
+    "secrets/email-encryption.bin" \
     "secrets/tls/tls.crt" \
     "secrets/tls/tls.key"
 echo "Removed generated signing, encryption, and local TLS keys."

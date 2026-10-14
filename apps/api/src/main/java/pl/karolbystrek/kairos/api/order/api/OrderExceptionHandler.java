@@ -13,7 +13,10 @@ import pl.karolbystrek.kairos.api.order.application.exception.ResourceNotFoundEx
 import pl.karolbystrek.kairos.api.order.domain.InvalidOrderTransitionException;
 
 @Order(Ordered.HIGHEST_PRECEDENCE)
-@RestControllerAdvice(basePackageClasses = {OrderController.class, TrackedOrderController.class})
+@RestControllerAdvice(
+        basePackageClasses = {OrderController.class, TrackedOrderController.class},
+        basePackages = "pl.karolbystrek.kairos.api.analytics.api"
+)
 class OrderExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

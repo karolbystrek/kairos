@@ -173,7 +173,10 @@ class SecurityFilterChainIntegrationTests extends RedisListenerIsolatedIntegrati
                 .contentType(MediaType.APPLICATION_JSON).content(" ".repeat(8193))
                 .with(request -> { request.removeHeader("Content-Length"); request.addHeader("Transfer-Encoding", "chunked"); return request; }))
                 .andExpect(status().isPayloadTooLarge());
-        for (var request = 0; request < 59; request++) {
+        mockMvc.perform(apiPost(reviewPath).secure(true).cookie(csrf).header(CSRF_HEADER, csrf.getValue())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"event\":\"review_link_clicked\"}"))
+                .andExpect(status().isNotFound());
+        for (var request = 0; request < 58; request++) {
             mockMvc.perform(apiPost(reviewPath).secure(true).cookie(csrf).header(CSRF_HEADER, csrf.getValue())
                     .contentType(MediaType.APPLICATION_JSON).content("{}"))
                     .andExpect(status().isBadRequest());
