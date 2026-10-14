@@ -636,7 +636,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
                   trwale odbierze dostęp.
                 </p>
               </PanelPopup.Body>
-              <PanelPopup.Footer className="flex-wrap">
+              <PanelPopup.Footer className="popup-action-grid">
                 {selectedAccount.status === "ENABLED" ? (
                   <HoldToConfirmButton
                     isDisabled={isChangingStatus || isDeleting}
@@ -901,7 +901,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
             )}
           </PanelPopup.Body>
           {isSelectedInvitationActive && (
-            <PanelPopup.Footer className="flex-wrap">
+            <PanelPopup.Footer className="popup-action-grid">
               <HoldToConfirmButton
                 isDisabled={isRevoking || isResending}
                 isPending={isRevoking}

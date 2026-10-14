@@ -356,21 +356,19 @@ class ExternalOrderServiceIntegrationTests extends RedisListenerIsolatedIntegrat
     }
 
     @Test
-    void createsOrdersWithActiveMenuItemsFromTheMenuItsKeyCanRead() {
+    void createsOrdersWithMenuItemsFromTheLocationMenuItsKeyCanRead() {
         var locationId = tenant.firstLocationId();
         var items = List.of(new OrderItem("Burger", 2));
         assertThat(menuService.findLocationMenu(principal, locationId)).isEmpty();
         assertThatThrownBy(() -> orderService.create(principal, locationId, null, items, "no-menu"))
                 .isInstanceOf(InvalidOrderRequestException.class);
 
-        var menu = menuService.create(tenant.administrator(), "Lunch", List.of("Burger", "Frytki"));
-        menuService.selectLocationMenu(tenant.administrator(), locationId, menu.id());
+        menuService.saveLocationMenu(tenant.administrator(), locationId, List.of("Burger", "Frytki"));
         assertThat(menuService.findLocationMenu(principal, locationId).map(MenuView::items))
                 .contains(List.of("Burger", "Frytki"));
         assertThatThrownBy(() -> menuService.findLocationMenu(principal, tenant.secondLocationId()))
                 .isInstanceOf(IntegrationAccessDeniedException.class);
-        var bar = menuService.create(tenant.administrator(), "Bar", List.of("Piwo"));
-        menuService.selectLocationMenu(tenant.administrator(), tenant.secondLocationId(), bar.id());
+        menuService.saveLocationMenu(tenant.administrator(), tenant.secondLocationId(), List.of("Piwo"));
         new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
             databaseAccess.integration(principal);
             assertThat(runtime.queryForList("SELECT name FROM menu_items ORDER BY position", String.class))

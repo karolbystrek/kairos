@@ -210,34 +210,32 @@ function IntegrationDetails({
           włączenia.
         </p>
       </PanelPopup.Body>
-      <PanelPopup.Footer className="flex-wrap">
-        <div className="flex flex-wrap gap-2 sm:mr-auto">
-          {integration.status === "ENABLED" ? (
-            <HoldToConfirmButton
-              isDisabled={Boolean(pendingAction)}
-              isPending={pendingAction === "status"}
-              onConfirm={changeStatus}
-            >
-              <DisableIcon size={18} /> Przytrzymaj, aby wyłączyć
-            </HoldToConfirmButton>
-          ) : (
-            <Button
-              isDisabled={Boolean(pendingAction)}
-              isPending={pendingAction === "status"}
-              variant="secondary"
-              onPress={() => void changeStatus()}
-            >
-              <CheckIcon size={18} /> Włącz
-            </Button>
-          )}
+      <PanelPopup.Footer className="popup-action-grid">
+        {integration.status === "ENABLED" ? (
           <HoldToConfirmButton
             isDisabled={Boolean(pendingAction)}
-            isPending={pendingAction === "delete"}
-            onConfirm={remove}
+            isPending={pendingAction === "status"}
+            onConfirm={changeStatus}
           >
-            <TrashIcon size={18} /> Przytrzymaj, aby usunąć
+            <DisableIcon size={18} /> Przytrzymaj, aby wyłączyć
           </HoldToConfirmButton>
-        </div>
+        ) : (
+          <Button
+            isDisabled={Boolean(pendingAction)}
+            isPending={pendingAction === "status"}
+            variant="secondary"
+            onPress={() => void changeStatus()}
+          >
+            <CheckIcon size={18} /> Włącz
+          </Button>
+        )}
+        <HoldToConfirmButton
+          isDisabled={Boolean(pendingAction)}
+          isPending={pendingAction === "delete"}
+          onConfirm={remove}
+        >
+          <TrashIcon size={18} /> Przytrzymaj, aby usunąć
+        </HoldToConfirmButton>
         <Button
           isDisabled={Boolean(pendingAction)}
           slot="close"

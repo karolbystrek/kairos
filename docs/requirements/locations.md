@@ -71,4 +71,4 @@ webhook subscription location selections. An API Key left without any location
 grant is deleted, and a webhook subscription left without any location
 selection is archived. Multi-location configurations retain their other
 location relationships and lifecycle state.
-Archiving a location also clears its active [menu](menus.md#active-location-menu).
+Archiving a location also removes its [menu](menus.md#location-menus).

@@ -285,6 +285,8 @@ export function StaffPanel({
   );
   const [requestedOrderLocationId, setRequestedOrderLocationId] =
     useState<string>();
+  const [requestedMenuLocationId, setRequestedMenuLocationId] =
+    useState<string>();
   const [hasChangedPassword, setHasChangedPassword] = useState(false);
   const {
     data: account,
@@ -507,17 +509,14 @@ export function StaffPanel({
     "MANAGE_EXTERNAL_INTEGRATIONS",
   );
   const canManageMenus = account.capabilities.includes("MANAGE_MENUS");
-  const canChooseLocationMenu = account.capabilities.includes(
-    "CHOOSE_LOCATION_MENU",
-  );
   const canViewAnalytics = account.capabilities.includes("VIEW_ANALYTICS");
   const canViewPlatform = account.capabilities.includes(
     "VIEW_PLATFORM_ANALYTICS",
   );
   const availableWorkspaces = [
     "orders",
-    ...(canManageLocations || canChooseLocationMenu ? ["locations"] : []),
-    ...(canChooseLocationMenu ? ["menus"] : []),
+    ...(canManageLocations ? ["locations"] : []),
+    ...(canManageMenus ? ["menus"] : []),
     ...(canManageAccounts ? ["accounts"] : []),
     ...(canManageIntegrations ? ["integrations"] : []),
     ...(canViewAnalytics ? ["analytics"] : []),
@@ -605,7 +604,7 @@ export function StaffPanel({
       {canManageAccounts ||
       canManageLocations ||
       canManageIntegrations ||
-      canChooseLocationMenu ||
+      canManageMenus ||
       canViewAnalytics ||
       canViewPlatform ? (
         <Tabs
@@ -634,7 +633,7 @@ export function StaffPanel({
                   </span>
                   <Tabs.Indicator />
                 </Tabs.Tab>
-                {(canManageLocations || canChooseLocationMenu) && (
+                {canManageLocations && (
                   <Tabs.Tab id="locations">
                     <span className="tab-motion-content">
                       <LocationsIcon size={18} />
@@ -643,7 +642,7 @@ export function StaffPanel({
                     <Tabs.Indicator />
                   </Tabs.Tab>
                 )}
-                {canChooseLocationMenu && (
+                {canManageMenus && (
                   <Tabs.Tab id="menus" isDisabled={hasNoLocations}>
                     <span className="tab-motion-content">
                       <MenuIcon size={18} />
@@ -707,12 +706,17 @@ export function StaffPanel({
               }
             />
           </Tabs.Panel>
-          {(canManageLocations || canChooseLocationMenu) && (
+          {canManageLocations && (
             <Tabs.Panel className="pt-6" id="locations">
               <LocationManagement
                 key={`locations-${account.accountId}`}
                 accountId={account.accountId}
                 canManageLocations={canManageLocations}
+                onEditMenu={(locationId) => {
+                  setRequestedMenuLocationId(locationId);
+                  recordPanelAction("menu_editor_opened");
+                  setSelectedWorkspace("menus");
+                }}
                 onViewOrders={(locationId) => {
                   setRequestedOrderLocationId(locationId);
                   setSelectedWorkspace("orders");
@@ -720,12 +724,15 @@ export function StaffPanel({
               />
             </Tabs.Panel>
           )}
-          {canChooseLocationMenu && (
+          {canManageMenus && (
             <Tabs.Panel className="pt-6" id="menus">
               <MenuManagement
                 key={`menus-${account.accountId}`}
                 accountId={account.accountId}
-                canManageMenus={canManageMenus}
+                requestedLocationId={requestedMenuLocationId}
+                onRequestedLocationApplied={() =>
+                  setRequestedMenuLocationId(undefined)
+                }
               />
             </Tabs.Panel>
           )}

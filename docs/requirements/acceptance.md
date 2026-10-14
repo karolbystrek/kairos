@@ -56,8 +56,8 @@
 * REST-backed Client Components use keyed SWR state rather than effects for request orchestration, retain cached data during background revalidation, and do not apply order transitions before the Spring API accepts them.
 * New orders start in `IN_PREPARATION`, receive an immutable number, optional label and items, and create exactly one initial history entry for that resulting state.
 * Numbers are unique per location and local business day under concurrent creation, restart at 1 after the location's local midnight and are independent of labels; labels are validated, optional and may duplicate existing labels.
-* Menu items require the location's current active menu, reject stale or repeated items and locations without a menu, and stay unchanged after menu edits; changing items in the panel regenerates the editable label.
-* Only tenant administrators manage menus; only administrators or the location's manager choose its active menu; a menu in use cannot be deleted.
+* Menu items require the location's current menu, reject stale or repeated items and locations without a menu, and stay unchanged after menu edits; changing items in the panel regenerates the editable label.
+* Each location owns an independent menu; only administrators or the location's manager create, edit or delete it, and copying another location's items leaves the two menus independent.
 * Staff order-list operations return only `IN_PREPARATION` and `READY` orders.
 ### Authentication, accounts and locations
 

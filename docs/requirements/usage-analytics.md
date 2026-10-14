@@ -15,7 +15,8 @@ Count actions, never unique people, sessions or devices. The panel collects
 `queue_opened`, `menu_editor_opened`, `integration_settings_opened` and
 `order_creation_form_opened`. Queue opening includes the initial visible queue
 and actual entry into the Orders workspace. Menu means entry into the Menu
-workspace, rather than each individual editing dialog. Creation counts each
+workspace, including through a location's Edit menu action, rather than each
+save. Creation counts each
 actual form opening, not successful order creation. Renders, refreshes and clicks
 on the already selected workspace do not count. Successful business transitions
 remain authoritative [order analytics](order-analytics.md).

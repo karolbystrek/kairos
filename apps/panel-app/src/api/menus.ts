@@ -4,16 +4,6 @@ import { apiFetch, request } from "./api-fetch";
 
 const singleLinePattern = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/;
 
-export const menuNameSchema = z
-  .string()
-  .trim()
-  .min(1, "Podaj nazwę menu.")
-  .refine(
-    (name) => Array.from(name).length <= 120,
-    "Nazwa może mieć maksymalnie 120 znaków.",
-  )
-  .refine((name) => !singleLinePattern.test(name), "Użyj jednej linii tekstu.");
-
 export const menuItemsSchema = z
   .array(
     z
@@ -38,15 +28,10 @@ export const menuItemsSchema = z
     "Nazwy pozycji muszą się różnić.",
   );
 
-export const menuSchema = z.object({
-  id: z.uuid(),
-  name: z.string(),
+const menuSchema = z.object({
   items: z.array(z.string()),
-  createdAt: z.iso.datetime({ offset: true }),
   updatedAt: z.iso.datetime({ offset: true }),
 });
-
-const menusSchema = z.array(menuSchema);
 
 const locationMenuSchema = z.object({
   menu: menuSchema.nullable(),
@@ -62,75 +47,40 @@ export function parseMenuItems(text: string): string[] {
     .filter(Boolean);
 }
 
-export function listMenus(): Promise<Menu[]> {
-  return request("/api/menus/v1", menusSchema);
-}
-
-function menuMutation(
-  path: string,
-  method: "POST" | "PUT",
-  name: string,
-  items: string[],
-): Promise<Menu> {
-  return request(path, menuSchema, {
-    method,
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      name: menuNameSchema.parse(name),
-      items: menuItemsSchema.parse(items),
-    }),
-  });
-}
-
-export function createMenu(name: string, items: string[]): Promise<Menu> {
-  return menuMutation("/api/menus/v1", "POST", name, items);
-}
-
-export function updateMenu(
-  menuId: string,
-  name: string,
-  items: string[],
-): Promise<Menu> {
-  return menuMutation(
-    `/api/menus/v1/${encodeURIComponent(menuId)}`,
-    "PUT",
-    name,
-    items,
-  );
-}
-
-export async function deleteMenu(menuId: string): Promise<boolean> {
-  await apiFetch(`/api/menus/v1/${encodeURIComponent(menuId)}`, {
-    method: "DELETE",
-  });
-
-  return true;
+function locationMenuPath(locationId: string): string {
+  return `/api/locations/v1/${encodeURIComponent(locationId)}/menu`;
 }
 
 export async function getLocationMenu(
   locationId: string,
 ): Promise<Menu | null> {
   const result = await request(
-    `/api/locations/v1/${encodeURIComponent(locationId)}/menu`,
+    locationMenuPath(locationId),
     locationMenuSchema,
   );
 
   return result.menu;
 }
 
-export async function setLocationMenu(
+export async function saveLocationMenu(
   locationId: string,
-  menuId: string | null,
+  items: string[],
 ): Promise<Menu | null> {
   const result = await request(
-    `/api/locations/v1/${encodeURIComponent(locationId)}/menu`,
+    locationMenuPath(locationId),
     locationMenuSchema,
     {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ menuId }),
+      body: JSON.stringify({ items: menuItemsSchema.parse(items) }),
     },
   );
 
   return result.menu;
+}
+
+export async function deleteLocationMenu(locationId: string): Promise<null> {
+  await apiFetch(locationMenuPath(locationId), { method: "DELETE" });
+
+  return null;
 }

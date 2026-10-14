@@ -53,7 +53,7 @@ The database schema must include tables covering the following concepts. Names a
 * **Platform administrators:** manually granted account references, written only by the database owner and cascaded with account deletion; see [platform authority](analytics-reporting.md#platform-authority).
 * **Order history:** order association, resulting state, acceptance time, and the initiator category and identity when known; records are append-only and have an unambiguous order. Initiator categories distinguish users, external integrations, and system actions without coupling history to one authentication mechanism.
 * **Daily order-number counters:** one row per location and local business date holds the last allocated number. Creation atomically increments it in the order transaction, so concurrent creation never duplicates a number; a unique order constraint on location, business date and number backs this up. Counters are removed with their location.
-* **Menus:** tenant association, normalized name, ordered item names and the optional active menu of each location; see [menus](menus.md#menu-storage-and-access).
+* **Menus:** the optional menu of each location with its ordered item names; see [menus](menus.md#menu-storage-and-access).
 * **External Integrations:** tenant association, normalized name, and enabled, disabled, or archived lifecycle state.
 * **API Keys:** immutable scopes, expiration, hashed one-time secret material and
   location grants on the named key, except for the removal of an archived

@@ -126,7 +126,7 @@ public class OrderCommandService {
         if (items.isEmpty()) {
             return;
         }
-        var menuItems = menuService.activeMenuItems(location.getId());
+        var menuItems = menuService.menuItems(location.getId());
         if (menuItems.isEmpty()) {
             throw new InvalidOrderRequestException("This location has no menu to choose items from");
         }

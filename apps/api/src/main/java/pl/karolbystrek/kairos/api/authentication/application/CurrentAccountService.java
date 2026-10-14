@@ -71,14 +71,12 @@ public class CurrentAccountService {
             capabilities.add("INVITE_MANAGERS");
             capabilities.add("INVITE_OPERATORS");
             capabilities.add("MANAGE_EXTERNAL_INTEGRATIONS");
-            capabilities.add("MANAGE_MENUS");
-            capabilities.add("CHOOSE_LOCATION_MENU");
         }
         else if (access.assignmentRole() == AssignmentRole.MANAGER) {
             capabilities.add("INVITE_OPERATORS");
-            capabilities.add("CHOOSE_LOCATION_MENU");
         }
         if (access.isTenantAdmin() || access.assignmentRole() == AssignmentRole.MANAGER) {
+            capabilities.add("MANAGE_MENUS");
             capabilities.add("VIEW_ANALYTICS");
         }
         if (databaseAccess.isPlatformAdministrator(access.accountId())) {

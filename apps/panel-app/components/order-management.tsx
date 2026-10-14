@@ -144,7 +144,7 @@ function useMinuteClock() {
   return now;
 }
 
-function LocationSelect({
+export function LocationSelect({
   isDisabled = false,
   label,
   locations,
@@ -927,17 +927,18 @@ export function OrderManagement({
             </p>
           )}
         </PanelPopup.Header>
-        <PanelPopup.Body className="grid items-center gap-6 px-6 pb-8 pt-2 sm:px-10 md:auto-cols-fr md:grid-flow-col">
+        <PanelPopup.Body className="grid items-start gap-6 px-6 pb-8 pt-2 sm:px-10 md:auto-cols-fr md:grid-flow-col">
           {detailsOrder && (
             <>
               <OrderQrCode accountId={accountId} order={detailsOrder} />
               {detailsOrder.items.length > 0 && (
+                // h-0 + min-h-full: the QR code alone sets the row height and the list scrolls within it.
                 <section
                   aria-label="Pozycje zamówienia"
-                  className="md:order-first"
+                  className="flex flex-col md:order-first md:h-0 md:min-h-[max(100%,18rem)] md:self-stretch"
                 >
                   <h3 className="pb-2 text-sm secondary-text">Pozycje</h3>
-                  <ul className="flex flex-col">
+                  <ul className="flex flex-col md:min-h-0 md:flex-1 md:overflow-y-auto">
                     {detailsOrder.items.map((item) => (
                       <li
                         key={item.name}

@@ -188,9 +188,9 @@ class SecurityFilterChainIntegrationTests extends RedisListenerIsolatedIntegrati
         assertCorsAllowed("http://localhost:3000", "/tracked-orders/v1/reference", "GET");
         assertCorsAllowed("http://localhost:3001", "/orders/v1", "POST");
         for (var method : new String[]{"GET", "POST", "PUT", "DELETE"}) {
-            assertCorsAllowed("http://localhost:3001", "/menus/v1", method);
-            assertCorsRejected("http://localhost:3000", "/menus/v1", method);
-            assertCorsRejected("https://unknown.example.org", "/menus/v1", method);
+            assertCorsAllowed("http://localhost:3001", "/locations/v1/" + UUID.randomUUID() + "/menu", method);
+            assertCorsRejected("http://localhost:3000", "/locations/v1/" + UUID.randomUUID() + "/menu", method);
+            assertCorsRejected("https://unknown.example.org", "/locations/v1/" + UUID.randomUUID() + "/menu", method);
         }
         assertCorsAllowed(
                 "http://localhost:3001",
