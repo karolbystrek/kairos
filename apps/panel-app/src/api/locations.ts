@@ -16,6 +16,40 @@ export const managedLocationNameSchema = z
     "Użyj jednej linii tekstu.",
   );
 
+// Mirrors the API's accepted hosts for early feedback; the API stays authoritative.
+const googleReviewHosts = new Set([
+  "g.page",
+  "maps.app.goo.gl",
+  "search.google.com",
+  "www.google.com",
+  "maps.google.com",
+]);
+
+function isGoogleReviewUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+
+    return (
+      url.protocol === "https:" &&
+      googleReviewHosts.has(url.hostname) &&
+      !url.username &&
+      !url.password &&
+      !value.includes("#")
+    );
+  } catch {
+    return false;
+  }
+}
+
+export const googleReviewUrlSchema = z
+  .string()
+  .trim()
+  .max(2048, "Link może mieć maksymalnie 2048 znaków.")
+  .refine(
+    (url) => url === "" || isGoogleReviewUrl(url),
+    "Użyj linku HTTPS do Map Google lub opinii Google.",
+  );
+
 export const locationSchema = z.object({
   id: z.uuid(),
   name: z.string(),
