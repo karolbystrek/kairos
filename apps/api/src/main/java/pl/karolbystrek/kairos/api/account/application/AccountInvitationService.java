@@ -19,9 +19,7 @@ import pl.karolbystrek.kairos.api.account.application.model.AccountInvitationPre
 import pl.karolbystrek.kairos.api.account.application.model.AccountInvitationView;
 import pl.karolbystrek.kairos.api.account.application.model.CreatedAccountInvitation;
 import pl.karolbystrek.kairos.api.account.application.model.StaffAccessContext;
-import pl.karolbystrek.kairos.api.account.application.model.StaffLocation;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
-import pl.karolbystrek.kairos.api.account.application.port.StaffLocationDirectory;
 import pl.karolbystrek.kairos.api.account.domain.Account;
 import pl.karolbystrek.kairos.api.account.domain.TenantRole;
 import pl.karolbystrek.kairos.api.account.domain.assignment.AssignmentRole;
@@ -34,6 +32,8 @@ import pl.karolbystrek.kairos.api.account.infrastructure.persistence.AccountRepo
 import pl.karolbystrek.kairos.api.account.infrastructure.persistence.LocationAssignmentRepository;
 import pl.karolbystrek.kairos.api.authentication.application.OneTimeBearerTokenService;
 import pl.karolbystrek.kairos.api.authentication.application.exception.RegistrationValidationException;
+import pl.karolbystrek.kairos.api.location.domain.Location;
+import pl.karolbystrek.kairos.api.location.infrastructure.persistence.LocationRepository;
 import pl.karolbystrek.kairos.api.persistence.infrastructure.DatabaseAccessContext;
 
 import java.time.Clock;
@@ -47,12 +47,14 @@ import java.util.UUID;
 @Slf4j
 public class AccountInvitationService {
 
+    private static final String INVITATION_CAPABILITY_REQUIRED = "The account cannot manage invitations";
+
     private final DatabaseAccessContext databaseAccess;
     private final AccountCreationService accountCreationService;
     private final LocationAssignmentRepository assignmentRepository;
     private final AccountInvitationRepository invitationRepository;
     private final AccountRepository accountRepository;
-    private final StaffLocationDirectory locationDirectory;
+    private final LocationRepository locationRepository;
     private final StaffAccessService staffAccessService;
     private final OneTimeBearerTokenService tokenService;
     private final Clock clock;
@@ -93,7 +95,7 @@ public class AccountInvitationService {
     @Transactional
     public CreatedAccountInvitation resend(StaffPrincipal actor, UUID invitationId, boolean replaceExisting) {
         var access = staffAccessService.resolveForUpdate(actor);
-        requireInvitationCapability(access);
+        access.requireAdminOrManager(INVITATION_CAPABILITY_REQUIRED);
         var previous = invitationRepository.findById(invitationId)
             .orElseThrow(AccountInvitationNotFoundException::new);
         var location = requireTargetLocation(access, previous.getLocationId(), previous.getAssignmentRole());
@@ -109,38 +111,38 @@ public class AccountInvitationService {
         return issue(access, location, previous.getAssignmentRole(), previous.getEmail(), (String) pending.get("administrator_email"));
     }
 
-    private StaffLocation requireTargetLocation(StaffAccessContext access, UUID locationId, AssignmentRole role) {
+    private Location requireTargetLocation(StaffAccessContext access, UUID locationId, AssignmentRole role) {
         if (!access.isTenantAdmin()) access.requireLocationAccess(access.tenantId(), locationId);
-        var location = locationDirectory.findById(locationId)
+        var location = locationRepository.findById(locationId)
             .orElseThrow(() -> new AccountNotFoundException("Location was not found"));
-        access.requireLocationAccess(location.tenantId(), location.id());
+        access.requireLocationAccess(location.getTenantId(), location.getId());
         requireEnabledLocation(location);
         requireManagementPermission(access, role);
         return location;
     }
 
-    private CreatedAccountInvitation issue(StaffAccessContext access, StaffLocation location, AssignmentRole role,
+    private CreatedAccountInvitation issue(StaffAccessContext access, Location location, AssignmentRole role,
         String email, String administratorEmail) {
         var issuer = accountRepository.findById(access.accountId())
             .orElseThrow(() -> new StaffAccessDeniedException("The issuing account is not available"));
         var token = tokenService.generate();
-        var invitation = AccountInvitation.issue(access.tenantId(), location.id(), access.accountId(), role, email,
+        var invitation = AccountInvitation.issue(access.tenantId(), location.getId(), access.accountId(), role, email,
             token.hash(), clock.instant());
         var tenant = "restauracji zarządzanej przez " + administratorEmail;
         var link = origins.panel().replaceAll("/+$", "") + "/account-registration#invitation=" + token.value();
         var delivery = emailDeliveries.enqueue(email, "Zaproszenie do " + tenant,
-            "Zapraszamy Cię do " + tenant + ".\nLokal: " + location.name() + "\nRola: " + (role == AssignmentRole.MANAGER ? "kierownik" : "pracownik")
-                + "\nZaprasza: " + issuer.getEmail() + "\n\nUtwórz konto: " + link + "\nZaproszenie wygasa po siedmiu dniach.", location.id());
+            "Zapraszamy Cię do " + tenant + ".\nLokal: " + location.getName() + "\nRola: " + (role == AssignmentRole.MANAGER ? "kierownik" : "pracownik")
+                + "\nZaprasza: " + issuer.getEmail() + "\n\nUtwórz konto: " + link + "\nZaproszenie wygasa po siedmiu dniach.", location.getId());
         invitation.attachDelivery(delivery, issuer.getEmail());
         invitationRepository.saveAndFlush(invitation);
-        log.info("Account {} issued {} invitation {} for location {}", access.accountId(), role, invitation.getId(), location.id());
+        log.info("Account {} issued {} invitation {} for location {}", access.accountId(), role, invitation.getId(), location.getId());
         return new CreatedAccountInvitation(toView(invitation, location), token.value());
     }
 
     @Transactional(readOnly = true)
     public List<AccountInvitationView> history(StaffPrincipal actor) {
         var access = staffAccessService.resolve(actor);
-        requireInvitationCapability(access);
+        access.requireAdminOrManager(INVITATION_CAPABILITY_REQUIRED);
         var invitations = access.isTenantAdmin()
             ? invitationRepository.findAllByTenantIdOrderByCreatedAtDescIdDesc(access.tenantId())
             : invitationRepository.findAllByTenantIdAndLocationIdAndAssignmentRoleOrderByCreatedAtDescIdDesc(
@@ -151,13 +153,13 @@ public class AccountInvitationService {
     @Transactional
     public void revoke(StaffPrincipal actor, UUID invitationId) {
         var access = staffAccessService.resolveForUpdate(actor);
-        requireInvitationCapability(access);
+        access.requireAdminOrManager(INVITATION_CAPABILITY_REQUIRED);
         var invitation = invitationRepository.findForUpdateById(invitationId)
             .orElseThrow(AccountInvitationNotFoundException::new);
         var now = clock.instant();
         requireAvailable(invitation, now);
         var location = requireLocation(invitation);
-        access.requireLocationAccess(invitation.getTenantId(), location.id());
+        access.requireLocationAccess(invitation.getTenantId(), location.getId());
         requireManagementPermission(access, invitation.getAssignmentRole());
         invitation.revoke(AccountInvitationRevocationReason.STAFF_REVOKED, now);
         emailDeliveries.cancel(invitation.getDeliveryId());
@@ -219,7 +221,7 @@ public class AccountInvitationService {
         requireIssuerAuthority(invitation);
         var location = requireLocation(invitation);
         requireEnabledLocation(location);
-        return new AccountInvitationPreview(invitation.getEmail(), location.name(), invitation.getAssignmentRole(), invitation.getExpiresAt());
+        return new AccountInvitationPreview(invitation.getEmail(), location.getName(), invitation.getAssignmentRole(), invitation.getExpiresAt());
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -229,7 +231,7 @@ public class AccountInvitationService {
         var locationId = invitationRepository.findLocationIdByTokenHash(tokenHash)
             .orElseThrow(AccountInvitationNotFoundException::new);
         // Location-before-invitation keeps redemption in the same lock order as lifecycle cascades.
-        var location = locationDirectory.findForShareById(locationId)
+        var location = locationRepository.findForShareById(locationId)
             .orElseThrow(() -> unavailable(AccountInvitationUnavailableException.Reason.REVOKED));
         var invitation = invitationRepository.findForUpdateByTokenHash(tokenHash)
             .orElseThrow(AccountInvitationNotFoundException::new);
@@ -287,22 +289,16 @@ public class AccountInvitationService {
         }
     }
 
-    private static void requireInvitationCapability(StaffAccessContext access) {
-        if (!access.isTenantAdmin() && access.assignmentRole() != AssignmentRole.MANAGER) {
-            throw new StaffAccessDeniedException("The account cannot manage invitations");
-        }
-    }
-
-    private StaffLocation requireLocation(AccountInvitation invitation) {
-        var location = locationDirectory.findById(invitation.getLocationId())
+    private Location requireLocation(AccountInvitation invitation) {
+        var location = locationRepository.findById(invitation.getLocationId())
             .orElseThrow(() -> unavailable(AccountInvitationUnavailableException.Reason.REVOKED));
-        if (!location.tenantId().equals(invitation.getTenantId())) {
+        if (!location.getTenantId().equals(invitation.getTenantId())) {
             throw unavailable(AccountInvitationUnavailableException.Reason.REVOKED);
         }
         return location;
     }
 
-    private static void requireEnabledLocation(StaffLocation location) {
+    private static void requireEnabledLocation(Location location) {
         if (!location.isEnabled()) {
             throw unavailable(AccountInvitationUnavailableException.Reason.REVOKED);
         }
@@ -328,13 +324,13 @@ public class AccountInvitationService {
 
     private AccountInvitationView toView(
         AccountInvitation invitation,
-        StaffLocation location
+        Location location
     ) {
         return new AccountInvitationView(
             invitation.getId(),
             invitation.getEmail(),
             invitation.getLocationId(),
-            location.name(),
+            location.getName(),
             invitation.getAssignmentRole(),
             invitation.getIssuedByEmail(),
             invitation.getCreatedAt(),

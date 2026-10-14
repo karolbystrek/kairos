@@ -17,6 +17,7 @@ import org.apache.hc.core5.io.CloseMode;
 import org.apache.hc.core5.util.Timeout;
 import org.springframework.stereotype.Component;
 import pl.karolbystrek.kairos.api.integration.webhook.infrastructure.config.WebhookProperties;
+import pl.karolbystrek.kairos.api.network.InvalidDestinationException;
 
 import java.io.IOException;
 import java.io.InterruptedIOException;
@@ -92,7 +93,7 @@ public class WebhookHttpClient {
         WebhookDestinationPolicy.AllowedDestination allowedDestination;
         try {
             allowedDestination = destinationPolicy.requireAllowedAndResolve(destination);
-        } catch (InvalidWebhookDestinationException exception) {
+        } catch (InvalidDestinationException exception) {
             return failure("DESTINATION_BLOCKED", safeMessage(exception));
         }
         if (deadlineExceeded.get() || Thread.currentThread().isInterrupted()) {

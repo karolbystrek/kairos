@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 import pl.karolbystrek.kairos.api.integration.application.model.ApiKeyPrincipal;
 import pl.karolbystrek.kairos.api.order.api.external.model.ExternalCreateOrderRequest;
 import pl.karolbystrek.kairos.api.order.api.external.model.ExternalOrderPageResponse;
-import pl.karolbystrek.kairos.api.order.api.external.model.ExternalOrderResponse;
+import pl.karolbystrek.kairos.api.order.api.model.OrderResponse;
 import pl.karolbystrek.kairos.api.order.api.external.model.ExternalUpdateOrderStatusRequest;
 import pl.karolbystrek.kairos.api.order.application.ExternalOrderService;
 import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
@@ -44,16 +44,16 @@ public class ExternalOrderController {
     }
 
     @GetMapping("/{orderId}")
-    ExternalOrderResponse get(
+    OrderResponse get(
             @AuthenticationPrincipal ApiKeyPrincipal principal,
             @PathVariable UUID orderId
     ) {
         var order = orderService.find(principal, orderId);
-        return ExternalOrderResponse.from(order);
+        return OrderResponse.from(order);
     }
 
     @PostMapping
-    ResponseEntity<ExternalOrderResponse> create(
+    ResponseEntity<OrderResponse> create(
             @AuthenticationPrincipal ApiKeyPrincipal principal,
             @RequestHeader("Idempotency-Key") String idempotencyKey,
             @Valid @RequestBody ExternalCreateOrderRequest request
@@ -67,16 +67,16 @@ public class ExternalOrderController {
         );
         var status = result.replayed() ? HttpStatus.OK : HttpStatus.CREATED;
         return ResponseEntity.status(status)
-                .body(ExternalOrderResponse.from(result.order()));
+                .body(OrderResponse.from(result.order()));
     }
 
     @PutMapping("/{orderId}/status")
-    ExternalOrderResponse updateStatus(
+    OrderResponse updateStatus(
             @AuthenticationPrincipal ApiKeyPrincipal principal,
             @PathVariable UUID orderId,
             @Valid @RequestBody ExternalUpdateOrderStatusRequest request
     ) {
         var order = orderService.updateStatus(principal, orderId, request.status());
-        return ExternalOrderResponse.from(order);
+        return OrderResponse.from(order);
     }
 }

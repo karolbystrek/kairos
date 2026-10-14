@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import pl.karolbystrek.kairos.api.account.application.StaffAccessService;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
 import pl.karolbystrek.kairos.api.integration.application.exception.IntegrationConflictException;
 import pl.karolbystrek.kairos.api.integration.application.exception.IntegrationNotFoundException;
@@ -29,16 +30,18 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ApiKeyManagementService {
 
+    private static final String ADMINISTRATOR_REQUIRED = "External Integration management requires a tenant administrator";
+
     private final ApiKeyRepository apiKeyRepository;
     private final ExternalIntegrationRepository integrationRepository;
     private final LocationRepository locationRepository;
-    private final IntegrationAdministrationAccessService administrationAccessService;
+    private final StaffAccessService staffAccessService;
     private final ApiKeyCredentialService credentialService;
     private final Clock clock;
 
     @Transactional(readOnly = true)
     public List<ApiKeyView> list(StaffPrincipal principal, UUID integrationId) {
-        var access = administrationAccessService.requireAdministrator(principal);
+        var access = staffAccessService.resolve(principal).requireTenantAdmin(ADMINISTRATOR_REQUIRED);
         requireManageableIntegration(integrationId, access.tenantId());
         return apiKeyRepository.findAllByIntegration_IdAndTenantIdAndDeletedAtIsNullOrderByCreatedAtAsc(
                         integrationId,
@@ -57,7 +60,7 @@ public class ApiKeyManagementService {
             Set<UUID> locationIds,
             Instant expiresAt
     ) {
-        var access = administrationAccessService.requireAdministratorForUpdate(principal);
+        var access = staffAccessService.resolveForUpdate(principal).requireTenantAdmin(ADMINISTRATOR_REQUIRED);
         var integration = requireManageableIntegrationForUpdate(integrationId, access.tenantId());
         var name = parseName(candidateName);
         var scopes = parseScopes(requestedScopes);
@@ -98,7 +101,7 @@ public class ApiKeyManagementService {
 
     @Transactional
     public void delete(StaffPrincipal principal, UUID apiKeyId) {
-        var access = administrationAccessService.requireAdministratorForUpdate(principal);
+        var access = staffAccessService.resolveForUpdate(principal).requireTenantAdmin(ADMINISTRATOR_REQUIRED);
         var apiKey = requireManageableKeyForUpdate(apiKeyId, access.tenantId());
         apiKey.delete(clock.instant());
     }

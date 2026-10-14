@@ -45,11 +45,9 @@ public class AnalyticsReportService {
 
     @Transactional(readOnly = true)
     public Report restaurant(StaffPrincipal principal, Range range, UUID locationId) {
-        var context = staff.resolve(principal);
+        var context = staff.resolve(principal)
+            .requireAdminOrManager("Analytics are available to administrators and managers");
         if (!context.isTenantAdmin()) {
-            if (context.assignmentRole() != AssignmentRole.MANAGER) {
-                throw new StaffAccessDeniedException("Analytics are available to administrators and managers");
-            }
             if (locationId != null && !locationId.equals(context.locationId())) {
                 throw new StaffAccessDeniedException("The account cannot access this location");
             }

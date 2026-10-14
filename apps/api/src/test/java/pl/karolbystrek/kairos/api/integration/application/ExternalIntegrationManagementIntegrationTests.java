@@ -10,7 +10,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
-import pl.karolbystrek.kairos.api.integration.application.exception.IntegrationAccessDeniedException;
+import pl.karolbystrek.kairos.api.account.application.exception.StaffAccessDeniedException;
 import pl.karolbystrek.kairos.api.integration.application.exception.IntegrationConflictException;
 import pl.karolbystrek.kairos.api.integration.application.exception.IntegrationNotFoundException;
 import pl.karolbystrek.kairos.api.integration.domain.ExternalIntegrationStatus;
@@ -84,7 +84,7 @@ class ExternalIntegrationManagementIntegrationTests
         assertThatThrownBy(() -> integrationService.create(
                 tenant.manager(),
                 "Manager-owned integration"
-        )).isInstanceOf(IntegrationAccessDeniedException.class);
+        )).isInstanceOf(StaffAccessDeniedException.class);
 
         var renamed = integrationService.rename(
                 tenant.administrator(),

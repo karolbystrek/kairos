@@ -10,7 +10,7 @@ import pl.karolbystrek.kairos.api.account.application.exception.StaffAccessDenie
 import pl.karolbystrek.kairos.api.account.application.model.ManagedAccountView;
 import pl.karolbystrek.kairos.api.account.application.model.StaffAccessContext;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
-import pl.karolbystrek.kairos.api.account.application.port.AccountSessionRevoker;
+import pl.karolbystrek.kairos.api.authentication.application.AuthenticationSessionService;
 import pl.karolbystrek.kairos.api.account.domain.Account;
 import pl.karolbystrek.kairos.api.account.domain.AccountStatus;
 import pl.karolbystrek.kairos.api.account.domain.TenantRole;
@@ -39,15 +39,13 @@ public class AccountProvisioningService {
     private final LocationAssignmentRepository assignmentRepository;
     private final StaffAccessService staffAccessService;
     private final AccountInvitationService invitationService;
-    private final AccountSessionRevoker sessionRevoker;
+    private final AuthenticationSessionService sessionRevoker;
     private final Clock clock;
 
     @Transactional(readOnly = true)
     public List<ManagedAccountView> listManageable(StaffPrincipal actor) {
-        var access = staffAccessService.resolve(actor);
-        if (!access.isTenantAdmin() && access.assignmentRole() != AssignmentRole.MANAGER) {
-            throw new StaffAccessDeniedException("The account cannot list managed accounts");
-        }
+        var access = staffAccessService.resolve(actor)
+            .requireAdminOrManager("The account cannot list managed accounts");
 
         var assignments = access.isTenantAdmin()
             ? assignmentRepository.findAllByTenantId(access.tenantId())

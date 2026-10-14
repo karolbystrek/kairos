@@ -11,7 +11,7 @@ import pl.karolbystrek.kairos.api.location.infrastructure.persistence.LocationRe
 import pl.karolbystrek.kairos.api.order.application.exception.InvalidOrderRequestException;
 import pl.karolbystrek.kairos.api.order.application.exception.ResourceNotFoundException;
 import pl.karolbystrek.kairos.api.order.application.model.OrderInitiator;
-import pl.karolbystrek.kairos.api.order.application.model.StaffOrderView;
+import pl.karolbystrek.kairos.api.order.application.model.OrderView;
 import pl.karolbystrek.kairos.api.order.application.model.TrackedOrderView;
 import pl.karolbystrek.kairos.api.order.domain.OrderItem;
 import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
@@ -35,7 +35,7 @@ public class OrderService {
     private final DatabaseAccessContext databaseAccess;
 
     @Transactional(readOnly = true)
-    public List<StaffOrderView> listOrders(
+    public List<OrderView> listOrders(
             StaffPrincipal principal,
             UUID locationId,
             OrderStatus status
@@ -45,37 +45,18 @@ public class OrderService {
 
         if (locationId != null) {
             requireAccessibleLocation(access, locationId);
-            return orderRepository.findAllByLocationIdAndStatusInOrderByCreatedAtDesc(
-                            locationId,
-                            statuses
-                    ).stream()
-                    .map(StaffOrderView::from)
-                    .toList();
         }
-        if (!access.isTenantAdmin()) {
-            return orderRepository.findAllByLocationIdAndStatusInOrderByCreatedAtDesc(
-                            access.locationId(),
-                            statuses
-                    ).stream()
-                    .map(StaffOrderView::from)
-                    .toList();
-        }
-
-        return orderRepository.findAllByLocationTenantIdAndStatusInOrderByCreatedAtDesc(
-                        access.tenantId(),
-                        statuses
-                ).stream()
-                .map(StaffOrderView::from)
+        var scopedLocationId = locationId != null ? locationId : access.locationId();
+        var orders = scopedLocationId != null
+                ? orderRepository.findAllByLocationIdAndStatusInOrderByCreatedAtDesc(scopedLocationId, statuses)
+                : orderRepository.findAllByLocationTenantIdAndStatusInOrderByCreatedAtDesc(access.tenantId(), statuses);
+        return orders.stream()
+                .map(OrderView::from)
                 .toList();
     }
 
     @Transactional
-    public StaffOrderView createOrder(StaffPrincipal principal, UUID locationId, String label) {
-        return createOrder(principal, locationId, label, List.of());
-    }
-
-    @Transactional
-    public StaffOrderView createOrder(
+    public OrderView createOrder(
             StaffPrincipal principal,
             UUID locationId,
             String label,
@@ -84,11 +65,11 @@ public class OrderService {
         var access = staffAccessService.resolveForUpdate(principal);
         var location = requireAccessibleLocationForUpdate(access, locationId);
         var initiator = OrderInitiator.user(access.accountId());
-        return StaffOrderView.from(commandService.create(location, label, items, initiator, null, clock.instant()));
+        return OrderView.from(commandService.create(location, label, items, initiator, null, clock.instant()));
     }
 
     @Transactional
-    public StaffOrderView updateStatus(StaffPrincipal principal, UUID orderId, OrderStatus target) {
+    public OrderView updateStatus(StaffPrincipal principal, UUID orderId, OrderStatus target) {
         var access = staffAccessService.resolveForUpdate(principal);
         var order = orderRepository.findForUpdateById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order was not found"));
@@ -103,7 +84,7 @@ public class OrderService {
                 OrderInitiator.user(access.accountId()),
                 now
         );
-        return StaffOrderView.from(order);
+        return OrderView.from(order);
     }
 
     @Transactional(readOnly = true)

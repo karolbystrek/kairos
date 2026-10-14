@@ -7,7 +7,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import pl.karolbystrek.kairos.api.integration.application.ExternalIntegrationManagementService;
-import pl.karolbystrek.kairos.api.integration.application.exception.IntegrationAccessDeniedException;
+import pl.karolbystrek.kairos.api.account.application.exception.StaffAccessDeniedException;
 import pl.karolbystrek.kairos.api.integration.application.exception.IntegrationConflictException;
 import pl.karolbystrek.kairos.api.integration.domain.ExternalIntegrationStatus;
 import pl.karolbystrek.kairos.api.integration.testsupport.IntegrationTestFixture;
@@ -24,6 +24,7 @@ import pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase;
 import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
 import tools.jackson.databind.ObjectMapper;
 
+import java.util.List;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
@@ -123,7 +124,7 @@ class WebhookSubscriptionIntegrationTests extends RedisListenerIsolatedIntegrati
         assertThatThrownBy(() -> subscriptionService.list(
                 tenant.manager(),
                 integrationId
-        )).isInstanceOf(IntegrationAccessDeniedException.class);
+        )).isInstanceOf(StaffAccessDeniedException.class);
     }
 
     @Test
@@ -168,7 +169,7 @@ class WebhookSubscriptionIntegrationTests extends RedisListenerIsolatedIntegrati
                 tenant.administrator(),
                 tenant.firstLocationId(),
                 "Pickup 4"
-        );
+        , List.of());
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM order_outbox_events WHERE order_id = ?",
                 Long.class,
@@ -229,7 +230,7 @@ class WebhookSubscriptionIntegrationTests extends RedisListenerIsolatedIntegrati
                 tenant.administrator(),
                 tenant.firstLocationId(),
                 null
-        );
+        , List.of());
         clock.advance(Duration.ofSeconds(1));
         integrationService.changeStatus(
                 tenant.administrator(),
@@ -257,7 +258,7 @@ class WebhookSubscriptionIntegrationTests extends RedisListenerIsolatedIntegrati
             tenant.administrator(),
             tenant.firstLocationId(),
             null
-        );
+        , List.of());
         clock.advance(Duration.ofSeconds(1));
         orderService.updateStatus(
             tenant.administrator(),

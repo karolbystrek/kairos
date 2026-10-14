@@ -12,6 +12,7 @@ import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
 import pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase;
 import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
 
+import java.util.List;
 import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -31,12 +32,12 @@ class ReviewInvitationTimingIntegrationTests extends RedisListenerIsolatedIntegr
         clock.setInstant(Instant.parse("2026-10-10T10:00:00Z"));
         var tenant = new IntegrationTestFixture(PostgresTestDatabase.ownerDatabase()).createTenant();
         locations.updateReviewLink(tenant.administrator(), tenant.firstLocationId(), "https://g.page/r/example/review");
-        var order = orders.createOrder(tenant.administrator(), tenant.firstLocationId(), null);
+        var order = orders.createOrder(tenant.administrator(), tenant.firstLocationId(), null, List.of());
         orders.updateStatus(tenant.administrator(), order.id(), OrderStatus.READY);
         orders.updateStatus(tenant.administrator(), order.id(), OrderStatus.COMPLETED);
         assertThat(orders.findTrackedOrder(order.trackingReference()).reviewInvitation().dueAt())
                 .isEqualTo(Instant.parse("2026-10-10T10:01:00Z"));
-        var canceled = orders.createOrder(tenant.administrator(), tenant.firstLocationId(), null);
+        var canceled = orders.createOrder(tenant.administrator(), tenant.firstLocationId(), null, List.of());
         orders.updateStatus(tenant.administrator(), canceled.id(), OrderStatus.CANCELED);
         assertThat(orders.findTrackedOrder(canceled.trackingReference()).reviewInvitation()).isNull();
         locations.updateReviewLink(tenant.administrator(), tenant.firstLocationId(), null);

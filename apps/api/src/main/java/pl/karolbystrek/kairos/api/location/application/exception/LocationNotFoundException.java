@@ -1,8 +1,11 @@
 package pl.karolbystrek.kairos.api.location.application.exception;
 
-public class LocationNotFoundException extends RuntimeException {
+import org.springframework.http.HttpStatus;
+import pl.karolbystrek.kairos.api.problem.ProblemException;
+
+public class LocationNotFoundException extends ProblemException {
 
     public LocationNotFoundException() {
-        super("Location was not found");
+        super(HttpStatus.NOT_FOUND, "Location was not found");
     }
 }

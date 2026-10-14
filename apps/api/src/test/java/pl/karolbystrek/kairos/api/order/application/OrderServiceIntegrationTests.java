@@ -73,7 +73,7 @@ class OrderServiceIntegrationTests extends RedisListenerIsolatedIntegrationTest 
 
     @Test
     void createsTransitionsAndTracksAnOrder() {
-        var created = orderService.createOrder(principal, locationId, null);
+        var created = orderService.createOrder(principal, locationId, null, List.of());
 
         assertThat(created.status()).isEqualTo(OrderStatus.IN_PREPARATION);
         assertThat(created.number()).isEqualTo(1);
@@ -103,7 +103,7 @@ class OrderServiceIntegrationTests extends RedisListenerIsolatedIntegrationTest 
 
     @Test
     void rejectsInvalidTransitions() {
-        var created = orderService.createOrder(principal, locationId, null);
+        var created = orderService.createOrder(principal, locationId, null, List.of());
 
         assertThatThrownBy(() -> orderService.updateStatus(principal, created.id(), OrderStatus.COMPLETED))
             .isInstanceOf(InvalidOrderTransitionException.class);
@@ -111,11 +111,11 @@ class OrderServiceIntegrationTests extends RedisListenerIsolatedIntegrationTest 
 
     @Test
     void numbersEveryOrderIndependentlyOfItsLabel() {
-        var first = orderService.createOrder(principal, locationId, null);
-        var custom = orderService.createOrder(principal, locationId, "Table 4");
+        var first = orderService.createOrder(principal, locationId, null, List.of());
+        var custom = orderService.createOrder(principal, locationId, "Table 4", List.of());
         orderService.updateStatus(principal, first.id(), OrderStatus.CANCELED);
-        var second = orderService.createOrder(principal, locationId, null);
-        var duplicate = orderService.createOrder(principal, locationId, "3");
+        var second = orderService.createOrder(principal, locationId, null, List.of());
+        var duplicate = orderService.createOrder(principal, locationId, "3", List.of());
 
         assertThat(List.of(first.number(), custom.number(), second.number(), duplicate.number()))
                 .containsExactly(1L, 2L, 3L, 4L);
@@ -141,11 +141,11 @@ class OrderServiceIntegrationTests extends RedisListenerIsolatedIntegrationTest 
                 "Europe/Warsaw"
         );
 
-        var utcOrder = orderService.createOrder(principal, locationId, null);
-        var warsawOrder = orderService.createOrder(principal, warsawLocationId, null);
+        var utcOrder = orderService.createOrder(principal, locationId, null, List.of());
+        var warsawOrder = orderService.createOrder(principal, warsawLocationId, null, List.of());
         clock.setInstant(Instant.parse("2026-07-25T00:01:00Z"));
-        var nextUtcDayOrder = orderService.createOrder(principal, locationId, null);
-        var sameWarsawDayOrder = orderService.createOrder(principal, warsawLocationId, null);
+        var nextUtcDayOrder = orderService.createOrder(principal, locationId, null, List.of());
+        var sameWarsawDayOrder = orderService.createOrder(principal, warsawLocationId, null, List.of());
 
         assertThat(List.of(utcOrder.number(), warsawOrder.number(), nextUtcDayOrder.number(), sameWarsawDayOrder.number()))
                 .containsExactly(1L, 1L, 1L, 2L);

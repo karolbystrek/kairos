@@ -11,6 +11,7 @@ import pl.karolbystrek.kairos.api.order.application.OrderService;
 import pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase;
 import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
 
+import java.util.List;
 import java.time.Clock;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -31,8 +32,8 @@ class OperationalBacklogIntegrationTests extends RedisListenerIsolatedIntegratio
         var first = fixture.createTenant();
         var second = fixture.createTenant();
         var before = counts();
-        orders.createOrder(first.administrator(), first.firstLocationId(), null);
-        orders.createOrder(second.administrator(), second.firstLocationId(), null);
+        orders.createOrder(first.administrator(), first.firstLocationId(), null, List.of());
+        orders.createOrder(second.administrator(), second.firstLocationId(), null, List.of());
         var after = counts();
         for (var worker : new String[]{"analytics", "webhook_fanout", "push_fanout"}) {
             assertThat(after.get(worker)).isEqualTo(before.get(worker) + 2);
@@ -51,7 +52,7 @@ class OperationalBacklogIntegrationTests extends RedisListenerIsolatedIntegratio
             metrics.refresh();
             var gauge = registry.get("kairos.worker.backlog.pending").tag("worker", "analytics").gauge();
             assertThat(gauge.value()).isEqualTo(after.get("analytics").doubleValue());
-            orders.createOrder(first.administrator(), first.firstLocationId(), null);
+            orders.createOrder(first.administrator(), first.firstLocationId(), null, List.of());
             assertThat(gauge.value()).isEqualTo(after.get("analytics").doubleValue());
             metrics.refresh();
             assertThat(gauge.value()).isEqualTo(after.get("analytics").doubleValue() + 1);

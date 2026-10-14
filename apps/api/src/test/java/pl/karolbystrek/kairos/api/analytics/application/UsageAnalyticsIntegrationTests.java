@@ -85,7 +85,7 @@ class UsageAnalyticsIntegrationTests extends RedisListenerIsolatedIntegrationTes
     void acceptsOnlyDueEligibleCompletedReviews() {
         owner.update("UPDATE locations SET google_review_url='https://example.com/review',review_configuration_id=? WHERE id=?",
                 UUID.randomUUID(), tenant.firstLocationId());
-        var order = orders.createOrder(tenant.administrator(), tenant.firstLocationId(), null);
+        var order = orders.createOrder(tenant.administrator(), tenant.firstLocationId(), null, List.of());
         assertThatThrownBy(() -> usage.review(order.trackingReference(), "review_link_clicked")).isInstanceOf(RuntimeException.class);
         orders.updateStatus(tenant.administrator(), order.id(), OrderStatus.READY);
         orders.updateStatus(tenant.administrator(), order.id(), OrderStatus.COMPLETED);

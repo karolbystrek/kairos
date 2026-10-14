@@ -10,7 +10,6 @@ import pl.karolbystrek.kairos.api.account.application.StaffAccessService;
 import pl.karolbystrek.kairos.api.account.application.exception.StaffAccessDeniedException;
 import pl.karolbystrek.kairos.api.account.application.model.PanelPrincipal;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
-import pl.karolbystrek.kairos.api.account.application.port.AccountSessionRevoker;
 import pl.karolbystrek.kairos.api.account.infrastructure.persistence.AccountRepository;
 import pl.karolbystrek.kairos.api.authentication.infrastructure.zitadel.ZitadelClient;
 
@@ -20,7 +19,7 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
-public class AuthenticationSessionService implements AccountSessionRevoker {
+public class AuthenticationSessionService {
     public static final String IDENTITY = "kairos.identity";
     public static final String SIGNED_IN_AT = "kairos.signedInAt";
     private final JdbcTemplate database;
@@ -48,14 +47,12 @@ public class AuthenticationSessionService implements AccountSessionRevoker {
         else if (pending != null) provider.terminate(pending.identity());
     }
 
-    @Override
     @Transactional
     public void revokeAll(UUID accountId) {
         accounts.findForUpdateById(accountId).ifPresent(account -> account.revokeAuthentication(clock.instant()));
         // Bulk deletion shares the Account transaction; JDBC session attributes cascade.
         database.update("DELETE FROM SPRING_SESSION WHERE PRINCIPAL_NAME = ?", accountId.toString());
     }
-    @Override
     @Transactional
     public void revokeAll(Collection<UUID> ids) { ids.stream().sorted().forEach(this::revokeAll); }
 

@@ -1,6 +1,7 @@
 package pl.karolbystrek.kairos.api.integration.webhook.application;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
@@ -25,6 +26,7 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class WebhookDeliveryClaimService {
 
     private final WebhookDeliveryRepository deliveryRepository;
@@ -68,6 +70,8 @@ public class WebhookDeliveryClaimService {
             signingSecrets = versions.stream().map(version -> signingSecretCipher.decrypt(
                     version.getEncryptedSecret(), version.getEncryptionNonce(), delivery.getSubscriptionId(), version.getId())).toList();
         } catch (RuntimeException exception) {
+            // Empty secrets make the processor record a SIGNING_ERROR attempt instead of losing the claim.
+            log.warn("Could not load signing material for webhook delivery {}", id, exception);
             signingSecrets = List.of();
         }
         return new ClaimedWebhookDelivery(id, claimToken, delivery.getSubscriptionId(),

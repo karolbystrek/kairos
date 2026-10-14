@@ -20,6 +20,7 @@ import pl.karolbystrek.kairos.api.order.application.OrderService;
 import pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase;
 import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
 
+import java.util.List;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
@@ -127,7 +128,7 @@ class RetentionPurgeIntegrationTests extends RedisListenerIsolatedIntegrationTes
 
     @Test
     void purgeFunctionRefusesLiveDataEvenWithForgedWorkerSettings() {
-        var order = orderService.createOrder(tenant.administrator(), tenant.firstLocationId(), null);
+        var order = orderService.createOrder(tenant.administrator(), tenant.firstLocationId(), null, List.of());
         var location = tenant.firstLocationId().toString();
 
         assertThatThrownBy(() -> new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
@@ -162,9 +163,9 @@ class RetentionPurgeIntegrationTests extends RedisListenerIsolatedIntegrationTes
     @Test
     void purgesArchivedLocationWithItsOrdersWithoutTouchingOtherLocations() {
         var otherTenant = new IntegrationTestFixture(jdbcTemplate).createTenant();
-        var archivedOrder = orderService.createOrder(tenant.administrator(), tenant.secondLocationId(), null);
-        var keptOrder = orderService.createOrder(tenant.administrator(), tenant.firstLocationId(), null);
-        var otherTenantOrder = orderService.createOrder(otherTenant.administrator(), otherTenant.secondLocationId(), null);
+        var archivedOrder = orderService.createOrder(tenant.administrator(), tenant.secondLocationId(), null, List.of());
+        var keptOrder = orderService.createOrder(tenant.administrator(), tenant.firstLocationId(), null, List.of());
+        var otherTenantOrder = orderService.createOrder(otherTenant.administrator(), otherTenant.secondLocationId(), null, List.of());
         insertPushDelivery(archivedOrder.id());
         insertInvitation(tenant.secondLocationId(), tenant.administrator().accountId(), "PENDING", ARCHIVED_AT, null);
         jdbcTemplate.update("UPDATE locations SET status = 'ARCHIVED', archived_at = ?, updated_at = ? WHERE id = ?",

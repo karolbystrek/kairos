@@ -40,8 +40,4 @@ public record OrderInitiator(
                 apiKeyId
         );
     }
-
-    public static OrderInitiator system() {
-        return new OrderInitiator(InitiatorType.SYSTEM, null, null);
-    }
 }

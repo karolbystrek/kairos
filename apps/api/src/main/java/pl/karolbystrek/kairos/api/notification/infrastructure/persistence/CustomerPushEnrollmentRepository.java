@@ -6,23 +6,13 @@ import pl.karolbystrek.kairos.api.notification.domain.CustomerPushEnrollment;
 
 import java.util.Collection;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 public interface CustomerPushEnrollmentRepository
         extends JpaRepository<CustomerPushEnrollment, UUID> {
 
-    long countByOrderId(UUID orderId);
-
     @Query(value = "SELECT public.count_push_enrollments(:trackingReference)", nativeQuery = true)
     long countForTrackingReference(UUID trackingReference);
-
-    boolean existsBySubscriptionIdAndOrderId(UUID subscriptionId, UUID orderId);
-
-    Optional<CustomerPushEnrollment> findBySubscriptionIdAndOrderId(
-            UUID subscriptionId,
-            UUID orderId
-    );
 
     List<CustomerPushEnrollment> findAllByOrderId(UUID orderId);
 

@@ -58,9 +58,9 @@ class DatabaseIsolationIntegrationTests extends RedisListenerIsolatedIntegration
     void scopesDirectRepositoriesAndDerivedRowsAndRejectsOwnershipWrites() {
         var fixture = new IntegrationTestFixture(PostgresTestDatabase.ownerDatabase());
         var own = fixture.createTenant(); var other = fixture.createTenant();
-        var first = orders.createOrder(own.administrator(),own.firstLocationId(),null);
-        var second = orders.createOrder(own.administrator(),own.secondLocationId(),null);
-        var foreign = orders.createOrder(other.administrator(),other.firstLocationId(),null);
+        var first = orders.createOrder(own.administrator(),own.firstLocationId(),null, List.of());
+        var second = orders.createOrder(own.administrator(),own.secondLocationId(),null, List.of());
+        var foreign = orders.createOrder(other.administrator(),other.firstLocationId(),null, List.of());
         for (var order : List.of(first, foreign)) {
             PostgresTestDatabase.ownerDatabase().update("INSERT INTO order_items(order_id,position,name,quantity) VALUES(?,0,'Burger',1)",order.id());
         }

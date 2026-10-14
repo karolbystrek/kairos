@@ -1,8 +1,11 @@
 package pl.karolbystrek.kairos.api.order.application.exception;
 
-public class ExternalOrderConflictException extends RuntimeException {
+import org.springframework.http.HttpStatus;
+import pl.karolbystrek.kairos.api.problem.ProblemException;
+
+public class ExternalOrderConflictException extends ProblemException {
 
     public ExternalOrderConflictException(String message) {
-        super(message);
+        super(HttpStatus.CONFLICT, message);
     }
 }

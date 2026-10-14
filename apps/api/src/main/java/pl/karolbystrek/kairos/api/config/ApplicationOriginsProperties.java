@@ -8,7 +8,6 @@ import org.springframework.validation.annotation.Validated;
 @ConfigurationProperties("kairos.origins")
 public record ApplicationOriginsProperties(
         @NotBlank String customer,
-        @NotBlank String panel,
-        @NotBlank String api
+        @NotBlank String panel
 ) {
 }

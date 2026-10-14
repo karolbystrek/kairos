@@ -24,6 +24,7 @@ import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.hc.core5.io.CloseMode;
 import org.apache.hc.core5.util.Timeout;
 import org.springframework.stereotype.Component;
+import pl.karolbystrek.kairos.api.network.PublicDestinationPolicy;
 import pl.karolbystrek.kairos.api.notification.application.model.WebPushMessage;
 import pl.karolbystrek.kairos.api.notification.application.model.WebPushResult;
 import pl.karolbystrek.kairos.api.notification.application.port.WebPushSender;
@@ -139,7 +140,7 @@ public class JavaWebPushSender implements WebPushSender {
         }
 
         var request = new HttpPost(destination.uri());
-        request.setHeader("Authorization", createAuthorization(destination.origin()));
+        request.setHeader("Authorization", createAuthorization(PushDestinationPolicy.origin(destination.uri())));
         request.setHeader("Content-Encoding", "aes128gcm");
         request.setHeader("TTL", Long.toString(ttlSeconds));
         request.setHeader("Urgency", "high");
@@ -183,7 +184,7 @@ public class JavaWebPushSender implements WebPushSender {
     }
 
     private CloseableHttpClient buildClient(
-            PushDestinationPolicy.AllowedPushDestination destination
+            PublicDestinationPolicy.AllowedDestination destination
     ) {
         var timeout = Timeout.of(properties.delivery().totalTimeout());
         var connectionConfig = ConnectionConfig.custom()

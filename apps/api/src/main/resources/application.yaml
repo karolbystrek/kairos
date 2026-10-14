@@ -62,7 +62,6 @@ kairos:
   origins:
     customer: "${NEXT_PUBLIC_CUSTOMER_APP_URL}"
     panel: "${PANEL_APP_URL}"
-    api: "${NEXT_PUBLIC_API_BASE_URL}"
   authentication:
     email-verification-enabled: ${EMAIL_VERIFICATION_ENABLED:true}
     base-url: "${ZITADEL_API_URL:http://zitadel:8080}"

@@ -13,8 +13,6 @@ import java.util.UUID;
 public interface WebhookSubscriptionLocationAccessRepository
         extends JpaRepository<WebhookSubscriptionLocationAccess, WebhookSubscriptionLocationAccessId> {
 
-    List<WebhookSubscriptionLocationAccess> findAllBySubscriptionId(UUID subscriptionId);
-
     List<WebhookSubscriptionLocationAccess> findAllBySubscriptionIdIn(
             Collection<UUID> subscriptionIds
     );

@@ -9,7 +9,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-public record ExternalOrderView(
+public record OrderView(
         @NonNull UUID id,
         @NonNull UUID locationId,
         @NonNull UUID trackingReference,
@@ -21,8 +21,8 @@ public record ExternalOrderView(
         @NonNull Instant updatedAt
 ) {
 
-    public static ExternalOrderView from(CustomerOrder order) {
-        return new ExternalOrderView(
+    public static OrderView from(CustomerOrder order) {
+        return new OrderView(
                 order.getId(),
                 order.getLocation().getId(),
                 order.getTrackingReference(),

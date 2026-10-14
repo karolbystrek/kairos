@@ -322,7 +322,7 @@ class WebhookDeliveryIntegrationTests extends RedisListenerIsolatedIntegrationTe
                     tenant.administrator(),
                     tenant.firstLocationId(),
                     null
-            );
+            , List.of());
         }
     }
 

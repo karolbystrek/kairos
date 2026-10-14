@@ -10,7 +10,7 @@ import pl.karolbystrek.kairos.api.account.application.StaffAccessService;
 import pl.karolbystrek.kairos.api.account.application.exception.StaffAccessDeniedException;
 import pl.karolbystrek.kairos.api.account.application.model.StaffAccessContext;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
-import pl.karolbystrek.kairos.api.account.application.port.AccountSessionRevoker;
+import pl.karolbystrek.kairos.api.authentication.application.AuthenticationSessionService;
 import pl.karolbystrek.kairos.api.account.domain.Account;
 import pl.karolbystrek.kairos.api.account.domain.assignment.LocationAssignment;
 import pl.karolbystrek.kairos.api.account.domain.invitation.AccountInvitationRevocationReason;
@@ -53,7 +53,7 @@ public class LocationService {
     private final LocationAssignmentRepository assignmentRepository;
     private final AccountRepository accountRepository;
     private final AccountInvitationService invitationService;
-    private final AccountSessionRevoker sessionRevoker;
+    private final AuthenticationSessionService sessionRevoker;
     private final CustomerOrderRepository orderRepository;
     private final ApiKeyRepository apiKeyRepository;
     private final WebhookSubscriptionRepository subscriptionRepository;
@@ -78,18 +78,13 @@ public class LocationService {
     }
 
     @Transactional
-    public LocationView create(StaffPrincipal principal, String candidateName) {
-        return create(principal, candidateName, null, "UTC");
-    }
-
-    @Transactional
     public LocationView create(
         StaffPrincipal principal,
         String candidateName,
         String googleReviewUrl,
         String candidateTimeZone
     ) {
-        var access = requireAdministrator(principal, true);
+        var access = requireAdministrator(principal);
         tenantRepository.findForUpdateById(access.tenantId())
             .orElseThrow(LocationNotFoundException::new);
         var name = parseName(candidateName);
@@ -110,7 +105,7 @@ public class LocationService {
 
     @Transactional
     public LocationView updateReviewLink(StaffPrincipal principal, UUID locationId, String candidateUrl) {
-        var access = requireAdministrator(principal, true);
+        var access = requireAdministrator(principal);
         var location = requireMutableLocationForUpdate(locationId, access.tenantId());
         location.configureReviews(parseReviewUrl(candidateUrl), clock.instant());
         return LocationView.from(location);
@@ -148,7 +143,7 @@ public class LocationService {
         UUID locationId,
         String candidateName
     ) {
-        var access = requireAdministrator(principal, true);
+        var access = requireAdministrator(principal);
         var location = requireMutableLocationForUpdate(locationId, access.tenantId());
         var name = parseName(candidateName);
         requireNameAvailable(access.tenantId(), name, location.getId());
@@ -175,7 +170,7 @@ public class LocationService {
         if (target == LocationStatus.ARCHIVED) {
             throw new InvalidLocationRequestException("Location archival requires Delete");
         }
-        var access = requireAdministrator(principal, true);
+        var access = requireAdministrator(principal);
         var location = requireMutableLocationForUpdate(locationId, access.tenantId());
         if (location.getStatus() == target) {
             return LocationView.from(location);
@@ -194,14 +189,11 @@ public class LocationService {
                 );
             }
             location.disable(now);
-            accounts.stream()
+            var activeAccounts = accounts.stream()
                 .filter(account -> !account.isArchived())
-                .forEach(account -> account.disable(now));
-            var accountIds = accounts.stream()
-                .filter(account -> !account.isArchived())
-                .map(Account::getId)
                 .toList();
-            sessionRevoker.revokeAll(accountIds);
+            activeAccounts.forEach(account -> account.disable(now));
+            sessionRevoker.revokeAll(activeAccounts.stream().map(Account::getId).toList());
             invitationService.revokePendingByLocation(
                 location.getId(),
                 AccountInvitationRevocationReason.LOCATION_DISABLED
@@ -226,7 +218,7 @@ public class LocationService {
 
     @Transactional
     public void delete(StaffPrincipal principal, UUID locationId) {
-        var access = requireAdministrator(principal, true);
+        var access = requireAdministrator(principal);
         tenantRepository.findForUpdateById(access.tenantId())
             .orElseThrow(LocationNotFoundException::new);
         var location = locationRepository.findForUpdateById(locationId)
@@ -278,17 +270,9 @@ public class LocationService {
         return location;
     }
 
-    private StaffAccessContext requireAdministrator(
-        StaffPrincipal principal,
-        boolean lockForUpdate
-    ) {
-        var access = lockForUpdate
-            ? staffAccessService.resolveForUpdate(principal)
-            : staffAccessService.resolve(principal);
-        if (!access.isTenantAdmin()) {
-            throw new StaffAccessDeniedException("Only a tenant administrator can manage locations");
-        }
-        return access;
+    private StaffAccessContext requireAdministrator(StaffPrincipal principal) {
+        return staffAccessService.resolveForUpdate(principal)
+            .requireTenantAdmin("Only a tenant administrator can manage locations");
     }
 
     private Location requireMutableLocationForUpdate(UUID locationId, UUID tenantId) {
