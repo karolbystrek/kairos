@@ -16,6 +16,11 @@ spring:
           time_zone: UTC
   jackson:
     time-zone: UTC
+  task:
+    scheduling:
+      pool:
+        # A long purge or analytics run must not delay email and heartbeats; kept small for one VPS.
+        size: 2
   datasource:
     url: "jdbc:postgresql://postgres:5432/${POSTGRES_DB}"
     username: "${KAIROS_DB_RUNTIME_USER}"
@@ -23,7 +28,6 @@ spring:
     hikari:
       connection-init-sql: SET TIME ZONE 'UTC'
   flyway:
-    url: "jdbc:postgresql://postgres:5432/${POSTGRES_DB}"
     user: "${KAIROS_DB_OWNER_USER}"
     password: "${KAIROS_DB_OWNER_PASSWORD}"
     placeholders:
@@ -63,7 +67,6 @@ kairos:
   origins:
     customer: "${NEXT_PUBLIC_CUSTOMER_APP_URL}"
     panel: "${PANEL_APP_URL}"
-    api: "${NEXT_PUBLIC_API_BASE_URL}"
   authentication:
     email-verification-enabled: ${EMAIL_VERIFICATION_ENABLED:true}
     base-url: "${ZITADEL_API_URL:http://zitadel:8080}"

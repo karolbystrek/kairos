@@ -13,7 +13,7 @@ export const registrationInputSchema = z
     ({ password, passwordConfirmation }) => password === passwordConfirmation,
     { message: "Hasła muszą być takie same.", path: ["passwordConfirmation"] },
   );
-export type TenantRegistrationInput = z.input<typeof registrationInputSchema>;
+type TenantRegistrationInput = z.input<typeof registrationInputSchema>;
 export async function registerTenant(registration: TenantRegistrationInput) {
   const result = await request(
     "/api/tenant-registrations/v1",

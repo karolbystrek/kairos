@@ -1,8 +1,11 @@
 package pl.karolbystrek.kairos.api.account.application.exception;
 
-public class StaffAccessDeniedException extends RuntimeException {
+import org.springframework.http.HttpStatus;
+import pl.karolbystrek.kairos.api.problem.ProblemException;
+
+public class StaffAccessDeniedException extends ProblemException {
 
     public StaffAccessDeniedException(String message) {
-        super(message);
+        super(HttpStatus.FORBIDDEN, message);
     }
 }

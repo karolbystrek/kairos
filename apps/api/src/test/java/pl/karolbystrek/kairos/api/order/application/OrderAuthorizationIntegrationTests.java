@@ -11,11 +11,12 @@ import pl.karolbystrek.kairos.api.account.domain.TenantRole;
 import pl.karolbystrek.kairos.api.location.application.LocationService;
 import pl.karolbystrek.kairos.api.location.application.model.LocationView;
 import pl.karolbystrek.kairos.api.order.application.exception.ResourceNotFoundException;
-import pl.karolbystrek.kairos.api.order.application.model.StaffOrderView;
+import pl.karolbystrek.kairos.api.order.application.model.OrderView;
 import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
 import pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase;
 import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
 
+import java.util.List;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.UUID;
@@ -81,29 +82,29 @@ class OrderAuthorizationIntegrationTests extends RedisListenerIsolatedIntegratio
 
     @Test
     void scopesLocationsAndOrdersToTheCurrentTenantAndAssignment() {
-        var ownOrder = orderService.createOrder(admin, locationId, null);
-        var otherOrder = orderService.createOrder(otherAdmin, otherLocationId, null);
+        var ownOrder = orderService.createOrder(admin, locationId, null, List.of());
+        var otherOrder = orderService.createOrder(otherAdmin, otherLocationId, null, List.of());
 
         assertThat(locationService.listAccessible(admin)).extracting(LocationView::id)
             .containsExactly(locationId);
         assertThat(locationService.listAccessible(manager)).extracting(LocationView::id)
             .containsExactly(locationId);
-        assertThat(orderService.listOrders(admin, null, null)).extracting(StaffOrderView::id)
+        assertThat(orderService.listOrders(admin, null, null)).extracting(OrderView::id)
             .containsExactly(ownOrder.id())
             .doesNotContain(otherOrder.id());
 
         assertThatThrownBy(() -> orderService.listOrders(manager, otherLocationId, null))
             .isInstanceOf(StaffAccessDeniedException.class);
-        assertThatThrownBy(() -> orderService.createOrder(operator, otherLocationId, null))
+        assertThatThrownBy(() -> orderService.createOrder(operator, otherLocationId, null, List.of()))
             .isInstanceOf(StaffAccessDeniedException.class);
-        assertThat(orderService.listOrders(manager, null, null)).extracting(StaffOrderView::id)
+        assertThat(orderService.listOrders(manager, null, null)).extracting(OrderView::id)
             .containsExactly(ownOrder.id())
             .doesNotContain(otherOrder.id());
     }
 
     @Test
     void authorizesTheStoredOrderLocationAndRecordsTheAuthenticatedInitiator() {
-        var order = orderService.createOrder(admin, locationId, null);
+        var order = orderService.createOrder(admin, locationId, null, List.of());
 
         var updated = orderService.updateStatus(operator, order.id(), OrderStatus.READY);
         assertThat(updated.status()).isEqualTo(OrderStatus.READY);
@@ -113,7 +114,7 @@ class OrderAuthorizationIntegrationTests extends RedisListenerIsolatedIntegratio
             order.id()
         )).isEqualTo(operator.accountId());
 
-        var otherOrder = orderService.createOrder(otherAdmin, otherLocationId, null);
+        var otherOrder = orderService.createOrder(otherAdmin, otherLocationId, null, List.of());
         assertThatThrownBy(() -> orderService.updateStatus(manager, otherOrder.id(), OrderStatus.READY))
             .isInstanceOf(ResourceNotFoundException.class);
     }
@@ -124,7 +125,7 @@ class OrderAuthorizationIntegrationTests extends RedisListenerIsolatedIntegratio
             .isInstanceOf(StaffAccessDeniedException.class);
 
         jdbcTemplate.update("UPDATE accounts SET status = 'DISABLED' WHERE id = ?", operator.accountId());
-        assertThatThrownBy(() -> orderService.createOrder(operator, locationId, null))
+        assertThatThrownBy(() -> orderService.createOrder(operator, locationId, null, List.of()))
             .isInstanceOf(StaffAccessDeniedException.class);
     }
 

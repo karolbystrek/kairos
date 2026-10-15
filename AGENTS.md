@@ -61,7 +61,8 @@ service; existing explicit approval remains valid within its stated scope.
 - PostgreSQL is authoritative, Redis Pub/Sub distributes customer events,
   ZITADEL owns identity.
 - `compose.yaml`: shared Docker Compose topology with NGINX HTTPS ingress.
-  Applications own their manifests and Dockerfiles.
+  Applications own their manifests and Dockerfiles; the two frontends share
+  `apps/panel-app/Dockerfile`.
 
 ## Read when relevant
 

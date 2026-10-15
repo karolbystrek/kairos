@@ -1,13 +1,13 @@
 package pl.karolbystrek.kairos.api.order.api.model;
 
-import pl.karolbystrek.kairos.api.order.application.model.StaffOrderView;
+import pl.karolbystrek.kairos.api.order.application.model.OrderView;
 import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-public record StaffOrderResponse(
+public record OrderResponse(
         UUID id,
         UUID locationId,
         UUID trackingReference,
@@ -18,8 +18,8 @@ public record StaffOrderResponse(
         Instant createdAt,
         Instant updatedAt
 ) {
-    public static StaffOrderResponse from(StaffOrderView order) {
-        return new StaffOrderResponse(
+    public static OrderResponse from(OrderView order) {
+        return new OrderResponse(
                 order.id(),
                 order.locationId(),
                 order.trackingReference(),

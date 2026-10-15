@@ -99,7 +99,7 @@ class WebhookDeliveryProcessorIntegrationTests
                     tenant.administrator(),
                     tenant.firstLocationId(),
                     null
-            );
+            , List.of());
             assertThat(fanoutService.fanOutAvailable()).isEqualTo(1);
             jdbcTemplate.update("UPDATE external_integrations SET status = 'ARCHIVED', archived_at = now() WHERE id = ?", integration.id());
             jdbcTemplate.update("UPDATE locations SET status = 'ARCHIVED', archived_at = now() WHERE id = ?", tenant.firstLocationId());

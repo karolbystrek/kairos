@@ -1,12 +1,15 @@
 package pl.karolbystrek.kairos.api.account.application.exception;
 
-public class AccountConflictException extends RuntimeException {
+import org.springframework.http.HttpStatus;
+import pl.karolbystrek.kairos.api.problem.ProblemException;
+
+public class AccountConflictException extends ProblemException {
 
     public AccountConflictException(String message) {
-        super(message);
+        super(HttpStatus.CONFLICT, message);
     }
 
     public AccountConflictException(String message, Throwable cause) {
-        super(message, cause);
+        super(HttpStatus.CONFLICT, message, cause);
     }
 }

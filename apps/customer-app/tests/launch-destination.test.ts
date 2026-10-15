@@ -30,17 +30,6 @@ describe("customer launch restoration", () => {
     ).toBe(ORDER_HREF);
   });
 
-  it("shows the scanner page without an unclosed order", () => {
-    for (const lastDestination of [null, { kind: "home" as const }]) {
-      expect(
-        resolveCustomerLaunchHref({
-          installationTrackingReference: null,
-          lastDestination,
-        }),
-      ).toBe("/");
-    }
-  });
-
   it.each(["IN_PREPARATION", "READY", "COMPLETED", "CANCELED"] as const)(
     "restores an unclosed %s order and returns to scanning after closing",
     async (status) => {

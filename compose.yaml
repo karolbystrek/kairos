@@ -4,11 +4,15 @@ services:
     environment:
       KAIROS_API_HOST:
       KAIROS_CUSTOMER_APP_HOST:
-      KAIROS_NGINX_LISTEN:
-      KAIROS_NGINX_REAL_IP_CONFIGURATION:
-      KAIROS_NGINX_TLS_CONFIGURATION:
+      KAIROS_NGINX_LISTEN: "443 ssl"
+      KAIROS_NGINX_REAL_IP_CONFIGURATION: ""
+      KAIROS_NGINX_TLS_CONFIGURATION: |-
+        ssl_certificate /run/secrets/tls/tls.crt;
+        ssl_certificate_key /run/secrets/tls/tls.key;
       KAIROS_PANEL_APP_HOST:
       NGINX_ENVSUBST_FILTER:
+    secrets:
+      - tls
     volumes:
       - type: bind
         source: ./nginx/default.conf.template
@@ -93,6 +97,12 @@ services:
         condition: service_healthy
       zitadel-bootstrap:
         condition: service_completed_successfully
+    secrets:
+      - email-encryption.bin
+      - webhook-encryption.bin
+      - vapid-private.pem
+      - vapid-public.pem
+      - push-subscription-encryption.bin
     volumes:
       - zitadel-api-credentials:/run/zitadel:ro
     networks:
@@ -146,6 +156,8 @@ services:
       ZITADEL_DEFAULTINSTANCE_SECRETGENERATORS_EMAILVERIFICATIONCODE_INCLUDESYMBOLS: false
       ZITADEL_DEFAULTINSTANCE_NOTIFICATIONPOLICY_PASSWORDCHANGE:
       ZITADEL_LOGSTORE_ACCESS_STDOUT_ENABLED:
+    secrets:
+      - zitadel-masterkey
     volumes:
       - zitadel-bootstrap-credentials:/bootstrap
     depends_on:
@@ -225,6 +237,23 @@ services:
       retries: 10
       start_period: 5s
     restart: unless-stopped
+
+# File secrets are read-only bind mounts at /run/secrets/<name>; a missing source fails startup.
+secrets:
+  email-encryption.bin:
+    file: ${KAIROS_APPLICATION_SECRETS_DIRECTORY:-./secrets}/email-encryption.bin
+  webhook-encryption.bin:
+    file: ${KAIROS_APPLICATION_SECRETS_DIRECTORY:-./secrets}/webhook-encryption.bin
+  vapid-private.pem:
+    file: ${KAIROS_APPLICATION_SECRETS_DIRECTORY:-./secrets}/vapid-private.pem
+  vapid-public.pem:
+    file: ${KAIROS_APPLICATION_SECRETS_DIRECTORY:-./secrets}/vapid-public.pem
+  push-subscription-encryption.bin:
+    file: ${KAIROS_APPLICATION_SECRETS_DIRECTORY:-./secrets}/push-subscription-encryption.bin
+  zitadel-masterkey:
+    file: ${KAIROS_APPLICATION_SECRETS_DIRECTORY:-./secrets}/zitadel-masterkey
+  tls:
+    file: ${KAIROS_TLS_DIRECTORY:-./secrets/tls}
 
 volumes:
   pgdata:

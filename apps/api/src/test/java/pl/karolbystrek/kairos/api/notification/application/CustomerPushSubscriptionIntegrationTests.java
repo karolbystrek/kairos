@@ -24,7 +24,7 @@ import pl.karolbystrek.kairos.api.notification.application.model.WebPushResult;
 import pl.karolbystrek.kairos.api.notification.domain.CustomerPushDeliveryStatus;
 import pl.karolbystrek.kairos.api.notification.infrastructure.security.VapidKeyLoader;
 import pl.karolbystrek.kairos.api.order.application.OrderService;
-import pl.karolbystrek.kairos.api.order.application.model.StaffOrderView;
+import pl.karolbystrek.kairos.api.order.application.model.OrderView;
 import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
 import pl.karolbystrek.kairos.api.persistence.infrastructure.DatabaseAccessContext;
 import pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase;
@@ -366,7 +366,7 @@ class CustomerPushSubscriptionIntegrationTests extends RedisListenerIsolatedInte
     void reconcilesOneCapabilityAcrossTenantsWithoutGrantingOtherOrderReads() {
         var second = new IntegrationTestFixture(jdbcTemplate).createTenant();
         var firstOrder = createOrder();
-        var secondOrder = orderService.createOrder(second.administrator(), second.firstLocationId(), null);
+        var secondOrder = orderService.createOrder(second.administrator(), second.firstLocationId(), null, List.of());
         var unrelated = createOrder();
         var input = newSubscription();
         subscriptionService.reconcile(input, List.of(firstOrder.trackingReference(), secondOrder.trackingReference()));
@@ -561,12 +561,12 @@ class CustomerPushSubscriptionIntegrationTests extends RedisListenerIsolatedInte
         assertThat(claimed.getFirst().payload()).contains("\"status\":\"" + terminalStatus + "\"");
     }
 
-    private StaffOrderView createOrder() {
+    private OrderView createOrder() {
         return orderService.createOrder(
                 tenant.administrator(),
                 tenant.firstLocationId(),
                 null
-        );
+        , List.of());
     }
 
     private CustomerPushSubscriptionInput newSubscription() {

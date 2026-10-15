@@ -6,6 +6,14 @@ import ts from "typescript";
 
 const require = createRequire(import.meta.url);
 
+// Loads a real source module, resolving its imports through the test's stubs.
+function loadModule(path, resolve) {
+  const exports = {};
+  const source = ts.transpileModule(readFileSync(new URL(`../${path}.ts`, import.meta.url), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
+  new Function("require", "exports", source)(name => resolve(name.startsWith("./") ? `@/src/api/${name.slice(2)}` : name), exports);
+  return exports;
+}
+
 function workspace({ delayMutation = false } = {}) {
   let finishMutation;
   const hooks = new Map();
@@ -44,6 +52,7 @@ function workspace({ delayMutation = false } = {}) {
       return new Promise(resolve => { completions.push(resolve); });
     } });
     if (["@/components/integrations/api-key-management", "@/components/integrations/webhook-subscription-management", "@/components/status-chip"].includes(name)) return load(name.replace("@/", ""));
+    if (name === "@/src/api/locations" || name === "@/src/messages") return loadModule(name.slice(2), dependencies);
     if (name.startsWith("@/")) return new Proxy({}, { get: (_, key) => String(key) });
     // Phosphor's CommonJS build does not load under Node's require; icons are inert here.
     if (name === "@phosphor-icons/react") return new Proxy({}, { get: (_, key) => String(key) });

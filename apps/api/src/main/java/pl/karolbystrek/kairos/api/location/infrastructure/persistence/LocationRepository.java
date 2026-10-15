@@ -7,7 +7,6 @@ import pl.karolbystrek.kairos.api.location.domain.Location;
 import pl.karolbystrek.kairos.api.location.domain.LocationStatus;
 
 import java.util.List;
-import java.util.Collection;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -16,8 +15,6 @@ public interface LocationRepository extends JpaRepository<Location, UUID> {
     long countByTenantIdAndStatusNot(UUID tenantId, LocationStatus status);
 
     List<Location> findAllByTenantIdAndStatusNot(UUID tenantId, LocationStatus status);
-
-    List<Location> findAllByIdInAndStatus(Collection<UUID> ids, LocationStatus status);
 
     boolean existsByTenantIdAndNormalizedNameAndStatusNot(
         UUID tenantId,

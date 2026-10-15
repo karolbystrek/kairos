@@ -5,7 +5,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
-import pl.karolbystrek.kairos.api.order.api.model.StaffOrderResponse;
+import pl.karolbystrek.kairos.api.order.api.model.OrderResponse;
 import pl.karolbystrek.kairos.api.order.application.OrderService;
 import pl.karolbystrek.kairos.api.order.application.model.OrderStatusChangedEvent;
 import pl.karolbystrek.kairos.api.worker.CoalescingWorker;
@@ -52,7 +52,7 @@ public class StaffOrderSseEmitterRegistry {
                 try {
                     var queue = orders.listOrders(principal, locationId, null);
                     delivery.send(SseEmitter.event().name("order-queue")
-                            .data(queue.stream().map(StaffOrderResponse::from).toList()), false);
+                            .data(queue.stream().map(OrderResponse::from).toList()), false);
                 } catch (RuntimeException exception) {
                     delivery.close();
                 }

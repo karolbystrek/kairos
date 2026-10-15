@@ -1,13 +1,8 @@
 import "fake-indexeddb/auto";
 
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, expect, it } from "vitest";
 
-import {
-  readLastStableDestination,
-  readTrackedOrder,
-  rememberTrackedOrder,
-  rememberLastStableDestination,
-} from "@/src/pwa/storage";
+import { readTrackedOrder, rememberTrackedOrder } from "@/src/pwa/storage";
 
 const TRACKING_REFERENCE = "930fccf0-c771-4c46-b4fd-ee59ce6e11cc";
 
@@ -23,22 +18,6 @@ function deleteCustomerDatabase(): Promise<void> {
 
 beforeEach(async () => {
   await deleteCustomerDatabase();
-});
-
-describe("last stable destination", () => {
-  it("stores Home and active order destinations", async () => {
-    await rememberLastStableDestination({ kind: "home" });
-    expect(await readLastStableDestination()).toEqual({ kind: "home" });
-
-    await rememberLastStableDestination({
-      kind: "order",
-      trackingReference: TRACKING_REFERENCE,
-    });
-    expect(await readLastStableDestination()).toEqual({
-      kind: "order",
-      trackingReference: TRACKING_REFERENCE,
-    });
-  });
 });
 
 it("does not let stale REST persistence undo a ready Push or stream state", async () => {

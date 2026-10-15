@@ -12,6 +12,8 @@ from urllib.parse import urlsplit
 
 STATE_DIRECTORY = Path("/srv/kairos")
 SERVICES = ("customer-app", "panel-app", "api")
+REVISION = r"[0-9a-f]{40}"
+IMAGE_DIGEST = r"ghcr\.io/karolbystrek/kairos/%s@sha256:[0-9a-f]{64}"
 RUNTIME_FILES = (
     "compose.yaml", "compose.deployment.yaml", "nginx/default.conf.template",
     "nginx/cloudflare-real-ip.conf", "deployment/zitadel/bootstrap.py",
@@ -51,13 +53,12 @@ def inputs(arguments):
     if not isinstance(manifest, dict) or set(manifest) != {"revision", "images"}:
         raise ValidationError("invalid release manifest")
     revision, images = manifest["revision"], manifest["images"]
-    if not isinstance(revision, str) or not re.fullmatch(r"[0-9a-f]{40}", revision):
+    if not isinstance(revision, str) or not re.fullmatch(REVISION, revision):
         raise ValidationError("invalid release revision")
     if not isinstance(images, dict) or set(images) != set(SERVICES):
         raise ValidationError("release requires exactly three application images")
     for service, image in images.items():
-        pattern = rf"ghcr\.io/karolbystrek/kairos/{service}@sha256:[0-9a-f]{{64}}"
-        if not isinstance(image, str) or not re.fullmatch(pattern, image):
+        if not isinstance(image, str) or not re.fullmatch(IMAGE_DIGEST % service, image):
             raise ValidationError("invalid repository-owned image digest")
     return release, env_file, manifest
 
@@ -109,25 +110,20 @@ def configuration(config, release, images):
         origins.append(origin.rstrip("/"))
     if len(set(origins)) != 3:
         raise ValidationError("three distinct public origins are required")
-    # Bind mounts fail safely: no missing path may become an empty directory,
-    # and persistent key/certificate material must live outside the checkout.
-    for name in ("api", "zitadel", "nginx"):
-        for volume in services[name].get("volumes", []):
-            if volume["type"] != "bind":
-                continue
-            if name == "nginx" and volume.get("target") != "/run/secrets/tls":
-                continue
-            source = Path(volume["source"])
-            if not source.is_absolute() or not source.exists():
-                raise ValidationError("bind mount source must exist at an absolute path")
-            if source.resolve().is_relative_to(release) or not volume.get("read_only"):
-                raise ValidationError("persistent secrets must be external and read-only")
-            if name == "nginx":
-                if not all((source / file).is_file() and not (source / file).resolve().is_relative_to(release)
-                           for file in ("tls.crt", "tls.key")):
-                    raise ValidationError("external TLS certificate and key are required")
-            elif not source.is_file():
-                raise ValidationError("application key bind mounts must be regular files")
+    # Compose file secrets are read-only binds; persistent key/certificate
+    # material must already exist outside the checkout at an absolute path.
+    for name, secret in config["secrets"].items():
+        source = Path(secret["file"])
+        if not source.is_absolute() or not source.exists():
+            raise ValidationError("secret source must exist at an absolute path")
+        if source.resolve().is_relative_to(release):
+            raise ValidationError("persistent secrets must be external to the release")
+        if name == "tls":
+            if not all((source / file).is_file() and not (source / file).resolve().is_relative_to(release)
+                       for file in ("tls.crt", "tls.key")):
+                raise ValidationError("external TLS certificate and key are required")
+        elif not source.is_file():
+            raise ValidationError("application key secrets must be regular files")
     return origins
 
 

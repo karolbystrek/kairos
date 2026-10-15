@@ -60,8 +60,6 @@ const stableCustomerDestinationSchema = z.discriminatedUnion("kind", [
 
 export type StoredTrackedOrder = z.infer<typeof storedOrderSchema>;
 
-export type StoredPushEvent = z.infer<typeof pushEventSchema>;
-
 export type StableCustomerDestination = z.infer<
   typeof stableCustomerDestinationSchema
 >;
@@ -85,14 +83,14 @@ export type SerializedPushSubscription = {
   };
 };
 
-export type PushTransition = {
+type PushTransition = {
   eventId: string;
   status: OrderStatus;
   trackingReference: string;
   transitionedAt: string;
 };
 
-export type PushTransitionResult = {
+type PushTransitionResult = {
   activeOrderCount: number;
   shouldDisplay: boolean;
 };
@@ -166,23 +164,23 @@ async function withDatabase<T>(
   }
 }
 
-export async function readTrackedOrders(): Promise<StoredTrackedOrder[]> {
-  try {
-    return await withDatabase(async (database) => {
-      const transaction = database.transaction(ORDER_STORE, "readonly");
-      const values = await requestResult(
-        transaction.objectStore(ORDER_STORE).getAll(),
-      );
+function parseAll<T>(schema: z.ZodType<T>, values: unknown[]): T[] {
+  return values.flatMap((value) => {
+    const result = schema.safeParse(value);
 
-      return values
-        .map((value) => storedOrderSchema.safeParse(value))
-        .filter((result) => result.success)
-        .map((result) => result.data)
-        .sort((left, right) => right.rememberedAt - left.rememberedAt);
-    });
-  } catch {
-    return [];
-  }
+    return result.success ? [result.data] : [];
+  });
+}
+
+function putTerminalTombstone(
+  transaction: IDBTransaction,
+  tombstone: Omit<z.infer<typeof tombstoneSchema>, "mode" | "expiresAt">,
+): void {
+  transaction.objectStore(TOMBSTONE_STORE).put({
+    ...tombstone,
+    mode: "terminal",
+    expiresAt: Date.now() + PUSH_FRESHNESS_MILLISECONDS,
+  });
 }
 
 export async function readTrackedOrder(
@@ -215,16 +213,10 @@ export async function readNotificationTrackingReferences(): Promise<string[]> {
     ]);
 
     return [
-      ...orders
-        .map((value) => storedOrderSchema.safeParse(value))
-        .filter((result) => result.success)
-        .map((result) => result.data)
+      ...parseAll(storedOrderSchema, orders)
         .filter((order) => isActiveOrderStatus(order.status))
         .map((order) => order.trackingReference),
-      ...tombstones
-        .map((value) => tombstoneSchema.safeParse(value))
-        .filter((result) => result.success)
-        .map((result) => result.data)
+      ...parseAll(tombstoneSchema, tombstones)
         .filter(
           (tombstone) =>
             tombstone.mode === "terminal" &&
@@ -335,9 +327,8 @@ export async function rememberTrackedOrder(
           );
         }
         orderStore.delete(parsed.data.trackingReference);
-        tombstoneStore.put({
+        putTerminalTombstone(transaction, {
           trackingReference: parsed.data.trackingReference,
-          mode: "terminal",
           status: parsed.data.status,
           transitionedAt: parsed.data.updatedAt,
           // REST can finish tracking before the final Push notification arrives.
@@ -349,7 +340,6 @@ export async function rememberTrackedOrder(
             (terminalTombstoneIsCurrent &&
               tombstoneResult.data.status === parsed.data.status &&
               tombstoneResult.data.notificationPending === true),
-          expiresAt: Date.now() + PUSH_FRESHNESS_MILLISECONDS,
         });
 
         await putMetadataInTransaction(transaction, {
@@ -366,9 +356,7 @@ export async function rememberTrackedOrder(
   notifyReviewStorageChange();
 }
 
-export async function pruneTerminalTrackedOrders(): Promise<
-  StoredTrackedOrder[]
-> {
+export async function pruneTerminalTrackedOrders(): Promise<void> {
   try {
     await withDatabase(async (database) => {
       const transaction = database.transaction(
@@ -378,31 +366,22 @@ export async function pruneTerminalTrackedOrders(): Promise<
       const orders = await requestResult(
         transaction.objectStore(ORDER_STORE).getAll(),
       );
-      const now = Date.now();
 
-      for (const candidate of orders) {
-        const parsed = storedOrderSchema.safeParse(candidate);
-
-        if (parsed.success && !isActiveOrderStatus(parsed.data.status)) {
-          transaction
-            .objectStore(ORDER_STORE)
-            .delete(parsed.data.trackingReference);
-          transaction.objectStore(TOMBSTONE_STORE).put({
-            trackingReference: parsed.data.trackingReference,
-            mode: "terminal",
-            status: parsed.data.status,
-            transitionedAt: parsed.data.updatedAt,
-            expiresAt: now + PUSH_FRESHNESS_MILLISECONDS,
+      for (const order of parseAll(storedOrderSchema, orders)) {
+        if (!isActiveOrderStatus(order.status)) {
+          transaction.objectStore(ORDER_STORE).delete(order.trackingReference);
+          putTerminalTombstone(transaction, {
+            trackingReference: order.trackingReference,
+            status: order.status,
+            transitionedAt: order.updatedAt,
           });
         }
       }
       await transactionComplete(transaction);
     });
   } catch {
-    return [];
+    // Pruning is best effort; stale terminal orders are pruned on a later start.
   }
-
-  return readTrackedOrders();
 }
 
 export async function readNotificationMetadata(): Promise<NotificationMetadata> {
@@ -458,123 +437,102 @@ export async function applyPushTransition(
       [ORDER_STORE, METADATA_STORE, EVENT_STORE, TOMBSTONE_STORE, REVIEW_STORE],
       "readwrite",
     );
-    const events = transaction.objectStore(EVENT_STORE);
-    const existingEvent = await requestResult(events.get(transition.eventId));
-    const metadata = await readMetadataFromTransaction(transaction);
-
-    await removeExpiredPushMetadata(transaction);
-    if (existingEvent) {
-      await transactionComplete(transaction);
-
-      return {
-        activeOrderCount: await countActiveOrders(database),
-        shouldDisplay: false,
-      };
-    }
-    events.put({
-      ...transition,
-      expiresAt: Date.now() + PUSH_FRESHNESS_MILLISECONDS,
-    });
-    if (metadata.notificationsEnabled !== true) {
-      await transactionComplete(transaction);
-
-      return {
-        activeOrderCount: await countActiveOrders(database),
-        shouldDisplay: false,
-      };
-    }
-    const tombstoneValue = await requestResult(
-      transaction
-        .objectStore(TOMBSTONE_STORE)
-        .get(transition.trackingReference),
+    const shouldDisplay = await applyPushTransitionInTransaction(
+      transaction,
+      transition,
     );
-    const tombstoneResult = tombstoneSchema.safeParse(tombstoneValue);
-    const pendingTerminalNotification =
-      tombstoneResult.success &&
-      tombstoneResult.data.mode === "terminal" &&
-      tombstoneResult.data.status === transition.status &&
-      tombstoneResult.data.notificationPending === true;
 
-    if (
-      (tombstoneResult.success && tombstoneResult.data.mode === "suppressed") ||
-      (!pendingTerminalNotification &&
-        !(metadata.enrolledTrackingReferences ?? []).includes(
-          transition.trackingReference,
-        ))
-    ) {
-      await transactionComplete(transaction);
-
-      return {
-        activeOrderCount: await countActiveOrders(database),
-        shouldDisplay: false,
-      };
-    }
-    if (
-      tombstoneResult.success &&
-      tombstoneResult.data.mode === "terminal" &&
-      (isActiveOrderStatus(transition.status) ||
-        tombstoneResult.data.status !== transition.status)
-    ) {
-      await transactionComplete(transaction);
-
-      return {
-        activeOrderCount: await countActiveOrders(database),
-        shouldDisplay: false,
-      };
-    }
-    const orderStore = transaction.objectStore(ORDER_STORE);
-    const currentValue = await requestResult(
-      orderStore.get(transition.trackingReference),
-    );
-    const currentResult = storedOrderSchema.safeParse(currentValue);
-
-    if (
-      currentResult.success &&
-      !canApplyStatus(currentResult.data.status, transition.status)
-    ) {
-      await transactionComplete(transaction);
-
-      return {
-        activeOrderCount: await countActiveOrders(database),
-        shouldDisplay: false,
-      };
-    }
-    if (isActiveOrderStatus(transition.status)) {
-      if (currentResult.success) {
-        orderStore.put({
-          ...currentResult.data,
-          status: transition.status,
-          updatedAt: transition.transitionedAt,
-        });
-      }
-    } else {
-      if (transition.status === "COMPLETED") {
-        await rememberReviewInTransaction(
-          transaction,
-          transition.trackingReference,
-        );
-      }
-      orderStore.delete(transition.trackingReference);
-      transaction.objectStore(TOMBSTONE_STORE).put({
-        trackingReference: transition.trackingReference,
-        mode: "terminal",
-        status: transition.status,
-        transitionedAt: transition.transitionedAt,
-        expiresAt: Date.now() + PUSH_FRESHNESS_MILLISECONDS,
-      });
-      await putMetadataInTransaction(transaction, {
-        enrolledTrackingReferences: (
-          metadata.enrolledTrackingReferences ?? []
-        ).filter((reference) => reference !== transition.trackingReference),
-      });
-    }
     await transactionComplete(transaction);
 
     return {
       activeOrderCount: await countActiveOrders(database),
-      shouldDisplay: true,
+      shouldDisplay,
     };
   });
+}
+
+async function applyPushTransitionInTransaction(
+  transaction: IDBTransaction,
+  transition: PushTransition,
+): Promise<boolean> {
+  const events = transaction.objectStore(EVENT_STORE);
+  const existingEvent = await requestResult(events.get(transition.eventId));
+  const metadata = await readMetadataFromTransaction(transaction);
+
+  await removeExpiredPushMetadata(transaction);
+  if (existingEvent) return false;
+  events.put({
+    ...transition,
+    expiresAt: Date.now() + PUSH_FRESHNESS_MILLISECONDS,
+  });
+  if (metadata.notificationsEnabled !== true) return false;
+  const tombstoneValue = await requestResult(
+    transaction.objectStore(TOMBSTONE_STORE).get(transition.trackingReference),
+  );
+  const tombstoneResult = tombstoneSchema.safeParse(tombstoneValue);
+  const pendingTerminalNotification =
+    tombstoneResult.success &&
+    tombstoneResult.data.mode === "terminal" &&
+    tombstoneResult.data.status === transition.status &&
+    tombstoneResult.data.notificationPending === true;
+
+  if (
+    (tombstoneResult.success && tombstoneResult.data.mode === "suppressed") ||
+    (!pendingTerminalNotification &&
+      !(metadata.enrolledTrackingReferences ?? []).includes(
+        transition.trackingReference,
+      ))
+  ) {
+    return false;
+  }
+  if (
+    tombstoneResult.success &&
+    tombstoneResult.data.mode === "terminal" &&
+    (isActiveOrderStatus(transition.status) ||
+      tombstoneResult.data.status !== transition.status)
+  ) {
+    return false;
+  }
+  const orderStore = transaction.objectStore(ORDER_STORE);
+  const currentResult = storedOrderSchema.safeParse(
+    await requestResult(orderStore.get(transition.trackingReference)),
+  );
+
+  if (
+    currentResult.success &&
+    !canApplyStatus(currentResult.data.status, transition.status)
+  ) {
+    return false;
+  }
+  if (isActiveOrderStatus(transition.status)) {
+    if (currentResult.success) {
+      orderStore.put({
+        ...currentResult.data,
+        status: transition.status,
+        updatedAt: transition.transitionedAt,
+      });
+    }
+  } else {
+    if (transition.status === "COMPLETED") {
+      await rememberReviewInTransaction(
+        transaction,
+        transition.trackingReference,
+      );
+    }
+    orderStore.delete(transition.trackingReference);
+    putTerminalTombstone(transaction, {
+      trackingReference: transition.trackingReference,
+      status: transition.status,
+      transitionedAt: transition.transitionedAt,
+    });
+    await putMetadataInTransaction(transaction, {
+      enrolledTrackingReferences: (
+        metadata.enrolledTrackingReferences ?? []
+      ).filter((reference) => reference !== transition.trackingReference),
+    });
+  }
+
+  return true;
 }
 
 export async function countActiveTrackedOrders(): Promise<number> {
@@ -600,14 +558,11 @@ async function countActiveOrders(database: IDBDatabase): Promise<number> {
   }
   const enrolled = new Set(metadata.enrolledTrackingReferences ?? []);
 
-  return values
-    .map((value) => storedOrderSchema.safeParse(value))
-    .filter(
-      (result) =>
-        result.success &&
-        isActiveOrderStatus(result.data.status) &&
-        enrolled.has(result.data.trackingReference),
-    ).length;
+  return parseAll(storedOrderSchema, values).filter(
+    (order) =>
+      isActiveOrderStatus(order.status) &&
+      enrolled.has(order.trackingReference),
+  ).length;
 }
 
 async function readMetadataFromTransaction(
@@ -636,24 +591,28 @@ async function removeExpiredPushMetadata(
 ): Promise<void> {
   const now = Date.now();
 
-  for (const storeName of [EVENT_STORE, TOMBSTONE_STORE]) {
-    const store = transaction.objectStore(storeName);
-    const values = await requestResult(store.getAll());
+  await deleteExpired(
+    transaction.objectStore(EVENT_STORE),
+    pushEventSchema,
+    (event) => event.eventId,
+    now,
+  );
+  await deleteExpired(
+    transaction.objectStore(TOMBSTONE_STORE),
+    tombstoneSchema,
+    (tombstone) => tombstone.trackingReference,
+    now,
+  );
+}
 
-    for (const candidate of values) {
-      const result =
-        storeName === EVENT_STORE
-          ? pushEventSchema.safeParse(candidate)
-          : tombstoneSchema.safeParse(candidate);
-
-      if (result.success && result.data.expiresAt <= now) {
-        store.delete(
-          storeName === EVENT_STORE
-            ? (result.data as StoredPushEvent).eventId
-            : result.data.trackingReference,
-        );
-      }
-    }
+async function deleteExpired<T extends { expiresAt: number }>(
+  store: IDBObjectStore,
+  schema: z.ZodType<T>,
+  keyOf: (record: T) => string,
+  now: number,
+): Promise<void> {
+  for (const record of parseAll(schema, await requestResult(store.getAll()))) {
+    if (record.expiresAt <= now) store.delete(keyOf(record));
   }
 }
 
@@ -706,10 +665,7 @@ export async function readReviewReferences(): Promise<string[]> {
       requestResult(transaction.objectStore(REVIEW_STORE).getAll()),
       requestResult(transaction.objectStore(ORDER_STORE).getAll()),
     ]);
-    const records = reviews
-      .map((value) => reviewRecordSchema.safeParse(value))
-      .filter((result) => result.success)
-      .map((result) => result.data);
+    const records = parseAll(reviewRecordSchema, reviews);
     const consumed = new Set(
       records
         .filter((record) => record.consumed)
@@ -721,10 +677,9 @@ export async function readReviewReferences(): Promise<string[]> {
         ...records
           .filter((record) => !record.consumed)
           .map((record) => record.trackingReference),
-        ...orders
-          .map((value) => storedOrderSchema.safeParse(value))
-          .filter((result) => result.success)
-          .map((result) => result.data.trackingReference),
+        ...parseAll(storedOrderSchema, orders).map(
+          (order) => order.trackingReference,
+        ),
       ]),
     ).filter((reference) => !consumed.has(reference));
   });

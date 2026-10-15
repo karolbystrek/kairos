@@ -124,7 +124,7 @@ Manually dispatching the workflow is the production approval; the Environment
 has no separate required reviewer. Deployment acceptance remains an operator
 launch check.
 
-`deployment/deploy.sh RELEASE_DIRECTORY ENV_FILE` runs on the Linux VM against
+`python3 deployment/deploy.py RELEASE_DIRECTORY ENV_FILE` runs on the Linux VM against
 an extracted exact-revision bundle. Both arguments are absolute; the environment
 file and existing application keys/Origin CA certificate material remain outside
 the release directory. The host needs Python 3.9 or newer, Docker with Compose

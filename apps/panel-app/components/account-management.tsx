@@ -20,11 +20,12 @@ import {
   PlusIcon,
   TrashIcon as DeleteIcon,
 } from "@phosphor-icons/react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import useSWR from "swr";
 import useSWRMutation from "swr/mutation";
 
 import { LoadingIndicator } from "@/components/loading-indicator";
+import { useMinuteClock } from "@/components/order-management";
 import { HoldToConfirmButton } from "@/components/hold-to-confirm-button";
 import { PanelPopup } from "@/components/panel-popup";
 import { FormSelect, FormTextField } from "@/components/form-controls";
@@ -49,64 +50,14 @@ import {
 } from "@/src/api/accounts";
 import { requiredEmailInputSchema } from "@/src/api/account-input";
 import { ApiError } from "@/src/api/api-fetch";
-import {
-  staffAccountsKey,
-  staffInvitationsKey,
-  staffLocationsKey,
-} from "@/src/api/cache-keys";
-import { listLocations, type Location } from "@/src/api/locations";
-
-type StatusMutationInput = {
-  accountId: string;
-  status: "ENABLED" | "DISABLED";
-};
-
-function createInvitationMutation(
-  _key: ReturnType<typeof staffInvitationsKey>,
-  { arg }: { arg: CreateAccountInvitationInput },
-): Promise<CreatedAccountInvitation> {
-  return createAccountInvitation(arg);
-}
-
-function resendInvitationMutation(
-  _key: ReturnType<typeof staffInvitationsKey>,
-  { arg }: { arg: string },
-): Promise<AccountInvitation> {
-  return resendAccountInvitation(arg);
-}
-
-function revokeInvitationMutation(
-  _key: ReturnType<typeof staffInvitationsKey>,
-  { arg }: { arg: string },
-): Promise<boolean> {
-  return revokeAccountInvitation(arg);
-}
-
-function statusMutation(
-  _key: ReturnType<typeof staffAccountsKey>,
-  { arg }: { arg: StatusMutationInput },
-): Promise<ManagedAccount> {
-  return updateManagedAccountStatus(arg.accountId, arg.status);
-}
-
-function deleteMutation(
-  _key: ReturnType<typeof staffAccountsKey>,
-  { arg }: { arg: string },
-): Promise<boolean> {
-  return deleteManagedAccount(arg);
-}
+import { staffAccountsKey, staffInvitationsKey } from "@/src/api/cache-keys";
+import { useStaffLocations, type Location } from "@/src/api/locations";
+import { errorMessage, formatDateTime } from "@/src/messages";
 
 function getErrorMessage(error: unknown): string {
-  if (error instanceof ApiError) return error.message;
-
-  return "Nie udało się wykonać operacji na koncie. Sprawdź połączenie i spróbuj ponownie.";
-}
-
-function shouldRetryOnError(error: Error): boolean {
-  return !(
-    error instanceof ApiError &&
-    error.status >= 400 &&
-    error.status < 500
+  return errorMessage(
+    error,
+    "Nie udało się wykonać operacji na koncie. Sprawdź połączenie i spróbuj ponownie.",
   );
 }
 
@@ -157,13 +108,6 @@ function invitationStatus(
     : { color: "success", label: "Oczekujące" };
 }
 
-function formatDateTime(value: string): string {
-  return new Intl.DateTimeFormat("pl-PL", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
-}
-
 export function AccountManagement({ account }: { account: TenantAccount }) {
   const isAdministrator = account.tenantRole === "ADMIN";
   const [selectedAccountId, setSelectedAccountId] = useState<string>();
@@ -177,43 +121,26 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
   const [role, setRole] = useState<AssignmentRole>("OPERATOR");
   const [replacementInput, setReplacementInput] =
     useState<CreateAccountInvitationInput>();
-  const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    const interval = window.setInterval(() => setNow(Date.now()), 60_000);
-
-    return () => window.clearInterval(interval);
-  }, []);
+  const now = useMinuteClock();
 
   const {
     data: locations = [],
+    enabledLocations,
     error: locationsError,
     isLoading: areLocationsLoading,
-  } = useSWR(staffLocationsKey(account.accountId), () => listLocations(), {
-    errorRetryCount: 3,
-    shouldRetryOnError,
-  });
-  const enabledLocations = locations.filter(
-    (location) => location.status === "ENABLED",
-  );
+  } = useStaffLocations(account.accountId);
   const {
     data: accounts = [],
     error: accountsError,
     isLoading: areAccountsLoading,
     mutate: mutateAccounts,
-  } = useSWR(staffAccountsKey(account.accountId), listManagedAccounts, {
-    errorRetryCount: 3,
-    shouldRetryOnError,
-  });
+  } = useSWR(staffAccountsKey(account.accountId), listManagedAccounts);
   const {
     data: invitationHistory = [],
     error: invitationsError,
     isLoading: areInvitationsLoading,
     mutate: mutateInvitations,
-  } = useSWR(staffInvitationsKey(account.accountId), listAccountInvitations, {
-    errorRetryCount: 3,
-    shouldRetryOnError,
-  });
+  } = useSWR(staffInvitationsKey(account.accountId), listAccountInvitations);
   // A redeemed invitation is represented by its account card.
   const invitations = invitationHistory.filter(
     (invitation) => invitation.state !== "REDEEMED",
@@ -225,7 +152,8 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
     trigger: triggerCreation,
   } = useSWRMutation(
     staffInvitationsKey(account.accountId),
-    createInvitationMutation,
+    (_, { arg }: { arg: CreateAccountInvitationInput }) =>
+      createAccountInvitation(arg),
     { throwOnError: false },
   );
   const {
@@ -235,7 +163,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
     trigger: triggerRevocation,
   } = useSWRMutation(
     staffInvitationsKey(account.accountId),
-    revokeInvitationMutation,
+    (_, { arg }: { arg: string }) => revokeAccountInvitation(arg),
     { throwOnError: false },
   );
   const {
@@ -245,7 +173,7 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
     trigger: triggerResend,
   } = useSWRMutation(
     staffInvitationsKey(account.accountId),
-    resendInvitationMutation,
+    (_, { arg }: { arg: string }) => resendAccountInvitation(arg),
     { throwOnError: false },
   );
   const {
@@ -253,17 +181,24 @@ export function AccountManagement({ account }: { account: TenantAccount }) {
     isMutating: isChangingStatus,
     reset: resetStatus,
     trigger: triggerStatus,
-  } = useSWRMutation(staffAccountsKey(account.accountId), statusMutation, {
-    throwOnError: false,
-  });
+  } = useSWRMutation(
+    staffAccountsKey(account.accountId),
+    (
+      _,
+      { arg }: { arg: { accountId: string; status: "ENABLED" | "DISABLED" } },
+    ) => updateManagedAccountStatus(arg.accountId, arg.status),
+    { throwOnError: false },
+  );
   const {
     error: deletionError,
     isMutating: isDeleting,
     reset: resetDeletion,
     trigger: triggerDeletion,
-  } = useSWRMutation(staffAccountsKey(account.accountId), deleteMutation, {
-    throwOnError: false,
-  });
+  } = useSWRMutation(
+    staffAccountsKey(account.accountId),
+    (_, { arg }: { arg: string }) => deleteManagedAccount(arg),
+    { throwOnError: false },
+  );
 
   const assignedLocationId = account.assignment?.locationId;
   const locationId = isAdministrator

@@ -4,8 +4,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import pl.karolbystrek.kairos.api.account.application.StaffAccessService;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
-import pl.karolbystrek.kairos.api.integration.application.IntegrationAdministrationAccessService;
 import pl.karolbystrek.kairos.api.integration.application.exception.IntegrationConflictException;
 import pl.karolbystrek.kairos.api.integration.application.exception.IntegrationNotFoundException;
 import pl.karolbystrek.kairos.api.integration.application.exception.InvalidIntegrationRequestException;
@@ -22,7 +22,6 @@ import pl.karolbystrek.kairos.api.integration.webhook.domain.WebhookSubscription
 import pl.karolbystrek.kairos.api.integration.webhook.domain.WebhookSubscriptionLocationAccess;
 import pl.karolbystrek.kairos.api.integration.webhook.domain.WebhookSubscriptionStatus;
 import pl.karolbystrek.kairos.api.integration.webhook.infrastructure.config.WebhookProperties;
-import pl.karolbystrek.kairos.api.integration.webhook.infrastructure.http.InvalidWebhookDestinationException;
 import pl.karolbystrek.kairos.api.integration.webhook.infrastructure.http.WebhookDestinationPolicy;
 import pl.karolbystrek.kairos.api.integration.webhook.infrastructure.persistence.WebhookSigningSecretVersionRepository;
 import pl.karolbystrek.kairos.api.integration.webhook.infrastructure.persistence.WebhookSubscriptionEventSelectionRepository;
@@ -30,6 +29,7 @@ import pl.karolbystrek.kairos.api.integration.webhook.infrastructure.persistence
 import pl.karolbystrek.kairos.api.integration.webhook.infrastructure.persistence.WebhookSubscriptionRepository;
 import pl.karolbystrek.kairos.api.integration.webhook.infrastructure.security.SigningSecretCipher;
 import pl.karolbystrek.kairos.api.location.infrastructure.persistence.LocationRepository;
+import pl.karolbystrek.kairos.api.network.InvalidDestinationException;
 import pl.karolbystrek.kairos.api.order.domain.OrderEventType;
 
 import java.time.Clock;
@@ -46,8 +46,9 @@ import java.util.stream.Collectors;
 public class WebhookSubscriptionManagementService {
 
     private static final int MAXIMUM_DESTINATION_LENGTH = 2048;
+    private static final String ADMINISTRATOR_REQUIRED = "External Integration management requires a tenant administrator";
 
-    private final IntegrationAdministrationAccessService administrationAccessService;
+    private final StaffAccessService staffAccessService;
     private final ExternalIntegrationRepository integrationRepository;
     private final LocationRepository locationRepository;
     private final WebhookSubscriptionRepository subscriptionRepository;
@@ -61,7 +62,7 @@ public class WebhookSubscriptionManagementService {
 
     @Transactional(readOnly = true)
     public List<WebhookSubscriptionView> list(StaffPrincipal principal, UUID integrationId) {
-        var access = administrationAccessService.requireAdministrator(principal);
+        var access = staffAccessService.resolve(principal).requireTenantAdmin(ADMINISTRATOR_REQUIRED);
         requireIntegration(integrationId, access.tenantId(), false);
         var subscriptions = subscriptionRepository
                 .findAllByIntegrationIdAndArchivedAtIsNullOrderByCreatedAt(integrationId);
@@ -77,7 +78,7 @@ public class WebhookSubscriptionManagementService {
             Set<UUID> locationIds,
             Set<OrderEventType> eventTypes
     ) {
-        var access = administrationAccessService.requireAdministratorForUpdate(principal);
+        var access = staffAccessService.resolveForUpdate(principal).requireTenantAdmin(ADMINISTRATOR_REQUIRED);
         requireIntegration(integrationId, access.tenantId(), true);
         var name = parseName(candidateName);
         var destination = parseDestination(candidateDestination);
@@ -122,12 +123,10 @@ public class WebhookSubscriptionManagementService {
             Set<UUID> locationIds,
             Set<OrderEventType> eventTypes
     ) {
-        var access = administrationAccessService.requireAdministratorForUpdate(principal);
-        var subscription = requireSubscriptionForUpdate(subscriptionId, access.tenantId());
-        requireIntegration(subscription.getIntegrationId(), access.tenantId(), true);
+        var subscription = lockManaged(principal, subscriptionId);
         var name = parseName(candidateName);
         var destination = parseDestination(candidateDestination);
-        validateSelections(access.tenantId(), locationIds, eventTypes);
+        validateSelections(subscription.getTenantId(), locationIds, eventTypes);
         if (subscriptionRepository.existsByIntegrationIdAndNormalizedNameAndIdNot(
                 subscription.getIntegrationId(),
                 name.normalizedValue(),
@@ -157,9 +156,7 @@ public class WebhookSubscriptionManagementService {
             UUID subscriptionId,
             WebhookSubscriptionStatus target
     ) {
-        var access = administrationAccessService.requireAdministratorForUpdate(principal);
-        var subscription = requireSubscriptionForUpdate(subscriptionId, access.tenantId());
-        requireIntegration(subscription.getIntegrationId(), access.tenantId(), true);
+        var subscription = lockManaged(principal, subscriptionId);
         var now = clock.instant();
         switch (target) {
             case ENABLED -> {
@@ -176,9 +173,7 @@ public class WebhookSubscriptionManagementService {
 
     @Transactional
     public void archive(StaffPrincipal principal, UUID subscriptionId) {
-        var access = administrationAccessService.requireAdministratorForUpdate(principal);
-        var subscription = requireSubscriptionForUpdate(subscriptionId, access.tenantId());
-        requireIntegration(subscription.getIntegrationId(), access.tenantId(), true);
+        var subscription = lockManaged(principal, subscriptionId);
         subscription.archive(clock.instant());
     }
 
@@ -187,9 +182,7 @@ public class WebhookSubscriptionManagementService {
             StaffPrincipal principal,
             UUID subscriptionId
     ) {
-        var access = administrationAccessService.requireAdministratorForUpdate(principal);
-        var subscription = requireSubscriptionForUpdate(subscriptionId, access.tenantId());
-        requireIntegration(subscription.getIntegrationId(), access.tenantId(), true);
+        var subscription = lockManaged(principal, subscriptionId);
         var now = clock.instant();
         var versions = signingSecretRepository
                 .findAllForUpdateBySubscriptionIdOrderByIssuedAtDesc(subscriptionId);
@@ -214,9 +207,7 @@ public class WebhookSubscriptionManagementService {
             UUID subscriptionId,
             UUID versionId
     ) {
-        var access = administrationAccessService.requireAdministratorForUpdate(principal);
-        var subscription = requireSubscriptionForUpdate(subscriptionId, access.tenantId());
-        requireIntegration(subscription.getIntegrationId(), access.tenantId(), true);
+        var subscription = lockManaged(principal, subscriptionId);
         var version = signingSecretRepository
                 .findForUpdateByIdAndSubscriptionId(versionId, subscriptionId)
                 .orElseThrow(() -> new IntegrationNotFoundException(
@@ -248,20 +239,7 @@ public class WebhookSubscriptionManagementService {
     }
 
     private WebhookSubscriptionView toView(WebhookSubscription subscription) {
-        var locationIds = locationAccessRepository.findAllBySubscriptionId(subscription.getId())
-                .stream()
-                .map(WebhookSubscriptionLocationAccess::getLocationId)
-                .collect(Collectors.toUnmodifiableSet());
-        var eventTypes = eventSelectionRepository.findAllBySubscriptionId(subscription.getId())
-                .stream()
-                .map(WebhookSubscriptionEventSelection::getEventType)
-                .collect(Collectors.toUnmodifiableSet());
-        var versions = signingSecretRepository
-                .findAllBySubscriptionIdOrderByIssuedAtDesc(subscription.getId())
-                .stream()
-                .map(WebhookSigningSecretVersionView::from)
-                .toList();
-        return WebhookSubscriptionView.from(subscription, locationIds, eventTypes, versions);
+        return toViews(List.of(subscription)).getFirst();
     }
 
     private List<WebhookSubscriptionView> toViews(List<WebhookSubscription> subscriptions) {
@@ -372,8 +350,8 @@ public class WebhookSubscriptionManagementService {
     }
 
     private void requireConfigured(UUID subscriptionId) {
-        if (locationAccessRepository.findAllBySubscriptionId(subscriptionId).isEmpty()
-                || eventSelectionRepository.findAllBySubscriptionId(subscriptionId).isEmpty()) {
+        if (!locationAccessRepository.existsBySubscriptionId(subscriptionId)
+                || !eventSelectionRepository.existsBySubscriptionId(subscriptionId)) {
             throw new InvalidIntegrationRequestException(
                     "A webhook subscription requires locations and event types before enabling"
             );
@@ -395,6 +373,13 @@ public class WebhookSubscriptionManagementService {
             throw new IntegrationNotFoundException("External Integration was not found");
         }
         return integration;
+    }
+
+    private WebhookSubscription lockManaged(StaffPrincipal principal, UUID subscriptionId) {
+        var access = staffAccessService.resolveForUpdate(principal).requireTenantAdmin(ADMINISTRATOR_REQUIRED);
+        var subscription = requireSubscriptionForUpdate(subscriptionId, access.tenantId());
+        requireIntegration(subscription.getIntegrationId(), access.tenantId(), true);
+        return subscription;
     }
 
     private WebhookSubscription requireSubscriptionForUpdate(UUID subscriptionId, UUID tenantId) {
@@ -426,7 +411,7 @@ public class WebhookSubscriptionManagementService {
                 );
             }
             return destination;
-        } catch (InvalidWebhookDestinationException exception) {
+        } catch (InvalidDestinationException exception) {
             throw new InvalidIntegrationRequestException(exception.getMessage(), exception);
         }
     }

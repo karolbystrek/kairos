@@ -13,7 +13,7 @@ export const currentAccountSchema = z.object({
     .nullable(),
   capabilities: z.array(z.string()),
 });
-export const pendingVerificationSchema = z.object({
+const pendingVerificationSchema = z.object({
   verificationRequired: z.literal(true),
   email: z.string(),
   // z.iso is not yet initialised when the prerender bundle evaluates this module.
@@ -21,6 +21,7 @@ export const pendingVerificationSchema = z.object({
     .string()
     .refine((value) => !Number.isNaN(Date.parse(value))),
 });
+
 export type PendingVerification = z.infer<typeof pendingVerificationSchema>;
 export const authenticationResultSchema = z.union([
   currentAccountSchema,
@@ -74,7 +75,7 @@ export function resendVerification(): Promise<PendingVerification> {
 }
 export type CurrentAccount = z.infer<typeof currentAccountSchema>;
 export type TenantAccount = CurrentAccount;
-export type AuthenticationResult = z.infer<typeof authenticationResultSchema>;
+type AuthenticationResult = z.infer<typeof authenticationResultSchema>;
 const loginSchema = z.object({
   email: requiredEmailInputSchema,
   password: z.string().min(1).max(200),

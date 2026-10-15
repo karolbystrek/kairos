@@ -12,8 +12,6 @@ import java.util.UUID;
 public interface CustomerPushSubscriptionRepository
         extends JpaRepository<CustomerPushSubscription, UUID> {
 
-    Optional<CustomerPushSubscription> findByEndpointHash(String endpointHash);
-
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<CustomerPushSubscription> findForUpdateByEndpointHash(String endpointHash);
 

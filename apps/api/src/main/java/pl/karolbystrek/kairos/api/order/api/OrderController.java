@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
 import pl.karolbystrek.kairos.api.order.api.model.CreateOrderRequest;
-import pl.karolbystrek.kairos.api.order.api.model.StaffOrderResponse;
+import pl.karolbystrek.kairos.api.order.api.model.OrderResponse;
 import pl.karolbystrek.kairos.api.order.api.model.UpdateOrderStatusRequest;
 import pl.karolbystrek.kairos.api.order.application.OrderService;
 import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
@@ -41,20 +41,20 @@ class OrderController {
     }
 
     @GetMapping
-    List<StaffOrderResponse> listOrders(
+    List<OrderResponse> listOrders(
             @AuthenticationPrincipal StaffPrincipal principal,
             @RequestParam(required = false) UUID locationId,
             @RequestParam(required = false) OrderStatus status
     ) {
         var orders = orderService.listOrders(principal, locationId, status);
         return orders.stream()
-                .map(StaffOrderResponse::from)
+                .map(OrderResponse::from)
                 .toList();
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    StaffOrderResponse createOrder(
+    OrderResponse createOrder(
             @AuthenticationPrincipal StaffPrincipal principal,
             @Valid @RequestBody CreateOrderRequest request
     ) {
@@ -64,16 +64,16 @@ class OrderController {
                 request.label(),
                 request.orderItems()
         );
-        return StaffOrderResponse.from(order);
+        return OrderResponse.from(order);
     }
 
     @PutMapping("/{orderId}/status")
-    StaffOrderResponse updateOrderStatus(
+    OrderResponse updateOrderStatus(
             @AuthenticationPrincipal StaffPrincipal principal,
             @PathVariable UUID orderId,
             @Valid @RequestBody UpdateOrderStatusRequest request
     ) {
         var order = orderService.updateStatus(principal, orderId, request.status());
-        return StaffOrderResponse.from(order);
+        return OrderResponse.from(order);
     }
 }

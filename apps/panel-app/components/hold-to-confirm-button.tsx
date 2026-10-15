@@ -119,7 +119,7 @@ export function HoldToConfirmButton({
       <Button
         aria-describedby={instructionsId}
         className={`hold-to-confirm ${className}`}
-        data-holding={(holding && !isDisabled && !isPending) || undefined}
+        data-holding={holding || undefined}
         isDisabled={isDisabled}
         isPending={isPending || submitting}
         type="button"

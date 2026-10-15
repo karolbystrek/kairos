@@ -87,8 +87,10 @@ else:
             path = source / name
             path.parent.mkdir(parents=True, exist_ok=True)
             if not path.exists():
-                path.write_text('echo "$@" > "$(dirname "$1")/invoked"\nexit "${FAIL_DEPLOY:-0}"\n'
-                                if name == 'deployment/deploy.sh' else '# fixture\n')
+                path.write_text('import os, pathlib, sys\n'
+                                'pathlib.Path(sys.argv[1]).parent.joinpath("invoked").write_text(" ".join(sys.argv[1:]))\n'
+                                'sys.exit(int(os.environ.get("FAIL_DEPLOY", "0")))\n'
+                                if name == 'deployment/deploy.py' else '# fixture\n')
         import shutil
         shutil.rmtree(self.artifact)
         with patch.object(release_manifest, '__file__', str(source / 'deployment/release_manifest.py')):

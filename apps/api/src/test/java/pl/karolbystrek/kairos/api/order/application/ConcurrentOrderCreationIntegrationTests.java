@@ -73,7 +73,7 @@ class ConcurrentOrderCreationIntegrationTests extends RedisListenerIsolatedInteg
         var principal = insertAdministrator(tenantId);
         var tasks = new ArrayList<Callable<Long>>();
         for (var index = 0; index < 6; index++) {
-            tasks.add(() -> orderService.createOrder(principal, locationId, null).number());
+            tasks.add(() -> orderService.createOrder(principal, locationId, null, List.of()).number());
         }
 
         List<Long> numbers;

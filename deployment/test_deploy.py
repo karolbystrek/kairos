@@ -64,15 +64,12 @@ class DeployTest(unittest.TestCase):
             "KAIROS_CUSTOMER_APP_HOST": "customer.example.com", "KAIROS_PANEL_APP_HOST": "panel.example.com",
             "KAIROS_API_HOST": "api.example.com",
         }
-        self.config["services"]["api"]["volumes"] = [
-            {"type": "bind", "source": str(self.secrets / name), "read_only": True}
+        self.config["secrets"] = {
+            name: {"file": str(self.secrets / name)}
             for name in ("webhook-encryption.bin", "email-encryption.bin", "vapid-private.pem", "vapid-public.pem",
-                         "push-subscription-encryption.bin")
-        ]
-        self.config["services"]["zitadel"]["volumes"] = [
-            {"type": "bind", "source": str(self.secrets / "zitadel-masterkey"), "read_only": True}]
-        self.config["services"]["nginx"]["volumes"] = [
-            {"type": "bind", "source": str(self.secrets), "target": "/run/secrets/tls", "read_only": True}]
+                         "push-subscription-encryption.bin", "zitadel-masterkey")
+        }
+        self.config["secrets"]["tls"] = {"file": str(self.secrets)}
         self.log = self.root / "commands.jsonl"
         self.bin = self.root / "bin"
         self.bin.mkdir()
@@ -138,7 +135,7 @@ sys.exit(deploy.main(sys.argv[1:]))
         interpreter.write_text(runner)
         interpreter.chmod(0o755)
         return subprocess.run(
-            ["bash", str(ROOT / "deployment/deploy.sh"),
+            [str(interpreter), str(ROOT / "deployment/deploy.py"),
              str(self.release if release is None else release), str(self.env_file if env_file is None else env_file)],
             env={**os.environ, "PATH": str(self.bin) + os.pathsep + os.environ["PATH"],
                  "COMMAND_LOG": str(self.log), "CONFIG_FIXTURE": str(fixture),
@@ -324,10 +321,6 @@ sys.exit(deploy.main(sys.argv[1:]))
         key.symlink_to(inside)
         self.assert_failed_safely(self.run_deploy())
         self.assertTrue(all("config" in call for call in self.commands()))
-
-    def test_shell_rejects_wrong_argument_count(self):
-        result = subprocess.run(["bash", str(ROOT / "deployment/deploy.sh")], capture_output=True, text=True)
-        self.assertEqual(result.returncode, 64)
 
     def test_unsafe_resolved_configuration_never_mutates_docker(self):
         for key, value in (("WEBHOOK_DESTINATION_POLICY", "LOCAL_DEVELOPMENT"),

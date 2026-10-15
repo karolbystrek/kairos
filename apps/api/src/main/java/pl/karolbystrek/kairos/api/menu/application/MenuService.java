@@ -95,9 +95,7 @@ public class MenuService {
 
     // Locks the location so concurrent first saves of its menu serialize.
     private Location requireManagedLocation(StaffAccessContext access, UUID locationId) {
-        if (!access.isTenantAdmin() && access.assignmentRole() != AssignmentRole.MANAGER) {
-            throw new StaffAccessDeniedException("Only an administrator or a location manager can change a menu");
-        }
+        access.requireAdminOrManager("Only an administrator or a location manager can change a menu");
         var location = locationRepository.findForUpdateById(locationId)
             .filter(candidate -> !candidate.isArchived())
             .orElseThrow(() -> new MenuNotFoundException("Location was not found"));

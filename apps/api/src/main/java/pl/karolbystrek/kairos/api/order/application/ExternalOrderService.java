@@ -17,7 +17,7 @@ import pl.karolbystrek.kairos.api.order.application.exception.ResourceNotFoundEx
 import pl.karolbystrek.kairos.api.order.application.model.ExternalOrderCreation;
 import pl.karolbystrek.kairos.api.order.application.model.ExternalOrderCreationResult;
 import pl.karolbystrek.kairos.api.order.application.model.ExternalOrderPage;
-import pl.karolbystrek.kairos.api.order.application.model.ExternalOrderView;
+import pl.karolbystrek.kairos.api.order.application.model.OrderView;
 import pl.karolbystrek.kairos.api.order.application.model.OrderInitiator;
 import pl.karolbystrek.kairos.api.order.domain.CustomerOrder;
 import pl.karolbystrek.kairos.api.order.domain.OrderItem;
@@ -90,7 +90,7 @@ public class ExternalOrderService {
         var hasNext = content.size() > limit;
         var visibleOrders = hasNext ? content.subList(0, limit) : content;
         var items = visibleOrders.stream()
-                .map(ExternalOrderView::from)
+                .map(OrderView::from)
                 .toList();
         var nextCursor = hasNext
                 ? cursorCodec.encode(visibleOrders.getLast())
@@ -99,14 +99,14 @@ public class ExternalOrderService {
     }
 
     @Transactional(readOnly = true)
-    public ExternalOrderView find(ApiKeyPrincipal principal, UUID orderId) {
+    public OrderView find(ApiKeyPrincipal principal, UUID orderId) {
         databaseAccess.integration(principal);
         if (!principal.scopes().contains(ApiKeyScope.ORDERS_READ)) {
             throw new IntegrationAccessDeniedException("The API Key does not grant the required scope");
         }
         var order = orderRepository.findByIdAndLocationIdIn(orderId, principal.locationIds())
                 .orElseThrow(ExternalOrderService::orderNotFound);
-        return ExternalOrderView.from(order);
+        return OrderView.from(order);
     }
 
     @Transactional
@@ -140,7 +140,7 @@ public class ExternalOrderService {
                         "Idempotency-Key was already used with different order input"
                 );
             }
-            return new ExternalOrderCreationResult(ExternalOrderView.from(existing), true);
+            return new ExternalOrderCreationResult(OrderView.from(existing), true);
         }
 
         var now = clock.instant();
@@ -156,11 +156,11 @@ public class ExternalOrderService {
                 ),
                 now
         );
-        return new ExternalOrderCreationResult(ExternalOrderView.from(order), false);
+        return new ExternalOrderCreationResult(OrderView.from(order), false);
     }
 
     @Transactional
-    public ExternalOrderView updateStatus(
+    public OrderView updateStatus(
             ApiKeyPrincipal principal,
             UUID orderId,
             OrderStatus target
@@ -181,7 +181,7 @@ public class ExternalOrderService {
                 integrationInitiator(principal),
                 clock.instant()
         );
-        return ExternalOrderView.from(order);
+        return OrderView.from(order);
     }
 
     private static Specification<CustomerOrder> orderSpecification(

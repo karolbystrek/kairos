@@ -9,8 +9,7 @@ import {
   XIcon as CloseIcon,
 } from "@phosphor-icons/react";
 import Image from "next/image";
-import QRCode from "qrcode";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 import useSWRMutation from "swr/mutation";
 
@@ -24,12 +23,8 @@ import {
   type ItemQuantities,
 } from "@/components/order-item-picker";
 import { ApiError } from "@/src/api/api-fetch";
-import {
-  staffCachePrefix,
-  staffLocationMenuKey,
-  staffLocationsKey,
-} from "@/src/api/cache-keys";
-import { listLocations, type Location } from "@/src/api/locations";
+import { staffCachePrefix, staffLocationMenuKey } from "@/src/api/cache-keys";
+import { useStaffLocations, type Location } from "@/src/api/locations";
 import { getLocationMenu } from "@/src/api/menus";
 import {
   createOrder as createOrderRequest,
@@ -45,6 +40,7 @@ import {
 } from "@/src/api/orders";
 import { customerAppUrl } from "@/src/config/public-environment";
 import { recordPanelAction } from "@/src/api/usage-analytics";
+import { errorMessage } from "@/src/messages";
 import { toastError } from "@/src/toast";
 
 const tenantOrderScope = "tenant";
@@ -66,53 +62,20 @@ const nextStatuses: Partial<Record<OrderStatus, OrderStatus>> = {
   READY: "COMPLETED",
 };
 
-type OrderListKey = ReturnType<typeof ordersKey>;
-type CreateMutationInput = {
-  locationId: string;
-  input: CreateOrderInput;
-};
-type StatusMutationInput = {
-  orderId: string;
-  status: OrderStatus;
+const statusErrorMessages: Partial<Record<number, string>> = {
+  403: "Nie masz uprawnień do zarządzania tymi zamówieniami.",
+  404: "Wybrane zamówienie lub lokal nie jest już dostępny.",
+  409: "Zamówienie zostało zmienione. Sprawdź jego obecny status i spróbuj ponownie.",
 };
 
 function getErrorMessage(error: unknown): string {
-  if (error instanceof ApiError) {
-    switch (error.status) {
-      case 403:
-        return "Nie masz uprawnień do zarządzania tymi zamówieniami.";
-      case 404:
-        return "Wybrane zamówienie lub lokal nie jest już dostępny.";
-      case 409:
-        return "Zamówienie zostało zmienione. Sprawdź jego obecny status i spróbuj ponownie.";
-      default:
-        return error.message;
-    }
-  }
-
-  return "Nie udało się wczytać lub zaktualizować zamówień. Sprawdź połączenie i spróbuj ponownie.";
-}
-
-function shouldRetryOnError(error: Error): boolean {
-  return !(
-    error instanceof ApiError &&
-    error.status >= 400 &&
-    error.status < 500
+  return (
+    (error instanceof ApiError && statusErrorMessages[error.status]) ||
+    errorMessage(
+      error,
+      "Nie udało się wczytać lub zaktualizować zamówień. Sprawdź połączenie i spróbuj ponownie.",
+    )
   );
-}
-
-function createOrderMutation(
-  _key: OrderListKey,
-  { arg }: { arg: CreateMutationInput },
-): Promise<StaffOrder> {
-  return createOrderRequest(arg.locationId, arg.input);
-}
-
-function updateOrderMutation(
-  _key: OrderListKey,
-  { arg }: { arg: StatusMutationInput },
-): Promise<StaffOrder> {
-  return updateOrderStatus(arg.orderId, arg.status);
 }
 
 function elapsedTime(createdAt: string, now: number): string {
@@ -132,7 +95,7 @@ function elapsedTime(createdAt: string, now: number): string {
     : `${hours.toLocaleString("pl-PL")} godz.`;
 }
 
-function useMinuteClock() {
+export function useMinuteClock() {
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -198,7 +161,9 @@ function OrderQrCode({
     isLoading,
   } = useSWR(
     [staffCachePrefix, accountId, "order-qr", trackingUrl] as const,
-    ([, , , url]) => QRCode.toDataURL(url, { margin: 2, width: 640 }),
+    // The encoder loads only when an order's details first open.
+    async ([, , , url]) =>
+      (await import("qrcode")).toDataURL(url, { margin: 2, width: 640 }),
     {
       revalidateOnFocus: false,
       revalidateOnReconnect: false,
@@ -330,21 +295,18 @@ function OrderCard({
 
 export function OrderManagement({
   accountId,
-  isActive = true,
   canManageLocations,
   canViewTenantOrders,
-  onRequestedLocationApplied,
-  requestedLocationId,
+  onSelectLocation,
+  selectedLocationId,
 }: {
   accountId: string;
-  isActive?: boolean;
   canManageLocations: boolean;
   canViewTenantOrders: boolean;
-  onRequestedLocationApplied?: () => void;
-  requestedLocationId?: string;
+  onSelectLocation: (locationId?: string) => void;
+  selectedLocationId?: string;
 }) {
   const now = useMinuteClock();
-  const [selectedLocationId, setSelectedLocationId] = useState<string>();
   const [createLocationId, setCreateLocationId] = useState<string>();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [createStep, setCreateStep] = useState<"items" | "label">("items");
@@ -360,37 +322,26 @@ export function OrderManagement({
 
   const {
     data: locations = [],
+    enabledLocations,
     error: locationsError,
     isLoading: areLocationsLoading,
-  } = useSWR(staffLocationsKey(accountId), () => listLocations(), {
-    errorRetryCount: 3,
-    shouldRetryOnError,
-  });
+  } = useStaffLocations(accountId);
 
-  const enabledLocations = locations.filter(
-    (location) => location.status === "ENABLED",
-  );
-
-  const effectiveSelectedLocationId = requestedLocationId ?? selectedLocationId;
   const locationId = enabledLocations.some(
-    (location) => location.id === effectiveSelectedLocationId,
+    (location) => location.id === selectedLocationId,
   )
-    ? effectiveSelectedLocationId
+    ? selectedLocationId
     : canViewTenantOrders
       ? undefined
       : enabledLocations[0]?.id;
+  // The orders tab panel unmounts when hidden, so each visit is a fresh mount.
   const queueWasOpened = useRef(false);
 
   useEffect(() => {
-    if (!isActive) {
-      queueWasOpened.current = false;
-
-      return;
-    }
     if (areLocationsLoading || locationsError || queueWasOpened.current) return;
     queueWasOpened.current = true;
     recordPanelAction("queue_opened", locationId);
-  }, [isActive, areLocationsLoading, locationsError, locationId]);
+  }, [areLocationsLoading, locationsError, locationId]);
 
   const currentOrdersKey =
     enabledLocations.length > 0
@@ -410,16 +361,11 @@ export function OrderManagement({
     currentOrdersKey,
     ([, , , scope]) =>
       listOrders(scope === tenantOrderScope ? undefined : scope),
-    {
-      errorRetryCount: 3,
-      shouldRetryOnError,
-      refreshInterval:
-        isActive && connectedQueueScope !== queueScope ? 15_000 : 0,
-    },
+    { refreshInterval: connectedQueueScope !== queueScope ? 15_000 : 0 },
   );
 
   useEffect(() => {
-    if (!isActive || !queueScope) return;
+    if (!queueScope) return;
     let disposed = false;
     const disconnect = () => {
       if (disposed) return;
@@ -441,24 +387,30 @@ export function OrderManagement({
       disposed = true;
       close();
     };
-  }, [isActive, queueScope, locationId, mutateOrders]);
+  }, [queueScope, locationId, mutateOrders]);
 
   const {
     error: createOrderError,
     isMutating: isCreatingOrder,
     reset: resetCreateOrder,
     trigger: triggerCreateOrder,
-  } = useSWRMutation(currentOrdersKey, createOrderMutation, {
-    throwOnError: false,
-  });
+  } = useSWRMutation(
+    currentOrdersKey,
+    (_, { arg }: { arg: { locationId: string; input: CreateOrderInput } }) =>
+      createOrderRequest(arg.locationId, arg.input),
+    { throwOnError: false },
+  );
   const {
     error: updateOrderError,
     isMutating: isUpdatingOrder,
     reset: resetUpdateOrder,
     trigger: triggerUpdateOrder,
-  } = useSWRMutation(currentOrdersKey, updateOrderMutation, {
-    throwOnError: false,
-  });
+  } = useSWRMutation(
+    currentOrdersKey,
+    (_, { arg }: { arg: { orderId: string; status: OrderStatus } }) =>
+      updateOrderStatus(arg.orderId, arg.status),
+    { throwOnError: false },
+  );
 
   const {
     data: createMenu,
@@ -469,11 +421,12 @@ export function OrderManagement({
       ? staffLocationMenuKey(accountId, createLocationId)
       : null,
     ([, , , menuLocationId]) => getLocationMenu(menuLocationId),
-    { errorRetryCount: 3, shouldRetryOnError },
   );
-  const selectedItems = (createMenu?.items ?? [])
-    .filter((item) => itemQuantities[item])
-    .map((item) => ({ name: item, quantity: itemQuantities[item] }));
+  const pickedItems = (quantities: ItemQuantities) =>
+    (createMenu?.items ?? [])
+      .filter((item) => quantities[item])
+      .map((item) => ({ name: item, quantity: quantities[item] }));
+  const selectedItems = pickedItems(itemQuantities);
   const selectedQuantity = selectedItems.reduce(
     (total, item) => total + item.quantity,
     0,
@@ -489,28 +442,12 @@ export function OrderManagement({
   // Changing items regenerates the label and replaces manual edits.
   function changeItems(quantities: ItemQuantities) {
     setItemQuantities(quantities);
-    setLabel(
-      describeOrderItems(
-        (createMenu?.items ?? [])
-          .filter((item) => quantities[item])
-          .map((item) => ({ name: item, quantity: quantities[item] })),
-      ),
-    );
+    setLabel(describeOrderItems(pickedItems(quantities)));
     setLabelError(undefined);
   }
 
-  const ordersByStatus = useMemo(
-    () => ({
-      IN_PREPARATION: orders.filter(
-        (order) => order.status === "IN_PREPARATION",
-      ),
-      READY: orders.filter((order) => order.status === "READY"),
-    }),
-    [orders],
-  );
-  const locationNames = useMemo(
-    () => new Map(locations.map((location) => [location.id, location.name])),
-    [locations],
+  const locationNames = new Map(
+    locations.map((location) => [location.id, location.name]),
   );
   const loadError = locationsError ?? ordersError;
 
@@ -629,8 +566,7 @@ export function OrderManagement({
 
   function selectLocation(nextLocationId?: string) {
     if (isCreatingOrder || isUpdatingOrder) return;
-    setSelectedLocationId(nextLocationId);
-    onRequestedLocationApplied?.();
+    onSelectLocation(nextLocationId);
     resetCreateOrder();
     resetUpdateOrder();
   }
@@ -703,7 +639,9 @@ export function OrderManagement({
             <div className="grid gap-10 md:grid-cols-2 md:gap-0 md:divide-x md:divide-separator">
               {(["IN_PREPARATION", "READY"] as const).map((status) => {
                 const lane = laneDetails[status];
-                const laneOrders = ordersByStatus[status];
+                const laneOrders = orders.filter(
+                  (order) => order.status === status,
+                );
 
                 return (
                   <section
@@ -899,10 +837,7 @@ export function OrderManagement({
         <LocationCreationModal
           accountId={accountId}
           isOpen={isCreateLocationOpen}
-          onCreated={(location) => {
-            setSelectedLocationId(location.id);
-            onRequestedLocationApplied?.();
-          }}
+          onCreated={(location) => onSelectLocation(location.id)}
           onOpenChange={setIsCreateLocationOpen}
         />
       )}

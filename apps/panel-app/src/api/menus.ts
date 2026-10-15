@@ -4,7 +4,7 @@ import { apiFetch, request } from "./api-fetch";
 
 const singleLinePattern = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/;
 
-export const menuItemsSchema = z
+const menuItemsSchema = z
   .array(
     z
       .string()

@@ -48,7 +48,15 @@ assert environment['ZITADEL_DB_USER'] == 'zitadel'
 assert environment['ZITADEL_DB_PASSWORD'] == 'local-password'
 PY
 chmod +x "${test_directory}/bin/docker"
+# Every Compose-mounted generated key plus local TLS must be removed.
+mkdir -p "${test_directory}/secrets/tls"
+keys="$(sed -n 's|.*:-\./secrets}/||p' "${repository_directory}/compose.yaml") tls/tls.crt tls/tls.key"
+[ "$(echo "${keys}" | wc -w)" -ge 8 ]
+for key in ${keys}; do echo fixture > "${test_directory}/secrets/${key}"; done
 PATH="${test_directory}/bin:${PATH}" sh "${test_directory}/reset.sh" > "${test_directory}/output"
 cmp "${test_directory}/expected-env" "${test_directory}/.env.old"
 cmp "${test_directory}/.env.example" "${test_directory}/.env"
-printf '%s\n' 'Reset defaults, existing project configuration, and environment backup passed.'
+for key in ${keys}; do
+    [ ! -e "${test_directory}/secrets/${key}" ] || { echo "reset.sh kept secrets/${key}" >&2; exit 1; }
+done
+printf '%s\n' 'Reset defaults, existing project configuration, key removal, and environment backup passed.'

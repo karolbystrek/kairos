@@ -10,7 +10,6 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import pl.karolbystrek.kairos.api.account.application.exception.AccountConflictException;
-import pl.karolbystrek.kairos.api.account.application.exception.StaffAccessDeniedException;
 import pl.karolbystrek.kairos.api.authentication.application.exception.InvalidLoginException;
 import pl.karolbystrek.kairos.api.authentication.application.exception.RegistrationValidationException;
 
@@ -55,10 +54,5 @@ class AuthenticationExceptionHandler {
         var problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, "Registration conflicts with an existing account.");
         problem.setProperty("fieldErrors", Map.of("email", "An account with this email already exists. Sign in instead."));
         return problem;
-    }
-
-    @ExceptionHandler(StaffAccessDeniedException.class)
-    ProblemDetail handleAccessDenied(StaffAccessDeniedException exception) {
-        return ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, exception.getMessage());
     }
 }

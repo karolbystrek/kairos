@@ -6,21 +6,14 @@ import re
 import sys
 import tarfile
 
-SERVICES = ("customer-app", "panel-app", "api")
-RUNTIME_FILES = (
-    "compose.yaml",
-    "compose.deployment.yaml",
-    "nginx/default.conf.template",
-    "nginx/cloudflare-real-ip.conf",
-    "deployment/zitadel/bootstrap.py",
-    "deployment/postgres/bootstrap.sh",
-    "deployment/deploy.sh",
-    "deployment/deploy.py",
-)
+import deploy
+from deploy import IMAGE_DIGEST, REVISION, SERVICES
+
+RUNTIME_FILES = (*deploy.RUNTIME_FILES, "deployment/deploy.py")
 
 
 def assemble(revision, inspections, output):
-    if not re.fullmatch(r"[0-9a-f]{40}", revision):
+    if not re.fullmatch(REVISION, revision):
         raise ValueError("release revision must be a full lowercase Git SHA")
     images = {}
     for service in SERVICES:
@@ -33,8 +26,7 @@ def assemble(revision, inspections, output):
             raise ValueError(f"{service}: expected linux/amd64")
         if labels.get("org.opencontainers.image.revision") != revision:
             raise ValueError(f"{service}: source revision mismatch")
-        pattern = rf"ghcr\.io/karolbystrek/kairos/{service}@sha256:[0-9a-f]{{64}}"
-        digests = [ref for ref in image.get("RepoDigests", []) if re.fullmatch(pattern, ref)]
+        digests = [ref for ref in image.get("RepoDigests", []) if re.fullmatch(IMAGE_DIGEST % service, ref)]
         if len(digests) != 1:
             raise ValueError(f"{service}: expected one repository-owned registry digest")
         images[service] = digests[0]

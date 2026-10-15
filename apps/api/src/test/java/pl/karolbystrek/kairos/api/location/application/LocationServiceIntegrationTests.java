@@ -53,8 +53,8 @@ class LocationServiceIntegrationTests extends RedisListenerIsolatedIntegrationTe
     void terminalTrackingSurvivesLocationDisablementAndArchival(String status) {
         var tenantId = insertTenant();
         var administrator = insertAccount(tenantId, TenantRole.ADMIN, AccountStatus.ENABLED);
-        var target = locationService.create(administrator, "Terminal tracking");
-        locationService.create(administrator, "Retained location");
+        var target = locationService.create(administrator, "Terminal tracking", null, "UTC");
+        locationService.create(administrator, "Retained location", null, "UTC");
         var orderId = insertOrder(target.id(), status);
         var reference = jdbcTemplate.queryForObject(
                 "SELECT tracking_reference FROM orders WHERE id = ?", UUID.class, orderId);
@@ -76,7 +76,7 @@ class LocationServiceIntegrationTests extends RedisListenerIsolatedIntegrationTe
     void configuresReviewsOnlyForTheOwningAdministratorAndRejectsUnsafeLinks() {
         var tenantId = insertTenant();
         var administrator = insertAccount(tenantId, TenantRole.ADMIN, AccountStatus.ENABLED);
-        var location = locationService.create(administrator, "Reviews");
+        var location = locationService.create(administrator, "Reviews", null, "UTC");
         assertThat(location.googleReviewUrl()).isNull();
         var enabled = locationService.updateReviewLink(administrator, location.id(), "https://g.page/r/example/review");
         assertThat(enabled.googleReviewUrl()).isEqualTo("https://g.page/r/example/review");
@@ -95,12 +95,12 @@ class LocationServiceIntegrationTests extends RedisListenerIsolatedIntegrationTe
         var tenantId = insertTenant();
         var administrator = insertAccount(tenantId, TenantRole.ADMIN, AccountStatus.ENABLED);
 
-        var kitchen = locationService.create(administrator, "  Kitchen  ");
-        var alpha = locationService.create(administrator, "Alpha");
+        var kitchen = locationService.create(administrator, "  Kitchen  ", null, "UTC");
+        var alpha = locationService.create(administrator, "Alpha", null, "UTC");
 
         assertThat(kitchen.name()).isEqualTo("Kitchen");
         assertThat(kitchen.status()).isEqualTo(LocationStatus.ENABLED);
-        assertThatThrownBy(() -> locationService.create(administrator, "kItChEn"))
+        assertThatThrownBy(() -> locationService.create(administrator, "kItChEn", null, "UTC"))
             .isInstanceOf(LocationConflictException.class);
         assertThat(locationService.create(administrator, "Warsaw", null, "Europe/Warsaw").timeZone())
             .isEqualTo("Europe/Warsaw");
@@ -115,7 +115,7 @@ class LocationServiceIntegrationTests extends RedisListenerIsolatedIntegrationTe
 
         locationService.updateStatus(administrator, kitchen.id(), LocationStatus.DISABLED);
         locationService.delete(administrator, kitchen.id());
-        var reused = locationService.create(administrator, "counter");
+        var reused = locationService.create(administrator, "counter", null, "UTC");
 
         assertThat(reused.id()).isNotEqualTo(kitchen.id());
         assertThat(locationService.listAccessible(administrator))
@@ -133,7 +133,7 @@ class LocationServiceIntegrationTests extends RedisListenerIsolatedIntegrationTe
     void persistsMaximumLengthNameWhoseNormalizationExpands() {
         var tenantId = insertTenant();
         var administrator = insertAccount(tenantId, TenantRole.ADMIN, AccountStatus.ENABLED);
-        var location = locationService.create(administrator, "İ".repeat(120));
+        var location = locationService.create(administrator, "İ".repeat(120), null, "UTC");
         assertThat(jdbcTemplate.queryForObject("SELECT normalized_name FROM locations WHERE id = ?",
             String.class, location.id())).isEqualTo("i\u0307".repeat(120));
     }
@@ -142,7 +142,7 @@ class LocationServiceIntegrationTests extends RedisListenerIsolatedIntegrationTe
     void rejectsDisableWithoutAnyCascadeWhileAnActiveOrderExists() {
         var tenantId = insertTenant();
         var administrator = insertAccount(tenantId, TenantRole.ADMIN, AccountStatus.ENABLED);
-        var location = locationService.create(administrator, "Active queue");
+        var location = locationService.create(administrator, "Active queue", null, "UTC");
         var manager = insertAccount(tenantId, TenantRole.MEMBER, AccountStatus.ENABLED);
         insertAssignment(manager.accountId(), tenantId, location.id(), AssignmentRole.MANAGER);
         var sessionId = insertSession(manager.accountId());
@@ -177,8 +177,8 @@ class LocationServiceIntegrationTests extends RedisListenerIsolatedIntegrationTe
     void disableEnableAndDeleteApplyTheCompleteAtomicCascade() {
         var tenantId = insertTenant();
         var administrator = insertAccount(tenantId, TenantRole.ADMIN, AccountStatus.ENABLED);
-        var target = locationService.create(administrator, "Target");
-        var retained = locationService.create(administrator, "Retained");
+        var target = locationService.create(administrator, "Target", null, "UTC");
+        var retained = locationService.create(administrator, "Retained", null, "UTC");
         var manager = insertAccount(tenantId, TenantRole.MEMBER, AccountStatus.ENABLED);
         var operator = insertAccount(tenantId, TenantRole.MEMBER, AccountStatus.DISABLED);
         insertAssignment(manager.accountId(), tenantId, target.id(), AssignmentRole.MANAGER);
@@ -250,10 +250,10 @@ class LocationServiceIntegrationTests extends RedisListenerIsolatedIntegrationTe
     void lastDisabledLocationCannotBeDeletedEvenWithArchivedOrOtherTenantLocations() {
         var tenantId = insertTenant();
         var administrator = insertAccount(tenantId, TenantRole.ADMIN, AccountStatus.ENABLED);
-        var archived = locationService.create(administrator, "Archived");
-        var last = locationService.create(administrator, "Last");
+        var archived = locationService.create(administrator, "Archived", null, "UTC");
+        var last = locationService.create(administrator, "Last", null, "UTC");
         var otherAdministrator = insertAccount(insertTenant(), TenantRole.ADMIN, AccountStatus.ENABLED);
-        locationService.create(otherAdministrator, "Other tenant");
+        locationService.create(otherAdministrator, "Other tenant", null, "UTC");
         locationService.updateStatus(administrator, archived.id(), LocationStatus.DISABLED);
         locationService.delete(administrator, archived.id());
         locationService.delete(administrator, archived.id());
@@ -277,8 +277,8 @@ class LocationServiceIntegrationTests extends RedisListenerIsolatedIntegrationTe
         var tenantId = insertTenant();
         var firstAdmin = insertAccount(tenantId, TenantRole.ADMIN, AccountStatus.ENABLED);
         var secondAdmin = insertAccount(tenantId, TenantRole.ADMIN, AccountStatus.ENABLED);
-        var first = locationService.create(firstAdmin, "First");
-        var second = locationService.create(firstAdmin, "Second");
+        var first = locationService.create(firstAdmin, "First", null, "UTC");
+        var second = locationService.create(firstAdmin, "Second", null, "UTC");
         locationService.updateStatus(firstAdmin, first.id(), LocationStatus.DISABLED);
         locationService.updateStatus(firstAdmin, second.id(), LocationStatus.DISABLED);
         var start = new CountDownLatch(1);

@@ -43,7 +43,7 @@ class CustomerPushSubscriptionValidator {
         return new ValidatedPushSubscription(
                 endpoint,
                 sha256(endpoint),
-                destination.origin(),
+                PushDestinationPolicy.origin(destination.uri()),
                 p256dh,
                 auth,
                 input.expirationTime()

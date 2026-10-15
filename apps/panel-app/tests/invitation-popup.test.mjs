@@ -6,12 +6,18 @@ import ts from "typescript";
 
 const require = createRequire(import.meta.url);
 
+// Loads a real source module, resolving its imports through the test's stubs.
+function loadModule(path, resolve) {
+  const exports = {};
+  const source = ts.transpileModule(readFileSync(new URL(`../${path}.ts`, import.meta.url), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
+  new Function("require", "exports", source)(name => resolve(name.startsWith("./") ? `@/src/api/${name.slice(2)}` : name), exports);
+  return exports;
+}
+
 function workspace(kind = "account-management", collections = {}) {
   const state = [];
   let cursor = 0;
-  let pending = false;
   let complete;
-  let creationFailure;
   class ApiError extends Error { constructor(status) { super(); this.status = status; } }
   const requests = [];
   const exports = {};
@@ -33,15 +39,19 @@ function workspace(kind = "account-management", collections = {}) {
       isLoading: collections.loading?.[key] ?? false,
       mutate: async () => { requests.push({ retry: key }); },
     }) };
-    if (name === "swr/mutation") return { default: (key, mutation) => ({
-      isMutating: ["createInvitationMutation", "createOrderMutation"].includes(mutation.name) && pending,
-      error: mutation.name === "createInvitationMutation" ? creationFailure : undefined,
-      reset() { if (["createInvitationMutation", "createOrderMutation"].includes(mutation.name)) { pending = false; creationFailure = undefined; } },
-      async trigger(arg) {
-        pending = true;
-        try { return await mutation(key, { arg }); } catch (error) { creationFailure = error; throw error; } finally { pending = false; }
-      },
-    }) };
+    // Each mutation hook keeps its own pending and error state, like SWR's.
+    if (name === "swr/mutation") return { default: (key, mutation) => {
+      const hook = state[cursor++] ??= {};
+      return {
+        isMutating: Boolean(hook.pending),
+        error: hook.error,
+        reset() { hook.pending = false; hook.error = undefined; },
+        async trigger(arg) {
+          hook.pending = true;
+          try { return await mutation(key, { arg }); } catch (error) { hook.error = error; throw error; } finally { hook.pending = false; }
+        },
+      };
+    } };
     if (name === "@/src/api/cache-keys") return {
       staffCachePrefix: "staff", staffLocationsKey: () => "locations", staffAccountsKey: () => "accounts",
       staffInvitationsKey: () => "invitations", staffLocationMenuKey: () => "location-menu",
@@ -69,13 +79,16 @@ function workspace(kind = "account-management", collections = {}) {
       new Function("require", "exports", loadingSource)(dependencies, loadingExports);
       return loadingExports;
     }
+    if (name === "@/components/order-management") return { useMinuteClock: () => Date.now() };
     if (name === "@/src/api/locations" && kind === "location-creation-modal") return {
+      ...loadModule("src/api/locations", dependencies),
       managedLocationNameSchema: { safeParse: value => value.trim() ? { success: true, data: value.trim() } : { success: false, error: { issues: [{ message: "Podaj nazwę." }] } } },
       googleReviewUrlSchema: { safeParse: () => ({ success: true }) },
       sortLocations: locations => locations,
       async createLocation(locationName, googleReviewUrl) { requests.push({ locationName, googleReviewUrl }); throw new ApiError(409); },
     };
     if (name === "@/src/api/locations" && kind === "location-management") return {
+      ...loadModule("src/api/locations", dependencies),
       managedLocationNameSchema: { parse: value => value.trim() },
       googleReviewUrlSchema: { parse: value => value.trim() },
       sortLocations: locations => locations,
@@ -84,6 +97,7 @@ function workspace(kind = "account-management", collections = {}) {
     };
     if (name === "@/src/api/usage-analytics") return { recordPanelAction() {} };
     if (name === "@/src/api/api-fetch") return { ApiError };
+    if (name === "@/src/api/locations" || name === "@/src/messages") return loadModule(name.slice(2), dependencies);
     if (name.startsWith("@/")) return new Proxy({}, { get: (_, key) => String(key) });
     // Phosphor's CommonJS build does not load under Node's require; icons are inert here.
     if (name === "@phosphor-icons/react") return new Proxy({}, { get: (_, key) => String(key) });
@@ -102,8 +116,8 @@ function workspace(kind = "account-management", collections = {}) {
     cursor = 0;
     if (kind === "account-management") return exports.AccountManagement({ account: { accountId: "staff", tenantRole: "ADMIN" } });
     if (kind === "location-creation-modal") return exports.LocationCreationModal({ accountId: "staff", isOpen: true, isRequired: true, onCreated() {}, onOpenChange() {} });
-    if (kind === "location-management") return exports.LocationManagement({ accountId: "staff", canManageLocations: true, onEditMenu() {}, onViewOrders() {} });
-    return exports.OrderManagement({ accountId: "staff", canViewTenantOrders: true, canManageLocations: false });
+    if (kind === "location-management") return exports.LocationManagement({ accountId: "staff", onEditMenu() {}, onViewOrders() {} });
+    return exports.OrderManagement({ accountId: "staff", canViewTenantOrders: true, canManageLocations: false, onSelectLocation() {} });
   }
   function find(predicate) {
     cursor = 0;

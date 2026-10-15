@@ -9,19 +9,20 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-public record StaffOrderView(
-        UUID id,
-        UUID locationId,
-        UUID trackingReference,
+public record OrderView(
+        @NonNull UUID id,
+        @NonNull UUID locationId,
+        @NonNull UUID trackingReference,
         long number,
         String label,
         @NonNull List<OrderItem> items,
-        OrderStatus status,
-        Instant createdAt,
-        Instant updatedAt
+        @NonNull OrderStatus status,
+        @NonNull Instant createdAt,
+        @NonNull Instant updatedAt
 ) {
-    public static StaffOrderView from(CustomerOrder order) {
-        return new StaffOrderView(
+
+    public static OrderView from(CustomerOrder order) {
+        return new OrderView(
                 order.getId(),
                 order.getLocation().getId(),
                 order.getTrackingReference(),

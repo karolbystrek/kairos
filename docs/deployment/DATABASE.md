@@ -31,7 +31,8 @@ protects ordinary runtime queries rather than a fully compromised API process.
 Compose mounts `deployment/postgres/bootstrap.sh` into PostgreSQL's standard
 `docker-entrypoint-initdb.d` directory. On an empty database volume, PostgreSQL
 creates its initial database, runs this role initialization script, and becomes
-ready. Spring then connects as the owner to apply V1 through Flyway automatically.
+ready. Spring then connects as the owner to apply migrations through Flyway automatically.
+V1 is frozen: every schema change goes into a new `V<n>__*.sql` migration.
 There is no separate database-bootstrap service or deployment stage.
 
 Initialization scripts run only for an empty database volume. Editing environment

@@ -6,6 +6,14 @@ import ts from "typescript";
 
 const require = createRequire(import.meta.url);
 
+// Loads a real source module, resolving its imports through the test's stubs.
+function loadModule(path, resolve) {
+  const exports = {};
+  const source = ts.transpileModule(readFileSync(new URL(`../${path}.ts`, import.meta.url), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
+  new Function("require", "exports", source)(name => resolve(name.startsWith("./") ? `@/src/api/${name.slice(2)}` : name), exports);
+  return exports;
+}
+
 // Render the panel's event flow without a browser; UI and request boundaries are stubs.
 function panel(screen = "dashboard", loginResult, initialHash = "") {
   const listeners = new Set();
@@ -52,7 +60,7 @@ function panel(screen = "dashboard", loginResult, initialHash = "") {
     };
     if (name === "@heroui/react") return ui;
     if (name === "swr") return {
-      default: key => key?.[0] === "locations" ? { data: locations, mutate: async () => {} } : key?.[1] === "verification" || key === null ? { data: verification, mutate: async value => { verification = value; } } : ({ data: account, error: accountError, isLoading: loading, mutate: async value => {
+      default: key => key?.[0] === "locations" ? { data: locations, mutate: async () => {} } : key?.[1] === "verification" || key === null ? { data: key && verification, mutate: async value => { verification = value; } } : ({ data: account, error: accountError, isLoading: loading, mutate: async value => {
         cacheClears.push("account");
         account = value;
         accountError = undefined;
@@ -78,6 +86,7 @@ function panel(screen = "dashboard", loginResult, initialHash = "") {
     if (name === "@/src/api/api-fetch") return { ApiError };
     if (name === "@/src/api/auth-state") return { subscribeToAuthenticationRequired(callback) { expireSession = callback; return () => {}; } };
     if (name === "@/src/api/cache-keys") return { currentAccountKey: ["authentication", "current-account"], staffLocationsKey: () => ["locations"], isStaffCacheKey: () => true };
+    if (name === "@/src/api/locations" || name === "@/src/messages") return loadModule(name.slice(2), dependencies);
     if (name.startsWith("@/")) return new Proxy({}, { get: (_, key) => String(key) });
     // Phosphor's CommonJS build does not load under Node's require; icons are inert here.
     if (name === "@phosphor-icons/react") return new Proxy({}, { get: (_, key) => String(key) });

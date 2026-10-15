@@ -1,6 +1,6 @@
 "use client";
 
-import type { FormEvent } from "react";
+import type { FormEvent, ReactNode } from "react";
 
 import { ArrowsClockwiseIcon, SignInIcon } from "@phosphor-icons/react";
 import {
@@ -25,18 +25,14 @@ import {
   XIcon as CloseIcon,
 } from "@phosphor-icons/react";
 import { useEffect, useState, useSyncExternalStore } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import useSWR, { useSWRConfig } from "swr";
 import useSWRMutation from "swr/mutation";
-import { ZodError } from "zod";
 
 import { FormTextField } from "@/components/form-controls";
 import { OrderManagement } from "@/components/order-management";
 import { AccountManagement } from "@/components/account-management";
-import {
-  PlatformAnalytics,
-  RestaurantAnalytics,
-} from "@/components/analytics-management";
 import { EmailVerification } from "@/components/email-verification";
 import { AuthFormLayout } from "@/components/auth-form-layout";
 import { IntegrationManagement } from "@/components/integration-management";
@@ -53,18 +49,77 @@ import {
   pendingVerificationKey,
   login as loginRequest,
   logout as logoutRequest,
-  type AuthenticationResult,
   type LoginCredentials,
 } from "@/src/api/authentication";
-import { listLocations } from "@/src/api/locations";
-import {
-  currentAccountKey,
-  isStaffCacheKey,
-  staffLocationsKey,
-} from "@/src/api/cache-keys";
+import { useStaffLocations } from "@/src/api/locations";
+import { currentAccountKey, isStaffCacheKey } from "@/src/api/cache-keys";
 import { recordPanelAction } from "@/src/api/usage-analytics";
+import { errorMessage } from "@/src/messages";
+
+// Charts load only when an analytics tab opens.
+const RestaurantAnalytics = dynamic(() =>
+  import("@/components/analytics-management").then(
+    (module) => module.RestaurantAnalytics,
+  ),
+);
+const PlatformAnalytics = dynamic(() =>
+  import("@/components/analytics-management").then(
+    (module) => module.PlatformAnalytics,
+  ),
+);
 
 const logoutKey = ["authentication", "logout"] as const;
+
+const workspaces = [
+  { id: "orders", label: "Zamówienia", Icon: OrdersIcon },
+  {
+    id: "locations",
+    label: "Lokale",
+    Icon: LocationsIcon,
+    capability: "MANAGE_LOCATIONS",
+  },
+  {
+    id: "menus",
+    label: "Menu",
+    Icon: MenuIcon,
+    capability: "MANAGE_MENUS",
+    needsLocation: true,
+  },
+  {
+    id: "accounts",
+    label: "Konta",
+    Icon: TeamIcon,
+    capability: "INVITE_OPERATORS",
+    needsLocation: true,
+  },
+  {
+    id: "integrations",
+    label: "Integracje",
+    Icon: IntegrationIcon,
+    capability: "MANAGE_EXTERNAL_INTEGRATIONS",
+    needsLocation: true,
+  },
+  {
+    id: "analytics",
+    label: "Analityka",
+    Icon: AnalyticsIcon,
+    capability: "VIEW_ANALYTICS",
+  },
+  {
+    id: "platform",
+    label: "Platforma",
+    Icon: PlatformIcon,
+    capability: "VIEW_PLATFORM_ANALYTICS",
+  },
+] as const satisfies readonly {
+  id: string;
+  label: string;
+  Icon: unknown;
+  capability?: string;
+  needsLocation?: boolean;
+}[];
+
+type WorkspaceId = (typeof workspaces)[number]["id"];
 
 function DismissibleNotice({
   description,
@@ -102,33 +157,11 @@ function DismissibleNotice({
   );
 }
 
-function loginMutation(
-  _key: typeof currentAccountKey,
-  { arg }: { arg: LoginCredentials },
-): Promise<AuthenticationResult> {
-  return loginRequest(arg);
-}
-
-function logoutMutation(): Promise<boolean> {
-  return logoutRequest();
-}
-
-function shouldRetryOnError(error: Error): boolean {
-  return !(
-    error instanceof ApiError &&
-    error.status >= 400 &&
-    error.status < 500
-  );
-}
-
 function getErrorMessage(error: unknown): string {
-  if (error instanceof ZodError) {
-    return error.issues[0]?.message ?? "Wprowadzone dane są nieprawidłowe.";
-  }
-
-  if (error instanceof ApiError) return error.message;
-
-  return "Nie udało się wykonać operacji. Sprawdź połączenie i spróbuj ponownie.";
+  return errorMessage(
+    error,
+    "Nie udało się wykonać operacji. Sprawdź połączenie i spróbuj ponownie.",
+  );
 }
 
 function getLoginErrorMessage(error: unknown): string {
@@ -283,20 +316,15 @@ export function StaffPanel({
     getWorkspace,
     () => "orders",
   );
-  const [requestedOrderLocationId, setRequestedOrderLocationId] =
-    useState<string>();
-  const [requestedMenuLocationId, setRequestedMenuLocationId] =
-    useState<string>();
+  const [orderLocationId, setOrderLocationId] = useState<string>();
+  const [menuLocationId, setMenuLocationId] = useState<string>();
   const [hasChangedPassword, setHasChangedPassword] = useState(false);
   const {
     data: account,
     error: accountError,
     isLoading,
     mutate: mutateAccount,
-  } = useSWR(currentAccountKey, getCurrentAccount, {
-    errorRetryCount: 3,
-    shouldRetryOnError,
-  });
+  } = useSWR(currentAccountKey, getCurrentAccount);
 
   const {
     data: verification,
@@ -313,35 +341,28 @@ export function StaffPanel({
     data: locations,
     error: locationsError,
     mutate: mutateLocations,
-  } = useSWR(
-    account && screen === "dashboard"
-      ? staffLocationsKey(account.accountId)
-      : null,
-    listLocations,
-    { errorRetryCount: 3, shouldRetryOnError },
+  } = useStaffLocations(
+    screen === "dashboard" ? account?.accountId : undefined,
   );
   const hasNoLocations = locations?.length === 0;
-  const workspace =
-    hasNoLocations &&
-    ["menus", "accounts", "integrations"].includes(selectedWorkspace)
-      ? "orders"
-      : selectedWorkspace;
 
   const {
     error: loginError,
     isMutating: isLoggingIn,
     reset: resetLogin,
     trigger: triggerLogin,
-  } = useSWRMutation(currentAccountKey, loginMutation, {
-    throwOnError: false,
-  });
+  } = useSWRMutation(
+    currentAccountKey,
+    (_, { arg }: { arg: LoginCredentials }) => loginRequest(arg),
+    { throwOnError: false },
+  );
 
   const {
     error: logoutError,
     isMutating: isLoggingOut,
     reset: resetLogout,
     trigger: triggerLogout,
-  } = useSWRMutation(logoutKey, logoutMutation, {
+  } = useSWRMutation(logoutKey, () => logoutRequest(), {
     throwOnError: false,
   });
 
@@ -440,15 +461,13 @@ export function StaffPanel({
   }
   if (screen === "login" && (isUnauthorized || isSignedOut)) {
     return (
-      <>
-        <SignedOutPanel
-          isLoggingIn={isLoggingIn}
-          loginError={loginError}
-          passwordChanged={passwordChanged}
-          onDismissLoginError={resetLogin}
-          onSignIn={signIn}
-        />
-      </>
+      <SignedOutPanel
+        isLoggingIn={isLoggingIn}
+        loginError={loginError}
+        passwordChanged={passwordChanged}
+        onDismissLoginError={resetLogin}
+        onSignIn={signIn}
+      />
     );
   }
 
@@ -503,30 +522,83 @@ export function StaffPanel({
     );
   }
 
-  const canManageAccounts = account.capabilities.includes("INVITE_OPERATORS");
   const canManageLocations = account.capabilities.includes("MANAGE_LOCATIONS");
-  const canManageIntegrations = account.capabilities.includes(
-    "MANAGE_EXTERNAL_INTEGRATIONS",
+  const canViewTenantOrders =
+    account.capabilities.includes("VIEW_TENANT_ORDERS");
+  const availableWorkspaces = workspaces.filter(
+    (workspace) =>
+      !("capability" in workspace) ||
+      account.capabilities.includes(workspace.capability),
   );
-  const canManageMenus = account.capabilities.includes("MANAGE_MENUS");
-  const canViewAnalytics = account.capabilities.includes("VIEW_ANALYTICS");
-  const canViewPlatform = account.capabilities.includes(
-    "VIEW_PLATFORM_ANALYTICS",
-  );
-  const availableWorkspaces = [
-    "orders",
-    ...(canManageLocations ? ["locations"] : []),
-    ...(canManageMenus ? ["menus"] : []),
-    ...(canManageAccounts ? ["accounts"] : []),
-    ...(canManageIntegrations ? ["integrations"] : []),
-    ...(canViewAnalytics ? ["analytics"] : []),
-    ...(canViewPlatform ? ["platform"] : []),
-  ];
-  const visibleWorkspace = availableWorkspaces.includes(workspace)
-    ? workspace
-    : "orders";
+  const visibleWorkspace: WorkspaceId =
+    availableWorkspaces.find(
+      (workspace) =>
+        workspace.id === selectedWorkspace &&
+        !(hasNoLocations && "needsLocation" in workspace),
+    )?.id ?? "orders";
 
   const needsFirstLocation = canManageLocations && hasNoLocations;
+  const panels: Record<WorkspaceId, ReactNode> = {
+    orders: (
+      <OrderManagement
+        key={`orders-${account.accountId}`}
+        accountId={account.accountId}
+        canManageLocations={canManageLocations}
+        canViewTenantOrders={canViewTenantOrders}
+        selectedLocationId={orderLocationId}
+        onSelectLocation={setOrderLocationId}
+      />
+    ),
+    locations: (
+      <LocationManagement
+        key={`locations-${account.accountId}`}
+        accountId={account.accountId}
+        onEditMenu={(locationId) => {
+          setMenuLocationId(locationId);
+          recordPanelAction("menu_editor_opened");
+          setSelectedWorkspace("menus");
+        }}
+        onViewOrders={(locationId) => {
+          setOrderLocationId(locationId);
+          setSelectedWorkspace("orders");
+        }}
+      />
+    ),
+    menus: (
+      <MenuManagement
+        key={`menus-${account.accountId}`}
+        accountId={account.accountId}
+        selectedLocationId={menuLocationId}
+        onSelectLocation={setMenuLocationId}
+      />
+    ),
+    accounts: (
+      <AccountManagement
+        key={`accounts-${account.accountId}`}
+        account={account}
+      />
+    ),
+    integrations: (
+      <IntegrationManagement
+        key={`integrations-${account.accountId}`}
+        accountId={account.accountId}
+      />
+    ),
+    analytics: (
+      <RestaurantAnalytics
+        key={`analytics-${account.accountId}`}
+        account={account}
+        onAccessLost={() => void mutateAccount()}
+      />
+    ),
+    platform: (
+      <PlatformAnalytics
+        key={`platform-${account.accountId}`}
+        accountId={account.accountId}
+        onAccessLost={() => void mutateAccount()}
+      />
+    ),
+  };
   const utilities = (
     <div className="panel-workspace-utilities flex shrink-0 items-center gap-2">
       <ThemeToggle className="theme-toggle--touch" />
@@ -601,12 +673,7 @@ export function StaffPanel({
         </div>
       )}
 
-      {canManageAccounts ||
-      canManageLocations ||
-      canManageIntegrations ||
-      canManageMenus ||
-      canViewAnalytics ||
-      canViewPlatform ? (
+      {availableWorkspaces.length > 1 ? (
         <Tabs
           selectedKey={visibleWorkspace}
           onSelectionChange={(key) => {
@@ -626,150 +693,28 @@ export function StaffPanel({
                 aria-label="Panel obsługi"
                 className="w-full justify-around sm:w-auto"
               >
-                <Tabs.Tab id="orders">
-                  <span className="tab-motion-content">
-                    <OrdersIcon size={18} />
-                    <span>Zamówienia</span>
-                  </span>
-                  <Tabs.Indicator />
-                </Tabs.Tab>
-                {canManageLocations && (
-                  <Tabs.Tab id="locations">
+                {availableWorkspaces.map((workspace) => (
+                  <Tabs.Tab
+                    key={workspace.id}
+                    id={workspace.id}
+                    isDisabled={hasNoLocations && "needsLocation" in workspace}
+                  >
                     <span className="tab-motion-content">
-                      <LocationsIcon size={18} />
-                      <span>Lokale</span>
+                      <workspace.Icon size={18} />
+                      <span>{workspace.label}</span>
                     </span>
                     <Tabs.Indicator />
                   </Tabs.Tab>
-                )}
-                {canManageMenus && (
-                  <Tabs.Tab id="menus" isDisabled={hasNoLocations}>
-                    <span className="tab-motion-content">
-                      <MenuIcon size={18} />
-                      <span>Menu</span>
-                    </span>
-                    <Tabs.Indicator />
-                  </Tabs.Tab>
-                )}
-                {canManageAccounts && (
-                  <Tabs.Tab id="accounts" isDisabled={hasNoLocations}>
-                    <span className="tab-motion-content">
-                      <TeamIcon size={18} />
-                      <span>Konta</span>
-                    </span>
-                    <Tabs.Indicator />
-                  </Tabs.Tab>
-                )}
-                {canManageIntegrations && (
-                  <Tabs.Tab id="integrations" isDisabled={hasNoLocations}>
-                    <span className="tab-motion-content">
-                      <IntegrationIcon size={18} />
-                      <span>Integracje</span>
-                    </span>
-                    <Tabs.Indicator />
-                  </Tabs.Tab>
-                )}
-                {canViewAnalytics && (
-                  <Tabs.Tab id="analytics">
-                    <span className="tab-motion-content">
-                      <AnalyticsIcon size={18} />
-                      <span>Analityka</span>
-                    </span>
-                    <Tabs.Indicator />
-                  </Tabs.Tab>
-                )}
-                {canViewPlatform && (
-                  <Tabs.Tab id="platform">
-                    <span className="tab-motion-content">
-                      <PlatformIcon size={18} />
-                      <span>Platforma</span>
-                    </span>
-                    <Tabs.Indicator />
-                  </Tabs.Tab>
-                )}
+                ))}
               </Tabs.List>
             </Tabs.ListContainer>
             {utilities}
           </div>
-          <Tabs.Panel className="pt-6" id="orders">
-            <OrderManagement
-              key={`orders-${account.accountId}`}
-              accountId={account.accountId}
-              canManageLocations={canManageLocations}
-              canViewTenantOrders={account.capabilities.includes(
-                "VIEW_TENANT_ORDERS",
-              )}
-              isActive={visibleWorkspace === "orders"}
-              requestedLocationId={requestedOrderLocationId}
-              onRequestedLocationApplied={() =>
-                setRequestedOrderLocationId(undefined)
-              }
-            />
-          </Tabs.Panel>
-          {canManageLocations && (
-            <Tabs.Panel className="pt-6" id="locations">
-              <LocationManagement
-                key={`locations-${account.accountId}`}
-                accountId={account.accountId}
-                canManageLocations={canManageLocations}
-                onEditMenu={(locationId) => {
-                  setRequestedMenuLocationId(locationId);
-                  recordPanelAction("menu_editor_opened");
-                  setSelectedWorkspace("menus");
-                }}
-                onViewOrders={(locationId) => {
-                  setRequestedOrderLocationId(locationId);
-                  setSelectedWorkspace("orders");
-                }}
-              />
+          {availableWorkspaces.map(({ id }) => (
+            <Tabs.Panel key={id} className="pt-6" id={id}>
+              {panels[id]}
             </Tabs.Panel>
-          )}
-          {canManageMenus && (
-            <Tabs.Panel className="pt-6" id="menus">
-              <MenuManagement
-                key={`menus-${account.accountId}`}
-                accountId={account.accountId}
-                requestedLocationId={requestedMenuLocationId}
-                onRequestedLocationApplied={() =>
-                  setRequestedMenuLocationId(undefined)
-                }
-              />
-            </Tabs.Panel>
-          )}
-          {canManageAccounts && (
-            <Tabs.Panel className="pt-6" id="accounts">
-              <AccountManagement
-                key={`accounts-${account.accountId}`}
-                account={account}
-              />
-            </Tabs.Panel>
-          )}
-          {canManageIntegrations && (
-            <Tabs.Panel className="pt-6" id="integrations">
-              <IntegrationManagement
-                key={`integrations-${account.accountId}`}
-                accountId={account.accountId}
-              />
-            </Tabs.Panel>
-          )}
-          {canViewAnalytics && (
-            <Tabs.Panel className="pt-6" id="analytics">
-              <RestaurantAnalytics
-                key={`analytics-${account.accountId}`}
-                account={account}
-                onAccessLost={() => void mutateAccount()}
-              />
-            </Tabs.Panel>
-          )}
-          {canViewPlatform && (
-            <Tabs.Panel className="pt-6" id="platform">
-              <PlatformAnalytics
-                key={`platform-${account.accountId}`}
-                accountId={account.accountId}
-                onAccessLost={() => void mutateAccount()}
-              />
-            </Tabs.Panel>
-          )}
+          ))}
         </Tabs>
       ) : (
         <>
@@ -778,9 +723,9 @@ export function StaffPanel({
             key={account.accountId}
             accountId={account.accountId}
             canManageLocations={false}
-            canViewTenantOrders={account.capabilities.includes(
-              "VIEW_TENANT_ORDERS",
-            )}
+            canViewTenantOrders={canViewTenantOrders}
+            selectedLocationId={orderLocationId}
+            onSelectLocation={setOrderLocationId}
           />
         </>
       )}
@@ -792,7 +737,7 @@ export function StaffPanel({
           isRequired
           accountId={account.accountId}
           onCreated={(location) => {
-            setRequestedOrderLocationId(location.id);
+            setOrderLocationId(location.id);
             setSelectedWorkspace("orders");
           }}
           onOpenChange={() => {}}

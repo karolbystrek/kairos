@@ -68,11 +68,9 @@ def main():
                 assert all(not service.get('ports') for key, service in config['services'].items() if key != 'nginx')
                 assert set(config['networks']) == {'gateway', 'data'}
                 assert config['networks']['data']['internal']
-                tls = next(v for v in nginx['volumes'] if v['target'] == '/run/secrets/tls')
-                # Compose v2 JSON omits false bind options; explicit true must still fail.
-                assert tls['read_only'] and not tls['bind'].get('create_host_path', False)
-                if mode == 'deployment':
-                    assert tls['source'] == str(work)
+                # File secrets are read-only binds whose missing source fails startup.
+                assert nginx['secrets'] == [{'source': 'tls', 'target': '/run/secrets/tls'}], nginx['secrets']
+                assert config['secrets']['tls']['file'] == str(work)
                 trust = work / 'cloudflare-real-ip.conf'
                 source = ROOT / 'nginx/cloudflare-real-ip.conf'
                 trust.write_text(source.read_text())

@@ -11,7 +11,7 @@ import java.util.UUID;
 public interface WebhookSubscriptionEventSelectionRepository
         extends JpaRepository<WebhookSubscriptionEventSelection, WebhookSubscriptionEventSelectionId> {
 
-    List<WebhookSubscriptionEventSelection> findAllBySubscriptionId(UUID subscriptionId);
+    boolean existsBySubscriptionId(UUID subscriptionId);
 
     List<WebhookSubscriptionEventSelection> findAllBySubscriptionIdIn(
             Collection<UUID> subscriptionIds

@@ -65,6 +65,8 @@ jobs:
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: apps/${{ matrix.service }}
+          # Both frontends share the panel app's Next.js Dockerfile.
+          file: apps/${{ matrix.service == 'api' && 'api' || 'panel-app' }}/Dockerfile
           target: runner
           platforms: linux/amd64
           pull: true
@@ -189,7 +191,6 @@ jobs:
         env:
           RELEASE_DIRECTORY: ${{ runner.temp }}/release
           RELEASE_REVISION: ${{ github.sha }}
-          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}

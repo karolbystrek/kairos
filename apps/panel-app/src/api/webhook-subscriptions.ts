@@ -3,21 +3,21 @@ import { z } from "zod";
 import { apiFetch, request } from "./api-fetch";
 import { managedIntegrationNameSchema } from "./integrations";
 
-export const webhookEventTypeSchema = z.enum([
+const webhookEventTypeSchema = z.enum([
   "order.created",
   "order.ready",
   "order.completed",
   "order.canceled",
 ]);
 
-export const webhookSigningSecretVersionSchema = z.object({
+const webhookSigningSecretVersionSchema = z.object({
   id: z.uuid(),
   issuedAt: z.iso.datetime({ offset: true }),
   validUntil: z.iso.datetime({ offset: true }).nullable(),
   retiredAt: z.iso.datetime({ offset: true }).nullable(),
 });
 
-export const webhookSubscriptionSchema = z.object({
+const webhookSubscriptionSchema = z.object({
   id: z.uuid(),
   integrationId: z.uuid(),
   name: z.string(),
@@ -54,17 +54,17 @@ const issuedWebhookSigningSecretSchema = z.object({
 });
 
 export type WebhookEventType = z.infer<typeof webhookEventTypeSchema>;
-export type WebhookSigningSecretVersion = z.infer<
+type WebhookSigningSecretVersion = z.infer<
   typeof webhookSigningSecretVersionSchema
 >;
 export type WebhookSubscription = z.infer<typeof webhookSubscriptionSchema>;
 export type WebhookSubscriptionInput = z.input<
   typeof webhookSubscriptionInputSchema
 >;
-export type IssuedWebhookSubscription = z.infer<
+type IssuedWebhookSubscription = z.infer<
   typeof issuedWebhookSubscriptionSchema
 >;
-export type IssuedWebhookSigningSecret = z.infer<
+type IssuedWebhookSigningSecret = z.infer<
   typeof issuedWebhookSigningSecretSchema
 >;
 

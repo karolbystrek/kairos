@@ -21,14 +21,11 @@ import useSWR from "swr";
 
 import { HoldToConfirmButton } from "@/components/hold-to-confirm-button";
 import { FormTextField } from "@/components/form-controls";
-import {
-  formatIntegrationDateTime,
-  getIntegrationErrorMessage,
-  shouldRetryIntegrationRequest,
-} from "@/components/integrations/integration-ui";
+import { getIntegrationErrorMessage } from "@/components/integrations/integration-ui";
 import { lifecycleStatus, StatusChip } from "@/components/status-chip";
 import { LoadingIndicator } from "@/components/loading-indicator";
 import { staffWebhookSubscriptionsKey } from "@/src/api/cache-keys";
+import { formatDateTime } from "@/src/messages";
 import {
   archiveWebhookSubscription,
   createWebhookSubscription,
@@ -275,13 +272,8 @@ export function WebhookSubscriptionManagement({
     error: subscriptionsError,
     isLoading: areSubscriptionsLoading,
     mutate: mutateSubscriptions,
-  } = useSWR(
-    staffWebhookSubscriptionsKey(accountId, integrationId),
-    () => listWebhookSubscriptions(integrationId),
-    {
-      errorRetryCount: 3,
-      shouldRetryOnError: shouldRetryIntegrationRequest,
-    },
+  } = useSWR(staffWebhookSubscriptionsKey(accountId, integrationId), () =>
+    listWebhookSubscriptions(integrationId),
   );
 
   const editedSubscription = subscriptions.find(
@@ -289,14 +281,33 @@ export function WebhookSubscriptionManagement({
   );
   const error = subscriptionsError ?? actionError;
 
+  // Runs one action at a time; resolves false when skipped or failed.
+  async function run(
+    action: string,
+    operation: () => Promise<void>,
+  ): Promise<boolean> {
+    if (pendingAction) return false;
+
+    setActionError(undefined);
+    setPendingAction(action);
+    try {
+      await operation();
+
+      return true;
+    } catch (caught) {
+      setActionError(caught);
+
+      return false;
+    } finally {
+      setPendingAction(undefined);
+    }
+  }
+
   async function create(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (pendingAction || !secretOperation.start()) return;
 
-    setActionError(undefined);
-    setPendingAction("create");
-
-    try {
+    await run("create", async () => {
       const result = await createWebhookSubscription(integrationId, draft);
 
       onSecretIssued({
@@ -320,24 +331,15 @@ export function WebhookSubscriptionManagement({
         locationIds: [],
         eventTypes: [...webhookEventTypes],
       });
-    } catch (caught) {
-      setActionError(caught);
-    } finally {
-      setPendingAction(undefined);
-      secretOperation.finish();
-    }
+    });
+    secretOperation.finish();
   }
 
   async function save(
     subscription: WebhookSubscription,
     input: WebhookSubscriptionInput,
   ) {
-    if (pendingAction) return;
-
-    setActionError(undefined);
-    setPendingAction(`save-${subscription.id}`);
-
-    try {
+    await run(`save-${subscription.id}`, async () => {
       const updated = await updateWebhookSubscription(subscription.id, input);
 
       await mutateSubscriptions(
@@ -346,23 +348,14 @@ export function WebhookSubscriptionManagement({
       );
       setEditedSubscriptionId(undefined);
       toast.success(`Zapisano webhook „${updated.name}”`);
-    } catch (caught) {
-      setActionError(caught);
-    } finally {
-      setPendingAction(undefined);
-    }
+    });
   }
 
-  async function changeStatus(
+  function changeStatus(
     subscription: WebhookSubscription,
     status: "DISABLED" | "ENABLED",
   ): Promise<boolean> {
-    if (pendingAction) return false;
-
-    setActionError(undefined);
-    setPendingAction(`status-${subscription.id}`);
-
-    try {
+    return run(`status-${subscription.id}`, async () => {
       const updated = await updateWebhookSubscriptionStatus(
         subscription.id,
         status,
@@ -375,24 +368,11 @@ export function WebhookSubscriptionManagement({
       toast.success(
         `${status === "ENABLED" ? "Włączono" : "Wyłączono"} webhook „${subscription.name}”`,
       );
-
-      return true;
-    } catch (caught) {
-      setActionError(caught);
-
-      return false;
-    } finally {
-      setPendingAction(undefined);
-    }
+    });
   }
 
-  async function archive(subscription: WebhookSubscription): Promise<boolean> {
-    if (pendingAction) return false;
-
-    setActionError(undefined);
-    setPendingAction(`archive-${subscription.id}`);
-
-    try {
+  function archive(subscription: WebhookSubscription): Promise<boolean> {
+    return run(`archive-${subscription.id}`, async () => {
       await archiveWebhookSubscription(subscription.id);
       await mutateSubscriptions(
         (current) =>
@@ -403,24 +383,13 @@ export function WebhookSubscriptionManagement({
         setEditedSubscriptionId(undefined);
       }
       toast.success(`Usunięto webhook „${subscription.name}”`);
-
-      return true;
-    } catch (caught) {
-      setActionError(caught);
-
-      return false;
-    } finally {
-      setPendingAction(undefined);
-    }
+    });
   }
 
   async function rotate(subscription: WebhookSubscription) {
     if (pendingAction || !secretOperation.start()) return;
 
-    setActionError(undefined);
-    setPendingAction(`rotate-${subscription.id}`);
-
-    try {
+    await run(`rotate-${subscription.id}`, async () => {
       const result = await rotateWebhookSigningSecret(subscription.id);
       const updated = {
         ...subscription,
@@ -449,24 +418,15 @@ export function WebhookSubscriptionManagement({
         (current) => replaceSubscription(current, updated),
         { revalidate: false },
       );
-    } catch (caught) {
-      setActionError(caught);
-    } finally {
-      setPendingAction(undefined);
-      secretOperation.finish();
-    }
+    });
+    secretOperation.finish();
   }
 
-  async function retire(
+  function retire(
     subscription: WebhookSubscription,
     versionId: string,
   ): Promise<boolean> {
-    if (pendingAction) return false;
-
-    setActionError(undefined);
-    setPendingAction(`retire-${versionId}`);
-
-    try {
+    return run(`retire-${versionId}`, async () => {
       const retired = await retireWebhookSigningSecret(
         subscription.id,
         versionId,
@@ -482,15 +442,7 @@ export function WebhookSubscriptionManagement({
         (current) => replaceSubscription(current, updated),
         { revalidate: false },
       );
-
-      return true;
-    } catch (caught) {
-      setActionError(caught);
-
-      return false;
-    } finally {
-      setPendingAction(undefined);
-    }
+    });
   }
 
   async function confirmDestructiveAction() {
@@ -758,15 +710,11 @@ export function WebhookSubscriptionManagement({
                         className="flex flex-wrap items-center justify-between gap-3"
                       >
                         <p className="text-xs text-muted">
-                          {formatIntegrationDateTime(version.issuedAt)} ·{" "}
+                          {formatDateTime(version.issuedAt)} ·{" "}
                           {version.retiredAt
-                            ? `wycofana ${formatIntegrationDateTime(
-                                version.retiredAt,
-                              )}`
+                            ? `wycofana ${formatDateTime(version.retiredAt)}`
                             : version.validUntil
-                              ? `ważna do ${formatIntegrationDateTime(
-                                  version.validUntil,
-                                )}`
+                              ? `ważna do ${formatDateTime(version.validUntil)}`
                               : "aktualna"}
                         </p>
                         {version.validUntil && !version.retiredAt && (

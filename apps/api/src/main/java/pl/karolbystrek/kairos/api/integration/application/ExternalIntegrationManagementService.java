@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import pl.karolbystrek.kairos.api.account.application.StaffAccessService;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
 import pl.karolbystrek.kairos.api.integration.application.exception.IntegrationConflictException;
 import pl.karolbystrek.kairos.api.integration.application.exception.IntegrationNotFoundException;
@@ -22,13 +23,15 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ExternalIntegrationManagementService {
 
+    private static final String ADMINISTRATOR_REQUIRED = "External Integration management requires a tenant administrator";
+
     private final ExternalIntegrationRepository integrationRepository;
-    private final IntegrationAdministrationAccessService administrationAccessService;
+    private final StaffAccessService staffAccessService;
     private final Clock clock;
 
     @Transactional(readOnly = true)
     public List<ExternalIntegrationView> list(StaffPrincipal principal) {
-        var access = administrationAccessService.requireAdministrator(principal);
+        var access = staffAccessService.resolve(principal).requireTenantAdmin(ADMINISTRATOR_REQUIRED);
         return integrationRepository.findAllByTenantIdAndStatusNotOrderByCreatedAtAsc(
                         access.tenantId(),
                         ExternalIntegrationStatus.ARCHIVED
@@ -39,7 +42,7 @@ public class ExternalIntegrationManagementService {
 
     @Transactional
     public ExternalIntegrationView create(StaffPrincipal principal, String candidateName) {
-        var access = administrationAccessService.requireAdministratorForUpdate(principal);
+        var access = staffAccessService.resolveForUpdate(principal).requireTenantAdmin(ADMINISTRATOR_REQUIRED);
         var name = parseName(candidateName);
         if (integrationRepository.existsByTenantIdAndNormalizedName(
                 access.tenantId(),
@@ -58,7 +61,7 @@ public class ExternalIntegrationManagementService {
             UUID integrationId,
             String candidateName
     ) {
-        var access = administrationAccessService.requireAdministratorForUpdate(principal);
+        var access = staffAccessService.resolveForUpdate(principal).requireTenantAdmin(ADMINISTRATOR_REQUIRED);
         var integration = requireManageableForUpdate(integrationId, access.tenantId());
         var name = parseName(candidateName);
         if (!integration.getNormalizedName().equals(name.normalizedValue())
@@ -87,7 +90,7 @@ public class ExternalIntegrationManagementService {
             throw new InvalidIntegrationRequestException("External Integration status is required");
         }
 
-        var access = administrationAccessService.requireAdministratorForUpdate(principal);
+        var access = staffAccessService.resolveForUpdate(principal).requireTenantAdmin(ADMINISTRATOR_REQUIRED);
         var integration = requireManageableForUpdate(integrationId, access.tenantId());
         try {
             integration.changeStatus(target, clock.instant());
@@ -99,7 +102,7 @@ public class ExternalIntegrationManagementService {
 
     @Transactional
     public void archive(StaffPrincipal principal, UUID integrationId) {
-        var access = administrationAccessService.requireAdministratorForUpdate(principal);
+        var access = staffAccessService.resolveForUpdate(principal).requireTenantAdmin(ADMINISTRATOR_REQUIRED);
         var integration = requireForUpdate(integrationId, access.tenantId());
         integration.archive(clock.instant());
     }

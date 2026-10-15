@@ -45,8 +45,8 @@ class MenuServiceIntegrationTests extends RedisListenerIsolatedIntegrationTest {
     void administratorsAndTheLocationManagerOwnIndependentLocationMenus() {
         var tenantId = insertTenant();
         var administrator = insertAccount(tenantId, TenantRole.ADMIN);
-        var kitchen = locationService.create(administrator, "Kitchen");
-        var bar = locationService.create(administrator, "Bar");
+        var kitchen = locationService.create(administrator, "Kitchen", null, "UTC");
+        var bar = locationService.create(administrator, "Bar", null, "UTC");
         var manager = insertMember(tenantId, kitchen.id(), AssignmentRole.MANAGER);
         var operator = insertMember(tenantId, kitchen.id(), AssignmentRole.OPERATOR);
         var foreignAdministrator = insertAccount(insertTenant(), TenantRole.ADMIN);
@@ -93,7 +93,7 @@ class MenuServiceIntegrationTests extends RedisListenerIsolatedIntegrationTest {
     void ordersStoreChosenMenuItemsAsASnapshotBesideTheirLabel() {
         var tenantId = insertTenant();
         var administrator = insertAccount(tenantId, TenantRole.ADMIN);
-        var kitchen = locationService.create(administrator, "Kitchen");
+        var kitchen = locationService.create(administrator, "Kitchen", null, "UTC");
         var operator = insertMember(tenantId, kitchen.id(), AssignmentRole.OPERATOR);
         var items = List.of(new OrderItem("Frytki", 1), new OrderItem("Burger", 2));
 

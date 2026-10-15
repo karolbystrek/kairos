@@ -19,13 +19,15 @@ import {
   sortLocations,
   type Location,
 } from "@/src/api/locations";
+import { errorMessage } from "@/src/messages";
 
 const steps = ["name", "review"] as const;
 
 function getErrorMessage(error: unknown): string {
-  if (error instanceof ApiError) return error.message;
-
-  return "Nie udało się utworzyć lokalu. Sprawdź połączenie i spróbuj ponownie.";
+  return errorMessage(
+    error,
+    "Nie udało się utworzyć lokalu. Sprawdź połączenie i spróbuj ponownie.",
+  );
 }
 
 export function LocationCreationModal({

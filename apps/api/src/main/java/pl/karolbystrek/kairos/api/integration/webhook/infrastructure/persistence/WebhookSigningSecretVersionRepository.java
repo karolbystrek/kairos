@@ -16,10 +16,6 @@ import java.util.UUID;
 public interface WebhookSigningSecretVersionRepository
         extends JpaRepository<WebhookSigningSecretVersion, UUID> {
 
-    List<WebhookSigningSecretVersion> findAllBySubscriptionIdOrderByIssuedAtDesc(
-            UUID subscriptionId
-    );
-
     List<WebhookSigningSecretVersion> findAllBySubscriptionIdInOrderBySubscriptionIdAscIssuedAtDesc(
             Collection<UUID> subscriptionIds
     );

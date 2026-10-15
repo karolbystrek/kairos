@@ -1,6 +1,8 @@
+import useSWR from "swr";
 import { z } from "zod";
 
 import { apiFetch, request } from "./api-fetch";
+import { staffLocationsKey } from "./cache-keys";
 import { browserTimeZone } from "./report-range";
 
 export const managedLocationNameSchema = z
@@ -50,7 +52,7 @@ export const googleReviewUrlSchema = z
     "Użyj linku HTTPS do Map Google lub opinii Google.",
   );
 
-export const locationSchema = z.object({
+const locationSchema = z.object({
   id: z.uuid(),
   name: z.string(),
   timeZone: z.string(),
@@ -78,8 +80,22 @@ export function sortLocations(locations: Location[]): Location[] {
   });
 }
 
-export function listLocations(): Promise<Location[]> {
+function listLocations(): Promise<Location[]> {
   return request("/api/locations/v1", locationsSchema);
+}
+
+// Pass no account to skip loading.
+export function useStaffLocations(accountId?: string) {
+  const result = useSWR(
+    accountId ? staffLocationsKey(accountId) : null,
+    listLocations,
+  );
+  const enabledLocations = (result.data ?? []).filter(
+    (location) => location.status === "ENABLED",
+  );
+
+  // Assigning keeps SWR's lazy getters, so callers subscribe only to fields they read.
+  return Object.assign(result, { enabledLocations });
 }
 
 function locationMutation(

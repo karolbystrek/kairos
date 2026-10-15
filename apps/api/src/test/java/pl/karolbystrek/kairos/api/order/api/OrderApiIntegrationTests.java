@@ -15,7 +15,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
 import pl.karolbystrek.kairos.api.account.domain.TenantRole;
 import pl.karolbystrek.kairos.api.order.application.OrderService;
-import pl.karolbystrek.kairos.api.order.application.model.StaffOrderView;
+import pl.karolbystrek.kairos.api.order.application.model.OrderView;
 import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
 import pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase;
 import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
@@ -136,17 +136,23 @@ class OrderApiIntegrationTests extends RedisListenerIsolatedIntegrationTest {
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.detail").isNotEmpty());
+
+        mockMvc.perform(withAuthenticationAndCsrf(apiPost("/orders/v1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("The request is invalid"));
     }
 
     @Test
     void returnsOnlyActiveOrdersFromLocationAndTenantQueues() throws Exception {
-        var inPreparation = orderService.createOrder(principal, locationId, null);
-        var ready = orderService.createOrder(principal, locationId, null);
+        var inPreparation = orderService.createOrder(principal, locationId, null, List.of());
+        var ready = orderService.createOrder(principal, locationId, null, List.of());
         orderService.updateStatus(principal, ready.id(), OrderStatus.READY);
-        var completed = orderService.createOrder(principal, locationId, null);
+        var completed = orderService.createOrder(principal, locationId, null, List.of());
         orderService.updateStatus(principal, completed.id(), OrderStatus.READY);
         orderService.updateStatus(principal, completed.id(), OrderStatus.COMPLETED);
-        var canceled = orderService.createOrder(principal, locationId, null);
+        var canceled = orderService.createOrder(principal, locationId, null, List.of());
         orderService.updateStatus(principal, canceled.id(), OrderStatus.CANCELED);
 
         assertActiveQueue(
@@ -159,8 +165,8 @@ class OrderApiIntegrationTests extends RedisListenerIsolatedIntegrationTest {
 
     @Test
     void queueStreamUsesRestAuthorizationAndCarriesOnlyTheActiveQueue() throws Exception {
-        var active = orderService.createOrder(principal, locationId, "active-stream-order");
-        var terminal = orderService.createOrder(principal, locationId, "terminal-stream-order");
+        var active = orderService.createOrder(principal, locationId, "active-stream-order", List.of());
+        var terminal = orderService.createOrder(principal, locationId, "terminal-stream-order", List.of());
         orderService.updateStatus(principal, terminal.id(), OrderStatus.CANCELED);
 
         mockMvc.perform(apiGet("/orders/v1/events"))
@@ -182,8 +188,8 @@ class OrderApiIntegrationTests extends RedisListenerIsolatedIntegrationTest {
 
     private void assertActiveQueue(
             MockHttpServletRequestBuilder request,
-            StaffOrderView first,
-            StaffOrderView second
+            OrderView first,
+            OrderView second
     ) throws Exception {
         mockMvc.perform(withAuthentication(request))
                 .andExpect(status().isOk())

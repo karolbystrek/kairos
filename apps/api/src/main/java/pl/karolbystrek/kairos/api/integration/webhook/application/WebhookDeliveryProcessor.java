@@ -28,19 +28,17 @@ public class WebhookDeliveryProcessor {
         try {
             var attemptedAt = clock.instant();
             WebhookHttpResult result;
+            String signatureHeader = null;
             try {
-                var signatureHeader = signatureService.createHeader(
+                signatureHeader = signatureService.createHeader(
                         attemptedAt,
                         delivery.payload(),
                         delivery.signingSecrets()
                 );
-                result = httpClient.post(
-                        delivery.destinationUrl(),
-                        delivery.payload(),
-                        signatureHeader
-                );
             } catch (RuntimeException exception) {
                 log.error("Could not prepare webhook delivery {}", delivery.id(), exception);
+            }
+            if (signatureHeader == null) {
                 result = new WebhookHttpResult(
                         null,
                         null,
@@ -48,6 +46,19 @@ public class WebhookDeliveryProcessor {
                         "SIGNING_ERROR",
                         "Webhook signing material could not be prepared"
                 );
+            } else {
+                try {
+                    result = httpClient.post(delivery.destinationUrl(), delivery.payload(), signatureHeader);
+                } catch (RuntimeException exception) {
+                    log.error("Could not send webhook delivery {}", delivery.id(), exception);
+                    result = new WebhookHttpResult(
+                            null,
+                            null,
+                            false,
+                            "NETWORK_ERROR",
+                            "Webhook delivery could not be sent"
+                    );
+                }
             }
 
             var completed = completionService.complete(

@@ -67,11 +67,8 @@ export async function readInvitations() {
 export function selectReviewInvitation(
   invitations: Awaited<ReturnType<typeof readInvitations>>,
   consumed: ReadonlySet<string>,
-  online: boolean,
 ) {
-  return online
-    ? invitations.find(
-        (item) => !consumed.has(item.trackingReference) && item.isDue,
-      )
-    : undefined;
+  return invitations.find(
+    (item) => !consumed.has(item.trackingReference) && item.isDue,
+  );
 }

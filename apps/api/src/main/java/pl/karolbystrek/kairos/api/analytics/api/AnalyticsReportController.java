@@ -2,15 +2,10 @@ package pl.karolbystrek.kairos.api.analytics.api;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ProblemDetail;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
-import pl.karolbystrek.kairos.api.account.application.exception.StaffAccessDeniedException;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
 import pl.karolbystrek.kairos.api.analytics.application.AnalyticsReportService;
 import pl.karolbystrek.kairos.api.analytics.application.AnalyticsReportService.Range;
@@ -47,15 +42,5 @@ class AnalyticsReportController {
     Health health(@AuthenticationPrincipal StaffPrincipal principal) {
         reports.requirePlatform(principal);
         return health.current();
-    }
-
-    @ExceptionHandler(StaffAccessDeniedException.class)
-    ProblemDetail denied(StaffAccessDeniedException exception) {
-        return ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, exception.getMessage());
-    }
-
-    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
-    ProblemDetail invalid() {
-        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "The reporting parameters are invalid");
     }
 }

@@ -5,7 +5,7 @@ import lombok.NonNull;
 import java.util.List;
 
 public record ExternalOrderPage(
-        @NonNull List<ExternalOrderView> items,
+        @NonNull List<OrderView> items,
         String nextCursor
 ) {
 

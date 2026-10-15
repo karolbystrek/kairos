@@ -8,11 +8,11 @@ import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 import pl.karolbystrek.kairos.api.integration.application.model.ApiKeyPrincipal;
 import pl.karolbystrek.kairos.api.integration.domain.ApiKeyScope;
-import pl.karolbystrek.kairos.api.integration.infrastructure.config.ExternalIntegrationProperties;
 import pl.karolbystrek.kairos.api.integration.infrastructure.persistence.ApiKeyAuthenticationRepository;
 import pl.karolbystrek.kairos.api.persistence.infrastructure.DatabaseAccessContext;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.UUID;
@@ -23,11 +23,11 @@ import java.util.stream.Collectors;
 public class ApiKeyAuthenticationService {
 
     private static final String INVALID_CREDENTIAL_MESSAGE = "Invalid API Key";
+    private static final Duration API_KEY_USAGE_REFRESH = Duration.ofHours(1);
 
     private final ApiKeyAuthenticationRepository credentialsRepository;
     private final DatabaseAccessContext databaseAccess;
     private final ApiKeyCredentialService credentialService;
-    private final ExternalIntegrationProperties properties;
     private final Clock clock;
     private final TransactionTemplate readTransaction;
     private final TransactionTemplate usageTransaction;
@@ -36,14 +36,12 @@ public class ApiKeyAuthenticationService {
             ApiKeyAuthenticationRepository credentialsRepository,
             DatabaseAccessContext databaseAccess,
             ApiKeyCredentialService credentialService,
-            ExternalIntegrationProperties properties,
             Clock clock,
             PlatformTransactionManager transactionManager
     ) {
         this.credentialsRepository = credentialsRepository;
         this.databaseAccess = databaseAccess;
         this.credentialService = credentialService;
-        this.properties = properties;
         this.clock = clock;
         this.readTransaction = new TransactionTemplate(transactionManager);
         this.readTransaction.setReadOnly(true);
@@ -54,7 +52,7 @@ public class ApiKeyAuthenticationService {
     public ApiKeyPrincipal authenticate(String credential) {
         var apiKeyId = parseApiKeyId(credential);
         var now = clock.instant();
-        var usageStaleAt = now.minus(properties.apiKeyUsageRefresh());
+        var usageStaleAt = now.minus(API_KEY_USAGE_REFRESH);
         var authenticated = readTransaction.execute(status -> {
             var credentials = credentialsRepository.findCredentials(apiKeyId, now, usageStaleAt)
                 .orElseThrow(ApiKeyAuthenticationService::invalidCredential);

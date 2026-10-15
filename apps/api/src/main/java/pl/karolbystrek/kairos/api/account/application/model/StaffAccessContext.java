@@ -28,6 +28,20 @@ public record StaffAccessContext(
         return tenantRole == TenantRole.ADMIN;
     }
 
+    public StaffAccessContext requireTenantAdmin(@NonNull String deniedMessage) {
+        if (!isTenantAdmin()) {
+            throw new StaffAccessDeniedException(deniedMessage);
+        }
+        return this;
+    }
+
+    public StaffAccessContext requireAdminOrManager(@NonNull String deniedMessage) {
+        if (!isTenantAdmin() && assignmentRole != AssignmentRole.MANAGER) {
+            throw new StaffAccessDeniedException(deniedMessage);
+        }
+        return this;
+    }
+
     public void requireLocationAccess(
         @NonNull UUID resourceTenantId,
         @NonNull UUID resourceLocationId

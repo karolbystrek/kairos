@@ -60,14 +60,14 @@ class OrderAnalyticsIntegrationTests extends RedisListenerIsolatedIntegrationTes
 
     @Test
     void recordsAcceptedTransitionsOnceAndAttributesDurationsToFinishingHour() {
-        var order = orders.createOrder(tenant.administrator(), tenant.firstLocationId(), null);
+        var order = orders.createOrder(tenant.administrator(), tenant.firstLocationId(), null, List.of());
         clock.advance(Duration.ofMinutes(2));
         orders.updateStatus(tenant.administrator(), order.id(), OrderStatus.READY);
         orders.updateStatus(tenant.administrator(), order.id(), OrderStatus.READY);
         clock.advance(Duration.ofMinutes(3));
         orders.updateStatus(tenant.administrator(), order.id(), OrderStatus.COMPLETED);
         orders.updateStatus(tenant.administrator(), order.id(), OrderStatus.COMPLETED);
-        var canceled = orders.createOrder(tenant.administrator(), tenant.firstLocationId(), null);
+        var canceled = orders.createOrder(tenant.administrator(), tenant.firstLocationId(), null, List.of());
         orders.updateStatus(tenant.administrator(), canceled.id(), OrderStatus.CANCELED);
 
         assertThat(count("order_measurements")).isEqualTo(5);
@@ -86,7 +86,7 @@ class OrderAnalyticsIntegrationTests extends RedisListenerIsolatedIntegrationTes
 
     @Test
     void countsTransitionButOmitsNegativeDurationAfterClockMovesBackward() {
-        var order = orders.createOrder(tenant.administrator(), tenant.firstLocationId(), null);
+        var order = orders.createOrder(tenant.administrator(), tenant.firstLocationId(), null, List.of());
         clock.setInstant(CREATED.plusSeconds(120));
         orders.updateStatus(tenant.administrator(), order.id(), OrderStatus.READY);
         clock.setInstant(CREATED.plusSeconds(120).minusNanos(500_000));
@@ -98,7 +98,7 @@ class OrderAnalyticsIntegrationTests extends RedisListenerIsolatedIntegrationTes
     @Test
     void rollsBackMeasurementWithTheOrderTransaction() {
         new TransactionTemplate(transactions).executeWithoutResult(status -> {
-            orders.createOrder(tenant.administrator(), tenant.firstLocationId(), null);
+            orders.createOrder(tenant.administrator(), tenant.firstLocationId(), null, List.of());
             status.setRollbackOnly();
         });
         assertThat(count("orders")).isZero();
@@ -122,7 +122,7 @@ class OrderAnalyticsIntegrationTests extends RedisListenerIsolatedIntegrationTes
 
     @Test
     void retriesFailedAggregationWithoutLosingOrDoubleCountingInput() {
-        orders.createOrder(tenant.administrator(), tenant.firstLocationId(), null);
+        orders.createOrder(tenant.administrator(), tenant.firstLocationId(), null, List.of());
         owner.execute("ALTER TABLE order_hourly_analytics ADD CONSTRAINT reject_test_measurements CHECK (transition_count = 0)");
         try {
             assertThatThrownBy(() -> analytics.processAvailable()).isInstanceOf(RuntimeException.class);
@@ -162,9 +162,9 @@ class OrderAnalyticsIntegrationTests extends RedisListenerIsolatedIntegrationTes
 
     @Test
     void retainsAggregatesAndPendingMeasurementsAcrossActualLocationPurge() {
-        orders.createOrder(tenant.administrator(), tenant.secondLocationId(), null);
+        orders.createOrder(tenant.administrator(), tenant.secondLocationId(), null, List.of());
         drain();
-        orders.createOrder(tenant.administrator(), tenant.secondLocationId(), null);
+        orders.createOrder(tenant.administrator(), tenant.secondLocationId(), null, List.of());
         owner.update("UPDATE locations SET status='ARCHIVED',archived_at=?,updated_at=? WHERE id=?",
                 Timestamp.from(CREATED), Timestamp.from(CREATED), tenant.secondLocationId());
         clock.advance(Duration.ofDays(31));
@@ -178,9 +178,9 @@ class OrderAnalyticsIntegrationTests extends RedisListenerIsolatedIntegrationTes
 
     @Test
     void runtimeWithoutCapabilityCannotReadOrWriteEitherTenantMeasurements() {
-        orders.createOrder(tenant.administrator(), tenant.firstLocationId(), null);
+        orders.createOrder(tenant.administrator(), tenant.firstLocationId(), null, List.of());
         var another = new IntegrationTestFixture(owner).createTenant();
-        orders.createOrder(another.administrator(), another.firstLocationId(), null);
+        orders.createOrder(another.administrator(), another.firstLocationId(), null, List.of());
         assertThat(runtime.queryForObject("SELECT count(*) FROM order_measurements", Long.class)).isZero();
         drain();
         assertThat(runtime.queryForObject("SELECT count(*) FROM order_hourly_analytics", Long.class)).isZero();
@@ -198,11 +198,11 @@ class OrderAnalyticsIntegrationTests extends RedisListenerIsolatedIntegrationTes
     @Test
     void staffCannotInsertMeasurementForAnotherTenantAndWorkerSeesOnlyDiscoveredInput() {
         var another = new IntegrationTestFixture(owner).createTenant();
-        orders.createOrder(tenant.administrator(), tenant.firstLocationId(), null);
-        orders.createOrder(another.administrator(), another.firstLocationId(), null);
+        orders.createOrder(tenant.administrator(), tenant.firstLocationId(), null, List.of());
+        orders.createOrder(another.administrator(), another.firstLocationId(), null, List.of());
         drain();
-        orders.createOrder(tenant.administrator(), tenant.firstLocationId(), null);
-        orders.createOrder(another.administrator(), another.firstLocationId(), null);
+        orders.createOrder(tenant.administrator(), tenant.firstLocationId(), null, List.of());
+        orders.createOrder(another.administrator(), another.firstLocationId(), null, List.of());
         assertThatThrownBy(() -> new TransactionTemplate(transactions).executeWithoutResult(status -> {
             access.staff(tenant.administrator());
             runtime.update("""

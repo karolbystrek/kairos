@@ -48,7 +48,7 @@ class ReleaseManifestTest(unittest.TestCase):
             self.assertEqual(set(archive.getnames()), {
                 "release.json", "compose.yaml", "compose.deployment.yaml",
                 "nginx/default.conf.template", "nginx/cloudflare-real-ip.conf",
-                "deployment/zitadel/bootstrap.py", "deployment/deploy.sh", "deployment/deploy.py",
+                "deployment/zitadel/bootstrap.py", "deployment/deploy.py",
                 "deployment/postgres/bootstrap.sh",
             })
             self.assertEqual(json.load(archive.extractfile("release.json")), manifest)
