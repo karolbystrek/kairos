@@ -7,6 +7,7 @@
 - [Project conventions first](#project-conventions-first)
 - [Components and effects](#components-and-effects)
 - [Authenticated client state](#authenticated-client-state)
+- [Tests](#tests)
 
 ## Project conventions first
 
@@ -44,3 +45,12 @@ including typography, status presentation and icon restraint in the following se
 - Route panel REST calls through the shared authenticated native-`fetch`
   client, scope staff SWR keys by account ID, and clear staff-owned state when
   the authenticated account changes.
+
+## Tests
+
+- Both apps test with Vitest. Panel tests render the real components with
+  Testing Library in jsdom; replace only the network (`fetch` through
+  `tests/helpers.tsx`, `EventSource`), browser APIs jsdom lacks (stubbed in
+  `tests/setup.ts`) and framework hooks that need a running Next.js app, such
+  as `next/navigation`. Do not mock HeroUI, React hooks or the panel's own
+  modules.
