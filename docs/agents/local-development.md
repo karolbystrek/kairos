@@ -30,8 +30,9 @@ token to `secrets/zitadel/kairos.pat`. Run the applications on the host:
   set by the Maven plugin, reads `../../.env` and `../../secrets/`), on
   `http://localhost:8080/api`. DevTools restarts it after a recompile.
 - Frontends: `npm run dev` in `apps/customer-app` (`http://localhost:3000`) and
-  `apps/panel-app` (`http://localhost:3001`). Their committed
-  `.env.development` files hold the local origins.
+  `PORT=3001 npm run dev` in `apps/panel-app` (`http://localhost:3001`). Their
+  committed `.env.development` files hold the local origins; `PORT` must come
+  from the shell because Next.js binds before loading `.env` files.
 
 `docker compose --profile apps up --build` runs the production-built
 application images instead, still over HTTP and without NGINX. NGINX, TLS and
