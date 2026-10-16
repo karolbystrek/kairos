@@ -34,6 +34,7 @@ def main():
         env.write_text((ROOT / '.env.example').read_text() + '\n' + '\n'.join([
             'KAIROS_IMAGE_REGISTRY=example.invalid/kairos',
             'KAIROS_RELEASE_VERSION=test',
+            'KAIROS_API_USER=1000:1000',
             'RESEND_API_KEY=gateway-test-placeholder',
             f'KAIROS_APPLICATION_SECRETS_DIRECTORY={work}',
             f'KAIROS_TLS_DIRECTORY={work}',

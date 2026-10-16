@@ -5,6 +5,8 @@ import org.hamcrest.Matchers;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -17,6 +19,7 @@ import pl.karolbystrek.kairos.api.account.domain.assignment.AssignmentRole;
 import pl.karolbystrek.kairos.api.integration.testsupport.IntegrationTestFixture;
 import pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase;
 import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
+import pl.karolbystrek.kairos.api.testsupport.RedisTestContainer;
 
 import java.util.UUID;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -44,6 +47,14 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
     @Autowired private AccountInvitationService invitations;
     @Autowired private RegistrationVerificationService verification;
     @Autowired private PlatformTransactionManager transactions;
+
+    // The per-account sign-in throttle counts failures in Redis.
+    @DynamicPropertySource
+    static void redis(DynamicPropertyRegistry registry) {
+        RedisTestContainer.start();
+        registry.add("spring.data.redis.host", RedisTestContainer::host);
+        registry.add("spring.data.redis.port", RedisTestContainer::port);
+    }
 
     @Test
     void registrationCreatesNoTenantUntilCodeThenEstablishesDurableSecureSession() throws Exception {
