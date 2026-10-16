@@ -9,14 +9,17 @@ import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
 import pl.karolbystrek.kairos.api.worker.CoalescingWorker;
 
 import java.time.Duration;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Stream;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.function.LongFunction;
 
 public class OrderSseEmitterRegistry {
     public static final String STATUS_CHANGED_EVENT_NAME = "order-status-changed";
-    private final ConcurrentHashMap<SseEmitter, Connection> connections = new ConcurrentHashMap<>();
+    // Keyed by tracking reference so an event reaches only its own order's streams.
+    private final ConcurrentHashMap<UUID, Map<SseEmitter, Connection>> connections = new ConcurrentHashMap<>();
     private final LongFunction<SseEmitter> emitterFactory;
     private final Executor executor;
 
@@ -30,15 +33,13 @@ public class OrderSseEmitterRegistry {
     }
 
     private final class Connection {
-        private final UUID reference;
         private final SseConnection delivery;
         private final CoalescingWorker recovery;
         private volatile OrderService orders;
         private OrderStatus latest;
 
         private Connection(UUID reference, SseEmitter emitter) {
-            this.reference = reference;
-            delivery = new SseConnection(emitter, () -> connections.remove(emitter), executor);
+            delivery = new SseConnection(emitter, () -> remove(reference, emitter), executor);
             recovery = new CoalescingWorker(executor, () -> {
                 try {
                     accept(OrderStatusChangedEvent.snapshot(reference, orders.findTrackedOrder(reference)));
@@ -60,7 +61,7 @@ public class OrderSseEmitterRegistry {
 
     public SseEmitter subscribe(UUID reference, OrderService orders) {
         var emitter = register(reference);
-        var connection = connections.get(emitter);
+        var connection = connections.getOrDefault(reference, Map.of()).get(emitter);
         try {
             var initial = orders.findTrackedOrder(reference);
             if (connection != null) {
@@ -75,7 +76,7 @@ public class OrderSseEmitterRegistry {
     }
 
     public void refresh(OrderService orders) {
-        connections.values().forEach(connection -> {
+        all().forEach(connection -> {
             connection.orders = orders;
             connection.recovery.wake();
         });
@@ -84,28 +85,44 @@ public class OrderSseEmitterRegistry {
     public SseEmitter register(UUID reference) {
         var emitter = emitterFactory.apply(Duration.ofMinutes(30).toMillis());
         var connection = new Connection(reference, emitter);
-        connections.put(emitter, connection);
+        // compute keeps the add atomic with a concurrent removal of the reference's last stream.
+        connections.compute(reference, (ignored, streams) -> {
+            var current = streams == null ? new ConcurrentHashMap<SseEmitter, Connection>() : streams;
+            current.put(emitter, connection);
+            return current;
+        });
         connection.delivery.send(SseEmitter.event().comment("connected"), false);
         return emitter;
     }
 
     public void complete(UUID reference, SseEmitter emitter) {
-        var connection = connections.remove(emitter);
+        var connection = connections.getOrDefault(reference, Map.of()).get(emitter);
+        remove(reference, emitter);
         if (connection != null) connection.delivery.close();
     }
 
     public void forward(OrderStatusChangedEvent event) {
-        connections.values().forEach(connection -> {
-            if (connection.reference.equals(event.trackingReference())) connection.accept(event);
-        });
+        connections.getOrDefault(event.trackingReference(), Map.of()).values()
+                .forEach(connection -> connection.accept(event));
     }
 
     @Scheduled(fixedRate = 15_000)
     void sendHeartbeats() {
-        connections.values().forEach(connection -> connection.delivery.heartbeat());
+        all().forEach(connection -> connection.delivery.heartbeat());
     }
 
     int connectionCount(UUID reference) {
-        return (int) connections.values().stream().filter(connection -> connection.reference.equals(reference)).count();
+        return connections.getOrDefault(reference, Map.of()).size();
+    }
+
+    private void remove(UUID reference, SseEmitter emitter) {
+        connections.computeIfPresent(reference, (ignored, streams) -> {
+            streams.remove(emitter);
+            return streams.isEmpty() ? null : streams;
+        });
+    }
+
+    private Stream<Connection> all() {
+        return connections.values().stream().flatMap(streams -> streams.values().stream());
     }
 }

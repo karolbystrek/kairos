@@ -44,12 +44,10 @@ email. Existing pending code delivery is canceled on completion. Identity and
 Account eligibility checks still apply, and invitation redemption is unchanged.
 Re-enabling verification does not undo emails already marked verified.
 
-The registration form has no step counter, progress bar, Next/Back controls, or
-persistent password-requirement paragraph. Account fields retain submitted values
-on recoverable failure and show corrective errors beside the affected control.
-Public Sign in ends with **Don't have an account? Create one.**, with only
-**Create one.** linked to the public `/registration` page. Registration ends with **Already have an
-account? Sign in.**, with only **Sign in.** linked to `/login`.
+Registration is a single form without steps. Account fields retain submitted
+values on recoverable failure and show corrective errors for the affected
+control. Public sign-in links to `/registration`, and registration links back to
+`/login`.
 
 The panel root `/` is the public restaurant-owner landing page. It checks the
 existing API session in the browser and redirects signed-in visitors to
@@ -79,8 +77,18 @@ Account resumes verification. Registering an email held by such an abandoned
 identity replaces it; an existing Account is never replaced.
 
 Managers/operators register through emailed, recipient-bound member invitations.
-Redemption verifies the fixed email without a separate code step. Forgotten-password
-recovery remains deferred. The password policy is a minimum of 12 characters
+Redemption verifies the fixed email without a separate code step.
+
+Forgotten passwords are reset from the login page with an emailed 6-digit code,
+under the same code rules as registration (one-hour lifetime, hashed, latest
+code only, five wrong attempts, 60-second resend cooldown). The request answers
+identically whether or not the email belongs to an Account that may sign in, and
+disabled or archived Accounts receive no code. A correct code sets the new
+password, marks the email verified and revokes every existing session of the
+Account; the user then signs in. An Account without stored credentials (created
+before the API owned them) gains them through this flow.
+
+The password policy is a minimum of 12 characters
 without mandatory character classes or scheduled password expiry. Registration
 and password change validate that minimum, and registration also email syntax,
 confirmation and the 200-character input bounds, in the panel and API. Identity

@@ -27,9 +27,8 @@ identifying it, and its name becomes available again. An integration's own
 enable/disable switch still stops all of its keys and webhooks at once.
 
 The full high-entropy secret is revealed once and only a non-reversible hash is
-stored. One-time secret presentation keeps the copy control beside the secret,
-temporarily replaces it with a completion mark after copying, and uses a
-right-aligned **Confirm** action to leave the locked state. Each key shows when
+stored. One-time secret presentation offers copying and requires an explicit
+**Confirm** to leave the locked state. Each key shows when
 it was last used for an authenticated request, or that it has not been used
 yet. The time is refreshed at most once per configured interval (one hour by
 default) per key, so it is approximate and authentication rarely writes to the
@@ -57,7 +56,8 @@ integration can choose valid item names; locations outside the key return `403`
 as for other location-scoped requests.
 
 Webhook subscriptions independently select at least one location and supported
-order event type. Creation starts with every supported event type selected so
+order event type (`order.created`, `order.ready`, `order.completed`,
+`order.canceled` or `order.expired`). Creation starts with every supported event type selected so
 the administrator can remove only events the recipient does not need. A new
 subscription is disabled until its one-time signing
 secret has been copied and the recipient configured. Each delivery uses a

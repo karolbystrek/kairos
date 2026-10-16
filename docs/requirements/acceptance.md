@@ -28,17 +28,13 @@
 * On the primary tablet layout, staff can create an automatically labelled
   order and reveal its customer QR code through one obvious primary action,
   and can perform a valid order transition through one obvious action.
-* Tablet and desktop queues present **In preparation** and **Ready** as adjacent
-  lanes; mobile preserves the same model as stacked sections. Queue navigation,
-  selection, and actions remain operable with touch, pointer, and keyboard.
+* Queues present **In preparation** and **Ready** sections on every layout.
+  Queue navigation, selection, and actions remain operable with touch, pointer,
+  and keyboard.
 * Queue cards expose an approximately minute-granularity elapsed waiting time
   without making an absolute timestamp or continuously animated timer primary.
 * Selecting an active-order card opens its details with the customer QR code.
-  The card keeps only the inline **Ready** or **Complete** and cancel controls,
-  with no duplicate QR button or narrow-width action stack.
-* Routine controls, menus, selection rows, and cards in both frontends use the
-  same short hover lift, held-press compression, and spring-like release, while
-  reduced-motion preferences retain non-spatial feedback without scaling.
+  The card keeps only the inline **Ready** or **Complete** and cancel controls.
 * New-order and order-details popups preserve the queue as visible context,
   restore focus to their invoking control when dismissed, and do not lose
   entered label text after a recoverable failure.
@@ -115,10 +111,9 @@
   account, requires inline hold confirmation, archives it atomically, invalidates
   earlier authentication and revokes pending invitations, retains its historical
   assignment and reserved identity, and removes it from ordinary account lists.
-* Accounts, Locations, and Integrations initially show responsive card collections
-  without automatic selection or persistent detail panels. Selecting a card
-  opens its details and management actions in the shared popup. Cards and
-  details show one status chip with accessible status labels; no search or
+* Accounts, Locations, and Integrations initially show card collections without
+  automatic selection. Selecting a card opens its details and management
+  actions. Cards and details expose status with accessible labels; no search or
   filters are included.
 * Accounts includes pending invitations alongside created accounts. Both show
   email, role, and location; Locations and Integrations show name. Invitation
@@ -147,9 +142,9 @@
   no worker or write-on-read materializes an `EXPIRED` lifecycle state.
 * Each pending invitation fixes a required valid normalized recipient email.
   Creation, list, and preview expose it; invited registration displays it
-  read-only beside clearly spaced location/role context. Mismatched redemption
+  read-only with its location and role. Mismatched redemption
   email is rejected before creating an identity and rechecked atomically.
-  Details identify the fixed role and location and the expiry. Its icon-and-text Revoke action
+  Details identify the fixed role and location and the expiry. Its Revoke action
   requires inline hold confirmation. The API history retains terminal metadata,
   lifecycle state and queued/sent/failed email delivery state; the panel folds
   them into one status (Pending, Not sent, Expired) and omits redeemed entries,
@@ -202,7 +197,7 @@
 * Each browser or installed-app context independently retains active, explicit
   IndexedDB order snapshots in most-recently-opened order and removes terminal
   orders without allowing a stale response to resurrect them.
-* The default page offers one centered Scan QR code action with Notifications
+* The default page offers one Scan QR code action with Notifications
   and Appearance, without an order collection or history. The root route
   restores the current unclosed order in browser and installed contexts,
   including terminal orders, and tolerates unavailable or invalid local storage.

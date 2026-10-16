@@ -32,7 +32,7 @@ public class DatabaseIsolationVerifier implements ApplicationRunner {
                         OR NOT EXISTS(SELECT 1 FROM pg_policy p WHERE p.polrelid=c.oid)))
                 AND NOT EXISTS(SELECT 1 FROM (VALUES
                     ('tenants','arw'),('locations','arw'),('accounts','arw'),('location_assignments','arw'),
-                    ('pending_registrations','adrw'),('account_invitations','arw'),('external_integrations','arw'),('api_keys','arw'),
+                    ('pending_registrations','adrw'),('password_resets','*'),('account_invitations','arw'),('external_integrations','arw'),('api_keys','arw'),
                     ('api_key_scopes','adrw'),('api_key_location_access','adrw'),
                     ('webhook_subscriptions','arw'),('webhook_subscription_location_access','adrw'),
                     ('webhook_subscription_event_types','adrw'),('webhook_signing_secret_versions','adrw'),

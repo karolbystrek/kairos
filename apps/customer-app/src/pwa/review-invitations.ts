@@ -22,7 +22,7 @@ export async function readInvitations() {
         }
         throw error;
       }
-      if (order.status === "COMPLETED" || order.status === "CANCELED") {
+      if (order.status !== "IN_PREPARATION" && order.status !== "READY") {
         if (await readTrackedOrder(trackingReference)) {
           await rememberTrackedOrder({
             trackingReference,
@@ -37,6 +37,7 @@ export async function readInvitations() {
 
       if (
         order.status === "CANCELED" ||
+        order.status === "EXPIRED" ||
         (order.status === "COMPLETED" && !order.reviewInvitation)
       ) {
         await consumeReviewInvitation(trackingReference);

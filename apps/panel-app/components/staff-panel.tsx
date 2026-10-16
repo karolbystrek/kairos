@@ -263,6 +263,8 @@ function SignedOutPanel({
     <AuthFormLayout
       footer={
         <>
+          <Link href="/password-reset">Nie pamiętasz hasła?</Link>
+          <br />
           Nie masz konta? <Link href="/registration">Utwórz je.</Link>
         </>
       }

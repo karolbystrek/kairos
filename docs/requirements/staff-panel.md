@@ -15,9 +15,8 @@
 The dashboard keeps its selected workspace in the URL fragment (for example,
 `#integrations`). Refresh, direct links and browser Back/Forward retain that
 selection. Missing, unknown, unavailable or onboarding-disabled workspaces fall
-back to Orders. Initial content loading uses a small accessible loading indicator, with no
-skeletons or placeholder queue headings. Loaded content remains visible during
-background refreshes; empty states appear only after loading completes.
+back to Orders. Loaded content remains visible during background refreshes;
+empty states appear only after loading completes.
 
 The staff panel must:
 
@@ -54,128 +53,86 @@ The staff panel must:
 
 #### Navigation and onboarding
 
-The panel application provides a public restaurant-owner landing page at
-`/`. It briefly explains QR-based order tracking and queue management
-without physical pagers or a customer app download. Its primary action links to
-public registration at `/registration`, while Sign in links to `/login` and the
-staff workspace lives at `/dashboard`, with password change at
-`/dashboard/password`. Signed-in visitors to `/` or `/login` are redirected to
-`/dashboard`; signed-out visitors to staff routes go to `/login` after the
-session check. Authentication failures leave the public landing page
-usable and keep the existing recovery state on staff routes. The creator's email
-contact appears as secondary footer information; contacting the creator or
-receiving an invitation is not required to register. The page uses spacious typography and the shared
-responsive, accessible light/dark design language.
+The panel application provides a public restaurant-owner landing page at `/`
+explaining QR-based order tracking and queue management without physical
+pagers or a customer app download. Public registration lives at
+`/registration`, sign-in at `/login`, the staff workspace at `/dashboard` and
+password change at `/dashboard/password`. Signed-in visitors to `/` or `/login`
+are redirected to `/dashboard`; signed-out visitors to staff routes go to
+`/login` after the session check. Authentication failures leave the public
+landing page usable and keep the existing recovery state on staff routes.
+Contacting the creator or receiving an invitation is not required to register.
 
-The staff experience keeps the active queue visually primary. Administrative
-capabilities must not compete with frequent order creation, QR presentation,
-or valid order transitions merely because they are available to the signed-in
-account.
+The active queue stays primary: administrative capabilities must not compete
+with frequent order creation, QR presentation or valid order transitions merely
+because the signed-in account may use them.
 
-Orders, Locations, Menu, Accounts, and Integrations use one adaptive tab-style
-navigation system: a centered rounded segmented control on tablet and desktop and bottom
-navigation on narrow mobile layouts. Tabs share equal widths determined by the
-visible destinations. Tablet and desktop show icons beside labels; phones show
-icons above small labels. The bar scrolls horizontally when destinations do not
-fit, preserving readable labels and touch targets. Only authorized destinations
-are present.
-An administrator with no non-archived location first sees the required
-first-location modal over the rendered workspace. The workspace remains visible
-through the shared blurred backdrop but cannot be interacted with while the
-required modal is open. The panel waits for
+The workspace destinations are Orders, Locations, Menu, Accounts and
+Integrations; only authorized destinations are present. Locations is available
+only to tenant administrators; Menu to administrators and managers. Appearance
+and Account are utilities rather than workspace destinations.
+
+An administrator with no non-archived location must create one in a required
+first-location modal before using the workspace. The panel waits for
 account-scoped authoritative location data before showing either onboarding or
 the workspace; a failed initial request shows Retry and does not permit skipping
 onboarding. A disabled location still counts as existing.
-The shell and visual treatment do not vary by role. Appearance and Account
-remain trailing icon-only utilities on the same level rather than peer workspace
-destinations. Account opens a menu containing Change password and, separated
-and last, Sign out. Sign out signs out the current device immediately without a
-confirmation; a failure keeps the session, shows a dismissible error in the
-panel, and pending logout prevents repeat submissions. There is no separate
-sign-out-everywhere action: changing the password ends every session. Change
-password opens its own page in the authentication-page layout with a link back
-to the panel; it omits persistent password-length guidance, and retains
-validation errors and the explanation that success signs out every device.
-Success leads to `/login`, which confirms the password change.
 
-Locations appears between Orders and Accounts for tenant administrators and is
-absent for managers and operators. Menu follows it for administrators and
-managers: a location selector, shown when more than one location is available,
-chooses whose menu the page edits as one item per line with Save, a hold-to-confirm
-Delete and a copy-from-another-location selector. The Locations collection includes enabled
-and disabled locations and omits archived locations. Operational selectors and
-new Account Invitation, API Key, and webhook-subscription forms offer only
-enabled locations.
+The Account menu offers Change password and Sign out. Sign out signs out the
+current device immediately without confirmation; a failure keeps the session
+and shows a dismissible error, and a pending logout prevents repeat
+submissions. There is no separate sign-out-everywhere action: changing the
+password ends every session. The Change password page retains validation errors
+and explains that success signs out every device; success leads to `/login`,
+which confirms the change.
+
+The Menu page edits the menu of a selected location as one item per line, with
+Save, hold-confirmed Delete and copying from another location
+([menus](menus.md#location-menus)). The Locations collection includes enabled
+and disabled locations and omits archived ones. Operational selectors and new
+Account Invitation, API Key and webhook-subscription forms offer only enabled
+locations.
 
 #### Orders and customer QR
 
-The active queue uses adjacent **In preparation** and **Ready** sections on
-tablet and desktop and the same two sections stacked vertically on mobile.
-These sections use headings, counts, whitespace, and a shared separator rather
-than large rounded lane containers. Order creation begins from one compact,
-icon-and-text creation action at the start of the active workspace and opens an
-extra-large popup that fills the screen on phones. When the location has a
-menu, step 1 shows its items as tiles in menu order: each tap adds one,
-up to 99; a selected tile shows its quantity, a distinct state and a decrease
-control, tinted red. Menus with more than 12 items add a search field, ignoring case and
-diacritics, that is focused automatically only with a precise pointer; Enter
-adds the single match and clears the search. A **Next** action with the total
-item count is always available, including with no items. Step 2 holds the label,
-prefilled from the items as described in [menus](menus.md#ordering-from-a-menu)
-and editable independently, with a restore-from-items action when it differs.
-Back keeps the selection; Create occupies the Next position, and steps switch
-in place with a short cross-fade that respects reduced motion. Without a
-menu, or when the menu cannot load, the flow opens at step 2.
-Successful creation continues directly into the order details popup.
-The underlying queue remains visible to preserve context. The Orders, Locations, Accounts, and Integrations creation actions
-share one 44-pixel control height, an icon with Polish text, an accessible name
-and a pointer tooltip above the workspace content on every layout. Repeated Orders, Locations, Accounts and
-Integrations titles are visually hidden; the selected navigation tab identifies
-the workspace, while an accessible heading remains for assistive technology. The queue-location selector
-remains an independent filter beneath the page header.
+The active queue shows **In preparation** and **Ready** sections with counts.
+Order creation opens a two-step flow. When the location has a menu, step 1
+adds one item per tap, up to 99 of each; menus with more than 12 items add a
+search that ignores case and diacritics, where Enter adds the single match and
+clears the search. **Next**, showing the total item count, is always available,
+including with no items. Step 2 holds the label, prefilled from the items as
+described in [menus](menus.md#ordering-from-a-menu) and editable independently,
+with a restore-from-items action when it differs. Back keeps the selection.
+Without a menu, or when the menu cannot load, the flow opens at step 2.
+Successful creation continues directly into the order details, keeping the
+queue as context.
 
 When a tenant has no enabled location, whether none have been created or every
 existing location is disabled, Orders replaces its queue and creation control
-with a direct message and **Create location** button. The button opens the same
-focused location-creation modal used by the Locations destination without
-changing the selected workspace destination. Successful creation closes the
-modal, keeps Orders visible, and selects the new enabled location for the first
-order.
+with a direct message and **Create location** action. It opens the same
+location-creation flow as Locations without leaving Orders; success keeps
+Orders visible and selects the new location for the first order.
 
-Order details show the centered order number with its label beneath when
-present, the dominant customer QR code to scan again, and the order's menu items
-with quantities. On wide screens the items sit left of the QR code, top-aligned,
-with their heading kept visible while the list scrolls within the QR code's
-height; narrow screens stack the QR code first and the popup scrolls as a whole. Details do not repeat queue status, elapsed
-time, explanatory copy, or a redundant footer action.
-
-Canceling an order requires a concise confirmation that identifies the order
-and distinguishes keeping it from the terminal destructive action.
+Order details show the order number, its label when present, the customer QR
+code to scan again and the order's menu items with quantities. Details do not
+repeat queue status or elapsed time.
 
 Each active-order card shows its elapsed waiting time, updated approximately
-once per minute. The duration is supporting information: the prominent order
-number beside its quieter label and the next valid action remain more
-prominent. Creator attribution is not shown. The
-complete compact card remains a direct target for opening its order details,
-without a duplicate QR control. One trailing action group exposes two large
-controls directly: the next valid status, labeled **Ready** or **Complete**, and
-cancel. Cancel retains its order-specific confirmation rather than being hidden
-in an overflow menu.
+once per minute, as supporting information below the order number and next
+valid action. Creator attribution is not shown. The whole card opens its order
+details. The card exposes the next valid status, labeled **Ready** or
+**Complete**, and cancel directly rather than in an overflow menu. Canceling
+requires a concise confirmation that identifies the order and distinguishes
+keeping it from the terminal destructive action.
 
 #### Management collections and details
 
-Locations, Accounts, and External Integrations initially show only
-responsive card collections and relevant creation controls, with no automatic
-selection or persistent right-hand details. Selecting a card opens details and
-applicable management actions in the shared centered popup, adapted to available
-mobile space. There is no collection search or filtering in this increment.
-Collections use one consistent responsive card size with no density controls
-or saved density preference. Phones use one full-width column.
+Locations, Accounts and External Integrations show card collections and their
+creation controls, with no automatic selection. Selecting a card opens its
+details and applicable management actions. There is no collection search,
+filtering or density control in this increment.
 
-Popups are sized by content: confirmations small, single-purpose forms medium,
-entity and order details large, and order creation extra large.
-
-New member access begins in an invitation popup capturing recipient email,
+New member access begins in an invitation form capturing recipient email,
 fixed location, and manager or operator role. Kairos emails the resulting link;
 the panel exposes no link or Copy action. Creating for an email with an active
 invitation requires replacement confirmation. Resend also requires confirmation
@@ -183,47 +140,35 @@ and replaces the old invitation with a new token and seven-day expiry. The calle
 must have authority over both old and new targets.
 
 Accounts includes non-archived created accounts and invitation history,
-showing recipient, role, location, creation/expiry and one status chip as defined
+showing recipient, role, location, creation/expiry and status as defined
 in [invitation cards](accounts-invitations.md#invitation-cards-and-synchronization).
-Revoked, replaced and expired invitations remain listed; entries appear
-newest first without sorting or paging controls. Managers see only operator
-invitations for their location;
+Revoked, replaced and expired invitations remain listed, newest first, without
+sorting or paging. Managers see only operator invitations for their location;
 administrators see the tenant. Active pending invitations expose Resend even
 when delivery failed; expired entries use the new-invitation form. Details retain
-a confirmed Revoke action. Accessible labels expose status and shared popup
-focus, touch targets and press feedback remain consistent.
+a confirmed Revoke action.
 
-Selecting an existing account
-opens its details and permitted status and Delete actions. Disable retains its
-hold confirmation; Delete uses hold confirmation. Both enabled and disabled
-manageable accounts can be deleted.
+Account details offer the permitted status and Delete actions. Disable and
+Delete use hold confirmation. Both enabled and disabled manageable accounts can
+be deleted.
 
-Integration details retain the compact segmented control between API Keys and
-Webhooks and their one-time secret handling.
+Integration details hold API Keys and Webhooks with their one-time secret
+handling.
 
-Every entity detail popup uses one sheet layout. The header row holds the title
-and its status chip, as tall as the title line, at the top left, level with Close. The body lists editable
-fields first, then read-only facts that are not already in the title. The footer
-holds immediate lifecycle actions (Disable or Enable, Delete, and invitation
-Revoke/Resend) and, for editable entities, one **Cancel**/**Save** pair that
-commits every changed field together. Footer actions share one equal-width
-grid, two columns from small screens up, with lifecycle actions above
-Cancel/Save. Save is unavailable until something
-changed and closes the popup on success; a failed save keeps the draft and
-shows the error. Locations, Accounts, External Integrations and Webhook
-Subscriptions show an Enabled or Disabled chip; API Keys have none.
-Contextual labels omit a repeated
-entity name when the popup makes the target unambiguous. The new-integration
-popup uses the direct **Integration name** placeholder with an accessible label.
+Entity details list editable fields, then read-only facts. Lifecycle actions
+(Disable or Enable, Delete, and invitation Revoke/Resend) take effect
+immediately, while editable entities commit every changed field together with
+one Save. Save is unavailable until something changed and closes the details on
+success; a failed save keeps the draft and shows the error. Locations,
+Accounts, External Integrations and Webhook Subscriptions show an Enabled or
+Disabled status; API Keys have none.
 
-Location cards retain enabled-first display-name ordering with stable identity
-as a tie-breaker. Location details edit the name and Google review link and commit
-them with Save, and show the location's menu item count with an Edit action that
-opens Menu for that location. The footer contains Disable or Enable, and
-Delete. Delete remains visible but unavailable until the location is disabled
-and another non-archived location exists. Details explain that the last location
-can be disabled but cannot be deleted, and offer no time-zone editor or unrelated
-operational fields.
+Location cards are ordered enabled first, then by display name, with stable
+identity as a tie-breaker. Location details edit the name and Google review link
+and show the location's menu item count with an Edit action that opens Menu for
+that location. Delete is unavailable until the location is disabled and another
+non-archived location exists; details explain that the last location can be
+disabled but cannot be deleted. There is no time-zone editor.
 
 If confirmed location disablement is rejected because the location still has
 active orders, the location remains enabled and the panel explains that those
@@ -231,21 +176,10 @@ orders must be completed or canceled first. A direct **View orders** action
 opens Orders filtered to that location.
 
 Accounts and Integrations remain available when all existing locations are
-disabled. Account Invitation creation is unavailable with quiet inline guidance
-to enable a location and an explanatory creation-control tooltip, without an
-"Account invitations unavailable" warning container. External Integrations may
-still be created, while API Key and webhook-subscription creation remains
-unavailable with inline guidance until an enabled location exists.
-
-Integration credential and webhook forms use neutral, task-specific
-placeholders rather than suggesting a restaurant, point-of-sale product, or
-other example identity.
-
-Repeated administrative actions use one shared visual vocabulary across the
-panel: Edit uses the pencil, Disable uses the prohibited-state symbol, Enable
-uses the check, and Delete uses the trash symbol. Their icon-and-text
-controls share size, corner treatment and accessible naming. Consequential
-controls include explicit Polish labels and nearby consequence text.
+disabled. Account Invitation creation is then unavailable, with inline guidance
+to enable a location. External Integrations may still be created, while API Key
+and webhook-subscription creation remains unavailable with inline guidance
+until an enabled location exists.
 
 #### Lifecycle vocabulary and confirmations
 

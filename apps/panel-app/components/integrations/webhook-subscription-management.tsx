@@ -41,6 +41,7 @@ const webhookEventTypes = [
   "order.ready",
   "order.completed",
   "order.canceled",
+  "order.expired",
 ] as const satisfies readonly WebhookEventType[];
 
 const webhookEventLabels: Record<WebhookEventType, string> = {
@@ -48,6 +49,7 @@ const webhookEventLabels: Record<WebhookEventType, string> = {
   "order.ready": "Zamówienie gotowe do odbioru",
   "order.completed": "Zamówienie zrealizowane",
   "order.canceled": "Zamówienie anulowane",
+  "order.expired": "Zamówienie wygasło",
 };
 
 type SubscriptionDraft = {

@@ -20,6 +20,8 @@ GET    /api/auth/v1/csrf
 POST   /api/auth/v1/login
 POST   /api/auth/v1/logout
 POST   /api/auth/v1/password
+POST   /api/auth/v1/password-reset
+POST   /api/auth/v1/password-reset/confirmation
 GET    /api/auth/v1/me
 POST   /api/tenant-registrations/v1
 

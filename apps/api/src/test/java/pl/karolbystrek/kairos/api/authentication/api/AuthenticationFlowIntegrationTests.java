@@ -322,6 +322,90 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
         assertThat(database.queryForObject("SELECT COUNT(*) FROM accounts WHERE email=?", Integer.class, email)).isOne();
     }
 
+    @Test
+    void passwordResetReplacesThePasswordEndsSessionsAndRevealsNoAccounts() throws Exception {
+        var email = email();
+        var session = register(email);
+        mvc.perform(csrf(postApi("/auth/v1/password-reset").content("{\"email\":\"" + email() + "\"}")))
+            .andExpect(status().isAccepted()).andExpect(content().string(""));
+        assertThat(database.queryForObject("SELECT COUNT(*) FROM password_resets", Integer.class)).isZero();
+        mvc.perform(csrf(postApi("/auth/v1/password-reset").content("{\"email\":\"" + email.toUpperCase() + "\"}")))
+            .andExpect(status().isAccepted()).andExpect(content().string(""));
+        var firstHash = resetCodeHash(email);
+        mvc.perform(csrf(postApi("/auth/v1/password-reset").content("{\"email\":\"" + email + "\"}")))
+            .andExpect(status().isAccepted());
+        assertThat(resetCodeHash(email)).as("a resend within 60 seconds keeps the emailed code").isEqualTo(firstHash);
+        useResetCode(email, "123456");
+        mvc.perform(csrf(postApi("/auth/v1/password-reset/confirmation").content(reset(email, "654321"))))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.fieldErrors.code").isNotEmpty());
+        mvc.perform(csrf(postApi("/auth/v1/password-reset/confirmation").content(reset(email, "123456").replace("new-password-123", "too-short"))))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.fieldErrors.password").isNotEmpty());
+        mvc.perform(csrf(postApi("/auth/v1/password-reset/confirmation").content(reset(email, "123456"))))
+            .andExpect(status().isNoContent());
+        mvc.perform(getApi("/auth/v1/me").cookie(session)).andExpect(status().isUnauthorized());
+        mvc.perform(csrf(postApi("/auth/v1/login").content("{\"email\":\"" + email + "\",\"password\":\"password-12345\"}")))
+            .andExpect(status().is4xxClientError());
+        mvc.perform(getApi("/auth/v1/me").cookie(login(email, "new-password-123"))).andExpect(status().isOk());
+        mvc.perform(csrf(postApi("/auth/v1/password-reset/confirmation").content(reset(email, "123456"))))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void passwordResetAllowsFiveWrongCodesThenRequiresANewCode() throws Exception {
+        var email = email();
+        register(email);
+        mvc.perform(csrf(postApi("/auth/v1/password-reset").content("{\"email\":\"" + email + "\"}"))).andExpect(status().isAccepted());
+        useResetCode(email, "123456");
+        for (var attempt = 0; attempt < 5; attempt++) {
+            mvc.perform(csrf(postApi("/auth/v1/password-reset/confirmation").content(reset(email, "000000"))))
+                .andExpect(status().isBadRequest());
+        }
+        mvc.perform(csrf(postApi("/auth/v1/password-reset/confirmation").content(reset(email, "123456"))))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.fieldErrors.code").value("Request a new code before trying again."));
+        login(email);
+    }
+
+    @Test
+    void passwordResetRecoversAnAccountWithoutStoredCredentials() throws Exception {
+        var email = email();
+        register(email);
+        // Accounts created before API-owned credentials have no staff_identities row.
+        database.update("DELETE FROM staff_identities WHERE email = ?", email);
+        mvc.perform(csrf(postApi("/auth/v1/login").content("{\"email\":\"" + email + "\",\"password\":\"password-12345\"}")))
+            .andExpect(status().is4xxClientError());
+        mvc.perform(csrf(postApi("/auth/v1/password-reset").content("{\"email\":\"" + email + "\"}"))).andExpect(status().isAccepted());
+        useResetCode(email, "123456");
+        mvc.perform(csrf(postApi("/auth/v1/password-reset/confirmation").content(reset(email, "123456"))))
+            .andExpect(status().isNoContent());
+        mvc.perform(getApi("/auth/v1/me").cookie(login(email, "new-password-123"))).andExpect(status().isOk());
+    }
+
+    @Test
+    void disabledAccountsCannotResetTheirPassword() throws Exception {
+        var email = email();
+        register(email);
+        database.update("UPDATE accounts SET status = 'DISABLED' WHERE email = ?", email);
+        mvc.perform(csrf(postApi("/auth/v1/password-reset").content("{\"email\":\"" + email + "\"}"))).andExpect(status().isAccepted());
+        assertThat(database.queryForObject("SELECT COUNT(*) FROM password_resets", Integer.class)).isZero();
+    }
+
+    private String resetCodeHash(String email) {
+        return database.queryForObject("SELECT r.code_hash FROM password_resets r JOIN accounts a ON a.provider_subject = r.subject WHERE a.email = ?",
+            String.class, email);
+    }
+    // Codes are random; replace the stored hash with a known code.
+    private void useResetCode(String email, String code) {
+        database.update("""
+            UPDATE password_resets r SET code_hash = encode(sha256(convert_to('password-reset:' || r.subject || ':' || ?, 'UTF8')), 'hex')
+            FROM accounts a WHERE a.provider_subject = r.subject AND a.email = ?
+            """, code, email);
+    }
+    private static String reset(String email, String code) {
+        return "{\"email\":\"" + email + "\",\"code\":\"" + code
+            + "\",\"password\":\"new-password-123\",\"passwordConfirmation\":\"new-password-123\"}";
+    }
+
     private Cookie register(String email) throws Exception {
         var pending = mvc.perform(csrf(postApi("/tenant-registrations/v1").content(registration(email, null))))
             .andExpect(status().isOk()).andReturn().getResponse().getCookie("__Host-session");

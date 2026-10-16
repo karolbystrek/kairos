@@ -98,6 +98,18 @@ public class OrderCommandService {
         return true;
     }
 
+    /** Expiry is recorded like any transition but adds no analytics measurement and no review invitation. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public boolean expire(CustomerOrder order, Instant now) {
+        if (!order.expire(now)) {
+            return false;
+        }
+        historyRepository.save(historyFor(order, OrderStatus.EXPIRED, now, OrderInitiator.system()));
+        var eventId = eventOutbox.recordStatusChanged(order, now);
+        eventPublisher.publishEvent(OrderStatusChangedEvent.from(eventId, order));
+        return true;
+    }
+
     private OrderHistory historyFor(
             CustomerOrder order,
             OrderStatus status,

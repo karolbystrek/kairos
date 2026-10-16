@@ -121,6 +121,26 @@ public class WorkerDiscoveryRepository {
                 .getSingleResult();
     }
 
+    public UUID nextStaleOrder(Instant cutoff) {
+        return (UUID) entityManager.createNativeQuery("SELECT public.next_stale_order(:cutoff)", UUID.class)
+                .setParameter("cutoff", cutoff)
+                .getSingleResult();
+    }
+
+    public int purgeFinishedWebhookDeliveries(Instant cutoff, int batchSize) {
+        return (Integer) entityManager.createNativeQuery("SELECT public.purge_finished_webhook_deliveries(:cutoff, :batch)", Integer.class)
+                .setParameter("cutoff", cutoff)
+                .setParameter("batch", batchSize)
+                .getSingleResult();
+    }
+
+    public int purgeFinishedOrderEvents(Instant cutoff, int batchSize) {
+        return (Integer) entityManager.createNativeQuery("SELECT public.purge_finished_order_events(:cutoff, :batch)", Integer.class)
+                .setParameter("cutoff", cutoff)
+                .setParameter("batch", batchSize)
+                .getSingleResult();
+    }
+
     public int purgeFinishedEmailDeliveries(Instant cutoff, int batchSize) {
         return (Integer) entityManager.createNativeQuery("SELECT public.purge_finished_email_deliveries(:cutoff, :batch)", Integer.class)
                 .setParameter("cutoff", cutoff)
