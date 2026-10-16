@@ -73,6 +73,9 @@ kairos:
     panel: "${PANEL_APP_URL}"
   authentication:
     email-verification-enabled: ${EMAIL_VERIFICATION_ENABLED:true}
+    sign-in-throttle:
+      maximum-failures: 10
+      window: 15m
   webhooks:
     signing:
       encryption-key-location: "file:${KAIROS_SECRETS_DIRECTORY:/run/secrets}/webhook-encryption.bin"

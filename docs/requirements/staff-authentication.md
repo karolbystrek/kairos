@@ -102,7 +102,10 @@ HttpOnly, host-only `__Host-session` cookie with `Path=/` and `SameSite=Lax`
 carries only an opaque session ID. Successful authenticated requests renew the
 30-day inactivity lifetime and cookie retention. There is no absolute deadline
 for active users; service restarts preserve sessions. Browser cookie deletion
-can require login. Login replaces the previous browser session with a new ID.
+can require login. After 10 failed sign-ins for one email within 15 minutes
+(counted in Redis by email hash), further sign-in attempts for that account
+return HTTP 429 without checking the password until the window expires; other
+accounts are unaffected. Login replaces the previous browser session with a new ID.
 The staff identity subject remains server-side in JDBC session attributes.
 Password hashes and passwords never appear in browser
 JavaScript, browser storage, API response bodies, URLs or logs. CSRF metadata is

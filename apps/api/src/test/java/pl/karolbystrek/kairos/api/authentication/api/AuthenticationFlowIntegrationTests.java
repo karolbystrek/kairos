@@ -80,6 +80,21 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
     }
 
     @Test
+    void repeatedFailedSignInsThrottleOnlyThatAccount() throws Exception {
+        var email = email();
+        var other = email();
+        register(email);
+        register(other);
+        var wrong = "{\"email\":\"" + email.toUpperCase() + "\",\"password\":\"wrong-password-1\"}";
+        for (var attempt = 0; attempt < 10; attempt++)
+            mvc.perform(csrf(postApi("/auth/v1/login").content(wrong))).andExpect(status().isUnauthorized());
+        // Even the correct password is refused (and unchecked) while the account is throttled.
+        mvc.perform(csrf(postApi("/auth/v1/login").content("{\"email\":\"" + email + "\",\"password\":\"password-12345\"}")))
+            .andExpect(status().isTooManyRequests());
+        login(other);
+    }
+
+    @Test
     void invalidRegistrationReturnsFieldErrorsBeforeProviderProvisioning() throws Exception {
         var email = email();
         mvc.perform(csrf(postApi("/tenant-registrations/v1")
