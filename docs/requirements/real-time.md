@@ -31,8 +31,10 @@ Redis recovery, it refreshes its connected customer and staff streams from
 PostgreSQL. Customer REST remains available for initial loading, focus and
 browser connectivity recovery, with approximately 15-second polling while the
 stream is unavailable. Healthy streams require no periodic REST safety request.
-A lost publication without subscription interruption can still leave a page
-stale until another reconciliation trigger. Customer REST, stream snapshots,
+Every open customer and staff stream also re-sends its current state read from
+PostgreSQL on one shared interval (`kairos.live-updates.resync-interval`, 60
+seconds by default), so a lost publication without subscription interruption
+leaves a page stale for about a minute at most. Customer REST, stream snapshots,
 stream events, Web Push messages and IndexedDB persistence share monotonic
 status reconciliation: `IN_PREPARATION` advances to `READY` or a terminal state,
 `READY` advances only to a terminal state, and a terminal state never changes.
@@ -43,8 +45,7 @@ matching the queue REST endpoint's location and tenant-wide access rules. The
 `order-queue` event carries the full current active queue on opening/reopening
 and after relevant committed creations or transitions. Queue refresh and
 snapshot delivery are serialized per connection so an older snapshot cannot
-replace a newer queue. Access is rechecked before refresh and at least every
-five minutes; denied connections end. Active revocation on assignment or
+replace a newer queue. Access is rechecked before each refresh, including every periodic re-sync; denied connections end. Active revocation on assignment or
 session changes remains out of scope. Staff state stays scoped to the signed-in
 account and queue, with REST recovery while disconnected. Servlet async and
 error redispatches preserve the original request's authorization decision.

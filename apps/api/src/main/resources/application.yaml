@@ -91,9 +91,12 @@ kairos:
     destination-policy: "${WEBHOOK_DESTINATION_POLICY:PUBLIC_HTTPS}"
   review-invitations:
     delay: "${REVIEW_INVITATION_DELAY:30m}"
+  live-updates:
+    resync-interval: 60s
   retention:
     grace-period: 30d
     order-expiry: 24h
+    cycle-budget: 60s
     batch-size: 50
     purge-delay: 1h
     purge-initial-delay: 10m

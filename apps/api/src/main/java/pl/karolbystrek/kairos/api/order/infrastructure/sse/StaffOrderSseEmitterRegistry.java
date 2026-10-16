@@ -80,7 +80,6 @@ public class StaffOrderSseEmitterRegistry {
         });
     }
 
-    @Scheduled(fixedDelay = 240_000)
     public void refresh() {
         connections.values().forEach(connection -> connection.refresh.wake());
     }

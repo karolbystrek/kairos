@@ -72,7 +72,7 @@ The database schema must include tables covering the following concepts. Names a
   encrypted message contents; unreferenced terminal rows are purged after 30
   days (see [retention purge](resilience.md#retention-purge)).
 * **Order outbox events:** immutable event identity, order/location and tracking association, exact serialized webhook payload, resulting order state, occurrence time, and independent webhook and customer-push fan-out state.
-* **Webhook deliveries:** recipient-specific captured destination, payload, signing versions, claim state, one attempt outcome, bounded response details, and durable success or dead-letter state.
+* **Webhook deliveries:** recipient-specific captured destination, payload, signing versions, claim state, attempt count and next attempt time, the latest attempt outcome, bounded response details, and durable success or dead-letter state.
 * **Customer push subscriptions:** a browser-context capability with hashed
   endpoint, encrypted recoverable endpoint and authentication secret, client
   P-256 public key, VAPID-key fingerprint, expiration when supplied by the

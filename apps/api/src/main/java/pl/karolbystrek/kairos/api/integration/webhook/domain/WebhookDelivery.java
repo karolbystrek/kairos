@@ -43,6 +43,12 @@ public class WebhookDelivery {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
+    @Column(name = "attempt_count", nullable = false)
+    private int attemptCount;
+
+    @Column(name = "next_attempt_at", nullable = false)
+    private Instant nextAttemptAt;
+
     @Column(name = "claim_token")
     private UUID claimToken;
 
@@ -88,6 +94,7 @@ public class WebhookDelivery {
         delivery.payload = payload;
         delivery.status = WebhookDeliveryStatus.PENDING;
         delivery.createdAt = createdAt;
+        delivery.nextAttemptAt = createdAt;
         return delivery;
     }
 
@@ -102,6 +109,7 @@ public class WebhookDelivery {
         claimToken = token;
         claimedAt = now;
         claimUntil = now.plus(lease);
+        attemptCount = Math.incrementExact(attemptCount);
     }
 
     public void succeed(
@@ -119,6 +127,30 @@ public class WebhookDelivery {
         this.responseStatus = responseStatus;
         this.responseBody = responseBody;
         this.responseTruncated = responseTruncated;
+        clearClaim();
+    }
+
+    // Back to PENDING until nextAttemptAt; claimedAt is cleared because a pending row has never been claimed.
+    public void retry(
+            @NonNull UUID token,
+            @NonNull Instant attemptedAt,
+            @NonNull Instant nextAttemptAt,
+            Integer responseStatus,
+            String responseBody,
+            boolean responseTruncated,
+            @NonNull String errorType,
+            String errorDetail
+    ) {
+        requireClaim(token);
+        status = WebhookDeliveryStatus.PENDING;
+        claimedAt = null;
+        this.attemptedAt = attemptedAt;
+        this.nextAttemptAt = nextAttemptAt;
+        this.responseStatus = responseStatus;
+        this.responseBody = responseBody;
+        this.responseTruncated = responseTruncated;
+        this.errorType = errorType;
+        this.errorDetail = errorDetail;
         clearClaim();
     }
 

@@ -226,6 +226,16 @@ class RetentionPurgeIntegrationTests extends RedisListenerIsolatedIntegrationTes
     }
 
     @Test
+    void purgesAFinishedBacklogLargerThanOneBatchInOneCycle() {
+        var old = ARCHIVED_AT.minus(Duration.ofDays(31));
+        for (var index = 0; index < 35; index++) insertDelivery(old);
+
+        purgeService.purge();
+
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM email_deliveries WHERE owner_identity = 'subject'", Long.class)).isZero();
+    }
+
+    @Test
     void registrationPurgeRefusesRecentRegistrationsEvenWithForgedWorkerSettings() {
         insertRegistration("live-subject", Instant.now());
 

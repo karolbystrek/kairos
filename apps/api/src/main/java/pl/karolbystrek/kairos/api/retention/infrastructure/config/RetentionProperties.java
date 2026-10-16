@@ -13,7 +13,8 @@ import java.time.Duration;
 public record RetentionProperties(
         @NotNull Duration gracePeriod,
         @Min(1) int batchSize,
-        @NotNull Duration orderExpiry
+        @NotNull Duration orderExpiry,
+        @NotNull Duration cycleBudget
 ) {
 
     @AssertTrue(message = "Retention grace period must be positive")
