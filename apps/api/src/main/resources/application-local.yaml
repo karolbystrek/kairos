@@ -16,9 +16,8 @@ kairos:
     mode: LOG
     encryption-key-location: "file:../../secrets/email-encryption.bin"
   authentication:
-    base-url: "http://localhost:8081"
-    # ZITADEL resolves its instance from the host; the published port is localhost:8081, not zitadel.
-    instance-host: zitadel
+    # ZITADEL picks its instance from the request host, so the host maps zitadel to 127.0.0.1.
+    base-url: "http://zitadel:8081"
     token-location: "file:../../secrets/zitadel/kairos.pat"
   webhooks:
     signing:

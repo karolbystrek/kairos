@@ -46,12 +46,8 @@ public class ZitadelClient {
         transport.setReadTimeout(Duration.ofSeconds(10));
         var token = properties.tokenLocation().getContentAsString(StandardCharsets.UTF_8).strip();
         if (token.isBlank()) throw new IllegalArgumentException("ZITADEL service token is empty");
-        var builder = RestClient.builder().baseUrl(properties.baseUrl()).requestFactory(transport)
-            .defaultHeader("Authorization", "Bearer " + token);
-        if (properties.instanceHost() != null && !properties.instanceHost().isBlank()) {
-            builder.defaultHeader("x-zitadel-instance-host", properties.instanceHost());
-        }
-        client = builder.build();
+        client = RestClient.builder().baseUrl(properties.baseUrl()).requestFactory(transport)
+            .defaultHeader("Authorization", "Bearer " + token).build();
     }
     // Package-private constructor keeps HTTP contract tests independent of credentials.
     ZitadelClient(RestClient client, Clock clock) { this.client = client; this.clock = clock; }

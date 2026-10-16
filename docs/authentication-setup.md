@@ -24,9 +24,9 @@ keys. Never discard that key while retaining the provider database.
    Configure `ZITADEL_DB`, `ZITADEL_DB_USER`, and `ZITADEL_DB_PASSWORD`.
 2. ZITADEL v4.19.4 starts on the data network as `http://zitadel:8080`. In
    production it exposes no host port and the network is internal; locally it is
-   published on `127.0.0.1:8081` for the host-run API, which sends
-   `x-zitadel-instance-host: zitadel` (`kairos.authentication.instance-host`)
-   because ZITADEL resolves its instance from the request host.
+   published on `127.0.0.1:8081` for the host-run API. ZITADEL resolves its
+   instance from the request hostname, so the API calls `http://zitadel:8081`
+   and the developer machine maps `zitadel` to `127.0.0.1` in `/etc/hosts`.
    A supplied provider Login UI is not needed for Kairos's custom login flow.
 3. A one-shot Python bootstrap creates the service account `kairos-api`, grants
    standard `IAM_LOGIN_CLIENT` and organization `ORG_USER_MANAGER` roles, and

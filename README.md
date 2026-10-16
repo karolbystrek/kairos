@@ -32,6 +32,13 @@ applications run on your machine with hot reload over plain HTTP.
 docker compose up -d
 ```
 
+Once per machine, let the host-run API reach ZITADEL by its Compose name
+(ZITADEL identifies its instance by that hostname):
+
+```bash
+echo "127.0.0.1 zitadel" | sudo tee -a /etc/hosts
+```
+
 `--dev` creates `.env` from `.env.example` (an existing `.env` is kept) and
 generates development keys in `secrets/`. Run `./setup.sh` without a preset to
 answer each step yourself.

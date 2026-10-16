@@ -28,7 +28,10 @@ token to `secrets/zitadel/kairos.pat`. Run the applications on the host:
 
 - API: `./mvnw spring-boot:run` from `apps/api` (the `local` Spring profile,
   set by the Maven plugin, reads `../../.env` and `../../secrets/`), on
-  `http://localhost:8080/api`. DevTools restarts it after a recompile.
+  `http://localhost:8080/api`. DevTools restarts it after a recompile. It calls
+  ZITADEL at `http://zitadel:8081`, which needs a one-time `127.0.0.1 zitadel`
+  line in `/etc/hosts` because ZITADEL resolves its instance from the request
+  hostname (the port is ignored). Editing `/etc/hosts` is the user's step.
 - Frontends: `npm run dev` in `apps/customer-app` (`http://localhost:3000`) and
   `PORT=3001 npm run dev` in `apps/panel-app` (`http://localhost:3001`). Their
   committed `.env.development` files hold the local origins; `PORT` must come
