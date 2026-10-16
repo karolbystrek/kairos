@@ -44,17 +44,15 @@
 
 * An hourly worker erases deleted data after a grace period of 30 days by
   default (`kairos.retention.grace-period`). An archived account is removed with
-  its ZITADEL identity, assignment and the invitations it issued or redeemed.
-  The identity is deleted first; a missing identity counts as deleted, and a
-  provider failure defers the account to a later cycle.
+  its staff identity, assignment and the invitations it issued or redeemed, in
+  one transaction.
 * An archived location is removed once no account is assigned to it, together
   with its orders, order history, outbox events, webhook and push deliveries,
   push enrollments, invitations and remaining integration selections.
 * Anonymous order and usage aggregates and self-contained business inputs survive location purge; permanent tenant deletion erases them. Usage ingestion and business processing coordinate through tenant locks.
 * Finished invitations are deleted 30 days after revocation, replacement or expiry.
 * A registration whose last code was sent more than 30 days ago is removed with
-  its unverified ZITADEL identity, unless an account already uses that identity.
-  A provider failure defers it to a later cycle.
+  its unverified staff identity, unless an account already uses that identity.
 * Sent and failed email deliveries are deleted 30 days after completion once no
   invitation or pending registration references them.
 * Invitation creation/replacement and its email outbox acceptance commit
@@ -67,5 +65,4 @@
 * Security events: staff sessions expire after 30 idle days and Spring Session
   removes expired rows. Production container logs, which hold IP addresses and
   security events, rotate at three 10 MB files per service
-  (`compose.deployment.yaml`). ZITADEL keeps its own event store, including
-  events of deleted users, under its own retention behaviour.
+  (`compose.deployment.yaml`).

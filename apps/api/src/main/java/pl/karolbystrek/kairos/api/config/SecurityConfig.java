@@ -24,7 +24,6 @@ import pl.karolbystrek.kairos.api.authentication.application.StaffAuthentication
 import pl.karolbystrek.kairos.api.authentication.infrastructure.web.SecurityProblemDetailsHandler;
 import pl.karolbystrek.kairos.api.authentication.infrastructure.web.SpaCsrfTokenRequestHandler;
 import pl.karolbystrek.kairos.api.authentication.infrastructure.web.StaffSessionFilter;
-import pl.karolbystrek.kairos.api.authentication.infrastructure.zitadel.ZitadelClient;
 
 import java.util.List;
 
@@ -105,7 +104,6 @@ public class SecurityConfig {
             HttpSecurity http,
             CsrfTokenRepository csrfTokenRepository,
             SpaCsrfTokenRequestHandler csrfTokenRequestHandler,
-            ZitadelClient provider,
             StaffAuthenticationService authentication,
             HttpSessionIdResolver cookies,
             SecurityProblemDetailsHandler problemDetailsHandler
@@ -120,7 +118,7 @@ public class SecurityConfig {
                     .sessionAuthenticationStrategy(new NullAuthenticatedSessionStrategy()))
                 .securityContext(context -> context.securityContextRepository(new NullSecurityContextRepository()))
                 .addFilterBefore(new StaffSessionFilter(
-                    provider, authentication, cookies, problemDetailsHandler), AnonymousAuthenticationFilter.class)
+                    authentication, cookies, problemDetailsHandler), AnonymousAuthenticationFilter.class)
                 .requestCache(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)

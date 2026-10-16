@@ -56,10 +56,9 @@ The applications are available at:
 * Staff panel: https://panel.kairos.localhost
 * API: https://api.kairos.localhost
 
-Compose includes self-hosted ZITADEL for email/password authentication. Setup
-creates its master key; first startup initializes a separate provider database
-and provisions backend service credentials automatically. No Google project,
-browser auth SDK, SMTP or email verification is required. Public Create account
+The API handles email/password authentication itself and stores password
+hashes in PostgreSQL; there is no separate identity service to run. No Google
+project, browser auth SDK, SMTP or email verification is required locally. Public Create account
 immediately creates a tenant administrator; managers/operators join through
 manually shared invitations. Sessions survive service restarts and expire after
 30 days without activity. See [authentication setup](docs/authentication-setup.md).

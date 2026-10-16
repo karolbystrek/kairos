@@ -11,11 +11,9 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.session.web.http.HttpSessionIdResolver;
 import org.springframework.web.filter.OncePerRequestFilter;
-import org.springframework.web.server.ResponseStatusException;
 import pl.karolbystrek.kairos.api.account.application.exception.StaffAccessDeniedException;
 import pl.karolbystrek.kairos.api.authentication.application.AuthenticationSessionService;
 import pl.karolbystrek.kairos.api.authentication.application.StaffAuthenticationService;
-import pl.karolbystrek.kairos.api.authentication.infrastructure.zitadel.ZitadelClient;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -23,7 +21,6 @@ import java.util.List;
 
 @RequiredArgsConstructor
 public class StaffSessionFilter extends OncePerRequestFilter {
-    private final ZitadelClient provider;
     private final StaffAuthenticationService authentication;
     private final HttpSessionIdResolver cookies;
     private final SecurityProblemDetailsHandler errors;
@@ -41,11 +38,10 @@ public class StaffSessionFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         var session = request.getSession(false);
-        if (session != null && session.getAttribute(AuthenticationSessionService.IDENTITY) instanceof ZitadelClient.ProviderSession identity) {
+        if (session != null && session.getAttribute(AuthenticationSessionService.IDENTITY) instanceof String subject) {
             try {
-                if (!provider.isValid(identity)) throw new StaffAccessDeniedException("Provider session is invalid");
                 var signedIn = (Instant) session.getAttribute(AuthenticationSessionService.SIGNED_IN_AT);
-                var principal = authentication.authenticate(identity, signedIn);
+                var principal = authentication.authenticate(subject, signedIn);
                 var context = SecurityContextHolder.createEmptyContext();
                 context.setAuthentication(UsernamePasswordAuthenticationToken.authenticated(principal, null,
                     List.of(new SimpleGrantedAuthority("ROLE_TENANT_ACCOUNT"))));
@@ -55,9 +51,6 @@ public class StaffSessionFilter extends OncePerRequestFilter {
                 session.invalidate();
                 cookies.expireSession(request, response);
                 errors.commence(request, response, new BadCredentialsException("Invalid session"));
-                return;
-            } catch (ResponseStatusException exception) {
-                errors.unavailable(response);
                 return;
             }
         }

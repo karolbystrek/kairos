@@ -16,7 +16,7 @@ REVISION = r"[0-9a-f]{40}"
 IMAGE_DIGEST = r"ghcr\.io/karolbystrek/kairos/%s@sha256:[0-9a-f]{64}"
 RUNTIME_FILES = (
     "compose.yaml", "compose.deployment.yaml", "nginx/default.conf.template",
-    "nginx/cloudflare-real-ip.conf", "deployment/zitadel/bootstrap.py",
+    "nginx/cloudflare-real-ip.conf",
     "deployment/postgres/bootstrap.sh",
 )
 
@@ -181,8 +181,6 @@ def main(arguments=None):
             healthy = [*up, "--wait", "--wait-timeout", "300"]
             for stage, args in (
                 ("postgres/redis", [*healthy, "postgres", "redis"]),
-                ("zitadel", [*healthy, "zitadel"]),
-                ("zitadel-bootstrap", [*up, "--force-recreate", "--exit-code-from", "zitadel-bootstrap", "zitadel-bootstrap"]),
                 ("api", [*healthy, "--force-recreate", "api"]),
                 ("frontends", [*healthy, "--force-recreate", "customer-app", "panel-app"]),
                 ("nginx", [*healthy, "--force-recreate", "nginx"]),

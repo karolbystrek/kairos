@@ -1,7 +1,6 @@
 package pl.karolbystrek.kairos.api.authentication.application;
 
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -13,7 +12,7 @@ import org.springframework.web.server.ResponseStatusException;
 import pl.karolbystrek.kairos.api.account.application.AccountCreationService;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
 import pl.karolbystrek.kairos.api.authentication.application.exception.RegistrationValidationException;
-import pl.karolbystrek.kairos.api.authentication.infrastructure.zitadel.ZitadelClient;
+import pl.karolbystrek.kairos.api.authentication.infrastructure.persistence.StaffIdentityStore;
 import pl.karolbystrek.kairos.api.email.application.EmailDeliveryService;
 import pl.karolbystrek.kairos.api.persistence.infrastructure.DatabaseAccessContext;
 import pl.karolbystrek.kairos.api.tenant.application.TenantRegistrationService;
@@ -30,12 +29,11 @@ import java.util.function.Supplier;
 
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class RegistrationVerificationService {
-    public record Pending(ZitadelClient.ProviderSession identity, String email) implements Serializable {}
+    public record Pending(String subject, String email) implements Serializable {}
     public record State(boolean verificationRequired, String email, Instant resendAvailableAt) {}
     private record Completion(StaffPrincipal principal, RegistrationValidationException error) {}
-    private final ZitadelClient provider;
+    private final StaffIdentityStore identities;
     private final AccountCreationService accounts;
     private final TenantRegistrationService tenants;
     private final StaffAuthenticationService authentication;
@@ -72,53 +70,43 @@ public class RegistrationVerificationService {
     public Pending register(String email, String password) {
         return nested(() -> new TransactionTemplate(transactions).execute(status -> {
             prepareIdentity(email);
-            ZitadelClient.PendingUser user;
-            try { user = provider.createUnverifiedUser(email, password); }
+            StaffIdentityStore.PendingUser user;
+            try { user = identities.createUnverifiedUser(email, password); }
             catch (ResponseStatusException exception) {
                 if (exception.getStatusCode().value() == 409) throw conflict();
                 throw exception;
             }
-            ZitadelClient.ProviderSession identity = null;
-            try {
-                identity = provider.signIn(email, password);
-                if (!user.id().equals(identity.userId())) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
-                if (!emailVerificationEnabled) return new Pending(identity, email);
-                access.verification(user.id());
-                var delivery = send(email, user.code());
-                database.update("INSERT INTO pending_registrations(subject,email,attempts,resend_available_at,delivery_id) VALUES (?,?,0,?,?)",
-                    user.id(), email, Timestamp.from(clock.instant().plusSeconds(60)), delivery);
-                return new Pending(identity, email);
-            } catch (RuntimeException exception) {
-                if (identity != null) provider.terminate(identity);
-                try { provider.deleteUser(user.id()); }
-                catch (RuntimeException cleanup) { log.error("Pending registration identity cleanup failed"); }
-                throw exception;
-            }
+            if (!emailVerificationEnabled) return new Pending(user.id(), email);
+            access.verification(user.id());
+            var delivery = send(email, user.code());
+            database.update("INSERT INTO pending_registrations(subject,email,attempts,resend_available_at,delivery_id) VALUES (?,?,0,?,?)",
+                user.id(), email, Timestamp.from(clock.instant().plusSeconds(60)), delivery);
+            return new Pending(user.id(), email);
         }));
     }
 
-    public Pending resume(ZitadelClient.ProviderSession identity, String email) {
+    public Pending resume(String subject, String email) {
         return new TransactionTemplate(transactions).execute(status -> {
             lockEmail(email);
-            requireNoAccount(email, identity.userId());
-            var user = provider.userEmail(identity.userId());
+            requireNoAccount(email, subject);
+            var user = identities.userEmail(subject);
             if (!email.equalsIgnoreCase(user.email())) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
-            access.verification(identity.userId());
-            if (database.queryForObject("SELECT COUNT(*) FROM pending_registrations WHERE subject = ?", Integer.class, identity.userId()) == 0) {
+            access.verification(subject);
+            if (database.queryForObject("SELECT COUNT(*) FROM pending_registrations WHERE subject = ?", Integer.class, subject) == 0) {
                 if (user.verified()) throw conflict();
-                if (!emailVerificationEnabled) return new Pending(identity, email);
-                var delivery = send(email, provider.resendEmailCode(identity.userId()));
+                if (!emailVerificationEnabled) return new Pending(subject, email);
+                var delivery = send(email, identities.resendEmailCode(subject));
                 database.update("INSERT INTO pending_registrations(subject,email,attempts,resend_available_at,delivery_id) VALUES (?,?,0,?,?)",
-                    identity.userId(), email, Timestamp.from(clock.instant().plusSeconds(60)), delivery);
+                    subject, email, Timestamp.from(clock.instant().plusSeconds(60)), delivery);
             }
-            return new Pending(identity, email);
+            return new Pending(subject, email);
         });
     }
 
     public State state(Pending pending) {
         return new TransactionTemplate(transactions).execute(status -> {
-            access.verification(pending.identity().userId());
-            var rows = database.queryForList("SELECT resend_available_at FROM pending_registrations WHERE subject = ?", pending.identity().userId());
+            access.verification(pending.subject());
+            var rows = database.queryForList("SELECT resend_available_at FROM pending_registrations WHERE subject = ?", pending.subject());
             if (rows.isEmpty()) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Registration is unavailable. Sign in again.");
             return new State(true, pending.email(), ((Timestamp) rows.getFirst().get("resend_available_at")).toInstant());
         });
@@ -128,16 +116,16 @@ public class RegistrationVerificationService {
         return new TransactionTemplate(transactions).execute(status -> {
             lockEmail(pending.email());
             validate(pending);
-            access.verification(pending.identity().userId());
+            access.verification(pending.subject());
             var row = pendingRow(pending);
             if (((Timestamp) row.get("resend_available_at")).toInstant().isAfter(clock.instant()))
                 throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Wait 60 seconds before requesting a new code.");
-            var code = provider.resendEmailCode(pending.identity().userId());
+            var code = identities.resendEmailCode(pending.subject());
             mail.cancel((UUID) row.get("delivery_id"));
             var delivery = send(pending.email(), code);
             var next = clock.instant().plusSeconds(60);
             database.update("UPDATE pending_registrations SET attempts=0,resend_available_at=?,delivery_id=? WHERE subject=?",
-                Timestamp.from(next), delivery, pending.identity().userId());
+                Timestamp.from(next), delivery, pending.subject());
             return new State(true, pending.email(), next);
         });
     }
@@ -145,34 +133,34 @@ public class RegistrationVerificationService {
     public StaffPrincipal verify(Pending pending, String code) {
         var result = nested(() -> new TransactionTemplate(transactions).execute(status -> {
             lockEmail(pending.email());
-            if (!provider.isValid(pending.identity())) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+            if (!identities.exists(pending.subject())) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
             // An earlier successful commit may have lost its HTTP response.
-            if (accounts.identityConflict(pending.email(), pending.identity().userId()))
-                return new Completion(authentication.authenticate(pending.identity(), clock.instant()), null);
+            if (accounts.identityConflict(pending.email(), pending.subject()))
+                return new Completion(authentication.authenticate(pending.subject(), clock.instant()), null);
             validate(pending);
-            access.verification(pending.identity().userId());
+            access.verification(pending.subject());
             if (!emailVerificationEnabled) {
-                provider.markEmailVerified(pending.identity().userId(), pending.email());
-                var principal = tenants.register(pending.email(), pending.identity().userId());
-                for (var row : database.queryForList("SELECT delivery_id FROM pending_registrations WHERE subject=?", pending.identity().userId()))
+                identities.markEmailVerified(pending.subject(), pending.email());
+                var principal = tenants.register(pending.email(), pending.subject());
+                for (var row : database.queryForList("SELECT delivery_id FROM pending_registrations WHERE subject=?", pending.subject()))
                     mail.cancel((UUID) row.get("delivery_id"));
-                database.update("DELETE FROM pending_registrations WHERE subject=?", pending.identity().userId());
+                database.update("DELETE FROM pending_registrations WHERE subject=?", pending.subject());
                 return new Completion(principal, null);
             }
             var row = pendingRow(pending);
             if (((Number) row.get("attempts")).intValue() >= 5)
                 return new Completion(null, new RegistrationValidationException(HttpStatus.BAD_REQUEST, "code", "Request a new code before trying again."));
-            var user = provider.userEmail(pending.identity().userId());
+            var user = identities.userEmail(pending.subject());
             if (!user.verified()) {
-                try { provider.verifyEmail(pending.identity().userId(), code); }
+                try { identities.verifyEmail(pending.subject(), code); }
                 catch (RegistrationValidationException exception) {
-                    database.update("UPDATE pending_registrations SET attempts=attempts+1 WHERE subject=?", pending.identity().userId());
+                    database.update("UPDATE pending_registrations SET attempts=attempts+1 WHERE subject=?", pending.subject());
                     return new Completion(null, exception);
                 }
             }
-            var principal = tenants.register(pending.email(), pending.identity().userId());
+            var principal = tenants.register(pending.email(), pending.subject());
             mail.cancel((UUID) row.get("delivery_id"));
-            database.update("DELETE FROM pending_registrations WHERE subject=?", pending.identity().userId());
+            database.update("DELETE FROM pending_registrations WHERE subject=?", pending.subject());
             return new Completion(principal, null);
         }));
         if (result.error() != null) throw result.error();
@@ -182,7 +170,7 @@ public class RegistrationVerificationService {
     void prepareIdentity(String email) {
         lockEmail(email);
         requireNoAccount(email, null);
-        var existing = provider.findByEmail(email);
+        var existing = identities.findByEmail(email);
         if (existing.isPresent()) {
             var identity = existing.get();
             requireNoAccount(email, identity.id());
@@ -191,7 +179,7 @@ public class RegistrationVerificationService {
         }
     }
 
-    private void replaceUnverified(ZitadelClient.UserEmail identity) {
+    private void replaceUnverified(StaffIdentityStore.UserEmail identity) {
         var transaction = new TransactionTemplate(transactions);
         transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         transaction.executeWithoutResult(status -> {
@@ -199,22 +187,22 @@ public class RegistrationVerificationService {
             var rows = database.queryForList("SELECT resend_available_at,delivery_id FROM pending_registrations WHERE subject=? FOR UPDATE", identity.id());
             if (!rows.isEmpty() && ((Timestamp) rows.getFirst().get("resend_available_at")).toInstant().isAfter(clock.instant()))
                 throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Wait 60 seconds before registering again.");
-            provider.deleteUser(identity.id());
+            identities.deleteUser(identity.id());
             if (!rows.isEmpty()) mail.cancel((UUID) rows.getFirst().get("delivery_id"));
             database.update("DELETE FROM pending_registrations WHERE subject=?", identity.id());
         });
     }
 
     private Map<String, Object> pendingRow(Pending pending) {
-        var rows = database.queryForList("SELECT attempts,resend_available_at,delivery_id FROM pending_registrations WHERE subject=? FOR UPDATE", pending.identity().userId());
+        var rows = database.queryForList("SELECT attempts,resend_available_at,delivery_id FROM pending_registrations WHERE subject=? FOR UPDATE", pending.subject());
         if (rows.isEmpty()) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Registration is unavailable. Sign in again.");
         return rows.getFirst();
     }
     private void validate(Pending pending) {
-        if (!provider.isValid(pending.identity())) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
-        var user = provider.userEmail(pending.identity().userId());
+        if (!identities.exists(pending.subject())) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+        var user = identities.userEmail(pending.subject());
         if (!pending.email().equalsIgnoreCase(user.email())) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
-        requireNoAccount(pending.email(), pending.identity().userId());
+        requireNoAccount(pending.email(), pending.subject());
     }
     private UUID send(String email, String code) {
         if (!code.matches("[0-9]{6}")) throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Email verification is unavailable");

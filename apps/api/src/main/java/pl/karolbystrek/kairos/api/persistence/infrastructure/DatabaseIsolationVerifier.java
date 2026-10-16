@@ -25,7 +25,7 @@ public class DatabaseIsolationVerifier implements ApplicationRunner {
                 AND (SELECT obj_description(oid,'pg_namespace') FROM pg_namespace WHERE nspname='kairos_security')='kairos-rls-v1'
                 AND NOT EXISTS(SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
                     WHERE n.nspname='public' AND c.relkind='r' AND c.relname NOT IN
-                        ('spring_session','spring_session_attributes','flyway_schema_history')
+                        ('spring_session','spring_session_attributes','staff_identities','flyway_schema_history')
                     AND (NOT c.relrowsecurity OR has_table_privilege(current_user,c.oid,'TRUNCATE')
                         OR EXISTS(SELECT 1 FROM unnest(ARRAY['SELECT','INSERT','UPDATE','DELETE']) privilege
                             WHERE NOT has_table_privilege(current_user,c.oid,privilege))

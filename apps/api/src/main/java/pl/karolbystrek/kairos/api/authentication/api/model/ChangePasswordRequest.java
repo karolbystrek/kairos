@@ -5,7 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 public record ChangePasswordRequest(@NotBlank @Size(max = 200) String currentPassword,
-        @NotBlank @Size(max = 200) String password, @NotBlank @Size(max = 200) String passwordConfirmation) {
+        @NotBlank @Size(min = 12, message = "Use at least 12 characters.") @Size(max = 200) String password, @NotBlank @Size(max = 200) String passwordConfirmation) {
     @AssertTrue(message = "Passwords must match")
     public boolean isPasswordConfirmed() { return password != null && password.equals(passwordConfirmation); }
 }

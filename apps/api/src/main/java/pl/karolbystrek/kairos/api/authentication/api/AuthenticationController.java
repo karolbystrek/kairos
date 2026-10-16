@@ -18,7 +18,7 @@ import pl.karolbystrek.kairos.api.authentication.api.model.*;
 import pl.karolbystrek.kairos.api.authentication.application.*;
 import pl.karolbystrek.kairos.api.authentication.application.exception.InvalidLoginException;
 import pl.karolbystrek.kairos.api.authentication.infrastructure.web.CsrfTokenService;
-import pl.karolbystrek.kairos.api.authentication.infrastructure.zitadel.ZitadelClient;
+import pl.karolbystrek.kairos.api.authentication.infrastructure.persistence.StaffIdentityStore;
 
 import java.time.Clock;
 import java.util.Locale;
@@ -26,7 +26,7 @@ import java.util.Locale;
 @RestController
 @RequiredArgsConstructor
 public class AuthenticationController {
-    private final ZitadelClient provider;
+    private final StaffIdentityStore identities;
     private final OnboardingService onboarding;
     private final RegistrationVerificationService verification;
     private final AccountCreationService accounts;
@@ -41,20 +41,15 @@ public class AuthenticationController {
 
     @PostMapping("/auth/v1/login")
     Object login(@Valid @RequestBody LoginRequest input, HttpServletRequest request, HttpServletResponse response) {
-        var identity = provider.signIn(normalize(input.email()), input.password());
-        try {
-            StaffPrincipal principal;
-            try { principal = authentication.authenticate(identity, clock.instant()); }
-            catch (StaffAccessDeniedException exception) {
-                var email = normalize(input.email());
-                if (accounts.identityConflict(email, identity.userId())) throw new InvalidLoginException();
-                return begin(verification.resume(identity, email), request, response);
-            }
-            return finish(principal, identity, request, response);
-        } catch (RuntimeException exception) {
-            provider.terminate(identity);
-            throw exception;
+        var email = normalize(input.email());
+        var subject = identities.signIn(email, input.password());
+        StaffPrincipal principal;
+        try { principal = authentication.authenticate(subject, clock.instant()); }
+        catch (StaffAccessDeniedException exception) {
+            if (accounts.identityConflict(email, subject)) throw new InvalidLoginException();
+            return begin(verification.resume(subject, email), request, response);
         }
+        return finish(principal, subject, request, response);
     }
 
     @PostMapping("/tenant-registrations/v1")
@@ -80,13 +75,13 @@ public class AuthenticationController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invitation is required");
         if (!invited) return begin(verification.register(normalize(input.email()), input.password()), request, response);
         var registration = onboarding.register(normalize(input.email()), input.password(), input.token());
-        return finish(registration.principal(), registration.session(), request, response);
+        return finish(registration.principal(), registration.subject(), request, response);
     }
 
     private Object begin(RegistrationVerificationService.Pending pending,
             HttpServletRequest request, HttpServletResponse response) {
         if (!verification.verificationRequired())
-            return finish(verification.verify(pending, null), pending.identity(), request, response);
+            return finish(verification.verify(pending, null), pending.subject(), request, response);
         var old = request.getSession(false);
         if (old != null) old.invalidate();
         request.getSession(true).setAttribute("kairos.pendingRegistration", pending);
@@ -106,7 +101,7 @@ public class AuthenticationController {
             HttpServletRequest request, HttpServletResponse response) {
         if (input.code() == null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Enter the 6-digit code.");
         var pending = pending(request);
-        return finish(verification.verify(pending, input.code()), pending.identity(), request, response);
+        return finish(verification.verify(pending, input.code()), pending.subject(), request, response);
     }
 
     @PostMapping("/auth/v1/verification/resend")
@@ -121,10 +116,10 @@ public class AuthenticationController {
         return pending;
     }
 
-    private CurrentAccountResponse finish(StaffPrincipal principal, ZitadelClient.ProviderSession identity,
+    private CurrentAccountResponse finish(StaffPrincipal principal, String subject,
             HttpServletRequest request, HttpServletResponse response) {
         var result = CurrentAccountResponse.from(current.get(principal));
-        sessions.establish(request, principal, identity);
+        sessions.establish(request, principal, subject);
         csrf.rotate(request, response);
         return result;
     }
@@ -140,7 +135,7 @@ public class AuthenticationController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     void changePassword(@AuthenticationPrincipal PanelPrincipal principal, @Valid @RequestBody ChangePasswordRequest input,
             HttpServletRequest request, HttpServletResponse response) {
-        provider.changePassword(current.providerSubject(principal), input.currentPassword(), input.password());
+        identities.changePassword(current.providerSubject(principal), input.currentPassword(), input.password());
         sessions.logoutAll(principal);
         sessions.logout(request);
         csrf.rotate(request, response);

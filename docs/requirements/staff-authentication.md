@@ -8,19 +8,26 @@
 - [4.1 Staff authentication](#41-staff-authentication)
 - [Registration and first-location onboarding](#registration-and-first-location-onboarding)
 - [Browser cookies and durable sessions](#browser-cookies-and-durable-sessions)
-- [Provider validation and revocation](#provider-validation-and-revocation)
+- [Session validation and revocation](#session-validation-and-revocation)
 - [Panel session behavior](#panel-session-behavior)
 
 ## 4. Authentication and Security
 
 ### 4.1 Staff authentication
 
-Staff authentication uses self-hosted ZITADEL through Spring's backend-only
-Session API integration. Users enter email/password on the Kairos panel; no
-hosted provider login redirect, browser SDK, social login, or JWT/refresh flow
-is used. Kairos owns tenants, Accounts, memberships and authorization. All
-Accounts belong to one tenant. Username, local password hashes, Platform
-Operator and Tenant Registration Invitations are removed.
+The API owns staff authentication. Users enter email/password on the Kairos
+panel; the API verifies a PBKDF2 password hash stored in PostgreSQL and issues a
+server-side session. No external identity provider, login redirect, browser SDK,
+social login, or JWT/refresh flow is used. Kairos owns tenants, Accounts,
+memberships and authorization. All Accounts belong to one tenant. Usernames,
+Platform Operator and Tenant Registration Invitations are removed.
+
+Credentials were previously delegated to a self-hosted ZITADEL instance. Kairos
+already owned the login form, sessions, CSRF, verification email and all
+authorization, so the provider only stored passwords and codes while adding a
+service, a bootstrap, credentials and a network call on every request. Storing
+credentials in the API removes that operational cost; JWTs were rejected because
+password change and account disabling must revoke access immediately.
 
 #### Registration and first-location onboarding
 
@@ -31,11 +38,11 @@ until the correct code is confirmed. Confirmation commits the tenant and
 administrator, establishes the browser session and opens `/dashboard`. Registration does not collect or
 create a location.
 `EMAIL_VERIFICATION_ENABLED` defaults to `true`. Local `.env.example` sets it to
-`false`: registration and unverified sign-in then mark the provider email verified
+`false`: registration and unverified sign-in then mark the identity email verified
 and complete tenant/admin onboarding without a code screen or new verification
 email. Existing pending code delivery is canceled on completion. Identity and
 Account eligibility checks still apply, and invitation redemption is unchanged.
-Re-enabling verification does not undo provider emails already marked verified.
+Re-enabling verification does not undo emails already marked verified.
 
 The registration form has no step counter, progress bar, Next/Back controls, or
 persistent password-requirement paragraph. Account fields retain submitted values
@@ -64,22 +71,21 @@ repeat the same check. This gate applies only to administrators; invited members
 already have a fixed location and do not create one. A disabled saved location
 counts as completed onboarding. Email verification precedes this same gate.
 
-A new code can be requested after a 60-second cooldown. Codes use the provider
-expiry and allow at most five wrong attempts; expired or incorrect codes show
+A new code can be requested after a 60-second cooldown. Codes expire after one
+hour, are stored hashed, only the latest code is valid, and at most five wrong
+attempts are allowed; expired or incorrect codes show
 safe corrective errors. Signing in with an unverified identity without an
 Account resumes verification. Registering an email held by such an abandoned
 identity replaces it; an existing Account is never replaced.
 
 Managers/operators register through emailed, recipient-bound member invitations.
 Redemption verifies the fixed email without a separate code step. Forgotten-password
-recovery remains deferred. Initial provider
-policy is a minimum of 12 characters without mandatory character classes or
-scheduled password expiry. Registration validates that configured minimum,
-email syntax, confirmation, and the 200-character input bounds at submission
-in the panel and API. ZITADEL remains authoritative for provider password policy;
-known provider password-complexity failures are translated to safe Password
-field messages, and identity conflicts to Email field messages. Provider response
-bodies, internal identifiers, and submitted credentials never become UI errors.
+recovery remains deferred. The password policy is a minimum of 12 characters
+without mandatory character classes or scheduled password expiry. Registration
+and password change validate that minimum, and registration also email syntax,
+confirmation and the 200-character input bounds, in the panel and API. Identity
+conflicts become Email field messages. Internal identifiers, password hashes and
+submitted credentials never become UI errors.
 
 #### Browser cookies and durable sessions
 
@@ -89,35 +95,28 @@ carries only an opaque session ID. Successful authenticated requests renew the
 30-day inactivity lifetime and cookie retention. There is no absolute deadline
 for active users; service restarts preserve sessions. Browser cookie deletion
 can require login. Login replaces the previous browser session with a new ID.
-Provider session/user IDs remain server-side in JDBC session attributes; the
-provider session bearer token is discarded because the service account created
-the session and can retrieve/terminate it without that token.
-provider credentials and passwords never appear in browser
+The staff identity subject remains server-side in JDBC session attributes.
+Password hashes and passwords never appear in browser
 JavaScript, browser storage, API response bodies, URLs or logs. CSRF metadata is
 separate: `__Host-XSRF-TOKEN` and the `X-XSRF-TOKEN` header protect unsafe browser
 requests, including login/registration/logout. Credentialed CORS remains scoped
-by frontend and resource family. No request-body/provider-response logging is
+by frontend and resource family. No request-body logging is
 used for authentication.
 
-#### Provider validation and revocation
+#### Session validation and revocation
 
-Each protected staff request retrieves the ZITADEL session and requires the
-expected provider user ID, successful password factor and absent/future expiry.
-HTTP 200 alone is insufficient: password changes can remove the password factor.
-Definitively invalid provider state invalidates the local session and returns
-`401`; provider outages return `503` without discarding the session. Current
-Account eligibility, role, Location Assignment and location status are checked
-in PostgreSQL, with no permission cache, provider cache or event synchronization.
-Email alone never grants authority. This deliberately adds a provider request
-and database work to each protected request; optimize only when measured need
-justifies the revocation delay or added complexity.
+Each protected staff request resolves the session's identity subject to its
+Account and rejects sessions created before the Account's authentication cutoff.
+Current Account eligibility, role, Location Assignment and location status are
+checked in PostgreSQL, with no permission cache or event synchronization.
+Invalid or revoked state invalidates the local session and returns `401`. Email
+alone never grants authority.
 
-Ordinary logout invalidates the current browser session and attempts provider
-session termination. Signed-in password changes supply the current password to
-ZITADEL; success deletes all indexed Kairos sessions for the Account, including
-the current one, records a cutoff to reject an in-flight stale session, and
-requires fresh login. There is no separate sign-out-everywhere action. Provider
-sessions that have no remaining Kairos session grant no access to Kairos.
+Ordinary logout invalidates the current browser session. Signed-in password
+changes require the current password; success stores the new hash, deletes all
+indexed Kairos sessions for the Account, including the current one, records a
+cutoff to reject an in-flight stale session, and requires fresh login. There is
+no separate sign-out-everywhere action.
 
 #### Panel session behavior
 

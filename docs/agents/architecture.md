@@ -36,7 +36,7 @@
 - Enforce security and tenant access in the API. Frontend redirects and hidden
   controls are user-experience features, not authorization controls.
 - Keep authentication credentials unavailable to JavaScript; browser sessions
-  use secure HttpOnly cookies, with provider credentials confined to the API.
+  use secure HttpOnly cookies, with password hashes confined to the API and database.
 - Keep production migrations free of environment-specific seed data.
 - A change adding a required (blank) key to `deployment/production.env.example`
   must also map it in the `deploy.yml` deploy step and tell the user to set it in

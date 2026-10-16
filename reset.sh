@@ -37,7 +37,6 @@ chmod 0600 ".env"
 echo "Copied .env.example to .env with mode 0600."
 
 rm -f \
-    "secrets/zitadel-masterkey" \
     "secrets/webhook-encryption.bin" \
     "secrets/vapid-private.pem" \
     "secrets/vapid-public.pem" \

@@ -102,8 +102,8 @@ export default function PrivacyPolicyPage() {
         </li>
       </ul>
       <p>
-        Usługa logowania (ZITADEL) działa na tym samym serwerze i nie przekazuje
-        danych podmiotom zewnętrznym.
+        Hasła przechowujemy wyłącznie jako skróty kryptograficzne w bazie danych
+        na tym samym serwerze i nie przekazujemy ich podmiotom zewnętrznym.
       </p>
 
       <h2>Jak długo przechowujemy dane</h2>

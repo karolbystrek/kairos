@@ -32,11 +32,11 @@ Do not skip an applicable requirement because it lives in another file.
 | [Order lifecycle and customer application](requirements/orders-customer.md) | Order changes, customer tracking, PWA, offline and notifications |
 | [Staff panel requirements](requirements/staff-panel.md) | Staff queues, navigation, management UI and confirmations |
 | [External Integration API and webhooks](requirements/external-integrations.md) | Integration credentials, external orders and webhook delivery |
-| [Staff authentication and browser sessions](requirements/staff-authentication.md) | Registration, onboarding, login, sessions, CSRF and provider validation |
+| [Staff authentication and browser sessions](requirements/staff-authentication.md) | Registration, onboarding, login, sessions, CSRF and session revocation |
 | [Location lifecycle and cascades](requirements/locations.md) | Location disable, enable and irreversible Delete |
 | [Menus and order items](requirements/menus.md) | Per-location menus and menu items on orders |
 | [Accounts and invitations](requirements/accounts-invitations.md) | Member provisioning, invitation redemption, account management and access |
-| [Provider setup and registration consistency](requirements/provider.md) | ZITADEL provisioning, service credentials and registration cleanup |
+| [Staff credentials and registration consistency](requirements/staff-credentials.md) | Password and verification-code storage, registration transactions and cleanup |
 | [Customer, integration and tenant access](requirements/access-isolation.md) | Any authorization, tenant isolation, RLS or customer capability change |
 | [Persistence requirements](requirements/persistence.md) | Schema, migrations, ownership, secret storage and daily order numbers |
 | [Real-time communication](requirements/real-time.md) | Customer state SSE, staff queue SSE, Redis Pub/Sub and Web Push |

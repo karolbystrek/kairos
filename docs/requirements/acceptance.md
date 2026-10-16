@@ -61,17 +61,16 @@
 * Staff order-list operations return only `IN_PREPARATION` and `READY` orders.
 ### Authentication, accounts and locations
 
-* Backend-mediated ZITADEL password authentication, email-verified registration,
-  durable/rolling sessions, provider outage/revocation, current local access,
-  password change, logout and cookie/CSRF behavior are covered by
-  provider-isolated and HTTP contract tests. Live provider acceptance is separate.
+* API-owned password authentication, email-verified registration,
+  durable/rolling sessions, revocation, current local access, password change,
+  logout and cookie/CSRF behavior are covered by integration and HTTP contract
+  tests against the real credential store.
 * Public registration rejects invalid email, a short password, and mismatched
-  confirmation with errors attached to the correct fields before provider
-  provisioning. Local/provider identity conflicts have an Email field error;
-  known provider password failures have a safe Password field error.
+  confirmation with errors attached to the correct fields before creating an
+  identity. Identity conflicts have an Email field error.
 * Public registration creates no tenant or administrator before a correct
   6-digit email code. Resending observes a 60-second cooldown, incorrect codes
-  permit five attempts and provider expiry is enforced. Unverified sign-in
+  permit five attempts and the one-hour code expiry is enforced. Unverified sign-in
   resumes the code step; abandoned identities without Accounts can be replaced.
 * Successful public email confirmation creates the tenant, administrator and browser
   session without creating a location. The main panel requires first-location
@@ -125,7 +124,7 @@
   email, role, and location; Locations and Integrations show name. Invitation
   details show role, location and expiry and retain confirmed revocation.
 * Public sign-in exposes Create account. Email verification and recovery are
-  deferred; immutable ZITADEL identity binding and current local authorization
+  deferred; immutable identity binding and current local authorization
   gate protected work. Password changes are available after login.
 * A tenant administrator can access all locations in the tenant but none in another tenant.
 * A tenant administrator can issue manager or operator account invitations only
@@ -149,7 +148,7 @@
 * Each pending invitation fixes a required valid normalized recipient email.
   Creation, list, and preview expose it; invited registration displays it
   read-only beside clearly spaced location/role context. Mismatched redemption
-  email is rejected before provider provisioning and rechecked atomically.
+  email is rejected before creating an identity and rechecked atomically.
   Details identify the fixed role and location and the expiry. Its icon-and-text Revoke action
   requires inline hold confirmation. The API history retains terminal metadata,
   lifecycle state and queued/sent/failed email delivery state; the panel folds

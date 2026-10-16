@@ -7,14 +7,13 @@ trap 'rm -rf -- "${test_directory}"' EXIT HUP INT TERM
 cp "${repository_directory}/setup.sh" "${repository_directory}/.env.example" "${test_directory}/"
 
 sh "${test_directory}/setup.sh" --non-interactive --secrets-directory secrets --no-tls > "${test_directory}/output"
-for key_name in zitadel-masterkey webhook-encryption.bin email-encryption.bin vapid-private.pem vapid-public.pem push-subscription-encryption.bin; do
+for key_name in webhook-encryption.bin email-encryption.bin vapid-private.pem vapid-public.pem push-subscription-encryption.bin; do
     [ -f "${test_directory}/secrets/${key_name}" ]
 done
 [ "$(wc -c < "${test_directory}/secrets/email-encryption.bin" | tr -d ' ')" -eq 32 ]
 cp "${test_directory}/secrets/email-encryption.bin" "${test_directory}/expected-email"
 printf '%s' 'externally-supplied-credential' > "${test_directory}/secrets/external-secret.txt"
 cp "${test_directory}/secrets/external-secret.txt" "${test_directory}/expected-credential"
-cp "${test_directory}/secrets/zitadel-masterkey" "${test_directory}/expected-masterkey"
 cp "${test_directory}/secrets/webhook-encryption.bin" "${test_directory}/expected-webhook"
 mkdir "${test_directory}/secrets/tls"
 # Open directory/file descriptors expose replacements even if paths still exist.
@@ -37,7 +36,6 @@ cmp "${test_directory}/expected-webhook" "${test_directory}/secrets/webhook-encr
 sh "${test_directory}/setup.sh" --non-interactive --keep-env --replace-keys --secrets-directory secrets --no-tls > "${test_directory}/output"
 same_inode "${test_directory}/secrets" 3
 same_inode "${test_directory}/secrets/tls" 4
-cmp "${test_directory}/expected-masterkey" "${test_directory}/secrets/zitadel-masterkey"
 cmp "${test_directory}/expected-credential" "${test_directory}/secrets/external-secret.txt"
 if cmp -s "${test_directory}/expected-webhook" "${test_directory}/secrets/webhook-encryption.bin"; then
     echo "Application key replacement did not replace its keys." >&2

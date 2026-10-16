@@ -16,7 +16,7 @@ SERVICES = ("customer-app", "panel-app", "api")
 DOCKER = shutil.which("docker")
 RUNTIME_FILES = (
     "compose.yaml", "compose.deployment.yaml", "nginx/default.conf.template",
-    "nginx/cloudflare-real-ip.conf", "deployment/zitadel/bootstrap.py",
+    "nginx/cloudflare-real-ip.conf",
     "deployment/postgres/bootstrap.sh",
 )
 
@@ -46,7 +46,7 @@ class DeployTest(unittest.TestCase):
         self.secrets = self.root / "secrets"
         self.secrets.mkdir()
         for name in ("webhook-encryption.bin", "email-encryption.bin", "vapid-private.pem", "vapid-public.pem",
-                     "push-subscription-encryption.bin", "zitadel-masterkey", "tls.crt", "tls.key"):
+                     "push-subscription-encryption.bin", "tls.crt", "tls.key"):
             (self.secrets / name).write_text("fixture-private-material")
         origins = {
             "NEXT_PUBLIC_CUSTOMER_APP_URL": "https://customer.example.com",
@@ -55,7 +55,7 @@ class DeployTest(unittest.TestCase):
         }
         self.config = {"services": {
             name: {"image": self.manifest["images"].get(name, "fixture:infra"), "environment": {}}
-            for name in (*SERVICES, "nginx", "postgres", "redis", "zitadel", "zitadel-bootstrap")
+            for name in (*SERVICES, "nginx", "postgres", "redis")
         }}
         self.config["services"]["api"]["environment"] = {
             **origins, "WEBHOOK_DESTINATION_POLICY": "PUBLIC_HTTPS", "PUSH_DESTINATION_POLICY": "PUBLIC_HTTPS",
@@ -67,7 +67,7 @@ class DeployTest(unittest.TestCase):
         self.config["secrets"] = {
             name: {"file": str(self.secrets / name)}
             for name in ("webhook-encryption.bin", "email-encryption.bin", "vapid-private.pem", "vapid-public.pem",
-                         "push-subscription-encryption.bin", "zitadel-masterkey")
+                         "push-subscription-encryption.bin")
         }
         self.config["secrets"]["tls"] = {"file": str(self.secrets)}
         self.log = self.root / "commands.jsonl"
@@ -88,7 +88,7 @@ if name == 'docker':
             print(result.stdout, end='')
             sys.exit(result.returncode)
         print(Path(os.environ['CONFIG_FIXTURE']).read_text())
-    if os.environ.get('FAIL_STAGE') in ('pull', 'redis', 'zitadel', 'api', 'zitadel-bootstrap', 'nginx'):
+    if os.environ.get('FAIL_STAGE') in ('pull', 'redis', 'api', 'nginx'):
         stage = os.environ['FAIL_STAGE']
         if (stage == 'pull' and 'pull' in args) or ('up' in args and args[-1] == stage):
             print('do-not-print-this-secret', file=sys.stderr)
@@ -184,7 +184,7 @@ sys.exit(deploy.main(sys.argv[1:]))
                 self.assertEqual(self.commands(), [])
 
     def test_missing_runtime_file_never_calls_docker(self):
-        (self.release / "deployment/zitadel/bootstrap.py").unlink()
+        (self.release / "deployment/postgres/bootstrap.sh").unlink()
         self.assert_failed_safely(self.run_deploy())
         self.assertEqual(self.commands(), [])
 
@@ -194,11 +194,9 @@ sys.exit(deploy.main(sys.argv[1:]))
         self.assertEqual(result.returncode, 0, result.stderr)
         calls = self.commands()
         stages = [call for call in calls if call[0] == "docker" and "up" in call]
-        self.assertEqual([call[-1] for call in stages], ["redis", "zitadel", "zitadel-bootstrap", "api", "panel-app", "nginx"])
+        self.assertEqual([call[-1] for call in stages], ["redis", "api", "panel-app", "nginx"])
         self.assertEqual(stages[0][-2:], ["postgres", "redis"])
-        self.assertIn("--exit-code-from", stages[2])
-        self.assertIn("--force-recreate", stages[2])
-        for call in (stages[0], stages[1], *stages[3:]):
+        for call in stages:
             self.assertIn("--wait", call)
             self.assertIn("--wait-timeout", call)
         for call in calls:
@@ -213,14 +211,14 @@ sys.exit(deploy.main(sys.argv[1:]))
         self.assertEqual(self.env_file.read_text(), "POSTGRES_PASSWORD=do-not-print-this-secret\n")
 
     def test_failed_stage_stops_rollout_and_preserves_previous_record(self):
-        for stage in ("pull", "redis", "zitadel", "zitadel-bootstrap", "api", "nginx"):
+        for stage in ("pull", "redis", "api", "nginx"):
             with self.subTest(stage=stage):
                 self.log.unlink(missing_ok=True)
                 result = self.run_deploy(FAIL_STAGE=stage)
                 self.assert_failed_safely(result)
                 self.assertIn(stage, result.stderr)
                 updates = [call[-1] for call in self.commands() if "up" in call]
-                if stage in ("pull", "redis", "zitadel", "zitadel-bootstrap", "api"):
+                if stage in ("pull", "redis", "api"):
                     self.assertNotIn("panel-app", updates)
                     self.assertNotIn("nginx", updates)
                 self.assertFalse(any(call[0] == "curl" for call in self.commands()))
@@ -260,7 +258,7 @@ sys.exit(deploy.main(sys.argv[1:]))
         self.assertEqual(self.commands(), [])
 
     def test_missing_external_secret_never_mutates_docker(self):
-        (self.secrets / "zitadel-masterkey").unlink()
+        (self.secrets / "email-encryption.bin").unlink()
         self.assert_failed_safely(self.run_deploy())
         self.assertTrue(all("config" in call for call in self.commands()))
 

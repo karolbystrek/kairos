@@ -12,7 +12,7 @@
 
 ## Credentials and fresh startup
 
-`POSTGRES_USER`/`POSTGRES_PASSWORD` are PostgreSQL initialization and provider
+`POSTGRES_USER`/`POSTGRES_PASSWORD` are PostgreSQL initialization and
 administration credentials. Configure two additional credential pairs in the
 normal VPS `production.env`: `KAIROS_DB_OWNER_USER`/`KAIROS_DB_OWNER_PASSWORD`
 for Flyway, and `KAIROS_DB_RUNTIME_USER`/`KAIROS_DB_RUNTIME_PASSWORD` for Spring's

@@ -8,21 +8,16 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
-import pl.karolbystrek.kairos.api.authentication.infrastructure.zitadel.ZitadelClient.PendingUser;
-import pl.karolbystrek.kairos.api.authentication.infrastructure.zitadel.ZitadelClient.ProviderSession;
-import pl.karolbystrek.kairos.api.authentication.infrastructure.zitadel.ZitadelClient.UserEmail;
 import pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase;
 import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
 
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -36,38 +31,37 @@ class EmailVerificationDisabledIntegrationTests extends RedisListenerIsolatedInt
 
     @Test
     void registrationImmediatelyCreatesAdministratorAndSessionWithoutEmail() throws Exception {
-        var email = configure();
+        var email = UUID.randomUUID() + "@example.com";
         completes(postApi("/tenant-registrations/v1").content("{\"email\":\"" + email
             + "\",\"password\":\"password-12345\",\"passwordConfirmation\":\"password-12345\"}"), email);
-        assertThat(database.queryForObject("SELECT COUNT(*) FROM email_deliveries WHERE owner_identity=?", Integer.class, email)).isZero();
+        assertThat(database.queryForObject("SELECT COUNT(*) FROM email_deliveries WHERE owner_identity=(SELECT subject FROM staff_identities WHERE email=?)", Integer.class, email)).isZero();
     }
 
     @Test
     void unverifiedSignInCompletesOnboardingAndCancelsExistingCode() throws Exception {
         var email = configure();
+        var subject = database.queryForObject("SELECT subject FROM staff_identities WHERE email=?", String.class, email);
         var delivery = UUID.randomUUID();
         database.update("INSERT INTO email_deliveries(id,owner_scope,owner_identity,encrypted_payload,payload_nonce,created_at,next_attempt_at) VALUES (?,'verification',?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
-            delivery, email, new byte[] {1}, new byte[12]);
-        database.update("INSERT INTO pending_registrations(subject,email,resend_available_at,delivery_id) VALUES (?,?,CURRENT_TIMESTAMP,?)", email, email, delivery);
+            delivery, subject, new byte[] {1}, new byte[12]);
+        database.update("INSERT INTO pending_registrations(subject,email,resend_available_at,delivery_id) VALUES (?,?,CURRENT_TIMESTAMP,?)", subject, email, delivery);
         completes(postApi("/auth/v1/login").content("{\"email\":\"" + email + "\",\"password\":\"password-12345\"}"), email);
         assertThat(database.queryForObject("SELECT state FROM email_deliveries WHERE id=?", String.class, delivery)).isEqualTo("FAILED");
-        verify(identityProvider, never()).resendEmailCode(anyString());
+        verify(identities, never()).resendEmailCode(anyString());
     }
 
     @Test
     void unverifiedSignInWithoutPendingCodeCompletesWithoutSendingEmail() throws Exception {
         var email = configure();
         completes(postApi("/auth/v1/login").content("{\"email\":\"" + email + "\",\"password\":\"password-12345\"}"), email);
-        assertThat(database.queryForObject("SELECT COUNT(*) FROM email_deliveries WHERE owner_identity=?", Integer.class, email)).isZero();
-        verify(identityProvider, never()).resendEmailCode(anyString());
+        assertThat(database.queryForObject("SELECT COUNT(*) FROM email_deliveries WHERE owner_identity=(SELECT subject FROM staff_identities WHERE email=?)", Integer.class, email)).isZero();
+        verify(identities, never()).resendEmailCode(anyString());
     }
 
+    // An unverified identity without an Account, as left by an earlier registration.
     private String configure() {
         var email = UUID.randomUUID() + "@example.com";
-        when(identityProvider.createUnverifiedUser(eq(email), anyString())).thenReturn(new PendingUser(email, "123456"));
-        when(identityProvider.signIn(eq(email), anyString())).thenReturn(new ProviderSession(UUID.randomUUID().toString(), email));
-        when(identityProvider.isValid(any())).thenReturn(true);
-        when(identityProvider.userEmail(email)).thenReturn(new UserEmail(email, email, false));
+        identities.createUser(email, "password-12345");
         return email;
     }
 
@@ -80,9 +74,10 @@ class EmailVerificationDisabledIntegrationTests extends RedisListenerIsolatedInt
         mvc.perform(get("/api/auth/v1/me").contextPath("/api").secure(true)
             .cookie(result.getResponse().getCookie("__Host-session"))).andExpect(status().isOk());
         assertThat(database.queryForObject("SELECT COUNT(*) FROM accounts WHERE email=?", Integer.class, email)).isOne();
-        assertThat(database.queryForObject("SELECT COUNT(*) FROM pending_registrations WHERE subject=?", Integer.class, email)).isZero();
-        verify(identityProvider).markEmailVerified(email, email);
-        verify(identityProvider, never()).verifyEmail(anyString(), anyString());
+        assertThat(database.queryForObject("SELECT COUNT(*) FROM pending_registrations WHERE email=?", Integer.class, email)).isZero();
+        verify(identities).markEmailVerified(anyString(), eq(email));
+        assertThat(database.queryForObject("SELECT email_verified FROM staff_identities WHERE email=?", Boolean.class, email)).isTrue();
+        verify(identities, never()).verifyEmail(anyString(), anyString());
     }
 
     private static MockHttpServletRequestBuilder postApi(String path) {

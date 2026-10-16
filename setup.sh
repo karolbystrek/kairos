@@ -258,7 +258,6 @@ working_directory="$(mktemp -d "${secrets_parent}/.kairos-setup.XXXXXX")"
 chmod 0700 "${working_directory}"
 
 key_names="
-zitadel-masterkey
 webhook-encryption.bin
 email-encryption.bin
 vapid-private.pem
@@ -368,8 +367,7 @@ validate_key_set() {
     for encryption_key in \
         "${key_directory}/webhook-encryption.bin" \
         "${key_directory}/email-encryption.bin" \
-        "${key_directory}/push-subscription-encryption.bin" \
-        "${key_directory}/zitadel-masterkey"; do
+        "${key_directory}/push-subscription-encryption.bin"; do
         key_size="$(wc -c < "${encryption_key}" | tr -d ' ')" || return 1
         [ "${key_size}" -eq 32 ] || return 1
     done
@@ -400,7 +398,7 @@ validate_tls_pair() {
 }
 
 key_set_status=absent
-if [ "${existing_key_count}" -eq 6 ]; then
+if [ "${existing_key_count}" -eq 5 ]; then
     if validate_key_set "${secrets_directory}"; then
         key_set_status=valid
     else
@@ -423,7 +421,7 @@ case "${key_action}" in
                 final_key_action=reuse
                 ;;
             partial)
-                fail "Cannot keep a partial application key set (${existing_key_count} of 6 files)."
+                fail "Cannot keep a partial application key set (${existing_key_count} of 5 files)."
                 ;;
             invalid)
                 fail "Cannot keep the existing invalid application key set."
@@ -450,7 +448,7 @@ case "${key_action}" in
                 if [ "${non_interactive}" = true ]; then
                     fail "A partial application key set requires --replace-keys in non-interactive mode."
                 fi
-                prompt_yes_no "Replace the partial application key set (${existing_key_count} of 6 files)?" no
+                prompt_yes_no "Replace the partial application key set (${existing_key_count} of 5 files)?" no
                 [ "${prompt_result}" = yes ] || fail "Setup stopped without replacing the partial application key set."
                 final_key_action=generate
                 ;;
@@ -505,11 +503,6 @@ mkdir "${new_secrets_directory}"
 chmod 0700 "${new_secrets_directory}"
 
 if [ "${final_key_action}" = generate ]; then
-    if [ -f "${secrets_directory}/zitadel-masterkey" ]; then
-        cp "${secrets_directory}/zitadel-masterkey" "${new_secrets_directory}/zitadel-masterkey"
-    else
-        openssl rand -hex 16 | tr -d '\n' > "${new_secrets_directory}/zitadel-masterkey"
-    fi
     openssl rand \
         -out "${new_secrets_directory}/webhook-encryption.bin" \
         32
@@ -581,9 +574,6 @@ chmod 0700 "${secrets_directory}"
 replacement_files=""
 if [ "${final_key_action}" = generate ]; then
     for key_name in ${key_names}; do
-        if [ "${key_name}" = zitadel-masterkey ] && [ -f "${secrets_directory}/${key_name}" ]; then
-            continue
-        fi
         replacement_files="${replacement_files} ${key_name}"
     done
 fi
@@ -627,7 +617,5 @@ case "${tls_action}:${existing_tls_status}" in
         echo "Skipped TLS certificate generation."
         ;;
 esac
-
-echo "ZITADEL initializes its database and API credentials on first Compose startup. Keep zitadel-masterkey stable while its database is retained."
 
 trap - EXIT HUP INT TERM

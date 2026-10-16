@@ -19,7 +19,7 @@ The current walking vertical slice is implemented for local development:
   with direct registration/sign-in actions and secondary creator contact,
   plus session-aware navigation to `/dashboard` and `/login`;
 * authenticated, tenant- and location-authorized staff operations;
-* backend-mediated self-hosted ZITADEL email/password authentication, email-verified
+* API-owned email/password authentication with PostgreSQL-stored hashes, email-verified
   public tenant registration, emailed recipient-bound manager/operator invitations with replacement and
   full history,
   durable rolling browser sessions, password changes and logout;
@@ -57,7 +57,7 @@ The current walking vertical slice is implemented for local development:
 * repository-owned local setup for configuration, complete key validation,
   restrictive permissions, and explicit existing-key handling;
 * shared hostname-routing NGINX HTTPS ingress, unbuffered SSE, internal health
-  paths, health-gated dependencies, persistent PostgreSQL/provider credentials,
+  paths, health-gated dependencies, persistent PostgreSQL,
   and nondurable Redis;
 * restricted PostgreSQL runtime identity, transaction-local tenant/location and
   capability scopes, command-specific RLS, narrow credential-bootstrap
@@ -85,9 +85,9 @@ public reference documentation, and formal automated public-contract checks.
 The handwritten frontend clients remain in place; generated SDKs are a later,
 separate decision.
 
-The ZITADEL session design replaces the transitional Google/Clerk work. Source
-and automated provider-isolated checks cover the accepted flow; live acceptance
-against the pinned provider and hosted gateway remains outstanding. Direct
+API-owned credentials replace the earlier self-hosted ZITADEL integration, which
+itself replaced the transitional Google/Clerk work. Automated checks cover the
+accepted flow; live acceptance against the hosted gateway remains outstanding. Direct
 member creation through `POST /api/accounts/v1` remains
 unavailable; managers/operators join only through fixed Account Invitations.
 
@@ -128,9 +128,7 @@ Outstanding security and acceptance work:
 * verify hosted gateway client addressing, throttling and origin-bypass blocking
   through Cloudflare; extend throttling when future recovery or linking routes
   are introduced;
-* operate and patch ZITADEL, rotate backend
-  service credentials, and
-  provide externally managed webhook-secret encryption keys,
+* provide externally managed webhook-secret encryption keys,
   VAPID signing keys, push-subscription and transactional-email encryption keys, with documented
   rotation procedures, security-event retention, monitoring, and dependency
   patching;

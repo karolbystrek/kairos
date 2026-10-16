@@ -8,7 +8,6 @@ import pl.karolbystrek.kairos.api.account.application.exception.StaffAccessDenie
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
 import pl.karolbystrek.kairos.api.account.domain.TenantRole;
 import pl.karolbystrek.kairos.api.authentication.infrastructure.persistence.StaffAuthenticationRepository;
-import pl.karolbystrek.kairos.api.authentication.infrastructure.zitadel.ZitadelClient;
 
 import java.time.Instant;
 
@@ -19,11 +18,11 @@ public class StaffAuthenticationService {
     private final StaffAccessService access;
 
     @Transactional(readOnly = true)
-    public StaffPrincipal authenticate(ZitadelClient.ProviderSession identity, Instant signedInAt) {
-        var credentials = credentialsRepository.findCredentials(identity.userId())
+    public StaffPrincipal authenticate(String subject, Instant signedInAt) {
+        var credentials = credentialsRepository.findCredentials(subject)
             .orElseThrow(() -> new StaffAccessDeniedException("Account is unavailable"));
         var cutoff = credentials.getAuthenticationCutoff();
-        if (signedInAt == null || (cutoff != null && !signedInAt.isAfter(cutoff.toInstant()))) {
+        if (signedInAt == null || (cutoff != null && !signedInAt.isAfter(cutoff))) {
             throw new StaffAccessDeniedException("Session was revoked");
         }
         var principal = new StaffPrincipal(credentials.getAccountId(), credentials.getTenantId(),

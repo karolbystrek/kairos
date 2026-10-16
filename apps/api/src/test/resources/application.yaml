@@ -38,9 +38,6 @@ kairos:
   origins:
     customer: "http://localhost:3000"
     panel: "http://localhost:3001"
-  authentication:
-    base-url: http://zitadel:8080
-    token-location: classpath:keys/test-provider-token.txt
   webhooks:
     signing:
       encryption-key-location: "classpath:keys/test-webhook-encryption.bin"

@@ -43,9 +43,9 @@ requests go directly to the dedicated API origin through the gateway.
   proxy buffering and uses a read timeout longer than the 30-minute emitter lifetime.
 * Local Compose builds application images, mounts private secrets at `/run/secrets`,
   and publishes only NGINX HTTPS on `127.0.0.1`. Redis Pub/Sub is nondurable and
-  has no volume; PostgreSQL and provider credential material remain persistent.
+  has no volume; PostgreSQL data remains persistent.
 * `setup.sh` prepares `.env`, validates the complete key set with explicit handling
-  of existing files, preserves the provider master key, and optionally generates
+  of existing files, and optionally generates
   local TLS material. Secret directories use `0700` and application key files `0400`.
 
 ### Validation and immutable publication
@@ -71,9 +71,9 @@ That artifact contains `release.json` with a full 40-character lowercase Git
 `revision` and `images` entries for `customer-app`, `panel-app`, and `api`, each
 using `ghcr.io/karolbystrek/kairos/<service>@sha256:<64 lowercase hex>`.
 `release.tar.gz` contains the same manifest plus the exact checkout's shared and
-hosted Compose files, both NGINX configuration files, and the ZITADEL bootstrap
-script, PostgreSQL entrypoint role initialization script,
-exact V1 SQL, and the deployment shell command/Python helper. An explicit file allowlist
+hosted Compose files, both NGINX configuration files, the PostgreSQL entrypoint
+role initialization script,
+exact SQL migrations, and the deployment shell command/Python helper. An explicit file allowlist
 excludes environment files, certificates and private keys. The separate
 `deploy.yml` workflow runs only by manual dispatch on `main`, with no revision
 input; every job refuses other refs. It uses the main revision captured at
@@ -142,11 +142,9 @@ directories. A nonblocking host-wide `flock` at `/srv/kairos/deploy.lock` reject
 concurrent deployments; Python's stdlib `fcntl.flock` provides the lock without
 an additional host command dependency.
 
-Deployment pulls the complete stack, waits for PostgreSQL/Redis health, completes
-then waits for ZITADEL and completes its recreated provider bootstrap before
+Deployment pulls the complete stack and waits for PostgreSQL/Redis health before
 starting the API. Fresh PostgreSQL initializes the restricted database roles
-through its standard entrypoint; Spring Flyway applies V1 automatically. The
-provider bootstrap preserves existing credentials. Existing database volumes do
+through its standard entrypoint; Spring Flyway applies migrations automatically. Existing database volumes do
 not rerun initialization; see [database initialization](../deployment/DATABASE.md).
 Ordinary deployment never resets volumes or repairs Flyway history. Only after API health
 passes does it replace the frontends and recreate NGINX so configuration bind
@@ -204,7 +202,7 @@ acceptance remain operator verification.
 ### Development operations policy
 
 The owner accepts the public single-VM deployment as a disposable development
-environment with no users. All orders, accounts and ZITADEL state may be lost
+environment with no users. All orders, accounts and credentials may be lost
 after host failure and recreated. Scheduled database backups, off-host backup
 storage/encryption/retention, destructive-migration backup procedures, data-loss
 and recovery targets, and replacement-host restore rehearsals are deferred.
@@ -226,8 +224,7 @@ A healthy instance can still have an application outage. Certificate expiry
 remains an operator maintenance check.
 
 Before onboarding real users or retaining valuable data, agree and implement
-backups for both Kairos and ZITADEL databases, roles, provider credentials and
-matching encryption/signing/master keys; define retention and recovery targets
+backups for the Kairos database, roles and matching encryption/signing keys; define retention and recovery targets
 and verify replacement-host restoration. Reassess application and capacity
 monitoring coverage then. Separate database/Redis instances require their own
 plan and do not themselves establish recoverability. Independent security,

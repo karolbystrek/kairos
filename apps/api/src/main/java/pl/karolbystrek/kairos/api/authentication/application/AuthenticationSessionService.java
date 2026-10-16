@@ -11,7 +11,6 @@ import pl.karolbystrek.kairos.api.account.application.exception.StaffAccessDenie
 import pl.karolbystrek.kairos.api.account.application.model.PanelPrincipal;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
 import pl.karolbystrek.kairos.api.account.infrastructure.persistence.AccountRepository;
-import pl.karolbystrek.kairos.api.authentication.infrastructure.zitadel.ZitadelClient;
 
 import java.time.Clock;
 import java.util.Collection;
@@ -25,26 +24,20 @@ public class AuthenticationSessionService {
     private final JdbcTemplate database;
     private final AccountRepository accounts;
     private final StaffAccessService access;
-    private final ZitadelClient provider;
     private final Clock clock;
 
-    public void establish(HttpServletRequest request, PanelPrincipal principal, ZitadelClient.ProviderSession identity) {
+    public void establish(HttpServletRequest request, PanelPrincipal principal, String subject) {
         var old = request.getSession(false);
         if (old != null) old.invalidate();
         var session = request.getSession(true);
-        session.setAttribute(IDENTITY, identity);
+        session.setAttribute(IDENTITY, subject);
         session.setAttribute(SIGNED_IN_AT, clock.instant());
         session.setAttribute(FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME, principal.getName());
     }
 
     public void logout(HttpServletRequest request) {
         var session = request.getSession(false);
-        if (session == null) return;
-        var identity = (ZitadelClient.ProviderSession) session.getAttribute(IDENTITY);
-        var pending = (RegistrationVerificationService.Pending) session.getAttribute("kairos.pendingRegistration");
-        session.invalidate();
-        if (identity != null) provider.terminate(identity);
-        else if (pending != null) provider.terminate(pending.identity());
+        if (session != null) session.invalidate();
     }
 
     @Transactional
