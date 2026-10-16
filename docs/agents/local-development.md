@@ -33,9 +33,9 @@ token to `secrets/zitadel/kairos.pat`. Run the applications on the host:
   line in `/etc/hosts` because ZITADEL resolves its instance from the request
   hostname (the port is ignored). Editing `/etc/hosts` is the user's step.
 - Frontends: `npm run dev` in `apps/customer-app` (`http://localhost:3000`) and
-  `PORT=3001 npm run dev` in `apps/panel-app` (`http://localhost:3001`). Their
-  committed `.env.development` files hold the local origins; `PORT` must come
-  from the shell because Next.js binds before loading `.env` files.
+  `apps/panel-app` (`http://localhost:3001`). Each committed `.env.development`
+  holds the app's `PORT` and local origins; the dev script exports it before
+  starting Next.js, which binds its port before reading `.env` files.
 
 `docker compose --profile apps up --build` runs the production-built
 application images instead, still over HTTP and without NGINX. NGINX, TLS and

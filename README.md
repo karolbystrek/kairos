@@ -54,11 +54,8 @@ npm --prefix apps/customer-app run dev
 ```
 
 ```bash
-PORT=3001 npm --prefix apps/panel-app run dev
+npm --prefix apps/panel-app run dev
 ```
-
-Both frontends default to port 3000, so the panel takes its port from `PORT`
-(Next.js reads it before `.env` files load, so it cannot live there).
 
 * Customer app: http://localhost:3000
 * Staff panel: http://localhost:3001
