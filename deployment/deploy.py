@@ -152,47 +152,82 @@ def probe(url, env, csrf=False):
     raise ValidationError(f"public probe failed after 5 attempts: {reason}")
 
 
+def rollout(release, env_file, manifest, base_env, report):
+    """Deploy one manifest and verify it publicly; report(stage) names the current stage."""
+    env = {**base_env, "KAIROS_RELEASE_VERSION": manifest["revision"]}
+    report("image override")
+    override = release / "compose.images.json"
+    atomic_json(override, {"services": {
+        service: {"image": image} for service, image in manifest["images"].items()
+    }})
+    compose = ["docker", "compose", "--project-name", "kairos", "--project-directory", str(release),
+               "--env-file", str(env_file), "-f", str(release / "compose.yaml"),
+               "-f", str(release / "compose.production.yaml"), "-f", str(override)]
+    report("Compose validation")
+    resolved = json.loads(command([*compose, "config", "--format", "json", "--no-path-resolution"], env, capture=True, timeout=60))
+    origins = configuration(resolved, release, manifest["images"])
+    report("pull")
+    command([*compose, "pull", "--policy", "always"], env)
+    up = [*compose, "up", "--no-deps", "--no-build", "--pull", "never"]
+    healthy = [*up, "--wait", "--wait-timeout", "300"]
+    for stage, args in (
+        ("postgres/redis", [*healthy, "postgres", "redis"]),
+        ("api", [*healthy, "--force-recreate", "api"]),
+        ("frontends", [*healthy, "--force-recreate", "customer-app", "panel-app"]),
+        ("nginx", [*healthy, "--force-recreate", "nginx"]),
+    ):
+        report(stage)
+        print(f"Deployment stage: {stage}", flush=True)
+        command(args, env, timeout=360)
+    report("customer HTTPS probe")
+    probe(origins[0] + "/", env)
+    report("panel HTTPS probe")
+    probe(origins[1] + "/", env)
+    report("API CSRF HTTPS probe")
+    probe(origins[2] + "/api/auth/v1/csrf", env, csrf=True)
+
+
+def previous_release():
+    try:
+        record = json.loads((STATE_DIRECTORY / "deployed-release.json").read_text())
+        images = record["images"]
+        if re.fullmatch(REVISION, record["revision"]) and set(images) == set(SERVICES):
+            return record
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+    return None
+
+
 def main(arguments=None):
     stage = "inputs"
+
+    def report(name):
+        nonlocal stage
+        stage = name
+
     try:
         release, env_file, manifest = inputs(sys.argv[1:] if arguments is None else arguments)
         env = {**os.environ, "COMPOSE_PROJECT_NAME": "kairos",
-               "KAIROS_IMAGE_REGISTRY": "ghcr.io/karolbystrek/kairos",
-               "KAIROS_RELEASE_VERSION": manifest["revision"]}
+               "KAIROS_IMAGE_REGISTRY": "ghcr.io/karolbystrek/kairos"}
         stage = "host lock"
         STATE_DIRECTORY.mkdir(parents=True, exist_ok=True)
         with (STATE_DIRECTORY / "deploy.lock").open("a") as lock:
             # Host-wide flock, independent of the disposable release directory.
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            stage = "image override"
-            override = release / "compose.images.json"
-            atomic_json(override, {"services": {
-                service: {"image": image} for service, image in manifest["images"].items()
-            }})
-            compose = ["docker", "compose", "--project-name", "kairos", "--project-directory", str(release),
-                       "--env-file", str(env_file), "-f", str(release / "compose.yaml"),
-                       "-f", str(release / "compose.production.yaml"), "-f", str(override)]
-            stage = "Compose validation"
-            resolved = json.loads(command([*compose, "config", "--format", "json", "--no-path-resolution"], env, capture=True, timeout=60))
-            origins = configuration(resolved, release, manifest["images"])
-            stage = "pull"
-            command([*compose, "pull", "--policy", "always"], env)
-            up = [*compose, "up", "--no-deps", "--no-build", "--pull", "never"]
-            healthy = [*up, "--wait", "--wait-timeout", "300"]
-            for stage, args in (
-                ("postgres/redis", [*healthy, "postgres", "redis"]),
-                ("api", [*healthy, "--force-recreate", "api"]),
-                ("frontends", [*healthy, "--force-recreate", "customer-app", "panel-app"]),
-                ("nginx", [*healthy, "--force-recreate", "nginx"]),
-            ):
-                print(f"Deployment stage: {stage}", flush=True)
-                command(args, env, timeout=360)
-            stage = "customer HTTPS probe"
-            probe(origins[0] + "/", env)
-            stage = "panel HTTPS probe"
-            probe(origins[1] + "/", env)
-            stage = "API CSRF HTTPS probe"
-            probe(origins[2] + "/api/auth/v1/csrf", env, csrf=True)
+            previous = previous_release()
+            try:
+                rollout(release, env_file, manifest, env, report)
+            except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as error:
+                print(f"Deployment failed at {stage}: {failure_reason(error)}.", file=sys.stderr)
+                if previous is not None:
+                    # Migrations are not undone; they must stay compatible with the previous release.
+                    print(f"Rolling back to {previous['revision']}.", file=sys.stderr)
+                    try:
+                        rollout(release, env_file, previous, env, report)
+                        print(f"Rollback verified: {previous['revision']}", file=sys.stderr)
+                    except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as rollback_error:
+                        print(f"Rollback failed at {stage}: {failure_reason(rollback_error)}.", file=sys.stderr)
+                return 1
             stage = "success record"
             atomic_json(STATE_DIRECTORY / "deployed-release.json", manifest)
             print(f"Deployment verified: {manifest['revision']}")

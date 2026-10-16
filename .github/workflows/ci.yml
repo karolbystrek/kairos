@@ -134,3 +134,38 @@ jobs:
 
       - name: Test manifest
         run: python3 -m unittest discover -s deployment -p 'test_*.py' -v
+
+  production-images:
+    name: Production images
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # Placeholders: only Compose interpolation and the build need them, nothing is pushed.
+      COMPOSE_FILE: compose.yaml:compose.production.yaml
+      KAIROS_IMAGE_REGISTRY: ghcr.io/karolbystrek/kairos
+      KAIROS_RELEASE_VERSION: ci
+      KAIROS_CUSTOMER_APP_HOST: customer.example.com
+      KAIROS_PANEL_APP_HOST: panel.example.com
+      KAIROS_API_HOST: api.example.com
+      NEXT_PUBLIC_CUSTOMER_APP_URL: https://customer.example.com
+      PANEL_APP_URL: https://panel.example.com
+      NEXT_PUBLIC_API_BASE_URL: https://api.example.com
+      POSTGRES_PASSWORD: placeholder
+      KAIROS_DB_OWNER_PASSWORD: placeholder
+      KAIROS_DB_RUNTIME_PASSWORD: placeholder
+      REDIS_PASSWORD: placeholder
+      VAPID_SUBJECT: mailto:ci@example.com
+      RESEND_API_KEY: placeholder
+      KAIROS_APPLICATION_SECRETS_DIRECTORY: ./secrets
+      KAIROS_TLS_DIRECTORY: ./tls
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      - name: Validate production Compose
+        run: docker compose -f compose.yaml -f compose.production.yaml config -q
+
+      - name: Build application images
+        run: docker compose -f compose.yaml -f compose.production.yaml build api panel-app customer-app
