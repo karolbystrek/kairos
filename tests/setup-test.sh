@@ -77,4 +77,93 @@ if sh "${preset_directory}/setup.sh" --dev --prod > "${test_directory}/output" 2
     echo "Setup accepted both presets." >&2
     exit 1
 fi
-printf '%s\n' 'Setup generation, reuse, directory preservation, rollback and presets passed.'
+# Exercise mode selection against the real Compose parser, replacing only startup.
+stack_directory="${test_directory}/stack"
+mkdir -p "${stack_directory}/deployment" "${stack_directory}/bin"
+cp "${repository_directory}/setup.sh" "${repository_directory}/.env.example" "${stack_directory}/"
+cp "${repository_directory}/deployment/production.env.example" "${stack_directory}/deployment/"
+printf 'services:\n  api:\n    image: alpine\n' > "${stack_directory}/compose.yaml"
+for overlay in local production; do
+    printf 'services: {}\n' > "${stack_directory}/compose.${overlay}.yaml"
+done
+cat > "${stack_directory}/compose.production.yaml" <<'YAML'
+services:
+  api:
+    environment:
+      RESEND_API_KEY: ${RESEND_API_KEY:?Set RESEND_API_KEY for production}
+YAML
+export KAIROS_TEST_DOCKER="$(command -v docker)"
+export KAIROS_SETUP_CALLS="${stack_directory}/calls"
+cat > "${stack_directory}/bin/docker" <<'MOCK'
+#!/bin/sh
+case " $* " in
+    *" up "*)
+        printf '%s\n' "$*" >> "$KAIROS_SETUP_CALLS"
+        case " $* " in *" up --build -d --wait "*) exit 0;; *) exit 1;; esac
+        ;;
+    *) exec "$KAIROS_TEST_DOCKER" "$@" ;;
+esac
+MOCK
+cat > "${stack_directory}/bin/npm" <<'MOCK'
+#!/bin/sh
+echo 'Setup must install dependencies inside Docker, not on the host.' >&2
+exit 1
+MOCK
+chmod +x "${stack_directory}/bin/docker" "${stack_directory}/bin/npm"
+# Existing host-run configuration is upgraded without replacing credentials/custom fields.
+cat > "${stack_directory}/.env" <<'ENV'
+POSTGRES_HOST=localhost
+REDIS_HOST=localhost
+KAIROS_SECRETS_DIRECTORY=../../secrets
+POSTGRES_PASSWORD=preserved-password
+CUSTOM=preserved
+ENV
+PATH="${stack_directory}/bin:${PATH}" sh "${stack_directory}/setup.sh" --dev > "${test_directory}/output"
+grep -q '^COMPOSE_FILE=compose.yaml:compose.local.yaml$' "${stack_directory}/.env"
+grep -q '^POSTGRES_HOST=postgres$' "${stack_directory}/.env"
+grep -q '^REDIS_HOST=redis$' "${stack_directory}/.env"
+grep -q '^KAIROS_SECRETS_DIRECTORY=/run/secrets$' "${stack_directory}/.env"
+grep -q '^POSTGRES_PASSWORD=preserved-password$' "${stack_directory}/.env"
+grep -q '^CUSTOM=preserved$' "${stack_directory}/.env"
+cp "${stack_directory}/.env" "${test_directory}/expected-dev.env"
+cp "${stack_directory}/secrets/webhook-encryption.bin" "${test_directory}/expected-stack-key"
+PATH="${stack_directory}/bin:${PATH}" sh "${stack_directory}/setup.sh" --dev > "${test_directory}/output"
+cmp "${test_directory}/expected-dev.env" "${stack_directory}/.env"
+cmp "${test_directory}/expected-stack-key" "${stack_directory}/secrets/webhook-encryption.bin"
+test "$(wc -l < "${stack_directory}/calls" | tr -d ' ')" -eq 2
+# A fresh production selection prepares config, but cannot start with missing credentials/TLS.
+mv "${stack_directory}/.env" "${stack_directory}/dev.env"
+if PATH="${stack_directory}/bin:${PATH}" sh "${stack_directory}/setup.sh" --prod > "${test_directory}/output" 2>&1; then
+    echo 'Production setup accepted missing production credentials and TLS.' >&2
+    exit 1
+fi
+grep -q '^COMPOSE_FILE=compose.yaml:compose.production.yaml$' "${stack_directory}/.env"
+grep -q 'RESEND_API_KEY' "${test_directory}/output"
+test "$(wc -l < "${stack_directory}/calls" | tr -d ' ')" -eq 2
+mkdir "${stack_directory}/tls"
+touch "${stack_directory}/tls/tls.crt" "${stack_directory}/tls/tls.key"
+cat >> "${stack_directory}/.env" <<ENV
+POSTGRES_PASSWORD=production-postgres
+KAIROS_DB_OWNER_PASSWORD=production-owner
+KAIROS_DB_RUNTIME_PASSWORD=production-runtime
+REDIS_PASSWORD=production-redis
+RESEND_API_KEY=production-resend
+VAPID_SUBJECT=mailto:operator@example.com
+KAIROS_TLS_DIRECTORY=${stack_directory}/tls
+CUSTOM=preserved-production
+ENV
+PATH="${stack_directory}/bin:${PATH}" sh "${stack_directory}/setup.sh" --prod > "${test_directory}/output"
+grep -q '^CUSTOM=preserved-production$' "${stack_directory}/.env"
+test "$(wc -l < "${stack_directory}/calls" | tr -d ' ')" -eq 3
+cmp "${test_directory}/expected-stack-key" "${stack_directory}/secrets/webhook-encryption.bin"
+# Selecting production from dev must preserve custom values and reject unsafe old defaults.
+cp "${stack_directory}/dev.env" "${stack_directory}/.env"
+printf '%s\n' 'RESEND_API_KEY=production-resend' >> "${stack_directory}/.env"
+if PATH="${stack_directory}/bin:${PATH}" sh "${stack_directory}/setup.sh" --prod > "${test_directory}/output" 2>&1; then
+    echo 'Production setup accepted local-only development configuration.' >&2
+    exit 1
+fi
+grep -q '^CUSTOM=preserved$' "${stack_directory}/.env"
+grep -q '^POSTGRES_PASSWORD=preserved-password$' "${stack_directory}/.env"
+test "$(wc -l < "${stack_directory}/calls" | tr -d ' ')" -eq 3
+printf '%s\n' 'Setup keys, rollback, Docker mode selection, config preservation and production validation passed.'

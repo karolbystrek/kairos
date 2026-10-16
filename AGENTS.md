@@ -57,17 +57,19 @@ service; existing explicit approval remains valid within its stated scope.
   the API owns staff credentials and sessions.
 - `compose.yaml`: shared infrastructure (PostgreSQL, Redis) on loopback ports;
   `compose.production.yaml` adds the application images and NGINX HTTPS ingress.
+  `compose.local.yaml` adds the complete Docker development stack with hot reload.
   Applications own their manifests and Dockerfiles; the two frontends share
   `apps/panel-app/Dockerfile`.
 
 ## Local development
 
-`./setup.sh --dev` creates `.env` and keys, installs frontend dependencies and
-starts PostgreSQL and Redis in Docker. Run the API with `(cd apps/api && ./mvnw
-spring-boot:run)` and each frontend with `npm --prefix apps/<app> run dev`.
-`docker compose stop` stops the infrastructure and keeps its data; `./reset.sh`
-deletes data, keys and `.env`, so run it only when the user asks. Details:
-[local development](docs/agents/local-development.md).
+`./setup.sh --dev` prepares configuration and keys and starts all five services
+in Docker with hot reload. `./setup.sh --prod` selects and starts production
+once its configuration and TLS files are ready. Later, `docker compose up
+--build -d` starts or rebuilds the selected mode; `docker compose stop` stops it
+and keeps data, and `docker compose logs -f` follows logs. `./reset.sh` deletes
+containers, volumes and keys and moves `.env` aside; run it only when the user
+asks. Details: [local development](docs/agents/local-development.md).
 
 ## Read when relevant
 

@@ -12,7 +12,7 @@ Use [the production runbook](RUNBOOK.md) for prerequisites and the sequence.
 ## 2. Prepare persistent configuration and keys
 
 Use the verified VM bootstrap described in [BOOTSTRAP.md](BOOTSTRAP.md) to
-prepare application keys. Production configuration is owned by the GitHub
+prepare application keys. Hosted release configuration is owned by the GitHub
 `production` Environment, never edited on the host. Every deployment writes
 `/srv/kairos/production.env` (mode `0600`, replaced atomically) from the
 committed `deployment/production.env.example` plus that Environment's values:
@@ -30,6 +30,12 @@ committed `deployment/production.env.example` plus that Environment's values:
   is literal.
 - Values reach the host only over the deploy job's SSH connection, never
   images, release bundles or artifacts.
+
+For a source checkout outside the hosted release workflow, `./setup.sh --prod`
+creates or preserves `.env`, selects the production Compose overlay, and starts
+it once required values and TLS files are supplied. Production source builds use
+the same Dockerfiles; the hosted deployer continues to use pinned images with
+`--no-build`. Missing configuration fails setup without resetting data or keys.
 
 **Adding a required production setting:** whenever a change adds a blank
 (required) key to `deployment/production.env.example`, also add its value to

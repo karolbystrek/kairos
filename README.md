@@ -23,59 +23,38 @@ The system consists of three applications:
 
 ## Local development
 
-Install [Docker](https://docs.docker.com/get-docker/), Node.js 22 and Java 25.
-Docker runs only the infrastructure (PostgreSQL and Redis); the applications run
-on your machine with hot reload over plain HTTP.
+Install [Docker](https://docs.docker.com/get-docker/) with Compose and OpenSSL, then run:
 
 ```bash
 ./setup.sh --dev
 ```
 
-`--dev` creates `.env` from `.env.example` (an existing `.env` is kept),
-generates development keys in `secrets/`, installs the frontend dependencies and
-starts PostgreSQL and Redis on loopback ports. Rerunning it is safe. Run
-`./setup.sh` without a preset to answer each step yourself.
-
-Then start each application in its own terminal (or from your IDE, with
-`apps/api` as the API's working directory):
-
-```bash
-(cd apps/api && ./mvnw spring-boot:run)
-```
-
-```bash
-npm --prefix apps/customer-app run dev
-```
-
-```bash
-npm --prefix apps/panel-app run dev
-```
+This prepares configuration and keys, builds the images, and starts the API,
+both frontends, PostgreSQL and Redis in Docker. Source edits reload the
+applications automatically; no host Node.js or Java installation is needed.
 
 * Customer app: http://localhost:3000
 * Staff panel: http://localhost:3001
 * API: http://localhost:8080/api
 
-The frontends use Fast Refresh. The API uses Spring Boot DevTools and restarts
-in about a second after a recompile (build in your IDE, or run
-`./mvnw compile` in `apps/api`). Session cookies are `Secure`, which Chrome and
-Firefox accept on `http://localhost`; Safari does not, so use Chrome or Firefox.
+Start or rebuild the selected stack later with:
 
-The API reads the same configuration keys locally and in production: locally
-from `.env`, in production from the environment that `compose.production.yaml`
-passes to its container. NGINX, TLS and the application images exist only in
-that production overlay.
+```bash
+docker compose up --build -d
+```
 
-Upgrading a checkout that used the earlier stack keeps the database: run
-`docker compose down --remove-orphans` (without `-v`) to remove the old gateway,
-application and ZITADEL containers, then `./setup.sh --dev --replace-env`, which
-replaces `.env` from `.env.example`, so re-apply any personal edits.
+For production from a source checkout, use `./setup.sh --prod` after supplying
+production configuration and TLS files. It selects the production stack; the
+same Compose command starts it afterward. Existing configuration, database data
+and keys are preserved. See [local development](docs/agents/local-development.md)
+for details and [production configuration](docs/deployment/CONFIGURATION.md)
+for required production settings. Hosted CI releases continue to use the
+[production runbook](docs/deployment/RUNBOOK.md).
 
-The API handles email/password authentication itself and stores password
-hashes in PostgreSQL; there is no separate identity service to run. No Google
-project, browser auth SDK, SMTP or email verification is required locally. Public Create account
-immediately creates a tenant administrator; managers/operators join through
-manually shared invitations. Sessions survive service restarts and expire after
-30 days without activity. See [authentication setup](docs/authentication-setup.md).
+Locally, email stays in log mode and registration skips email verification.
+The customer service worker and Web Push require a production build; `next dev`
+provides foreground tracking and Fast Refresh. Session cookies work over
+`http://localhost` in Chrome and Firefox; Safari requires HTTPS.
 
 ## Hosted VM preparation
 
@@ -96,8 +75,9 @@ git diff --check
 
 ## Stopping and resetting the local environment
 
-Stop each application with Ctrl-C. `docker compose stop` stops PostgreSQL and
-Redis and keeps their data; `docker compose up -d --wait` starts them again.
+`docker compose stop` stops the full stack and keeps its data.
+`docker compose up --build -d` starts it again; `docker compose logs -f` follows
+application logs.
 
 
 To delete the Compose containers and volumes and the generated keys, and move

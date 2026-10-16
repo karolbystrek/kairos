@@ -43,10 +43,26 @@ def main():
             'NGINX_ENVSUBST_FILTER=^KAIROS_',
         ]) + '\n')
         local = json.loads(run('docker', 'compose', '--env-file', str(env), '-f', str(ROOT / 'compose.yaml'),
+                               '-f', str(ROOT / 'compose.local.yaml'),
                                'config', '--format', 'json'))
-        assert set(local['services']) == {'postgres', 'redis'}, local['services'].keys()
+        assert set(local['services']) == {'postgres', 'redis', 'api', 'customer-app', 'panel-app'}
         assert all(port['host_ip'] == '127.0.0.1' for service in local['services'].values()
                    for port in service.get('ports', [])), 'local Compose published a non-loopback port'
+        for app, port in (('api', 8080), ('customer-app', 3000), ('panel-app', 3001)):
+            service = local['services'][app]
+            assert service['build']['target'] == 'development'
+            assert service['ports'][0]['target'] == port
+            mounts = {mount['target']: mount for mount in service['volumes']}
+            if app == 'api':
+                assert mounts['/app/src']['type'] == 'bind'
+                assert '/app/target' not in mounts
+                assert mounts['/root/.m2']['type'] == 'volume'
+                assert service['environment']['POSTGRES_HOST'] == 'postgres'
+                assert service['environment']['REDIS_HOST'] == 'redis'
+                assert len(service['secrets']) == 5
+            else:
+                assert mounts['/app']['source'] == str(ROOT / 'apps' / app)
+                assert mounts['/app/node_modules']['type'] == mounts['/app/.next']['type'] == 'volume'
         run('openssl', 'req', '-x509', '-newkey', 'rsa:2048', '-nodes',
             '-keyout', str(work / 'tls.key'), '-out', str(work / 'tls.crt'),
             '-days', '1', '-subj', '/CN=api.kairos.localhost')

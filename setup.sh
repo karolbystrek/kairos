@@ -23,12 +23,11 @@ Usage: $0 [--dev | --prod] [OPTIONS]
 Without a preset, setup asks about each step.
 
 Presets (explicit options below still take precedence):
-  --dev                          Local development: keep or create .env from
-                                 .env.example and keep or create keys in secrets/,
-                                 install frontend dependencies and start the
-                                 PostgreSQL and Redis containers.
-  --prod                         Production host: keep or create keys in
-                                 /srv/kairos/secrets; deployment owns production.env.
+  --dev                          Select and start the Docker development stack
+                                 with hot reload, keeping existing config/keys.
+  --prod                         Select and start the production Docker stack
+                                 using production configuration. A copied
+                                 setup command without Compose prepares keys only.
 
 Options:
   --secrets-directory DIRECTORY  Store generated material in DIRECTORY.
@@ -104,20 +103,36 @@ while [ "$#" -gt 0 ]; do
     esac
 done
 
+checkout_mode=false
+if [ -n "${preset}" ] && [ -f "${repository_directory}/compose.yaml" ]; then
+    checkout_mode=true
+fi
+
 case "${preset}" in
     dev)
         non_interactive=true
         : "${environment_action:=keep}"
         : "${key_action:=keep}"
-        : "${secrets_argument:=secrets}"
         ;;
     prod)
         non_interactive=true
-        : "${environment_action:=skip}"
         : "${key_action:=keep}"
-        : "${secrets_argument:=/srv/kairos/secrets}"
+        if [ "${checkout_mode}" = true ]; then
+            : "${environment_action:=keep}"
+            environment_example="${repository_directory}/deployment/production.env.example"
+        else
+            : "${environment_action:=skip}"
+            : "${secrets_argument:=/srv/kairos/secrets}"
+        fi
         ;;
 esac
+
+if [ -n "${preset}" ] && [ -z "${secrets_argument}" ]; then
+    if [ -f "${environment_file}" ]; then
+        secrets_argument="$(sed -n 's/^KAIROS_APPLICATION_SECRETS_DIRECTORY=//p' "${environment_file}" | tail -n 1 | sed "s/^['\"]//;s/['\"]$//")"
+    fi
+    : "${secrets_argument:=secrets}"
+fi
 
 cleanup() {
     if [ -n "${temporary_environment_file}" ] && [ -f "${temporary_environment_file}" ]; then
@@ -180,7 +195,7 @@ prompt_yes_no() {
 }
 
 write_environment_file() {
-    [ -f "${environment_example}" ] || fail ".env.example is required for setup."
+    [ -f "${environment_example}" ] || fail "The selected configuration template is missing: ${environment_example}"
 
     temporary_environment_file="$(mktemp "${repository_directory}/.env.tmp.XXXXXX")"
     cp "${environment_example}" "${temporary_environment_file}"
@@ -210,7 +225,7 @@ elif [ -e "${environment_file}" ] || [ -L "${environment_file}" ]; then
 
     if [ "${environment_action}" = replace ]; then
         write_environment_file
-        echo "Replaced .env from .env.example with mode 0600."
+        echo "Replaced .env from the selected configuration template with mode 0600."
     else
         if [ -f "${environment_file}" ] && [ ! -L "${environment_file}" ]; then
             chmod 0600 "${environment_file}"
@@ -219,7 +234,43 @@ elif [ -e "${environment_file}" ] || [ -L "${environment_file}" ]; then
     fi
 else
     write_environment_file
-    echo "Created .env from .env.example with mode 0600."
+    echo "Created .env from the selected configuration template with mode 0600."
+fi
+
+set_environment_value() {
+    temporary_environment_file="$(mktemp "${repository_directory}/.env.tmp.XXXXXX")"
+    awk -v key="$1" -v value="$2" '
+        index($0, key "=") == 1 { if (!written++) print key "=" value; next }
+        { print }
+        END { if (!written) print key "=" value }
+    ' "${environment_file}" > "${temporary_environment_file}"
+    mv -f "${temporary_environment_file}" "${environment_file}"
+    temporary_environment_file=""
+}
+
+if [ "${checkout_mode}" = true ]; then
+    # Add new settings without replacing credentials or personal configuration.
+    temporary_environment_file="$(mktemp "${repository_directory}/.env.tmp.XXXXXX")"
+    awk '
+        NR == FNR { split($0, fields, "="); present[fields[1]]=1; print; next }
+        /^[A-Z][A-Z0-9_]*=/ { split($0, fields, "="); if (!present[fields[1]]) print }
+    ' "${environment_file}" "${environment_example}" > "${temporary_environment_file}"
+    mv -f "${temporary_environment_file}" "${environment_file}"
+    temporary_environment_file=""
+    if [ "${preset}" = dev ]; then
+        set_environment_value COMPOSE_FILE compose.yaml:compose.local.yaml
+    else
+        set_environment_value COMPOSE_FILE compose.yaml:compose.production.yaml
+        for setting in KAIROS_IMAGE_REGISTRY=kairos-local KAIROS_RELEASE_VERSION=production; do
+            key="${setting%%=*}"
+            if ! grep -Eq "^${key}=.+" "${environment_file}"; then
+                set_environment_value "${key}" "${setting#*=}"
+            fi
+        done
+    fi
+    set_environment_value POSTGRES_HOST postgres
+    set_environment_value REDIS_HOST redis
+    set_environment_value KAIROS_SECRETS_DIRECTORY /run/secrets
 fi
 
 if [ -z "${secrets_argument}" ]; then
@@ -505,17 +556,22 @@ else
 fi
 
 
-trap - EXIT HUP INT TERM
-
-# A local checkout also gets frontend dependencies and running infrastructure; copies without Compose (tests) skip this.
-if [ "${preset}" = dev ] && [ -f "${repository_directory}/compose.yaml" ]; then
-    for app in customer-app panel-app; do
-        [ -d "${repository_directory}/apps/${app}/node_modules" ] || npm --prefix "${repository_directory}/apps/${app}" ci
-    done
-    docker compose --project-directory "${repository_directory}" up -d --wait
+if [ "${checkout_mode}" = true ]; then
+    set_environment_value KAIROS_APPLICATION_SECRETS_DIRECTORY "${secrets_directory}"
+    docker compose --project-directory "${repository_directory}" config --quiet ||
+        fail "The ${preset} stack is selected but configuration is incomplete. Update .env and TLS paths, then retry --${preset}; existing values and keys were preserved."
+    if [ "${preset}" = prod ]; then
+        # Preserved development settings must never relax production boundaries.
+        docker compose --project-directory "${repository_directory}" config --environment | awk -F= '
+            $1 ~ /^(WEBHOOK_DESTINATION_POLICY|PUSH_DESTINATION_POLICY)$/ && $2 != "PUBLIC_HTTPS" { invalid=1 }
+            $1 == "EMAIL_VERIFICATION_ENABLED" && tolower($2) != "true" { invalid=1 }
+            $1 ~ /^(NEXT_PUBLIC_CUSTOMER_APP_URL|PANEL_APP_URL|NEXT_PUBLIC_API_BASE_URL)$/ && $2 !~ "^https://[^/]+/?$" { invalid=1 }
+            END { exit invalid }
+        ' || fail "Production requires HTTPS origins, PUBLIC_HTTPS delivery policies and email verification. Update .env, then retry --prod; existing settings were preserved."
+    fi
+    docker compose --project-directory "${repository_directory}" up --build -d --wait
     echo
-    echo "Infrastructure is running. Start the applications with hot reload:"
-    echo "  (cd apps/api && ./mvnw spring-boot:run)   # http://localhost:8080/api"
-    echo "  npm --prefix apps/customer-app run dev     # http://localhost:3000"
-    echo "  npm --prefix apps/panel-app run dev        # http://localhost:3001"
+    echo "The ${preset} Docker stack is running. Rebuild: docker compose up --build -d"
+    echo "Stop and keep data: docker compose stop"
 fi
+trap - EXIT HUP INT TERM

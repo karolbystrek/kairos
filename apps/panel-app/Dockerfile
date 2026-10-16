@@ -5,6 +5,12 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm ci
 
+# Reuse the dependency cache; refresh the container volume from the mounted lockfile.
+FROM deps AS development
+ENV NODE_ENV=development
+ENV NEXT_TELEMETRY_DISABLED=1
+CMD ["sh", "-c", "npm ci --prefer-offline --no-audit --no-fund && npm run dev -- --hostname 0.0.0.0"]
+
 # Stage 2: Build the application
 FROM node:22-alpine AS builder
 WORKDIR /app
