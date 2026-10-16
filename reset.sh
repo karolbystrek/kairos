@@ -46,4 +46,4 @@ rm -f \
 echo "Removed generated keys from ${secrets_directory}."
 
 echo
-echo "Reset complete. Run ./setup.sh --dev (or --prod), then docker compose up."
+echo "Reset complete. Run ./setup.sh --dev (or --prod)."

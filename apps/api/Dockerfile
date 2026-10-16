@@ -11,6 +11,13 @@ COPY .mvn .mvn
 # Resolve dependencies (cached unless pom.xml changes)
 RUN chmod +x mvnw && ./mvnw dependency:go-offline -B
 
+# The development image watches mounted sources; production needs only the JRE.
+FROM dependencies AS development
+RUN apk add --no-cache watchexec
+COPY src ./src
+EXPOSE 8080
+CMD ["watchexec", "--restart", "--poll", "1s", "--watch", "src/main", "--watch", "pom.xml", "--", "./mvnw", "--batch-mode", "-Dmaven.test.skip=true", "clean", "spring-boot:run"]
+
 # Stage 2: Build the application
 FROM dependencies AS builder
 

@@ -16,12 +16,13 @@
 Production Compose (`compose.yaml` plus `compose.production.yaml`) uses NGINX
 HTTPS ingress. Application and data services do not publish host ports. Browser
 REST and SSE requests go directly to the dedicated API origin through the gateway.
-Local development has no gateway: `compose.yaml` publishes infrastructure
-ports on `127.0.0.1`, the applications run on the host over HTTP, and browsers
-call the API origin `http://localhost:8080` directly.
+Local development adds `compose.local.yaml`: all five services run in Docker
+with hot reload, publishing only loopback ports over HTTP. Browsers call the
+API origin `http://localhost:8080` directly; there is no local gateway.
 
-* The root environment file configures the customer, panel, and API origins;
-  production adds exact gateway hostnames. `.env.example` records the local
+* Local development uses the committed localhost origins in frontend development
+  settings and the local Compose overlay. Production configures public origins
+  and exact gateway hostnames in the root environment file. `.env.example` records the local
   configuration surface and `deployment/production.env.example` the hosted one.
 * Spring scopes credentialed CORS by frontend origin and browser resource family.
   External Integration APIs and internal management endpoints have no browser
@@ -48,22 +49,22 @@ call the API origin `http://localhost:8080` directly.
   proxy buffering and use a read timeout longer than the 30-minute emitter lifetime.
 * The customer and panel hosts add HSTS, `X-Content-Type-Options: nosniff` and
   `X-Frame-Options: DENY`; the API sends the same through Spring Security.
-* `compose.yaml` holds only PostgreSQL and Redis, published on `127.0.0.1`.
-  Locally the applications run on the host with hot reload (`./mvnw
-  spring-boot:run` with Spring Boot DevTools, `next dev`) and read the same
-  configuration keys as production: the API imports the repository `.env`, the
-  frontends their committed `.env.development`. `compose.production.yaml` adds the
-  application images, NGINX, private networking and limits. Rate limits, header
-  replacement and SSE proxy settings are therefore exercised only by the
-  production overlay and `tests/gateway-test.py`. Redis Pub/Sub is nondurable and
-  has no volume; PostgreSQL data remains persistent.
-* `setup.sh` validates the complete key set with explicit handling of existing
-  files. Without a preset it asks about each step; `--dev` prepares `.env` and
-  `secrets/` without prompts, installs frontend dependencies and starts the
-  infrastructure, and `--prod` prepares `/srv/kairos/secrets` without writing an
-  environment file. Secret directories use `0700` and application key files
-  `0400`. `reset.sh` has no modes: it removes the Compose project, its volumes and
-  the generated keys in the configured secrets directory.
+* `compose.yaml` owns PostgreSQL and Redis; `compose.local.yaml` adds development
+  application builds, source mounts and isolated dependency/build volumes.
+  Next.js provides Fast Refresh; the API development image uses `watchexec`
+  for automatic clean compilation and process restart on source changes.
+  `compose.production.yaml` instead adds
+  production builds/images, NGINX, private networking and limits. Hosted releases
+  use manifest-pinned images with `--no-build`. Redis Pub/Sub is nondurable;
+  PostgreSQL data remains persistent.
+* `setup.sh --dev` prepares configuration and keys and starts the entire Docker
+  development stack. `--prod` selects and starts production after checking its
+  supplied configuration. Both persist their Compose selection in `.env`, so
+  `docker compose up --build -d` subsequently starts the selected mode.
+  Existing credentials, custom configuration and keys are preserved. Copies of
+  setup without Compose retain the VM bootstrap's keys-only production behavior.
+  Secret directories use `0700` and application key files `0400`. `reset.sh`
+  removes containers, volumes and generated keys and moves `.env` aside.
 
 ### Validation and immutable publication
 

@@ -21,25 +21,31 @@
 
 ## Setup
 
-Run `./setup.sh --dev` to prepare `.env` and development keys, install frontend
-dependencies and start PostgreSQL and Redis (`compose.yaml`, loopback ports
-`5432` and `6379`). Run the applications on the host:
+Run `./setup.sh --dev` to prepare `.env` and development keys and start the API,
+both frontends, PostgreSQL and Redis in Docker. No host application commands
+are required. Setup selects `compose.yaml` plus `compose.local.yaml` in `.env`;
+`docker compose up --build -d` subsequently starts or rebuilds that mode.
 
-- API: `./mvnw spring-boot:run` from `apps/api`, on `http://localhost:8080/api`.
-  It imports `../../.env` (the same keys production passes as environment
-  variables) and reads keys from `KAIROS_SECRETS_DIRECTORY` (`../../secrets`).
-  The Maven plugin activates the `local` profile, which permits logged email.
-  DevTools restarts it after a recompile.
-- Frontends: `npm run dev` in `apps/customer-app` (`http://localhost:3000`) and
-  `apps/panel-app` (`http://localhost:3001`). Each committed `.env.development`
-  holds the app's `PORT` and local origins; the dev script exports it before
-  starting Next.js, which binds its port before reading `.env` files.
+- Customer: `http://localhost:3000`; panel: `http://localhost:3001`;
+  API: `http://localhost:8080/api`.
+- Source files are mounted from the checkout. Next.js provides Fast Refresh;
+  the API development image uses `watchexec` to rebuild and restart after Java
+  or resource edits. A compile error leaves the API unavailable until the next
+  successful edit; the watcher stays running.
+- Dependencies and frontend build output use container-owned volumes; API build
+  output stays inside its container. Host artifacts do not interfere. Rebuild
+  after changing dependency descriptors or Dockerfiles.
+- `docker compose logs -f` follows logs; `docker compose stop` stops all services
+  without deleting data.
+- `./setup.sh --prod` selects `compose.yaml` plus `compose.production.yaml`,
+  validates the supplied configuration and starts the production stack. Existing
+  settings and keys are preserved; supply missing production values and TLS
+  material before retrying. A copied setup script without Compose retains the
+  VM bootstrap's keys-only behavior.
 
-NGINX, TLS, Cloudflare trust and the application images exist only in
-`compose.production.yaml`; `tests/gateway-test.py` covers them. Web Push is
-disabled under `next dev`; check it with a production build (`npm run build &&
-npm start`). A phone cannot reach `localhost`, so phone testing needs a tunnel
-or a LAN-reachable origin set in `.env` and `.env.development`.
+Development uses HTTP on loopback; NGINX and TLS belong to production.
+Web Push is disabled under `next dev`; use a production build for PWA/push
+acceptance. Phone testing needs reachable origins rather than `localhost`.
 
 For runtime verification use the default `kairos` Compose project, never a
 separately named stack. Use `./reset.sh` only when the user has authorized

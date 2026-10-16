@@ -57,6 +57,14 @@ services:
 
   customer-app:
     image: ${KAIROS_IMAGE_REGISTRY:?Set KAIROS_IMAGE_REGISTRY}/customer-app:${KAIROS_RELEASE_VERSION:?Set KAIROS_RELEASE_VERSION}
+    build:
+      context: ./apps/customer-app
+      dockerfile: ../panel-app/Dockerfile
+      target: runner
+      args:
+        NEXT_PUBLIC_API_BASE_URL:
+        NEXT_PUBLIC_CUSTOMER_APP_URL:
+        NEXT_TELEMETRY_DISABLED:
     depends_on:
       api:
         condition: service_healthy
@@ -75,6 +83,15 @@ services:
 
   panel-app:
     image: ${KAIROS_IMAGE_REGISTRY:?Set KAIROS_IMAGE_REGISTRY}/panel-app:${KAIROS_RELEASE_VERSION:?Set KAIROS_RELEASE_VERSION}
+    build:
+      context: ./apps/panel-app
+      dockerfile: Dockerfile
+      target: runner
+      args:
+        NEXT_PUBLIC_API_BASE_URL:
+        NEXT_PUBLIC_CUSTOMER_APP_URL:
+        NEXT_PUBLIC_PANEL_APP_URL: ${PANEL_APP_URL}
+        NEXT_TELEMETRY_DISABLED:
     depends_on:
       api:
         condition: service_healthy
@@ -93,7 +110,10 @@ services:
 
   api:
     image: ${KAIROS_IMAGE_REGISTRY:?Set KAIROS_IMAGE_REGISTRY}/api:${KAIROS_RELEASE_VERSION:?Set KAIROS_RELEASE_VERSION}
-    # The same keys as the host-run API reads from .env; only the values differ.
+    build:
+      context: ./apps/api
+      target: runner
+    # Hosted releases select immutable images with --no-build.
     environment:
       EMAIL_DELIVERY_MODE: RESEND
       EMAIL_VERIFICATION_ENABLED: "${EMAIL_VERIFICATION_ENABLED:-true}"

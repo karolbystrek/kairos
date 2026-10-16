@@ -1,0 +1,111 @@
+# Selected by ./setup.sh --dev. Applications and their build tools stay in Docker.
+services:
+  customer-app:
+    build:
+      context: ./apps/customer-app
+      dockerfile: ../panel-app/Dockerfile
+      target: development
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - ./apps/customer-app:/app
+      - customer_node_modules:/app/node_modules
+      - customer_next:/app/.next
+    networks:
+      - data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
+  panel-app:
+    build:
+      context: ./apps/panel-app
+      dockerfile: Dockerfile
+      target: development
+    ports:
+      - "127.0.0.1:3001:3001"
+    volumes:
+      - ./apps/panel-app:/app
+      - panel_node_modules:/app/node_modules
+      - panel_next:/app/.next
+    networks:
+      - data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3001/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
+  api:
+    build:
+      context: ./apps/api
+      target: development
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      POSTGRES_HOST: postgres
+      POSTGRES_DB:
+      KAIROS_DB_OWNER_USER:
+      KAIROS_DB_OWNER_PASSWORD:
+      KAIROS_DB_RUNTIME_USER:
+      KAIROS_DB_RUNTIME_PASSWORD:
+      REDIS_HOST: redis
+      REDIS_PORT:
+      REDIS_PASSWORD:
+      KAIROS_SECRETS_DIRECTORY: /run/secrets
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:8080
+      NEXT_PUBLIC_CUSTOMER_APP_URL: http://localhost:3000
+      PANEL_APP_URL: http://localhost:3001
+      VAPID_SUBJECT:
+      WEBHOOK_DESTINATION_POLICY: LOCAL_DEVELOPMENT
+      PUSH_DESTINATION_POLICY: PUBLIC_HTTPS
+      EMAIL_DELIVERY_MODE: LOG
+      EMAIL_VERIFICATION_ENABLED: "${EMAIL_VERIFICATION_ENABLED:-false}"
+      REVIEW_INVITATION_DELAY: "${REVIEW_INVITATION_DELAY:-1m}"
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./apps/api/src:/app/src:ro
+      - ./apps/api/pom.xml:/app/pom.xml:ro
+      - api_maven:/root/.m2
+    secrets:
+      - email-encryption.bin
+      - webhook-encryption.bin
+      - vapid-private.pem
+      - vapid-public.pem
+      - push-subscription-encryption.bin
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/api/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+secrets:
+  email-encryption.bin:
+    file: ${KAIROS_APPLICATION_SECRETS_DIRECTORY:-./secrets}/email-encryption.bin
+  webhook-encryption.bin:
+    file: ${KAIROS_APPLICATION_SECRETS_DIRECTORY:-./secrets}/webhook-encryption.bin
+  vapid-private.pem:
+    file: ${KAIROS_APPLICATION_SECRETS_DIRECTORY:-./secrets}/vapid-private.pem
+  vapid-public.pem:
+    file: ${KAIROS_APPLICATION_SECRETS_DIRECTORY:-./secrets}/vapid-public.pem
+  push-subscription-encryption.bin:
+    file: ${KAIROS_APPLICATION_SECRETS_DIRECTORY:-./secrets}/push-subscription-encryption.bin
+
+volumes:
+  customer_node_modules:
+  customer_next:
+  panel_node_modules:
+  panel_next:
+  api_maven:
