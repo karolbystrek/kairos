@@ -26,6 +26,18 @@ it("expired sessions notify authentication listeners without request replay", as
   expect(calls.map(({ url }) => url.pathname)).toEqual(["/api/orders/v1"]);
 });
 
+it.each([
+  [401, 0],
+  [409, 0],
+  [429, 0],
+  [500, 1],
+])("status %i is logged %i time(s) as a technical error", async (status, logged) => {
+  stubFetch(() => new Response(null, { status }));
+
+  await expect(apiFetch("/api/orders/v1")).rejects.toMatchObject({ status });
+  expect(console.error).toHaveBeenCalledTimes(logged);
+});
+
 it.each([true, false])("CSRF rejection retries once after retrieving a fresh token (recovers: %s)", async (recovered) => {
   let tokens = 0;
   let writes = 0;

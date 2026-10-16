@@ -36,6 +36,10 @@ function apiUrl(path: string): string {
 }
 
 function logTechnicalError(message: string, error: unknown): void {
+  // 4xx answers (signed out, validation, conflict, rate limit) are expected
+  // outcomes that callers present to the user, not technical failures.
+  if (error instanceof ApiError && error.status < 500) return;
+
   // Technical details belong in diagnostics, never in user-facing messages.
   // eslint-disable-next-line no-console
   console.error(message, error);
