@@ -168,7 +168,9 @@ class RetentionPurgeIntegrationTests extends RedisListenerIsolatedIntegrationTes
         assertThat(count("SELECT count(*) FROM account_invitations WHERE location_id = ?", tenant.secondLocationId())).isZero();
         for (var order : new UUID[]{keptOrder.id(), otherTenantOrder.id()}) {
             assertThat(count("SELECT count(*) FROM orders WHERE id = ?", order)).isOne();
-            assertThat(count("SELECT count(*) FROM order_history WHERE order_id = ?", order)).isOne();
+            // Unchanged for days, the kept orders were also expired, which adds one history entry each.
+            assertThat(count("SELECT count(*) FROM order_history WHERE order_id = ?", order)).isEqualTo(2);
+            assertThat(count("SELECT count(*) FROM orders WHERE id = ? AND status = 'EXPIRED'", order)).isOne();
         }
         assertThat(count("SELECT count(*) FROM locations WHERE id = ?", otherTenant.secondLocationId())).isOne();
     }
