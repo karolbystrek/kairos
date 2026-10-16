@@ -45,11 +45,12 @@ predefined review `event`. Accepted requests return `204`. Both use server
 receipt time and reject invalid requests atomically. Unsafe browser requests
 retain CSRF protection and origin-scoped CORS.
 
-Bodies are limited to 8 KiB, including bodies without Content-Length. An
-API-local budget allows 60 requests per minute per staff account or tracking
-reference. Keys live only in bounded expiring memory; no caller identity or IP
-is persisted in analytics. The budget is per API instance and resets on restart;
-multiple instances increase the effective allowance.
+Bodies are limited to 8 KiB, including bodies without Content-Length. A budget
+of 60 requests per clock minute per staff account or tracking reference is
+counted in Redis, so every API instance shares it. Counters expire after two
+minutes; no caller identity or IP is persisted in analytics. A review action
+uses the budget only once its order is found and its invitation is due, so
+made-up references cannot exhaust it. Redis being unavailable returns `503`.
 
 Frontends initially submit singleton requests asynchronously with silent failure.
 Collection never delays or blocks the user action. There is no browser telemetry
