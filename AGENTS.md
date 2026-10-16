@@ -39,7 +39,7 @@ stages and rules, not the tools. Scale each stage to the task's size and risk.
 6. **Ship.** Use Conventional Commit messages; PRs are squash-merged, so the PR
    title is a Conventional Commit too. Open a PR to `main` describing the
    outcome and the checks run, link the issue with a closing keyword, get CI
-   green, label the issue `ready-for-human`, and stop. The user verifies,
+   green, and stop. The user verifies,
    merges and decides when to deploy; never merge or deploy yourself.
 
 ## Cloud resource approval
@@ -78,8 +78,8 @@ service; existing explicit approval remains valid within its stated scope.
 - [Documentation maintenance](docs/agents/documentation.md): before documentation
   changes or recording accepted decisions. Keep agent guidance focused by purpose
   and update this index whenever it changes; keep task records in GitHub.
-- [GitHub issues](docs/agents/issue-tracker.md): before creating, linking,
-  labelling or auditing issues.
+- [GitHub issues](docs/agents/issue-tracker.md): before creating, linking
+  or auditing issues.
 - [Thesis framing](docs/PROBLEM_DESCRIPTION.md): when discussing thesis scope.
 - [Authentication operations](docs/authentication-setup.md): before provider
   setup, credential rotation, or live authentication acceptance.

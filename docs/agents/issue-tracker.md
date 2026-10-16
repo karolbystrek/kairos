@@ -5,7 +5,6 @@
 - [GitHub issues](#github-issues)
 - [Contents](#contents)
 - [Commands and sub-issues](#commands-and-sub-issues)
-- [Labels](#labels)
 - [Issue audits](#issue-audits)
 
 The end-to-end workflow lives in [AGENTS.md](../../AGENTS.md#workflow). This
@@ -19,14 +18,6 @@ native sub-issue with `gh api repos/karolbystrek/kairos/issues/<parent>/sub_issu
 -X POST -F sub_issue_id=<child-database-id>`, getting the child database ID from
 `gh api repos/karolbystrek/kairos/issues/<child> --jq .id`. Close a parent issue
 only when all of its scope is complete.
-
-## Labels
-
-- `needs-triage`: not yet assessed.
-- `needs-info`: waiting on more information.
-- `ready-for-agent`: agreed and ready for an agent to implement.
-- `ready-for-human`: a PR is open and waiting for user verification.
-- `wontfix`: will not be done.
 
 ## Issue audits
 
