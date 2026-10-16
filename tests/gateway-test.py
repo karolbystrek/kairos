@@ -143,8 +143,8 @@ def main():
                          '/api/auth/v1/password-reset/confirmation',
                          '/api/auth/v1/verification', '/api/auth/v1/verification/resend',
                          '/api/tenant-registrations/v1', '/api/account-invitation-redemptions/v1']
-            statuses = [request(protected[i % len(protected)], client=f'203.0.113.{i + 1}', method='POST')[0] for i in range(9)]
-            assert statuses[:6] == [200] * 6 and statuses[6:] == [429] * 3, (mode, statuses)
+            statuses = [request(protected[i % len(protected)], client=f'203.0.113.{i + 1}', method='POST')[0] for i in range(24)]
+            assert statuses[:21] == [200] * 21 and statuses[21:] == [429] * 3, (mode, statuses)
             for path, method in (
                 ('/api/auth/v1/csrf', 'GET'), ('/api/auth/v1/me', 'GET'),
                 ('/api/orders/v1', 'GET'), ('/api/orders/v1', 'POST'),
@@ -155,8 +155,13 @@ def main():
                 ('/api/account-invitation-previews/v1', 'POST'),
             ):
                 assert request(path, method=method)[0] == 200, (path, method)
-            status, _, headers = request('/api/tracked-orders/v1/test/events')
-            assert status == 200 and headers['X-Accel-Buffering'] == 'no'
+            for path in ('/api/tracked-orders/v1/test/events', '/api/orders/v1/events'):
+                status, _, headers = request(path)
+                assert status == 200 and headers['X-Accel-Buffering'] == 'no', path
+            for host in ('customer.kairos.localhost', 'panel.kairos.localhost'):
+                headers = request('/', host)[2]
+                assert headers['Strict-Transport-Security'].startswith('max-age=') and headers['X-Frame-Options'] == 'DENY'
+                assert headers['X-Content-Type-Options'] == 'nosniff', host
             with concurrent.futures.ThreadPoolExecutor(max_workers=16) as pool:
                 external = list(pool.map(lambda _: request('/api/external/orders/v1')[0], range(60)))
             assert 200 in external and 429 in external and set(external) == {200, 429}, external
@@ -169,8 +174,8 @@ def main():
             assert request('/api/auth/v1/csrf', client='2001:db8::1')[1].split('|')[1:3] == ['2001:db8::1'] * 2
             for i, path in enumerate(protected):
                 client = f'203.0.113.{100 + i}'
-                statuses = [request(path, client=client, method='POST')[0] for _ in range(7)]
-                assert statuses == [200] * 6 + [429], statuses
+                statuses = [request(path, client=client, method='POST')[0] for _ in range(22)]
+                assert statuses == [200] * 21 + [429], statuses
             assert request('/api/auth/v1/csrf', client='203.0.113.100')[0] == 200
             print(f'{mode}: Compose, TLS, routing, header trust, throttling and SSE checks passed')
             run('docker', 'rm', '-f', gateway)

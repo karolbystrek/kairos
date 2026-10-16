@@ -20,6 +20,7 @@ import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
 import pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase;
 import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
 
+import pl.karolbystrek.kairos.api.order.application.exception.ResourceNotFoundException;
 import java.time.Duration;
 import java.sql.Timestamp;
 import java.time.temporal.ChronoUnit;
@@ -86,16 +87,21 @@ class UsageAnalyticsIntegrationTests extends RedisListenerIsolatedIntegrationTes
         owner.update("UPDATE locations SET google_review_url='https://example.com/review',review_configuration_id=? WHERE id=?",
                 UUID.randomUUID(), tenant.firstLocationId());
         var order = orders.createOrder(tenant.administrator(), tenant.firstLocationId(), null, List.of());
-        assertThatThrownBy(() -> usage.review(order.trackingReference(), "review_link_clicked")).isInstanceOf(RuntimeException.class);
+        assertThatThrownBy(() -> usage.review(order.trackingReference(), "review_link_clicked", () -> {
+            throw new AssertionError("an ineligible order must not use rate-limit budget");
+        })).isInstanceOf(ResourceNotFoundException.class);
+        assertThatThrownBy(() -> usage.review(UUID.randomUUID(), "review_link_clicked", () -> {
+            throw new AssertionError("an unknown reference must not use rate-limit budget");
+        })).isInstanceOf(ResourceNotFoundException.class);
         orders.updateStatus(tenant.administrator(), order.id(), OrderStatus.READY);
         orders.updateStatus(tenant.administrator(), order.id(), OrderStatus.COMPLETED);
-        assertThatThrownBy(() -> usage.review(order.trackingReference(), "review_link_clicked")).isInstanceOf(RuntimeException.class);
+        assertThatThrownBy(() -> usage.review(order.trackingReference(), "review_link_clicked", () -> {})).isInstanceOf(RuntimeException.class);
         clock.advance(Duration.ofDays(1));
-        usage.review(order.trackingReference(), "review_link_clicked");
-        usage.review(order.trackingReference(), "review_prompt_dismissed");
+        usage.review(order.trackingReference(), "review_link_clicked", () -> {});
+        usage.review(order.trackingReference(), "review_prompt_dismissed", () -> {});
         assertThat(total()).isEqualTo(2);
         owner.update("UPDATE locations SET review_configuration_id=? WHERE id=?", UUID.randomUUID(), tenant.firstLocationId());
-        assertThatThrownBy(() -> usage.review(order.trackingReference(), "review_link_clicked")).isInstanceOf(RuntimeException.class);
+        assertThatThrownBy(() -> usage.review(order.trackingReference(), "review_link_clicked", () -> {})).isInstanceOf(RuntimeException.class);
         assertThat(total()).isEqualTo(2);
     }
 
