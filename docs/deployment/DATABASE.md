@@ -1,15 +1,5 @@
 # PostgreSQL roles and initialization
 
-## Contents
-
-- [PostgreSQL roles and initialization](#postgresql-roles-and-initialization)
-- [Contents](#contents)
-- [Credentials and fresh startup](#credentials-and-fresh-startup)
-- [Spring persistence and RLS](#spring-persistence-and-rls)
-- [Platform administrator grants](#platform-administrator-grants)
-  - [Grant platform access](#grant-platform-access)
-  - [Verify and revoke](#verify-and-revoke)
-
 ## Credentials and fresh startup
 
 `POSTGRES_USER`/`POSTGRES_PASSWORD` are PostgreSQL initialization and

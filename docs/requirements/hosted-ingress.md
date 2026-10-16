@@ -1,12 +1,6 @@
 # Hosted ingress and Cloudflare range maintenance
 
-## Contents
-
-- [Hosted ingress and Cloudflare range maintenance](#hosted-ingress-and-cloudflare-range-maintenance)
-- [Contents](#contents)
-- [7.2 Hosted ingress and Cloudflare range maintenance](#72-hosted-ingress-and-cloudflare-range-maintenance)
-
-### 7.2 Hosted ingress and Cloudflare range maintenance
+### Hosted ingress and Cloudflare range maintenance
 
 The hosted Compose overlay publishes only NGINX port 443 directly on the VM;
 application and database ports remain private. Configure Cloudflare to proxy the

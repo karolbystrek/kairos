@@ -1,22 +1,16 @@
 # Cloudflare and origin ingress
 
-## Contents
-
-- [Cloudflare and origin ingress](#cloudflare-and-origin-ingress)
-- [Contents](#contents)
-- [3. Configure Cloudflare and origin ingress](#3-configure-cloudflare-and-origin-ingress)
-
 Agent execution of AWS/Cloudflare resource changes requires explicit user
 approval; read-only inspection is allowed. See [cloud operations](../agents/cloud-operations.md).
 
 Use [the production runbook](RUNBOOK.md) for prerequisites and the sequence.
 
-## 3. Configure Cloudflare and origin ingress
+## Configure Cloudflare and origin ingress
 
 Create proxied DNS records for the three chosen application hostnames pointing
 to the VM. Install a Cloudflare Origin CA certificate covering all three names
 at `/srv/kairos/tls/tls.crt` and its matching private key at `tls.key`, with the
-permissions in [host preparation](HOST.md#1-choose-and-prepare-the-host). Configure **Full (strict)** encryption. Never use mkcert,
+permissions in [host preparation](HOST.md#choose-and-prepare-the-host). Configure **Full (strict)** encryption. Never use mkcert,
 Certbot or a tunnel for this hosted path. Origin CA is trusted by Cloudflare;
 direct browser access to the origin is not the certificate acceptance test.
 See [Origin CA operations](https://developers.cloudflare.com/ssl/origin-configuration/origin-ca/).
@@ -38,7 +32,7 @@ families, including SNI/Host requests to the VM IP; certificate distrust alone i
 not proof that ingress is blocked. See [Docker firewall behavior](https://docs.docker.com/engine/network/packet-filtering-firewalls/).
 
 Maintain firewall allowlists and `nginx/cloudflare-real-ip.conf` together using
-[the range maintenance procedure](../requirements/hosted-ingress.md#72-hosted-ingress-and-cloudflare-range-maintenance).
+[the range maintenance procedure](../requirements/hosted-ingress.md#hosted-ingress-and-cloudflare-range-maintenance).
 NGINX trusts `CF-Connecting-IP` only from those ranges and replaces upstream
 forwarding headers. Never add arbitrary VM/Docker subnets to restore forwarding.
 

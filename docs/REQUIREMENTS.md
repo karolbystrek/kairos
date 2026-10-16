@@ -1,14 +1,5 @@
 # Kairos Architecture and Requirements
 
-## Contents
-
-- [Kairos Architecture and Requirements](#kairos-architecture-and-requirements)
-- [Contents](#contents)
-- [Reading by task](#reading-by-task)
-- [Topic map](#topic-map)
-- [Common dependencies](#common-dependencies)
-- [Maintaining requirements](#maintaining-requirements)
-
 Canonical requirements live in the topic files below. This index is the entry
 point; the linked files form one specification, not independent alternatives.
 
@@ -16,7 +7,7 @@ point; the linked files form one specification, not independent alternatives.
 
 Before planning, implementing or reviewing, read the purpose/ownership and
 current delivery status, then the topics affected by the task. Use each file's
-Contents to select relevant sections. Follow cross-links and read adjacent
+headings to select relevant sections. Follow cross-links and read adjacent
 security, data-integrity and contract rules when the change crosses boundaries.
 Do not skip an applicable requirement because it lives in another file.
 

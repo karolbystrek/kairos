@@ -1,12 +1,6 @@
 # Real-time communication
 
-## Contents
-
-- [Real-time communication](#real-time-communication)
-- [Contents](#contents)
-- [6. Real-Time Communication](#6-real-time-communication)
-
-## 6. Real-Time Communication
+## Real-time communication
 
 The API exposes an anonymous, read-only Server-Sent Events stream for each
 customer tracking reference. Possession of the high-entropy reference grants

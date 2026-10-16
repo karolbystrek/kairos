@@ -1,12 +1,6 @@
 # Persistence requirements
 
-## Contents
-
-- [Persistence requirements](#persistence-requirements)
-- [Contents](#contents)
-- [5. Persistence Requirements](#5-persistence-requirements)
-
-## 5. Persistence Requirements
+## Persistence requirements
 
 The database schema must include tables covering the following concepts. Names and nonessential columns are implementation decisions.
 

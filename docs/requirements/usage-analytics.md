@@ -1,14 +1,5 @@
 # Anonymous panel and review usage counts
 
-## Contents
-
-- [Anonymous panel and review usage counts](#anonymous-panel-and-review-usage-counts)
-- [Contents](#contents)
-- [Events and attribution](#events-and-attribution)
-- [Ingestion and delivery](#ingestion-and-delivery)
-- [Storage, isolation and deletion](#storage-isolation-and-deletion)
-- [Accuracy and privacy limits](#accuracy-and-privacy-limits)
-
 ## Events and attribution
 
 Count actions, never unique people, sessions or devices. The panel collects

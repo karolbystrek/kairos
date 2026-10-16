@@ -1,13 +1,5 @@
 # Cloud operations and approval
 
-## Contents
-
-- [Cloud operations and approval](#cloud-operations-and-approval)
-- [Contents](#contents)
-- [Read-only access](#read-only-access)
-- [Resource changes](#resource-changes)
-- [Approval scope](#approval-scope)
-
 ## Read-only access
 
 Agents may use AWS CLI and Cloudflare CLI/API tools to read service state

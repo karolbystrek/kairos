@@ -93,7 +93,7 @@ containers, volumes and keys and moves `.env` aside, refuses to run when
 - [GitHub issues](docs/agents/issue-tracker.md): before creating, linking
   or auditing issues.
 - [Thesis framing](docs/PROBLEM_DESCRIPTION.md): when discussing thesis scope.
-- [Authentication operations](docs/authentication-setup.md): before changing
+- [Staff authentication](docs/requirements/staff-authentication.md): before changing
   staff sign-in, verification codes or session operations.
 
 Keep all repository documentation Markdown under `docs/`, except the root

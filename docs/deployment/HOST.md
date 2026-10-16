@@ -1,17 +1,11 @@
 # Host preparation
 
-## Contents
-
-- [Host preparation](#host-preparation)
-- [Contents](#contents)
-- [1. Choose and prepare the host](#1-choose-and-prepare-the-host)
-
 Agent execution of AWS/Cloudflare resource changes requires explicit user
 approval; read-only inspection is allowed. See [cloud operations](../agents/cloud-operations.md).
 
 Use [the production runbook](RUNBOOK.md) for prerequisites and the sequence.
 
-## 1. Choose and prepare the host
+## Choose and prepare the host
 
 Record the provider, supported Linux release, region, capacity, three hostnames
 under one parent domain, administrator access path, and operational owner.
@@ -79,7 +73,9 @@ release archive, image, issue, PR, or Actions log.
 
 Private GHCR packages require a host credential with `read:packages` and read
 access to all three packages. Authenticate Docker as the deployment account
-using `docker login ghcr.io --username "$KAIROS_REGISTRY_USER" --password-stdin`,
+using `docker login ghcr.io --username "$KAIROS_REGISTRY_USER" --password-stdin`
+(`KAIROS_REGISTRY_USER` is the GitHub account owning the read-only token; set it
+in your shell for this command only),
 feeding the token from a protected secret source. Prefer a credential helper;
 otherwise protect that account's Docker config with `0700`/`0600`. Do not put
 the token in command arguments or enable shell tracing. Public packages can be

@@ -1,17 +1,6 @@
 # HTTP resource families and contracts
 
-## Contents
-
-- [HTTP resource families and contracts](#http-resource-families-and-contracts)
-- [Contents](#contents)
-- [7.1 Current HTTP resource families](#71-current-http-resource-families)
-- [Authentication and registration responses](#authentication-and-registration-responses)
-- [Location and account mutations](#location-and-account-mutations)
-- [Invitation contracts](#invitation-contracts)
-- [Integration and order contracts](#integration-and-order-contracts)
-- [Container runtime and environment](#container-runtime-and-environment)
-
-### 7.1 Current HTTP resource families
+### Current HTTP resource families
 
 The implemented browser-facing contract consists of:
 

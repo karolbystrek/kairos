@@ -1,13 +1,5 @@
 # Operational metrics
 
-## Contents
-
-- [Operational metrics](#operational-metrics)
-- [Contents](#contents)
-- [Collection and privacy](#collection-and-privacy)
-- [Workers and backlog](#workers-and-backlog)
-- [Protected export and limits](#protected-export-and-limits)
-
 ## Collection and privacy
 
 Actuator/Micrometer supplies HTTP server request counts, errors and durations,

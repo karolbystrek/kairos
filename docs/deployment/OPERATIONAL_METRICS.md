@@ -1,13 +1,5 @@
 # API operational metrics export
 
-## Contents
-
-- [API operational metrics export](#api-operational-metrics-export)
-- [Contents](#contents)
-- [Enable export](#enable-export)
-- [Collector configuration](#collector-configuration)
-- [Interpretation and verification](#interpretation-and-verification)
-
 ## Enable export
 
 The API exposes GET `/api/actuator/prometheus`, protected by its own bearer token.

@@ -1,12 +1,5 @@
 # Backend conventions
 
-## Contents
-
-- [Backend conventions](#backend-conventions)
-- [Contents](#contents)
-- [Feature structure and API mapping](#feature-structure-and-api-mapping)
-- [Java and persistence conventions](#java-and-persistence-conventions)
-
 ## Feature structure and API mapping
 
 - Organize code first by business feature and then by `api`, `application`,

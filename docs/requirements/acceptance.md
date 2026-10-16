@@ -1,16 +1,6 @@
 # Verification and acceptance criteria
 
-## Contents
-
-- [Verification and acceptance criteria](#verification-and-acceptance-criteria)
-- [Contents](#contents)
-- [9. Verification and Acceptance Criteria](#9-verification-and-acceptance-criteria)
-- [Build and REST consistency](#build-and-rest-consistency)
-- [Authentication, accounts and locations](#authentication-accounts-and-locations)
-- [Customer tracking, PWA and Web Push](#customer-tracking-pwa-and-web-push)
-- [Integration and delivery invariants](#integration-and-delivery-invariants)
-
-## 9. Verification and Acceptance Criteria
+## Verification and acceptance criteria
 
 * Both frontends build and lint independently.
 * Both frontends expose Light, Dark, and System appearance choices, default to

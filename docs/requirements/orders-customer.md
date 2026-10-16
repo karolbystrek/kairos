@@ -1,22 +1,8 @@
 # Order lifecycle and customer application
 
-## Contents
+## Functional requirements
 
-- [Order lifecycle and customer application](#order-lifecycle-and-customer-application)
-- [Contents](#contents)
-- [3. Functional Requirements](#3-functional-requirements)
-- [3.1 Order lifecycle](#31-order-lifecycle)
-- [3.2 Customer application](#32-customer-application)
-- [Installation and application identity](#installation-and-application-identity)
-- [Current order and scanner default page](#current-order-and-scanner-default-page)
-- [Scanner and offline behavior](#scanner-and-offline-behavior)
-- [Notification consent and subscriptions](#notification-consent-and-subscriptions)
-- [Push payloads and application badges](#push-payloads-and-application-badges)
-- [Google review invitations](#google-review-invitations)
-
-## 3. Functional Requirements
-
-### 3.1 Order lifecycle
+### Order lifecycle
 
 An order follows a controlled lifecycle:
 
@@ -31,7 +17,7 @@ There is no separate `CREATED` state: every created order is automatically accep
 
 The backend validates every transition regardless of whether it originates from the panel or an External Integration. Every accepted resulting state is recorded in an append-only history. The prior state is derived from the preceding history entry, with the first `IN_PREPARATION` entry representing creation.
 
-### 3.2 Customer application
+### Customer application
 
 The customer application must:
 

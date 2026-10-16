@@ -1,16 +1,6 @@
 # Staff panel requirements
 
-## Contents
-
-- [Staff panel requirements](#staff-panel-requirements)
-- [Contents](#contents)
-- [3.3 Staff panel](#33-staff-panel)
-- [Navigation and onboarding](#navigation-and-onboarding)
-- [Orders and customer QR](#orders-and-customer-qr)
-- [Management collections and details](#management-collections-and-details)
-- [Lifecycle vocabulary and confirmations](#lifecycle-vocabulary-and-confirmations)
-
-### 3.3 Staff panel
+### Staff panel
 
 The dashboard keeps its selected workspace in the URL fragment (for example,
 `#integrations`). Refresh, direct links and browser Back/Forward retain that

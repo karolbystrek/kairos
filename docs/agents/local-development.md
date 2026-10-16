@@ -1,12 +1,5 @@
 # Local development and data safety
 
-## Contents
-
-- [Local development and data safety](#local-development-and-data-safety)
-- [Contents](#contents)
-- [Worktree and runtime safety](#worktree-and-runtime-safety)
-- [Setup](#setup)
-
 ## Worktree and runtime safety
 
 - Before changing files, inspect `git status --short` and preserve unrelated
@@ -43,18 +36,40 @@ are required. Setup selects `compose.yaml` plus `compose.local.yaml` in `.env`;
   material before retrying. A copied setup script without Compose retains the
   VM bootstrap's keys-only behavior.
 
+## First start and daily use
+
+- The first start builds all images and downloads dependencies; expect a few
+  minutes. Wait until `docker compose ps` shows the services as healthy.
+- First login: open the panel at `http://localhost:3001` and register. Local
+  mode sets `EMAIL_VERIFICATION_ENABLED=false` (`.env.example`), so
+  registration completes without a code and opens first-location onboarding.
+  Set it to `true` in `.env` and restart the API to exercise verification.
+- No email is sent locally: `compose.local.yaml` sets `EMAIL_DELIVERY_MODE=LOG`.
+  Verification codes, password-reset codes and invitation links are printed in
+  `docker compose logs -f api`.
+- Single services use the Compose names `api`, `panel-app`, `customer-app`,
+  `postgres` and `redis`:
+  - `docker compose up --build -d api` rebuilds and restarts one service.
+  - `docker compose logs -f panel-app` follows one service.
+  - `docker compose restart customer-app` restarts without rebuilding.
+  - `docker compose ps` shows state and health.
+- `./reset.sh` deletes containers, volumes and keys, so it asks once before
+  deleting local data and refuses to run when `COMPOSE_FILE` selects production.
+
+## Runtime limits and test safety
+
 Development uses HTTP on loopback; NGINX and TLS belong to production.
 Web Push is disabled under `next dev`; use a production build for PWA/push
 acceptance. Phone testing needs reachable origins rather than `localhost`.
+Session cookies work over `http://localhost` in Chrome and Firefox; Safari
+requires HTTPS.
 
 For runtime verification use the default `kairos` Compose project, never a
 separately named stack. Use `./reset.sh` only when the user has authorized
-resetting containers or data; it refuses to run when `COMPOSE_FILE` selects
-production.
+resetting containers or data.
 
-Backend verification requires a running Docker engine. Run `./mvnw --batch-mode verify`
-from `apps/api` (or `apps/api/mvnw -f apps/api/pom.xml --batch-mode verify`
-from the repository root). The JUnit launcher starts one disposable PostgreSQL 18
+Backend verification requires a running Docker engine; the command is in
+[validation](validation.md). The JUnit launcher starts one disposable PostgreSQL 18
 container per session and removes it afterward. Missing Docker fails verification;
 there is no H2 fallback or silently skipped database suite. Tests never reuse
 Compose containers or user-owned volumes. Fixture setup can use

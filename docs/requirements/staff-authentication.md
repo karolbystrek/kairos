@@ -1,19 +1,8 @@
 # Staff authentication and browser sessions
 
-## Contents
+## Authentication and security
 
-- [Staff authentication and browser sessions](#staff-authentication-and-browser-sessions)
-- [Contents](#contents)
-- [4. Authentication and Security](#4-authentication-and-security)
-- [4.1 Staff authentication](#41-staff-authentication)
-- [Registration and first-location onboarding](#registration-and-first-location-onboarding)
-- [Browser cookies and durable sessions](#browser-cookies-and-durable-sessions)
-- [Session validation and revocation](#session-validation-and-revocation)
-- [Panel session behavior](#panel-session-behavior)
-
-## 4. Authentication and Security
-
-### 4.1 Staff authentication
+### Staff authentication
 
 The API owns staff authentication. Users enter email/password on the Kairos
 panel; the API verifies a PBKDF2 password hash stored in PostgreSQL and issues a
@@ -22,12 +11,8 @@ social login, or JWT/refresh flow is used. Kairos owns tenants, Accounts,
 memberships and authorization. All Accounts belong to one tenant. Usernames,
 Platform Operator and Tenant Registration Invitations are removed.
 
-Credentials were previously delegated to a self-hosted ZITADEL instance. Kairos
-already owned the login form, sessions, CSRF, verification email and all
-authorization, so the provider only stored passwords and codes while adding a
-service, a bootstrap, credentials and a network call on every request. Storing
-credentials in the API removes that operational cost; JWTs were rejected because
-password change and account disabling must revoke access immediately.
+JWTs are not used because password change and account disabling must revoke
+access immediately.
 
 #### Registration and first-location onboarding
 

@@ -1,15 +1,8 @@
 # Persistent configuration and keys
 
-## Contents
-
-- [Persistent configuration and keys](#persistent-configuration-and-keys)
-- [Contents](#contents)
-- [2. Prepare persistent configuration and keys](#2-prepare-persistent-configuration-and-keys)
-  - [Transactional email (Resend)](#transactional-email-resend)
-
 Use [the production runbook](RUNBOOK.md) for prerequisites and the sequence.
 
-## 2. Prepare persistent configuration and keys
+## Prepare persistent configuration and keys
 
 Use the verified VM bootstrap described in [BOOTSTRAP.md](BOOTSTRAP.md) to
 prepare application keys. Hosted release configuration is owned by the GitHub
@@ -62,15 +55,20 @@ outside the VPS for a fresh rebuild; runtime configuration already lives in GitH
 | `POSTGRES_USER`, `POSTGRES_DB`, `POSTGRES_PASSWORD` | Initialization/admin identity and database name; never the API datasource |
 | `KAIROS_DB_OWNER_USER`, `KAIROS_DB_OWNER_PASSWORD` | Restricted migration owner; unique role/password |
 | `KAIROS_DB_RUNTIME_USER`, `KAIROS_DB_RUNTIME_PASSWORD` | Restricted application datasource role; separate unique role/password |
+| `POSTGRES_HOST` | `postgres`, the Compose service name the API connects to |
 | `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD` | `redis`, `6379`, and a unique strong password |
 | `NEXT_PUBLIC_CUSTOMER_APP_URL`, `PANEL_APP_URL`, `NEXT_PUBLIC_API_BASE_URL` | Three distinct `https://` origins without path/query/fragment; match exact gateway hosts |
 | `KAIROS_CUSTOMER_APP_HOST`, `KAIROS_PANEL_APP_HOST`, `KAIROS_API_HOST` | Hostnames only; chosen customer, panel and API names |
+| `KAIROS_SECRETS_DIRECTORY` | `/run/secrets`, where the API reads the mounted secret files in its container |
 | `KAIROS_APPLICATION_SECRETS_DIRECTORY`, `KAIROS_TLS_DIRECTORY` | `/srv/kairos/secrets`, `/srv/kairos/tls`; Compose file secrets mounted read-only under `/run/secrets/` (local default `./secrets`) |
 | `WEBHOOK_DESTINATION_POLICY`, `PUSH_DESTINATION_POLICY` | Both `PUBLIC_HTTPS`; never carry the local webhook relaxation into production |
 | `EMAIL_DELIVERY_MODE`, `RESEND_API_KEY` | Hosted mode `RESEND` and a Resend sending key; the API refuses production startup without it. Local/test mode `LOG` sends no mail and logs no message secrets. |
 | `VAPID_SUBJECT` | Operator-owned `mailto:` contact or public HTTPS contact URL |
 | `KAIROS_IMAGE_REGISTRY`, `KAIROS_RELEASE_VERSION` | deploy.py supplies repository registry and manifest revision; operator values are not used for its digest selection |
 | `KAIROS_API_USER` | `uid:gid` the API container runs as so it can read the owner-only secret files; deploy.py and `setup.sh --prod` set it to the current user |
+| `REVIEW_INVITATION_DELAY` | Delay between order completion and the optional Google review invitation; default `30m` |
+| `EMAIL_VERIFICATION_ENABLED` | Not in the template; the API defaults to `true`. Keep verification enabled in production (`false` is for local development) |
+| `NEXT_TELEMETRY_DISABLED` | `1`; disables Next.js telemetry in the frontend images |
 | `NGINX_ENVSUBST_FILTER` | Keep `^KAIROS_`; hosted overlay supplies TLS and trusted-proxy settings |
 
 Generate database and Redis passwords with a password manager or

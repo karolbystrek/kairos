@@ -1,20 +1,6 @@
 # Purpose, technology and ownership
 
-## Contents
-
-- [Purpose, technology and ownership](#purpose-technology-and-ownership)
-- [Contents](#contents)
-- [1. Purpose and Scope](#1-purpose-and-scope)
-- [2. Technology and Ownership Decisions](#2-technology-and-ownership-decisions)
-- [2.1 Frontend applications](#21-frontend-applications)
-- [Appearance and popup behavior](#appearance-and-popup-behavior)
-- [Accessibility, language and target devices](#accessibility-language-and-target-devices)
-- [Frontend state and API ownership](#frontend-state-and-api-ownership)
-- [Search indexing and link previews](#search-indexing-and-link-previews)
-- [2.2 Backend](#22-backend)
-- [2.3 API contracts](#23-api-contracts)
-
-## 1. Purpose and Scope
+## Purpose and scope
 
 Kairos is a multi-tenant virtual pager system for restaurants. A tenant represents a customer organization, such as an independent restaurant or restaurant chain, and owns physical locations. Public registration first creates the tenant and administrator; before entering the staff workspace, that administrator must create the first enabled location through mandatory onboarding. A tenant may temporarily have no location while onboarding is incomplete. Once created, its last non-archived location may be disabled but cannot be deleted. A customer scans a QR code assigned to an order and opens a lightweight web application that displays the current order state and receives real-time updates. Restaurant staff manage orders through a separate administrative panel. External systems, initially point-of-sale systems, can create and update orders through a versioned REST API and receive webhooks.
 
@@ -35,9 +21,9 @@ the browser experience must work without installing the customer PWA. Web Push
 is an optional enhancement that requires explicit customer consent; foreground
 REST and SSE tracking remains the primary experience.
 
-## 2. Technology and Ownership Decisions
+## Technology and Ownership Decisions
 
-### 2.1 Frontend applications
+### Frontend applications
 
 Both frontends use Next.js 16, React 19, TypeScript, Tailwind CSS 4, HeroUI 3,
 and Phosphor Icons. They remain separate because they serve different audiences
@@ -110,7 +96,7 @@ The Spring API retains domain authority. Frontend controls and redirects provide
 
 Only public service information is indexable: the panel landing page, terms and privacy policy, and the customer home and privacy notice. Each has a canonical URL, Polish Open Graph metadata and a build-time preview image, and appears in its application's sitemap. Order pages, order manifests, scanning, the offline fallback, login, registration and the dashboard carry `noindex, nofollow`; order pages and manifests also send `X-Robots-Tag`. `robots.txt` does not block private paths, so crawlers can read their noindex rules. Order-page titles and previews are generic and never include the tracking reference, order label or status. Absolute URLs come from the build-time `NEXT_PUBLIC_CUSTOMER_APP_URL` and `NEXT_PUBLIC_PANEL_APP_URL` origins. Structured data and ranking work are out of scope.
 
-### 2.2 Backend
+### Backend
 
 The backend uses Java 25 and Spring Boot 4. It is the only system of record and owns:
 
@@ -129,7 +115,7 @@ NGINX gateway in production and to `http://localhost:8080` locally. Both use
 credentialed CORS scoped by frontend origin and browser resource family. Next.js route handlers are
 limited to frontend rendering concerns.
 
-### 2.3 API contracts
+### API contracts
 
 REST is the integration boundary for frontends and third-party systems. During the first walking vertical slice, the endpoints are implemented as ordinary Spring MVC controllers and each frontend uses small handwritten TypeScript response types with native `fetch`, wrapped by SWR in Client Components that need server-state synchronization. The slice does not expose an OpenAPI document or generate REST clients. Next.js Server Actions and proxy route handlers do not replace or wrap the Spring REST boundary.
 

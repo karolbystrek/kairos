@@ -1,16 +1,5 @@
 # Accounts and invitations
 
-## Contents
-
-- [Accounts and invitations](#accounts-and-invitations)
-- [Contents](#contents)
-- [Accounts and invitations](#accounts-and-invitations-1)
-- [Expiration and bearer handling](#expiration-and-bearer-handling)
-- [Management and issuer eligibility](#management-and-issuer-eligibility)
-- [Invitation cards and synchronization](#invitation-cards-and-synchronization)
-- [Account authority and archival](#account-authority-and-archival)
-- [Redemption and browser context](#redemption-and-browser-context)
-
 ## Accounts and invitations
 
 An **Account Invitation** is a separate, single-use bearer capability that

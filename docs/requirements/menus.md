@@ -1,13 +1,5 @@
 # Menus and order items
 
-## Contents
-
-- [Menus and order items](#menus-and-order-items)
-- [Contents](#contents)
-- [Location menus](#location-menus)
-- [Ordering from a menu](#ordering-from-a-menu)
-- [Menu storage and access](#menu-storage-and-access)
-
 ## Location menus
 
 Each non-archived location owns at most one **Menu**: an ordered list of item

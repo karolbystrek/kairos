@@ -1,13 +1,5 @@
 # Public production operations
 
-## Contents
-
-- [Public production operations](#public-production-operations)
-- [Contents](#contents)
-- [Approval before cloud changes](#approval-before-cloud-changes)
-- [Operator sequence](#operator-sequence)
-- [Related procedures](#related-procedures)
-
 Kairos runs one Docker Compose stack on an x86-64 Linux VM behind Cloudflare.
 Use this runbook for operator provisioning and approved releases. Repository
 preparation does not provision a VM, configure DNS or GitHub protection, or
@@ -47,5 +39,4 @@ step and check its prerequisites. Public launch still requires every launch gate
 - [Ubuntu VM bootstrap](BOOTSTRAP.md): repeatable host packages, account and keys.
 - [Native Lightsail email alarms](MONITORING.md): reduced development coverage and activation.
 - [AWS OIDC and temporary SSH](AWS-SSH.md): approved firewall lifecycle and recovery.
-- [Authentication operations](../authentication-setup.md): staff sign-in, verification and sessions.
 - [Requirements topic map](../REQUIREMENTS.md): contracts and outstanding launch gates.

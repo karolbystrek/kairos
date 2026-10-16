@@ -1,13 +1,6 @@
 # Resilience and consistency
 
-## Contents
-
-- [Resilience and consistency](#resilience-and-consistency)
-- [Contents](#contents)
-- [8. Resilience and Consistency](#8-resilience-and-consistency)
-  - [Retention purge](#retention-purge)
-
-## 8. Resilience and Consistency
+## Resilience and consistency
 
 * Transactional email acceptance commits a durable outbox row. The asynchronous
   worker retries transient failures with backoff for at most 23 hours, within

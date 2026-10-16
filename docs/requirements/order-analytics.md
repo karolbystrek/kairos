@@ -1,13 +1,5 @@
 # Anonymous order analytics
 
-## Contents
-
-- [Anonymous order analytics](#anonymous-order-analytics)
-- [Contents](#contents)
-- [Collection and activation](#collection-and-activation)
-- [Hourly summaries](#hourly-summaries)
-- [Processing and ownership](#processing-and-ownership)
-
 ## Collection and activation
 
 The API collects durable restaurant business measurements when an order is

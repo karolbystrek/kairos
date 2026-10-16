@@ -1,17 +1,6 @@
 # Local routing and hosted releases
 
-## Contents
-
-- [Local routing and hosted releases](#local-routing-and-hosted-releases)
-- [Contents](#contents)
-- [7. Local and Hosted Routing](#7-local-and-hosted-routing)
-- [Validation and immutable publication](#validation-and-immutable-publication)
-- [OIDC and temporary SSH](#oidc-and-temporary-ssh)
-- [Host deployment and health verification](#host-deployment-and-health-verification)
-- [Repeatable VM bootstrap](#repeatable-vm-bootstrap)
-- [Development operations policy](#development-operations-policy)
-
-## 7. Local and Hosted Routing
+## Local and hosted routing
 
 Production Compose (`compose.yaml` plus `compose.production.yaml`) uses NGINX
 HTTPS ingress. Application and data services do not publish host ports. Browser
@@ -180,7 +169,10 @@ with the successful revision/digests. Failed stages retain the previous success
 record and report the failed stage with a safe validation reason, command exit
 status/timeout, or final probe HTTP status. Raw command arguments/output, response
 bodies, environment values and resolved configuration are not printed. A failed
-update can leave a partially updated stack; recovery uses a forward fix, with no automated rollback or reset.
+release makes the command automatically redeploy the previous recorded release
+(digest-pinned, same checks) and still exit non-zero; migrations are not undone
+and must stay compatible with the previous release. Recovery of the cause uses a
+forward fix, never a reset; see [maintenance](../deployment/MAINTENANCE.md).
 Command tests use fake Docker/curl and temporary state. First install, reboot
 recovery and real Cloudflare-path acceptance on the selected VM remain launch
 work requiring explicit runtime authorization.

@@ -1,15 +1,5 @@
 # Temporary SSH access through AWS OIDC
 
-## Contents
-
-- [Temporary SSH access through AWS OIDC](#temporary-ssh-access-through-aws-oidc)
-- [Contents](#contents)
-- [Operator setup](#operator-setup)
-- [Read inputs and render policy](#read-inputs-and-render-policy)
-- [Provision IAM with explicit approval](#provision-iam-with-explicit-approval)
-- [Configure deployment variables](#configure-deployment-variables)
-- [Failure and interrupted-run recovery](#failure-and-interrupted-run-recovery)
-
 Agent execution of AWS/Cloudflare resource changes requires explicit user
 approval; read-only inspection is allowed. See [cloud operations](../agents/cloud-operations.md).
 

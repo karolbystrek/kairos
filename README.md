@@ -1,15 +1,5 @@
 # Kairos
 
-## Contents
-
-- [Kairos](#kairos)
-- [Contents](#contents)
-- [Local development](#local-development)
-- [Hosted VM preparation](#hosted-vm-preparation)
-- [Repository checks](#repository-checks)
-- [Stopping and resetting the local environment](#stopping-and-resetting-the-local-environment)
-- [Documentation](#documentation)
-
 Kairos is a virtual pager system for restaurants. Customers scan an
 order-specific QR code to follow its status without creating an account or
 installing an app. Restaurant staff manage orders through a separate
@@ -37,24 +27,21 @@ applications automatically; no host Node.js or Java installation is needed.
 * Staff panel: http://localhost:3001
 * API: http://localhost:8080/api
 
-Start or rebuild the selected stack later with:
+The first start builds the images and takes a few minutes. Register your first
+staff account at the panel URL. First login, daily commands, logs, single-service
+rebuilds and Web Push limits are in
+[local development](docs/agents/local-development.md). Production from a source
+checkout is described in [production configuration](docs/deployment/CONFIGURATION.md);
+hosted releases use the [production runbook](docs/deployment/RUNBOOK.md).
+
+To delete the Compose containers and volumes and the generated keys, and move
+`.env` aside as `.env.old` (refuses to run in production mode, asks before
+deleting unless given the skip flag):
 
 ```bash
-docker compose up --build -d
+./reset.sh
+./setup.sh --dev
 ```
-
-For production from a source checkout, use `./setup.sh --prod` after supplying
-production configuration and TLS files. It selects the production stack; the
-same Compose command starts it afterward. Existing configuration, database data
-and keys are preserved. See [local development](docs/agents/local-development.md)
-for details and [production configuration](docs/deployment/CONFIGURATION.md)
-for required production settings. Hosted CI releases continue to use the
-[production runbook](docs/deployment/RUNBOOK.md).
-
-Locally, email stays in log mode and registration skips email verification.
-The customer service worker and Web Push require a production build; `next dev`
-provides foreground tracking and Fast Refresh. Session cookies work over
-`http://localhost` in Chrome and Firefox; Safari requires HTTPS.
 
 ## Hosted VM preparation
 
@@ -64,29 +51,7 @@ prepares persistent application keys without starting Kairos.
 
 ## Repository checks
 
-Run the checks from the repository root:
-
-```bash
-npm --prefix apps/customer-app run check
-npm --prefix apps/panel-app run check
-(cd apps/api && ./mvnw --batch-mode verify)
-git diff --check
-```
-
-## Stopping and resetting the local environment
-
-`docker compose stop` stops the full stack and keeps its data.
-`docker compose up --build -d` starts it again; `docker compose logs -f` follows
-application logs.
-
-
-To delete the Compose containers and volumes and the generated keys, and move
-`.env` aside as `.env.old`:
-
-```bash
-./reset.sh
-./setup.sh --dev
-```
+Frontend and backend check commands are listed in [validation](docs/agents/validation.md).
 
 ## Documentation
 

@@ -1,16 +1,5 @@
 # Kairos brand mark
 
-## Contents
-
-- [Kairos brand mark](#kairos-brand-mark)
-- [Contents](#contents)
-- [Idea](#idea)
-- [Masters](#masters)
-- [Colour](#colour)
-- [Clear space and minimum size](#clear-space-and-minimum-size)
-- [Application assets](#application-assets)
-- [Misuse](#misuse)
-
 ## Idea
 
 A hanging bell caught mid-swing. The bell's motion, shown by two trails left

@@ -1,14 +1,5 @@
 # Frontend conventions
 
-## Contents
-
-- [Frontend conventions](#frontend-conventions)
-- [Contents](#contents)
-- [Project conventions first](#project-conventions-first)
-- [Components and effects](#components-and-effects)
-- [Authenticated client state](#authenticated-client-state)
-- [Tests](#tests)
-
 ## Project conventions first
 
 Project requirements and conventions take precedence over generic advice:

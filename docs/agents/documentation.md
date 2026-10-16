@@ -1,14 +1,5 @@
 # Documentation maintenance
 
-## Contents
-
-- [Documentation maintenance](#documentation-maintenance)
-- [Contents](#contents)
-- [Reading and canonical ownership](#reading-and-canonical-ownership)
-- [File size and navigation](#file-size-and-navigation)
-- [Durable knowledge and task records](#durable-knowledge-and-task-records)
-- [Validation](#validation)
-
 ## Reading and canonical ownership
 
 - Start at `docs/REQUIREMENTS.md` before planning, implementing or reviewing.
@@ -32,8 +23,8 @@
 - Keep repository knowledge and rule Markdown files below 300 lines, including
   navigation and code examples; aim below 200 when practical. Short files do
   not need padding. Split by a coherent topic before exceeding 300 lines.
-- Every file has a near-top `Contents` section with links to every heading,
-  including the title, Contents and nested headings, in document order.
+- Do not add per-file contents lists; GitHub renders a heading outline. Headings
+  carry no manual section numbers, so anchors stay stable when sections move.
 - Use descriptive headings that name the behavior, contract or procedure.
   Break long sections into meaningful subsections so a reader can locate a
   rule without reading the whole file. Keep complete examples/code fences
@@ -43,9 +34,8 @@
   Requirements and operational guides use their own topic maps.
 - When moving content, preserve its accepted meaning, update relative links
   and heading anchors, and leave an index at an established entry path.
-- Use local heading links for quick navigation and cross-file links for
-  dependencies. Add a task/topic map when an index routes readers to several
-  files. Do not create a second canonical copy to preserve an old link.
+- Use cross-file links for dependencies. Add a task/topic map when an index
+  routes readers to several files. Do not create a second canonical copy to preserve an old link.
 
 ## Durable knowledge and task records
 
@@ -60,7 +50,7 @@
 
 ## Validation
 
-Check line counts, Contents coverage, heading anchors and relative links in
+Check line counts, heading anchors and relative links in
 all affected files. When splitting a canonical document, compare its original
 content with the new topic files to ensure no requirement or safety rule was
 lost. Check references repository-wide and run `git diff --check`. Application
