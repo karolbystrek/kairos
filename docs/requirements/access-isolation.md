@@ -22,7 +22,9 @@ each high-entropy tracking reference and does not create a durable customer
 identity or reveal whether an unrelated order exists.
 
 Push endpoints must use HTTPS and resolve to public network addresses in
-production. DNS is revalidated for delivery, pinned for the connection,
+production, and their host must belong to a known browser push service
+(`fcm.googleapis.com`, `*.push.services.mozilla.com`, `*.push.apple.com`,
+`*.notify.windows.com`); other hosts are rejected as invalid subscriptions. DNS is revalidated for delivery, pinned for the connection,
 redirects are not followed, and fixed timeouts and response limits apply. Only
 an operator-controlled local profile may relax the public-address restriction.
 The endpoint and authentication secret are encrypted at rest with an externally
