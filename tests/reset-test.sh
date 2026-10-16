@@ -56,4 +56,17 @@ cmp "${test_directory}/expected-env" "${test_directory}/.env.old"
 for key in ${keys}; do
     [ ! -e "${test_directory}/secrets/${key}" ] || { echo "reset.sh kept secrets/${key}" >&2; exit 1; }
 done
-printf '%s\n' 'Reset defaults, existing project configuration, key removal, and environment backup passed.'
+# A production selection is refused before Docker or any file is touched.
+echo 'COMPOSE_FILE="compose.yaml:compose.production.yaml"' > "${test_directory}/.env"
+echo fixture > "${test_directory}/secrets/webhook-encryption.bin"
+cat > "${test_directory}/bin/docker" <<'SH'
+#!/bin/sh
+echo "docker must not run for production" >&2
+exit 99
+SH
+if PATH="${test_directory}/bin:${PATH}" sh "${test_directory}/reset.sh" > "${test_directory}/output" 2> "${test_directory}/error"; then
+    echo "reset.sh ran against production" >&2; exit 1
+fi
+grep -q 'Refusing to reset' "${test_directory}/error"
+[ -f "${test_directory}/.env" ] && [ -f "${test_directory}/secrets/webhook-encryption.bin" ]
+printf '%s\n' 'Reset defaults, existing project configuration, key removal, environment backup and production refusal passed.'

@@ -13,15 +13,26 @@ cd "${repository_directory}"
 
 # .env.example supplies variables an older .env may lack; either file alone also works.
 environment_files=""
+configuration_files=""
 for file in .env.example .env; do
     if [ -f "${file}" ] || [ -L "${file}" ]; then
         environment_files="${environment_files} --env-file ${file}"
         configuration_file="${file}"
+        configuration_files="${configuration_files} ${file}"
     fi
 done
 [ -n "${environment_files}" ] || { echo ".env or .env.example is required to reset Kairos." >&2; exit 1; }
 
-secrets_directory="$(sed -n 's/^KAIROS_APPLICATION_SECRETS_DIRECTORY=//p' "${configuration_file}" | tail -n 1)"
+# .env is read last so it overrides .env.example, as in the --env-file order.
+compose_file="$(cat ${configuration_files} | sed -n 's/^COMPOSE_FILE=//p' | tail -n 1)"
+case "${compose_file}" in
+    *compose.production.yaml*)
+        echo "Refusing to reset: COMPOSE_FILE selects production. reset.sh deletes volumes and keys; it only runs in development." >&2
+        exit 1
+        ;;
+esac
+
+secrets_directory="$(sed -n 's/^KAIROS_APPLICATION_SECRETS_DIRECTORY=//p' "${configuration_file}" | tail -n 1 | sed "s/^['\"]//;s/['\"]\$//")"
 secrets_directory="${secrets_directory:-./secrets}"
 
 echo

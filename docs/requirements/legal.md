@@ -1,18 +1,5 @@
 # Legal readiness
 
-## Contents
-
-- [Legal readiness](#legal-readiness)
-- [Contents](#contents)
-- [Status and scope](#status-and-scope)
-- [Roles and documents](#roles-and-documents)
-- [Data inventory](#data-inventory)
-- [Cookies and device storage](#cookies-and-device-storage)
-- [Google review invitations](#google-review-invitations)
-- [Retention commitments](#retention-commitments)
-- [Launch blockers](#launch-blockers)
-- [Open questions for legal review](#open-questions-for-legal-review)
-
 ## Status and scope
 
 This records the assessment for
@@ -77,6 +64,9 @@ user requested needs information but not consent. All current storage
 qualifies:
 
 - panel session and CSRF cookies and the theme preference;
+- the panel-origin `localStorage` flag `kairos.staff-session`, set after a
+  successful staff session check and cleared on sign-out or a `401`; it only lets
+  the landing page skip an API call and holds no personal data;
 - customer IndexedDB order snapshots, notification and review-dismissal state,
   local preferences, and the service worker for offline use and push.
 

@@ -1,16 +1,5 @@
 # Native Lightsail email alarms
 
-## Contents
-
-- [Native Lightsail email alarms](#native-lightsail-email-alarms)
-- [Contents](#contents)
-- [Coverage and thresholds](#coverage-and-thresholds)
-- [Verify the regional email contact](#verify-the-regional-email-contact)
-- [Create the alarms](#create-the-alarms)
-- [Verify notification delivery](#verify-notification-delivery)
-- [Response and maintenance](#response-and-maintenance)
-- [Activation status](#activation-status)
-
 Application metrics use a separate [protected API export](OPERATIONAL_METRICS.md).
 Its collector deployment is deferred; native alarms below remain independent.
 

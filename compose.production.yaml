@@ -114,6 +114,8 @@ services:
       context: ./apps/api
       target: runner
     # Hosted releases select immutable images with --no-build.
+    # The owner of the 0400 secret files; deploy.py and setup.sh --prod supply it.
+    user: "${KAIROS_API_USER:?Set KAIROS_API_USER to the uid:gid owning the secrets directory}"
     environment:
       EMAIL_DELIVERY_MODE: RESEND
       EMAIL_VERIFICATION_ENABLED: "${EMAIL_VERIFICATION_ENABLED:-true}"

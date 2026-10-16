@@ -261,6 +261,7 @@ if [ "${checkout_mode}" = true ]; then
         set_environment_value COMPOSE_FILE compose.yaml:compose.local.yaml
     else
         set_environment_value COMPOSE_FILE compose.yaml:compose.production.yaml
+        set_environment_value KAIROS_API_USER "$(id -u):$(id -g)"
         for setting in KAIROS_IMAGE_REGISTRY=kairos-local KAIROS_RELEASE_VERSION=production; do
             key="${setting%%=*}"
             if ! grep -Eq "^${key}=.+" "${environment_file}"; then

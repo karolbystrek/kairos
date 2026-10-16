@@ -1,13 +1,6 @@
 # Resilience and consistency
 
-## Contents
-
-- [Resilience and consistency](#resilience-and-consistency)
-- [Contents](#contents)
-- [8. Resilience and Consistency](#8-resilience-and-consistency)
-  - [Retention purge](#retention-purge)
-
-## 8. Resilience and Consistency
+## Resilience and consistency
 
 * Transactional email acceptance commits a durable outbox row. The asynchronous
   worker retries transient failures with backoff for at most 23 hours, within
@@ -19,7 +12,7 @@
 * Order transitions, required outbox events and anonymous measurement inputs are committed atomically. Analytics merge/consumption is retry-safe and independent of retained orders; see [anonymous order analytics](order-analytics.md).
 * SSE or Redis event loss does not prevent later REST recovery.
 * Redis unavailability must not corrupt PostgreSQL state; event delivery may be delayed and recovered according to operational policy.
-* A known webhook delivery outcome is attempted once and stored as success or a terminal dead-letter result; v1 has no policy retry or `Retry-After` handling.
+* A webhook delivery is stored as success or a terminal dead-letter result. Timeouts, network errors, `429` and `5xx` responses are retried with backoff of 30 seconds, 2 minutes, 10 minutes and 30 minutes, for at most five attempts in total, then dead-lettered; other `4xx` responses, blocked destinations and signing failures dead-letter at once. v1 has no `Retry-After` handling.
 * Crash recovery may repeat an uncertain webhook attempt, and repeated external client commands are handled safely where an integration can legitimately retry.
 * Customer-push fan-out and delivery failure cannot roll back a committed order
   transition or block webhook fan-out.
@@ -43,7 +36,11 @@
 ### Retention purge
 
 * An hourly worker erases deleted data after a grace period of 30 days by
-  default (`kairos.retention.grace-period`). An archived account is removed with
+  default (`kairos.retention.grace-period`). Each kind is purged in batches of
+  `kairos.retention.batch-size` until a batch comes back short or the cycle
+  budget (`kairos.retention.cycle-budget`, 60 seconds by default) is spent, so a
+  backlog larger than one batch clears within the cycle and the rest continues
+  the next hour. An archived account is removed with
   its staff identity, assignment and the invitations it issued or redeemed, in
   one transaction.
 * An archived location is removed once no account is assigned to it, together

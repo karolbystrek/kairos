@@ -128,3 +128,16 @@ it("registration field errors survive the API error boundary", async () => {
     email: "admin@example.com", password: "password-12345", passwordConfirmation: "password-12345",
   })).rejects.toMatchObject({ problem: { fieldErrors: { password: "Use at least 12 characters." } } });
 });
+
+it("a stalled request times out as a quiet network error", async () => {
+  // Timer-backed signals ignore fake timers, so the 10 s expiry is made immediate.
+  const timeout = vi.spyOn(AbortSignal, "timeout")
+    .mockImplementation(() => AbortSignal.abort(new DOMException("", "TimeoutError")));
+
+  vi.stubGlobal("fetch", async (_: unknown, init: RequestInit) =>
+    init.signal?.aborted ? Promise.reject(init.signal.reason) : new Promise(() => {}));
+  await expect(apiFetch("/api/orders/v1")).rejects.toMatchObject({ name: "TimeoutError" });
+  expect(timeout).toHaveBeenCalledWith(10_000);
+  expect(console.error).not.toHaveBeenCalled();
+  timeout.mockRestore();
+});

@@ -1,12 +1,6 @@
 # External Integration API and webhooks
 
-## Contents
-
-- [External Integration API and webhooks](#external-integration-api-and-webhooks)
-- [Contents](#contents)
-- [3.4 External Integration API and webhooks](#34-external-integration-api-and-webhooks)
-
-### 3.4 External Integration API and webhooks
+### External Integration API and webhooks
 
 An External Integration is a named, tenant-owned representation of a
 third-party system. A point-of-sale system is the first use case rather than a

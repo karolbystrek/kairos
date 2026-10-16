@@ -5,6 +5,8 @@ import org.hamcrest.Matchers;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -17,6 +19,7 @@ import pl.karolbystrek.kairos.api.account.domain.assignment.AssignmentRole;
 import pl.karolbystrek.kairos.api.integration.testsupport.IntegrationTestFixture;
 import pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase;
 import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
+import pl.karolbystrek.kairos.api.testsupport.RedisTestContainer;
 
 import java.util.UUID;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -44,6 +47,14 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
     @Autowired private AccountInvitationService invitations;
     @Autowired private RegistrationVerificationService verification;
     @Autowired private PlatformTransactionManager transactions;
+
+    // The per-account sign-in throttle counts failures in Redis.
+    @DynamicPropertySource
+    static void redis(DynamicPropertyRegistry registry) {
+        RedisTestContainer.start();
+        registry.add("spring.data.redis.host", RedisTestContainer::host);
+        registry.add("spring.data.redis.port", RedisTestContainer::port);
+    }
 
     @Test
     void registrationCreatesNoTenantUntilCodeThenEstablishesDurableSecureSession() throws Exception {
@@ -77,6 +88,21 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
             .andExpect(cookie().maxAge("__Host-session", 30 * 86400));
         assertThat(database.queryForObject("SELECT password_hash FROM staff_identities WHERE email = ?", String.class, email))
             .isNotBlank().doesNotContain("password-12345");
+    }
+
+    @Test
+    void repeatedFailedSignInsThrottleOnlyThatAccount() throws Exception {
+        var email = email();
+        var other = email();
+        register(email);
+        register(other);
+        var wrong = "{\"email\":\"" + email.toUpperCase() + "\",\"password\":\"wrong-password-1\"}";
+        for (var attempt = 0; attempt < 10; attempt++)
+            mvc.perform(csrf(postApi("/auth/v1/login").content(wrong))).andExpect(status().isUnauthorized());
+        // Even the correct password is refused (and unchecked) while the account is throttled.
+        mvc.perform(csrf(postApi("/auth/v1/login").content("{\"email\":\"" + email + "\",\"password\":\"password-12345\"}")))
+            .andExpect(status().isTooManyRequests());
+        login(other);
     }
 
     @Test

@@ -1,14 +1,8 @@
 # First install and later releases
 
-## Contents
-
-- [First install and later releases](#first-install-and-later-releases)
-- [Contents](#contents)
-- [5. First install and later releases](#5-first-install-and-later-releases)
-
 Use [the production runbook](RUNBOOK.md) for prerequisites and the sequence.
 
-## 5. First install and later releases
+## First install and later releases
 
 CI validates pull requests and main pushes without building images. After
 provisioning and authorization, start the deployment workflow from `main`
@@ -34,7 +28,9 @@ Actions verifies the bundled manifest against the selected revision, uploads thr
 a private incoming directory, activates `/srv/kairos/releases/<revision>`, then
 invokes the command below with absolute paths. A retry of an existing revision
 requires an identical archive. For an authorized manual invocation, use that
-same verified, extracted artifact, not files from the moving main checkout:
+same verified, extracted artifact, not files from the moving main checkout.
+`KAIROS_REVISION` is the full commit SHA of the release (the directory name under
+`/srv/kairos/releases/`); export it in your shell first:
 
 ```bash
 python3 "/srv/kairos/releases/${KAIROS_REVISION}/deployment/deploy.py" \

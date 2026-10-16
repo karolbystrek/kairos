@@ -1,16 +1,6 @@
 # Current delivery status and roadmap
 
-## Contents
-
-- [Current delivery status and roadmap](#current-delivery-status-and-roadmap)
-- [Contents](#contents)
-- [10. Current Delivery Status and Roadmap](#10-current-delivery-status-and-roadmap)
-- [Implemented behavior](#implemented-behavior)
-- [Next integration and authentication acceptance](#next-integration-and-authentication-acceptance)
-- [Outstanding security and acceptance](#outstanding-security-and-acceptance)
-- [Deferred work](#deferred-work)
-
-## 10. Current Delivery Status and Roadmap
+## Current delivery status and roadmap
 
 The current walking vertical slice is implemented for local development:
 
@@ -85,9 +75,7 @@ public reference documentation, and formal automated public-contract checks.
 The handwritten frontend clients remain in place; generated SDKs are a later,
 separate decision.
 
-API-owned credentials replace the earlier self-hosted ZITADEL integration, which
-itself replaced the transitional Google/Clerk work. Automated checks cover the
-accepted flow; live acceptance against the hosted gateway remains outstanding. Direct
+Automated checks cover the API-owned credential flow; live acceptance against the hosted gateway remains outstanding. Direct
 member creation through `POST /api/accounts/v1` remains
 unavailable; managers/operators join only through fixed Account Invitations.
 
@@ -120,8 +108,6 @@ collector is connected or operational history retained by this increment.
 
 ### Outstanding security and acceptance
 
-Outstanding security and acceptance work:
-
 * verify restricted-role RLS and scoped application/worker behavior on the hosted
   runtime; repository implementation and disposable PostgreSQL tests do not
   establish live acceptance;
@@ -152,8 +138,7 @@ memory-pressure and public HTTPS availability alerts are also deferred in favor
 of native Lightsail status, CPU and CPU burst-capacity alarms. No custom host
 scripts, monitoring agents or external monitoring service are introduced.
 
-Deferred operational and product work includes live staff queue
-synchronization, order archives and search, printable QR artifacts,
+Deferred operational and product work includes order archives and search, printable QR artifacts,
 tracking-reference expiration, session-management UI, additional
 administrators, CAPTCHA, MFA,
 passkeys, webhook DLQ

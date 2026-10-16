@@ -68,8 +68,8 @@ in Docker with hot reload. `./setup.sh --prod` selects and starts production
 once its configuration and TLS files are ready. Later, `docker compose up
 --build -d` starts or rebuilds the selected mode; `docker compose stop` stops it
 and keeps data, and `docker compose logs -f` follows logs. `./reset.sh` deletes
-containers, volumes and keys and moves `.env` aside; run it only when the user
-asks. Details: [local development](docs/agents/local-development.md).
+containers, volumes and keys and moves `.env` aside, refuses to run when
+`COMPOSE_FILE` selects production, and runs only when the user asks. Details: [local development](docs/agents/local-development.md).
 
 ## Read when relevant
 
@@ -93,7 +93,7 @@ asks. Details: [local development](docs/agents/local-development.md).
 - [GitHub issues](docs/agents/issue-tracker.md): before creating, linking
   or auditing issues.
 - [Thesis framing](docs/PROBLEM_DESCRIPTION.md): when discussing thesis scope.
-- [Authentication operations](docs/authentication-setup.md): before changing
+- [Staff authentication](docs/requirements/staff-authentication.md): before changing
   staff sign-in, verification codes or session operations.
 
 Keep all repository documentation Markdown under `docs/`, except the root

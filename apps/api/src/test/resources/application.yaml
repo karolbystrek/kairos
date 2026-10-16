@@ -51,9 +51,12 @@ kairos:
       recovery-poll-delay: 5s
       initial-delay: 24h
     destination-policy: LOCAL_DEVELOPMENT
+  live-updates:
+    resync-interval: 24h
   retention:
     grace-period: 30d
     order-expiry: 24h
+    cycle-budget: 60s
     batch-size: 10
     purge-delay: 1h
     purge-initial-delay: 24h

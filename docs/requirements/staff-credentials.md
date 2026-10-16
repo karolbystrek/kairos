@@ -1,15 +1,6 @@
 # Staff credentials and registration consistency
 
-## Contents
-
-- [Staff credentials and registration consistency](#staff-credentials-and-registration-consistency)
-- [Contents](#contents)
-- [4.1.1 Staff credentials and registration consistency](#411-staff-credentials-and-registration-consistency)
-  - [Credential storage](#credential-storage)
-  - [Registration consistency](#registration-consistency)
-  - [Login and protected requests](#login-and-protected-requests)
-
-### 4.1.1 Staff credentials and registration consistency
+### Staff credentials and registration consistency
 
 #### Credential storage
 
@@ -62,6 +53,6 @@ sequenceDiagram
     API-->>Panel: Response + renewed cookie retention
 ```
 
-See [staff authentication operations](../authentication-setup.md) for
-operational steps. Primary contract:
+See [maintenance](../deployment/MAINTENANCE.md) for credential operations.
+Primary contract:
 [Spring Session JDBC](https://docs.spring.io/spring-session/reference/configuration/jdbc.html).

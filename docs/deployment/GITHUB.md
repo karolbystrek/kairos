@@ -1,15 +1,8 @@
 # GitHub release protection
 
-## Contents
-
-- [GitHub release protection](#github-release-protection)
-- [Contents](#contents)
-- [4. Protect GitHub releases before enabling deployment](#4-protect-github-releases-before-enabling-deployment)
-- [Temporary deployment SSH access](#temporary-deployment-ssh-access)
-
 Use [the production runbook](RUNBOOK.md) for prerequisites and the sequence.
 
-## 4. Protect GitHub releases before enabling deployment
+## Protect GitHub releases before enabling deployment
 
 An authorized repository owner configures the `production` Environment before
 adding deployment secrets or dispatching a deployment. A workflow reference alone may

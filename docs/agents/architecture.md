@@ -1,12 +1,5 @@
 # Architecture and ownership
 
-## Contents
-
-- [Architecture and ownership](#architecture-and-ownership)
-- [Contents](#contents)
-- [Ownership and REST boundaries](#ownership-and-rest-boundaries)
-- [Real-time and security invariants](#real-time-and-security-invariants)
-
 ## Ownership and REST boundaries
 
 - Spring Boot owns business rules, authentication, authorization, tenant

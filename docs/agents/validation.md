@@ -1,12 +1,5 @@
 # Validation and test scope
 
-## Contents
-
-- [Validation and test scope](#validation-and-test-scope)
-- [Contents](#contents)
-- [Commands and scope](#commands-and-scope)
-- [Behavioral coverage](#behavioral-coverage)
-
 ## Commands and scope
 
 - Run only focused tests for affected behavior when useful. Do not run full local

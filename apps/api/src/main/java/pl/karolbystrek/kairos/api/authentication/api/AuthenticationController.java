@@ -18,6 +18,7 @@ import pl.karolbystrek.kairos.api.authentication.api.model.*;
 import pl.karolbystrek.kairos.api.authentication.application.*;
 import pl.karolbystrek.kairos.api.authentication.application.exception.InvalidLoginException;
 import pl.karolbystrek.kairos.api.authentication.infrastructure.web.CsrfTokenService;
+import pl.karolbystrek.kairos.api.authentication.infrastructure.web.SignInThrottle;
 import pl.karolbystrek.kairos.api.authentication.infrastructure.persistence.StaffIdentityStore;
 
 import java.time.Clock;
@@ -27,6 +28,7 @@ import java.util.Locale;
 @RequiredArgsConstructor
 public class AuthenticationController {
     private final StaffIdentityStore identities;
+    private final SignInThrottle throttle;
     private final OnboardingService onboarding;
     private final RegistrationVerificationService verification;
     private final AccountCreationService accounts;
@@ -43,7 +45,13 @@ public class AuthenticationController {
     @PostMapping("/auth/v1/login")
     Object login(@Valid @RequestBody LoginRequest input, HttpServletRequest request, HttpServletResponse response) {
         var email = normalize(input.email());
-        var subject = identities.signIn(email, input.password());
+        throttle.requireNotThrottled(email);
+        String subject;
+        try { subject = identities.signIn(email, input.password()); }
+        catch (InvalidLoginException exception) {
+            throttle.recordFailure(email);
+            throw exception;
+        }
         StaffPrincipal principal;
         try { principal = authentication.authenticate(subject, clock.instant()); }
         catch (StaffAccessDeniedException exception) {

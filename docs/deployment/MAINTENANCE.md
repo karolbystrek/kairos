@@ -1,14 +1,8 @@
 # Failed release and maintenance
 
-## Contents
-
-- [Failed release and maintenance](#failed-release-and-maintenance)
-- [Contents](#contents)
-- [6. Failed release and maintenance](#6-failed-release-and-maintenance)
-
 Use [the production runbook](RUNBOOK.md) for prerequisites and the sequence.
 
-## 6. Failed release and maintenance
+## Failed release and maintenance
 
 A failure reports its stage and safe error metadata in Actions. The previous
 success record remains, but the actual stack may be partially updated. Do not
@@ -17,8 +11,16 @@ stage and, only with runtime authorization, container health and bounded logs
 privately. Redact credentials, bearer tracking references and personal data before
 sharing diagnostics; avoid environment/config dumps and shell tracing.
 
-Fix forward: correct configuration or commit a fix, obtain a new validated
-release and approval, and rerun the normal command. There is no automated rollback.
+When a release fails at any stage, including the public probes, the deployment
+command automatically redeploys the previous release recorded in
+`deployed-release.json` (if present) and still exits non-zero. The rollback
+reuses that record's digest-pinned images and runs the same checks; its outcome
+is printed to the log. Rollback does not undo database migrations, so every
+migration must stay compatible with the previous release (expand/contract:
+add first, remove only in a later release once no running release uses it).
+
+Then fix forward: correct configuration or commit a fix, obtain a new validated
+release and approval, and rerun the normal command.
 A failed migration requires diagnosis, not removal of volumes, key regeneration,
 checksum bypass or resetting production. Application redeployment cannot recover
 lost data. The current development VPS accepts that loss under the
@@ -28,7 +30,7 @@ lost data. The current development VPS accepts that loss under the
 | --- | --- |
 | OS/Docker/infrastructure patches | Schedule an outage with the operator; review upstream changes, validate changed Compose/NGINX configuration and deploy a reviewed revision. Infrastructure tags can change independently of source; test upgrades deliberately and record pulled versions. Verify health and reboot recovery. |
 | SSH/GHCR credentials | Install and verify replacement credentials through a trusted path before revoking old ones. Update the Environment SSH key/known_hosts after independently verifying any changed host key. Renew host registry credentials before expiry and verify all three pulls without exposing tokens. |
-| Staff credentials | Password hashes live in PostgreSQL; follow [authentication operations](../authentication-setup.md#operations-and-limits). There is no service token to rotate; replace the API volume file atomically, restart API, verify auth and revoke the old PAT. The bootstrap administrator PAT is separate and never mounted into the API; rotate it through trusted provider administration. |
+| Staff credentials | Password hashes, verification-code hashes and session IDs live in PostgreSQL; protect the database and its backups as credential-bearing data. The retention purge deletes an account's credentials with its data. There is no staff service token to rotate. Changing database passwords in `.env` alone does not rotate existing PostgreSQL roles. |
 | Resend sending key | Replace the `RESEND_API_KEY` production Environment secret, deploy in an approved window and verify bounded delivery outcome metadata before revoking the old key. Never log codes, invitation tokens or email bodies. Queued messages survive API restarts; terminal delivery clears their encrypted contents. |
 | Origin CA certificate | Track expiry with `openssl x509 -in /srv/kairos/tls/tls.crt -noout -dates`. Provision a matching replacement covering all names into the external TLS directory, preserve permissions, recreate/reload NGINX in an approved window, verify Full (strict) paths, then retire the old certificate/key. Never disable strict TLS to hide an expiry failure. |
 | Encryption/VAPID keys | Do not overwrite keys in place as a routine rotation. Current encrypted webhook signing secrets, push subscriptions and pending email contents require their original keys; there is no multi-key decrypt/re-encrypt command. Plan a separately reviewed data transformation or explicit retirement of affected data/deliveries, with backup and retention implications. VAPID changes require browser subscription replacement and existing delivery acceptance. |

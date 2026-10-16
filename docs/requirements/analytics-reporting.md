@@ -1,18 +1,5 @@
 # Analytics reporting and platform health
 
-## Contents
-
-- [Analytics reporting and platform health](#analytics-reporting-and-platform-health)
-- [Contents](#contents)
-- [Audiences and scope](#audiences-and-scope)
-- [Platform authority](#platform-authority)
-- [Report contents and semantics](#report-contents-and-semantics)
-- [Dates, zones and ranges](#dates-zones-and-ranges)
-- [Retention, purge and deletion](#retention-purge-and-deletion)
-- [Current platform health](#current-platform-health)
-- [Panel presentation](#panel-presentation)
-- [Boundaries](#boundaries)
-
 ## Audiences and scope
 
 Reports read the hourly aggregates of [order analytics](order-analytics.md) and

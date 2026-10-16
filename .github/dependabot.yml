@@ -1,0 +1,38 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+  - package-ecosystem: npm
+    directory: /apps/panel-app
+    schedule:
+      interval: weekly
+    groups:
+      npm:
+        patterns: ["*"]
+  - package-ecosystem: npm
+    directory: /apps/customer-app
+    schedule:
+      interval: weekly
+    groups:
+      npm:
+        patterns: ["*"]
+  - package-ecosystem: maven
+    directory: /apps/api
+    schedule:
+      interval: weekly
+    groups:
+      maven:
+        patterns: ["*"]
+  # The customer app builds from the panel app Dockerfile.
+  - package-ecosystem: docker
+    directories: [/apps/api, /apps/panel-app]
+    schedule:
+      interval: weekly
+    groups:
+      docker:
+        patterns: ["*"]

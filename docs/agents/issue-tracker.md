@@ -1,12 +1,5 @@
 # GitHub issues
 
-## Contents
-
-- [GitHub issues](#github-issues)
-- [Contents](#contents)
-- [Commands and sub-issues](#commands-and-sub-issues)
-- [Issue audits](#issue-audits)
-
 The end-to-end workflow lives in [AGENTS.md](../../AGENTS.md#workflow). This
 file covers the GitHub mechanics. Use descriptive issue titles without an agent
 prefix, and pass multi-line bodies with `--body-file`.
