@@ -49,7 +49,8 @@ acceptance. Phone testing needs reachable origins rather than `localhost`.
 
 For runtime verification use the default `kairos` Compose project, never a
 separately named stack. Use `./reset.sh` only when the user has authorized
-resetting containers or data.
+resetting containers or data; it refuses to run when `COMPOSE_FILE` selects
+production.
 
 Backend verification requires a running Docker engine. Run `./mvnw --batch-mode verify`
 from `apps/api` (or `apps/api/mvnw -f apps/api/pom.xml --batch-mode verify`
