@@ -31,15 +31,9 @@ import useSWR, { useSWRConfig } from "swr";
 import useSWRMutation from "swr/mutation";
 
 import { FormTextField } from "@/components/form-controls";
-import { OrderManagement } from "@/components/order-management";
-import { AccountManagement } from "@/components/account-management";
 import { EmailVerification } from "@/components/email-verification";
 import { AuthFormLayout } from "@/components/auth-form-layout";
-import { IntegrationManagement } from "@/components/integration-management";
 import { LocationCreationModal } from "@/components/location-creation-modal";
-import { LocationManagement } from "@/components/location-management";
-import { MenuManagement } from "@/components/menu-management";
-import { PasswordChangeForm } from "@/components/password-change-form";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { subscribeToAuthenticationRequired } from "@/src/api/auth-state";
 import { ApiError } from "@/src/api/api-fetch";
@@ -56,7 +50,37 @@ import { currentAccountKey, isStaffCacheKey } from "@/src/api/cache-keys";
 import { recordPanelAction } from "@/src/api/usage-analytics";
 import { errorMessage } from "@/src/messages";
 
-// Charts load only when an analytics tab opens.
+// Staff workspaces load only after sign-in; charts only when an analytics tab opens.
+const OrderManagement = dynamic(() =>
+  import("@/components/order-management").then(
+    (module) => module.OrderManagement,
+  ),
+);
+const AccountManagement = dynamic(() =>
+  import("@/components/account-management").then(
+    (module) => module.AccountManagement,
+  ),
+);
+const IntegrationManagement = dynamic(() =>
+  import("@/components/integration-management").then(
+    (module) => module.IntegrationManagement,
+  ),
+);
+const LocationManagement = dynamic(() =>
+  import("@/components/location-management").then(
+    (module) => module.LocationManagement,
+  ),
+);
+const MenuManagement = dynamic(() =>
+  import("@/components/menu-management").then(
+    (module) => module.MenuManagement,
+  ),
+);
+const PasswordChangeForm = dynamic(() =>
+  import("@/components/password-change-form").then(
+    (module) => module.PasswordChangeForm,
+  ),
+);
 const RestaurantAnalytics = dynamic(() =>
   import("@/components/analytics-management").then(
     (module) => module.RestaurantAnalytics,
