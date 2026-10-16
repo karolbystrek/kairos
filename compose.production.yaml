@@ -6,29 +6,65 @@ x-deployment-logging: &deployment-logging
 
 services:
   nginx:
+    image: nginx:1.28-alpine
     environment:
+      KAIROS_API_HOST:
+      KAIROS_CUSTOMER_APP_HOST:
+      KAIROS_NGINX_LISTEN: "443 ssl"
       KAIROS_NGINX_REAL_IP_CONFIGURATION: "include /etc/nginx/cloudflare-real-ip.conf;"
+      KAIROS_NGINX_TLS_CONFIGURATION: |-
+        ssl_certificate /run/secrets/tls/tls.crt;
+        ssl_certificate_key /run/secrets/tls/tls.key;
+      KAIROS_PANEL_APP_HOST:
+      NGINX_ENVSUBST_FILTER:
     ports:
       - "443:443"
+    secrets:
+      - tls
     volumes:
+      - type: bind
+        source: ./nginx/default.conf.template
+        target: /etc/nginx/templates/default.conf.template
+        read_only: true
+        bind:
+          create_host_path: false
       - type: bind
         source: ./nginx/cloudflare-real-ip.conf
         target: /etc/nginx/cloudflare-real-ip.conf
         read_only: true
         bind:
           create_host_path: false
+    depends_on:
+      api:
+        condition: service_healthy
+      customer-app:
+        condition: service_healthy
+      panel-app:
+        condition: service_healthy
+    networks:
+      - gateway
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
     mem_limit: 128m
     cpus: 0.50
     logging: *deployment-logging
 
   customer-app:
     image: ${KAIROS_IMAGE_REGISTRY:?Set KAIROS_IMAGE_REGISTRY}/customer-app:${KAIROS_RELEASE_VERSION:?Set KAIROS_RELEASE_VERSION}
+    # Production always runs the applications; the profile only gates local Compose.
+    profiles: !reset []
     mem_limit: 512m
     cpus: 0.75
     logging: *deployment-logging
 
   panel-app:
     image: ${KAIROS_IMAGE_REGISTRY:?Set KAIROS_IMAGE_REGISTRY}/panel-app:${KAIROS_RELEASE_VERSION:?Set KAIROS_RELEASE_VERSION}
+    profiles: !reset []
     mem_limit: 512m
     cpus: 0.75
     logging: *deployment-logging
@@ -38,6 +74,7 @@ services:
       EMAIL_DELIVERY_MODE: RESEND
       RESEND_API_KEY: ${RESEND_API_KEY:?Set RESEND_API_KEY for production email delivery}
     image: ${KAIROS_IMAGE_REGISTRY:?Set KAIROS_IMAGE_REGISTRY}/api:${KAIROS_RELEASE_VERSION:?Set KAIROS_RELEASE_VERSION}
+    profiles: !reset []
     mem_limit: 1g
     cpus: 1.50
     logging: *deployment-logging
@@ -61,3 +98,7 @@ services:
     mem_limit: 256m
     cpus: 0.50
     logging: *deployment-logging
+
+secrets:
+  tls:
+    file: ${KAIROS_TLS_DIRECTORY:?Set KAIROS_TLS_DIRECTORY}

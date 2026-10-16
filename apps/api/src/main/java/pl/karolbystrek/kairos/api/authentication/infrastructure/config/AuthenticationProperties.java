@@ -8,4 +8,5 @@ import org.springframework.validation.annotation.Validated;
 
 @Validated
 @ConfigurationProperties("kairos.authentication")
-public record AuthenticationProperties(@NotBlank String baseUrl, @NotNull Resource tokenLocation) {}
+/** {@code instanceHost} names the ZITADEL instance when {@code baseUrl}'s host differs, as for a host-run API. */
+public record AuthenticationProperties(@NotBlank String baseUrl, @NotNull Resource tokenLocation, String instanceHost) {}

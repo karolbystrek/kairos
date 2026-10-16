@@ -1,7 +1,20 @@
 services:
-  nginx:
+  postgres:
     ports:
-      - "127.0.0.1:443:443"
+      - "127.0.0.1:5432:5432"
+
+  redis:
+    ports:
+      - "127.0.0.1:6379:6379"
+
+  zitadel:
+    ports:
+      - "127.0.0.1:8081:8080"
+
+  # The host-run API reads the provisioned PAT from secrets/zitadel instead of a private volume.
+  zitadel-bootstrap:
+    volumes:
+      - ./secrets/zitadel:/credentials
 
   customer-app:
     build:
@@ -13,6 +26,8 @@ services:
         NEXT_PUBLIC_API_BASE_URL:
         NEXT_PUBLIC_CUSTOMER_APP_URL:
         NEXT_TELEMETRY_DISABLED:
+    ports:
+      - "127.0.0.1:3000:3000"
 
   panel-app:
     build:
@@ -24,13 +39,23 @@ services:
         NEXT_PUBLIC_CUSTOMER_APP_URL:
         NEXT_PUBLIC_PANEL_APP_URL: ${PANEL_APP_URL}
         NEXT_TELEMETRY_DISABLED:
+    ports:
+      - "127.0.0.1:3001:3000"
 
   api:
     environment:
-      SPRING_PROFILES_ACTIVE: local
       EMAIL_DELIVERY_MODE: LOG
       REVIEW_INVITATION_DELAY: "${REVIEW_INVITATION_DELAY:-1m}"
     build:
       context: ./apps/api
       dockerfile: Dockerfile
       target: runner
+    volumes:
+      - ./secrets/zitadel:/run/zitadel:ro
+    ports:
+      - "127.0.0.1:8080:8080"
+
+networks:
+  # Published infrastructure ports need a non-internal network.
+  data:
+    internal: false

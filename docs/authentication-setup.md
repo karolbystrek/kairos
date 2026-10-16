@@ -9,9 +9,8 @@
 - [Operations and limits](#operations-and-limits)
 - [Provider verification](#provider-verification)
 
-Run `./setup.sh`, then start Compose separately with `docker compose up --build`.
-Setup creates webhook/push secrets, the stable 32-character `zitadel-masterkey`,
-and optional local TLS material. No external provider account or SMTP setup is
+Run `./setup.sh --dev`, then start Compose separately with `docker compose up -d`.
+Setup creates webhook/push secrets and the stable 32-character `zitadel-masterkey`. No external provider account or SMTP setup is
 required. Existing `.env` files kept with `--keep-env` do not gain new variables;
 copy the ZITADEL variables from `.env.example` when retaining an old file.
 Older four-file key sets need explicit `--replace-keys` to add the master key.
@@ -23,14 +22,17 @@ keys. Never discard that key while retaining the provider database.
 1. PostgreSQL starts with the existing Kairos database. ZITADEL initializes a
    separate database and user using the configured PostgreSQL bootstrap account.
    Configure `ZITADEL_DB`, `ZITADEL_DB_USER`, and `ZITADEL_DB_PASSWORD`.
-2. ZITADEL v4.19.4 starts on the private data network as `http://zitadel:8080`.
-   It exposes no host port. Its HTTP endpoint is used only inside this trusted
-   private network; browser/API traffic remains behind the existing HTTPS gateway.
+2. ZITADEL v4.19.4 starts on the data network as `http://zitadel:8080`. In
+   production it exposes no host port and the network is internal; locally it is
+   published on `127.0.0.1:8081` for the host-run API, which sends
+   `x-zitadel-instance-host: zitadel` (`kairos.authentication.instance-host`)
+   because ZITADEL resolves its instance from the request host.
    A supplied provider Login UI is not needed for Kairos's custom login flow.
 3. A one-shot Python bootstrap creates the service account `kairos-api`, grants
    standard `IAM_LOGIN_CLIENT` and organization `ORG_USER_MANAGER` roles, and
-   writes a non-expiring PAT into the private `zitadel-api-credentials` volume.
-   The API mounts this volume read-only and starts after bootstrap completes.
+   writes a non-expiring PAT into the private `zitadel-api-credentials` volume
+   (locally the bind-mounted `secrets/zitadel/`, which `reset.sh` clears).
+   The API mounts it read-only and starts after bootstrap completes.
    The administrator PAT lives in a different private bootstrap volume and is
    never mounted into the API. No bootstrap credentials are printed.
 4. The API loads `ZITADEL_TOKEN_LOCATION` and calls `ZITADEL_API_URL`.

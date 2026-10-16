@@ -255,9 +255,9 @@ The backend uses Java 25 and Spring Boot 4. It is the only system of record and 
 * transactional order-event outbox processing;
 * anonymous customer notification enrollment and durable Web Push delivery.
 
-Browser-facing API requests go directly to the Spring API origin through the
-shared NGINX gateway. The local HTTPS environment uses credentialed CORS scoped
-by frontend origin and browser resource family. Next.js route handlers are
+Browser-facing API requests go directly to the Spring API origin, through the
+NGINX gateway in production and to `http://localhost:8080` locally. Both use
+credentialed CORS scoped by frontend origin and browser resource family. Next.js route handlers are
 limited to frontend rendering concerns.
 
 ### 2.3 API contracts

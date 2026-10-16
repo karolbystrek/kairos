@@ -9,43 +9,43 @@ if [ "$#" -ne 0 ]; then
     exit 2
 fi
 
-echo
-echo "Resetting Kairos containers, Compose volume data, and local environment..."
-echo
-
 cd "${repository_directory}"
 
-if [ ! -f ".env.example" ]; then
-    echo ".env.example is required to reset Kairos." >&2
-    exit 1
-fi
+# .env.example supplies variables an older .env may lack; either file alone also works.
+environment_files=""
+for file in .env.example .env; do
+    if [ -f "${file}" ] || [ -L "${file}" ]; then
+        environment_files="${environment_files} --env-file ${file}"
+        configuration_file="${file}"
+    fi
+done
+[ -n "${environment_files}" ] || { echo ".env or .env.example is required to reset Kairos." >&2; exit 1; }
+
+secrets_directory="$(sed -n 's/^KAIROS_APPLICATION_SECRETS_DIRECTORY=//p' "${configuration_file}" | tail -n 1)"
+secrets_directory="${secrets_directory:-./secrets}"
+
+echo
+echo "Resetting Kairos containers, Compose volume data, and generated keys..."
+echo
 
 echo "Stopping Kairos and removing its containers and volumes..."
-if [ -f ".env" ] || [ -L ".env" ]; then
-    docker compose --env-file .env.example --env-file .env down -v --remove-orphans
-else
-    echo "No .env found; using .env.example for Docker Compose."
-    docker compose --env-file .env.example down -v --remove-orphans
-fi
+# shellcheck disable=SC2086 # Word splitting builds the --env-file arguments.
+docker compose ${environment_files} --profile apps down -v --remove-orphans
 
 if [ -f ".env" ] || [ -L ".env" ]; then
     mv -f ".env" ".env.old"
     echo "Saved the previous .env as .env.old."
 fi
-cp ".env.example" ".env"
-chmod 0600 ".env"
-echo "Copied .env.example to .env with mode 0600."
 
 rm -f \
-    "secrets/zitadel-masterkey" \
-    "secrets/webhook-encryption.bin" \
-    "secrets/vapid-private.pem" \
-    "secrets/vapid-public.pem" \
-    "secrets/push-subscription-encryption.bin" \
-    "secrets/email-encryption.bin" \
-    "secrets/tls/tls.crt" \
-    "secrets/tls/tls.key"
-echo "Removed generated signing, encryption, and local TLS keys."
+    "${secrets_directory}/zitadel-masterkey" \
+    "${secrets_directory}/webhook-encryption.bin" \
+    "${secrets_directory}/vapid-private.pem" \
+    "${secrets_directory}/vapid-public.pem" \
+    "${secrets_directory}/push-subscription-encryption.bin" \
+    "${secrets_directory}/email-encryption.bin" \
+    "${secrets_directory}/zitadel/kairos.pat"
+echo "Removed generated keys and the ZITADEL API token from ${secrets_directory}."
 
 echo
-echo "Reset complete. Run ./setup.sh, then docker compose up --build to start Kairos."
+echo "Reset complete. Run ./setup.sh --dev (or --prod), then docker compose up."

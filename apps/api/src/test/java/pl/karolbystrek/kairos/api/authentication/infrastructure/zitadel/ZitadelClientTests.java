@@ -38,7 +38,7 @@ class ZitadelClientTests {
         new ApplicationContextRunner()
             .withBean(AuthenticationProperties.class,
                 () -> new AuthenticationProperties(
-                    "http://zitadel:8080", new ClassPathResource("keys/test-provider-token.txt")))
+                    "http://zitadel:8080", new ClassPathResource("keys/test-provider-token.txt"), null))
             .withBean(Clock.class, Clock::systemUTC)
             .withUserConfiguration(ZitadelClient.class)
             .run(context -> assertThat(context).hasSingleBean(ZitadelClient.class));

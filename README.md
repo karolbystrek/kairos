@@ -23,38 +23,53 @@ The system consists of three applications:
 
 ## Local development
 
-Install [Docker](https://docs.docker.com/get-docker/) and
-[mkcert](https://github.com/FiloSottile/mkcert), then trust the local certificate
-authority once:
+Install [Docker](https://docs.docker.com/get-docker/), Node.js 22 and Java 25.
+Docker runs only the infrastructure (PostgreSQL, Redis and ZITADEL); the
+applications run on your machine with hot reload over plain HTTP.
 
 ```bash
-mkcert -install
+./setup.sh --dev
+docker compose up -d
 ```
 
-Prepare the local configuration and development keys:
+`--dev` creates `.env` from `.env.example` (an existing `.env` is kept) and
+generates development keys in `secrets/`. Run `./setup.sh` without a preset to
+answer each step yourself.
+
+Then start each application in its own terminal:
 
 ```bash
-./setup.sh
+(cd apps/api && ./mvnw spring-boot:run)
 ```
-
-Setup prompts before replacing an existing `.env`, asks for the secrets
-directory with `secrets/` as its default, and asks whether to generate the local
-TLS certificate. Pressing Enter accepts the displayed default.
-Setup keeps existing secrets and TLS directories in place and leaves reused
-files untouched. Generated replacements are validated before installation;
-failed installations restore the previous file contents.
-
-Build and start Kairos:
 
 ```bash
-docker compose up --build
+npm --prefix apps/customer-app run dev
 ```
 
-The applications are available at:
+```bash
+npm --prefix apps/panel-app run dev
+```
 
-* Customer app: https://customer.kairos.localhost
-* Staff panel: https://panel.kairos.localhost
-* API: https://api.kairos.localhost
+* Customer app: http://localhost:3000
+* Staff panel: http://localhost:3001
+* API: http://localhost:8080/api
+
+The frontends use Fast Refresh. The API uses Spring Boot DevTools and restarts
+in about a second after a recompile (build in your IDE, or run
+`./mvnw compile` in `apps/api`). Session cookies are `Secure`, which Chrome and
+Firefox accept on `http://localhost`; Safari does not, so use Chrome or Firefox.
+
+To run the whole stack as production-built containers instead, without the
+production NGINX gateway:
+
+```bash
+docker compose --profile apps up --build
+```
+
+Upgrading a checkout that used the earlier HTTPS gateway keeps all data:
+stop the old containers with `docker compose down` (without `-v`), then
+refresh `.env` with `./setup.sh --dev --replace-env`, which replaces it from
+`.env.example`, so re-apply any personal edits.
 
 Compose includes self-hosted ZITADEL for email/password authentication. Setup
 creates its master key; first startup initializes a separate provider database
@@ -83,14 +98,13 @@ git diff --check
 
 ## Resetting the local environment
 
-To reset the local containers, persisted data, configuration, and generated key
-material:
+To delete the Compose containers and volumes, generated keys and the ZITADEL
+API token, and move `.env` aside as `.env.old`:
 
 ```bash
 ./reset.sh
+./setup.sh --dev
 ```
-
-This deletes the Compose volumes and generated keys.
 
 ## Documentation
 

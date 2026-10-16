@@ -15,9 +15,9 @@
 - Keep REST as the boundary between frontends, External Integrations, and the
   API. Browser families use `/api/{resource-family}/v1`; external families use
   `/api/external/{resource-family}/v1`.
-- Local browser-facing API and SSE traffic goes directly to the dedicated API
-  HTTPS origin through the shared NGINX gateway, with explicit credentialed
-  CORS scoped by frontend origin and browser resource family.
+- Browser-facing API and SSE traffic goes directly to the dedicated API origin
+  (through NGINX HTTPS in production, `http://localhost:8080` locally), with
+  explicit credentialed CORS scoped by frontend origin and browser resource family.
 - Frontends use small handwritten request modules and response types with
   native `fetch`. Use SWR for REST-backed client state and Zod for
   frontend-owned input and event validation.

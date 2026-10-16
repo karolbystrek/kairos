@@ -21,12 +21,28 @@
 
 ## Setup
 
-Run `./setup.sh` to prepare local configuration and externally managed key
-files. Start Compose separately with `docker compose up --build`. Use
-`./reset.sh` only when the user has authorized resetting containers or data.
-Source is not synchronized into the production-mode containers; rebuild and
-recreate only affected services when runtime verification requires updated
-code.
+Run `./setup.sh --dev` to prepare `.env` and development keys, then
+`docker compose up -d` to start PostgreSQL, Redis and ZITADEL. They publish
+loopback ports `5432`, `6379` and `8081`; ZITADEL's bootstrap writes the API
+token to `secrets/zitadel/kairos.pat`. Run the applications on the host:
+
+- API: `./mvnw spring-boot:run` from `apps/api` (the `local` Spring profile,
+  set by the Maven plugin, reads `../../.env` and `../../secrets/`), on
+  `http://localhost:8080/api`. DevTools restarts it after a recompile.
+- Frontends: `npm run dev` in `apps/customer-app` (`http://localhost:3000`) and
+  `apps/panel-app` (`http://localhost:3001`). Their committed
+  `.env.development` files hold the local origins.
+
+`docker compose --profile apps up --build` runs the production-built
+application images instead, still over HTTP and without NGINX. NGINX, TLS and
+Cloudflare trust exist only in `compose.production.yaml`; `tests/gateway-test.py`
+covers them. Web Push is disabled under `next dev`; check it with the `apps`
+profile. A phone cannot reach `localhost`, so phone testing needs a tunnel or a
+LAN-reachable origin set in `.env` and `.env.development`.
+
+For runtime verification use the default `kairos` Compose project, never a
+separately named stack. Use `./reset.sh` only when the user has authorized
+resetting containers or data.
 
 Backend verification requires a running Docker engine. Run `./mvnw --batch-mode verify`
 from `apps/api` (or `apps/api/mvnw -f apps/api/pom.xml --batch-mode verify`

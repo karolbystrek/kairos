@@ -13,12 +13,16 @@
 
 ## 7. Local and Hosted Routing
 
-The local Docker Compose stack uses NGINX HTTPS ingress with mkcert certificates.
-Application and data services do not publish host ports. Browser REST and SSE
-requests go directly to the dedicated API origin through the gateway.
+Production Compose (`compose.yaml` plus `compose.production.yaml`) uses NGINX
+HTTPS ingress. Application and data services do not publish host ports. Browser
+REST and SSE requests go directly to the dedicated API origin through the gateway.
+Local development has no gateway: `compose.local.yaml` publishes infrastructure
+ports on `127.0.0.1`, the applications run on the host over HTTP, and browsers
+call the API origin `http://localhost:8080` directly.
 
-* The root environment file configures the customer, panel, and API origins and
-  exact gateway hostnames; `.env.example` records the configuration surface.
+* The root environment file configures the customer, panel, and API origins;
+  production adds exact gateway hostnames. `.env.example` records the local
+  configuration surface and `deployment/production.env.example` the hosted one.
 * Spring scopes credentialed CORS by frontend origin and browser resource family.
   External Integration APIs and internal management endpoints have no browser
   CORS policy. Next.js services render frontend concerns only.
@@ -28,9 +32,10 @@ requests go directly to the dedicated API origin through the gateway.
   forwards `/api/`; frontend hostnames reject that namespace.
 * NGINX and applications share the gateway network. Only the API also joins the
   internal data network containing PostgreSQL and Redis.
-* Local traffic does not trust supplied forwarding headers. NGINX replaces them
-  with a canonical client address, host, HTTPS scheme, and port.
-* Both overlays share per-client NGINX request throttling. POST login, password
+* NGINX does not trust supplied forwarding headers, except the Cloudflare client
+  address from trusted ranges. It replaces them with a canonical client address,
+  host, HTTPS scheme, and port.
+* NGINX applies per-client request throttling. POST login, password
   change, email verification/code resend, tenant registration, and invitation redemption share an initial budget
   of 5 requests/minute with burst 5. External `/api/external/` requests use
   10 requests/second with burst 20. Bursts are accepted immediately (`nodelay`);
@@ -41,12 +46,19 @@ requests go directly to the dedicated API origin through the gateway.
   remains in place.
 * Request-body, header, connection, and timeout bounds apply. Customer SSE disables
   proxy buffering and uses a read timeout longer than the 30-minute emitter lifetime.
-* Local Compose builds application images, mounts private secrets at `/run/secrets`,
-  and publishes only NGINX HTTPS on `127.0.0.1`. Redis Pub/Sub is nondurable and
-  has no volume; PostgreSQL and provider credential material remain persistent.
-* `setup.sh` prepares `.env`, validates the complete key set with explicit handling
-  of existing files, preserves the provider master key, and optionally generates
-  local TLS material. Secret directories use `0700` and application key files `0400`.
+* Local Compose starts only PostgreSQL, Redis and ZITADEL by default and publishes
+  them on `127.0.0.1`; its `apps` profile adds locally built application images
+  on loopback ports `8080`, `3000` and `3001`. Rate limits, header replacement and
+  SSE proxy settings are therefore exercised only by the production overlay and
+  `tests/gateway-test.py`. Redis Pub/Sub is nondurable and has no volume;
+  PostgreSQL and provider credential material remain persistent.
+* `setup.sh` validates the complete key set with explicit handling of existing
+  files and preserves the provider master key. Without a preset it asks about
+  each step; `--dev` prepares `.env` and `secrets/` without prompts, and `--prod`
+  prepares `/srv/kairos/secrets` without writing an environment file. Secret
+  directories use `0700` and application key files `0400`. `reset.sh` has no
+  modes: it removes the Compose project with every profile, its volumes, the
+  generated keys in the configured secrets directory and the ZITADEL API token.
 
 ### Validation and immutable publication
 
@@ -182,8 +194,7 @@ It refuses unsupported hosts, invalid public keys and conflicting Docker package
 rather than removing existing infrastructure. Installed packages are retained on
 reruns; upgrades remain deliberately scheduled maintenance.
 
-Host preparation reuses this checkout's `setup.sh` with `--keep-env --keep-keys
---no-tls`, preserves existing key bytes, rejects invalid/partial key sets, and
+Host preparation reuses this checkout's `setup.sh --prod`, preserves existing key bytes, rejects invalid/partial key sets, and
 removes temporary setup inputs even on failure. Bootstrap never creates or
 changes `production.env`. The GitHub `production` Environment owns production
 configuration: each deployment writes `/srv/kairos/production.env` atomically

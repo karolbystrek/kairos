@@ -128,7 +128,7 @@ else:
         self.assertEqual(values['POSTGRES_PASSWORD'], "'p$HOME\"x'")
         self.assertEqual(values['VAPID_SUBJECT'], "'mailto:ops@example.com'")
         self.assertEqual(values['REVIEW_INVITATION_DELAY'], "'5m'")
-        self.assertEqual(values['COMPOSE_FILE'], 'compose.yaml:compose.deployment.yaml')
+        self.assertEqual(values['COMPOSE_FILE'], 'compose.yaml:compose.production.yaml')
         self.assertEqual(values['KAIROS_RELEASE_VERSION'], '')
         self.assertNotIn('DEPLOY_SSH_KEY', values)
         self.assertEqual(list(self.remote.glob('.production.env.*')), [])

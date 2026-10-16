@@ -67,5 +67,5 @@
 * Security events: staff sessions expire after 30 idle days and Spring Session
   removes expired rows. Production container logs, which hold IP addresses and
   security events, rotate at three 10 MB files per service
-  (`compose.deployment.yaml`). ZITADEL keeps its own event store, including
+  (`compose.production.yaml`). ZITADEL keeps its own event store, including
   events of deleted users, under its own retention behaviour.

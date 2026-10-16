@@ -15,7 +15,7 @@ SERVICES = ("customer-app", "panel-app", "api")
 REVISION = r"[0-9a-f]{40}"
 IMAGE_DIGEST = r"ghcr\.io/karolbystrek/kairos/%s@sha256:[0-9a-f]{64}"
 RUNTIME_FILES = (
-    "compose.yaml", "compose.deployment.yaml", "nginx/default.conf.template",
+    "compose.yaml", "compose.production.yaml", "nginx/default.conf.template",
     "nginx/cloudflare-real-ip.conf", "deployment/zitadel/bootstrap.py",
     "deployment/postgres/bootstrap.sh",
 )
@@ -171,7 +171,7 @@ def main(arguments=None):
             }})
             compose = ["docker", "compose", "--project-name", "kairos", "--project-directory", str(release),
                        "--env-file", str(env_file), "-f", str(release / "compose.yaml"),
-                       "-f", str(release / "compose.deployment.yaml"), "-f", str(override)]
+                       "-f", str(release / "compose.production.yaml"), "-f", str(override)]
             stage = "Compose validation"
             resolved = json.loads(command([*compose, "config", "--format", "json", "--no-path-resolution"], env, capture=True, timeout=60))
             origins = configuration(resolved, release, manifest["images"])

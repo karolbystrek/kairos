@@ -52,7 +52,7 @@ outside the VPS for a fresh rebuild; runtime configuration already lives in GitH
 
 | Variables | Production value or responsibility |
 | --- | --- |
-| `COMPOSE_FILE` | `compose.yaml:compose.deployment.yaml` for manual Compose use; deploy.py explicitly selects its files |
+| `COMPOSE_FILE` | `compose.yaml:compose.production.yaml` for manual Compose use; deploy.py explicitly selects its files |
 | `POSTGRES_USER`, `POSTGRES_DB`, `POSTGRES_PASSWORD` | Initialization/admin identity and database name; never the API datasource |
 | `KAIROS_DB_OWNER_USER`, `KAIROS_DB_OWNER_PASSWORD` | Restricted migration owner; unique role/password |
 | `KAIROS_DB_RUNTIME_USER`, `KAIROS_DB_RUNTIME_PASSWORD` | Restricted application datasource role; separate unique role/password |

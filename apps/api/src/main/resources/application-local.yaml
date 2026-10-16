@@ -1,3 +1,33 @@
+# Host-run API (./mvnw spring-boot:run from apps/api) against the local Compose infrastructure.
+spring:
+  config:
+    import: "optional:file:../../.env[.properties]"
+  datasource:
+    url: "jdbc:postgresql://localhost:5432/${POSTGRES_DB}"
+  data:
+    redis:
+      host: localhost
+  devtools:
+    livereload:
+      enabled: false
+
 kairos:
   email:
     mode: LOG
+    encryption-key-location: "file:../../secrets/email-encryption.bin"
+  authentication:
+    base-url: "http://localhost:8081"
+    # ZITADEL resolves its instance from the host; the published port is localhost:8081, not zitadel.
+    instance-host: zitadel
+    token-location: "file:../../secrets/zitadel/kairos.pat"
+  webhooks:
+    signing:
+      encryption-key-location: "file:../../secrets/webhook-encryption.bin"
+  review-invitations:
+    delay: 1m
+  customer-notifications:
+    vapid:
+      public-key-location: "file:../../secrets/vapid-public.pem"
+      private-key-location: "file:../../secrets/vapid-private.pem"
+    subscription:
+      encryption-key-location: "file:../../secrets/push-subscription-encryption.bin"

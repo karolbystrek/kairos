@@ -1,44 +1,8 @@
 services:
-  nginx:
-    image: nginx:1.28-alpine
-    environment:
-      KAIROS_API_HOST:
-      KAIROS_CUSTOMER_APP_HOST:
-      KAIROS_NGINX_LISTEN: "443 ssl"
-      KAIROS_NGINX_REAL_IP_CONFIGURATION: ""
-      KAIROS_NGINX_TLS_CONFIGURATION: |-
-        ssl_certificate /run/secrets/tls/tls.crt;
-        ssl_certificate_key /run/secrets/tls/tls.key;
-      KAIROS_PANEL_APP_HOST:
-      NGINX_ENVSUBST_FILTER:
-    secrets:
-      - tls
-    volumes:
-      - type: bind
-        source: ./nginx/default.conf.template
-        target: /etc/nginx/templates/default.conf.template
-        read_only: true
-        bind:
-          create_host_path: false
-    depends_on:
-      api:
-        condition: service_healthy
-      customer-app:
-        condition: service_healthy
-      panel-app:
-        condition: service_healthy
-    networks:
-      - gateway
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/health || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 10s
-    restart: unless-stopped
-
   customer-app:
     image: kairos-customer-app:local
+    # Local development runs apps on the host; this profile runs them in Compose.
+    profiles: [apps]
     depends_on:
       api:
         condition: service_healthy
@@ -54,6 +18,7 @@ services:
 
   panel-app:
     image: kairos-panel-app:local
+    profiles: [apps]
     depends_on:
       api:
         condition: service_healthy
@@ -69,6 +34,7 @@ services:
 
   api:
     image: kairos-api:local
+    profiles: [apps]
     environment:
       EMAIL_DELIVERY_MODE:
       EMAIL_VERIFICATION_ENABLED: "${EMAIL_VERIFICATION_ENABLED:-true}"
@@ -252,8 +218,6 @@ secrets:
     file: ${KAIROS_APPLICATION_SECRETS_DIRECTORY:-./secrets}/push-subscription-encryption.bin
   zitadel-masterkey:
     file: ${KAIROS_APPLICATION_SECRETS_DIRECTORY:-./secrets}/zitadel-masterkey
-  tls:
-    file: ${KAIROS_TLS_DIRECTORY:-./secrets/tls}
 
 volumes:
   pgdata:
