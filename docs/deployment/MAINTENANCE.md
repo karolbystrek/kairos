@@ -17,8 +17,16 @@ stage and, only with runtime authorization, container health and bounded logs
 privately. Redact credentials, bearer tracking references and personal data before
 sharing diagnostics; avoid environment/config dumps and shell tracing.
 
-Fix forward: correct configuration or commit a fix, obtain a new validated
-release and approval, and rerun the normal command. There is no automated rollback.
+When a release fails at any stage, including the public probes, the deployment
+command automatically redeploys the previous release recorded in
+`deployed-release.json` (if present) and still exits non-zero. The rollback
+reuses that record's digest-pinned images and runs the same checks; its outcome
+is printed to the log. Rollback does not undo database migrations, so every
+migration must stay compatible with the previous release (expand/contract:
+add first, remove only in a later release once no running release uses it).
+
+Then fix forward: correct configuration or commit a fix, obtain a new validated
+release and approval, and rerun the normal command.
 A failed migration requires diagnosis, not removal of volumes, key regeneration,
 checksum bypass or resetting production. Application redeployment cannot recover
 lost data. The current development VPS accepts that loss under the

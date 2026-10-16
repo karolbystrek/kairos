@@ -223,6 +223,22 @@ sys.exit(deploy.main(sys.argv[1:]))
                     self.assertNotIn("nginx", updates)
                 self.assertFalse(any(call[0] == "curl" for call in self.commands()))
 
+    def test_failed_release_redeploys_previous_release_and_still_fails(self):
+        previous = {"revision": "b" * 40, "images": {
+            service: f"ghcr.io/karolbystrek/kairos/{service}@sha256:" + str(index + 4) * 64
+            for index, service in enumerate(SERVICES)}}
+        self.record.write_text(json.dumps(previous))
+        # The Compose fixture resolves only the previous images, so the new release fails validation.
+        for service in SERVICES:
+            self.config["services"][service]["image"] = previous["images"][service]
+        result = self.run_deploy()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Rolling back to " + "b" * 40, result.stderr)
+        override = json.loads((self.release / "compose.images.json").read_text())
+        self.assertEqual(override["services"]["api"]["image"], previous["images"]["api"])
+        self.assertEqual(json.loads(self.record.read_text()), previous)
+        self.assertIn("Rollback verified", result.stderr)
+
     def test_failed_external_probe_never_records_success(self):
         for extra in ({"FAIL_STAGE": "external"}, {"PROBE_STATUS": "302"},
                       {"PROBE_STATUS": "503"}, {"PROBE_BODY": "gateway-only"}, {"PROBE_BODY": '{"token":""}'}):
