@@ -96,8 +96,8 @@ git diff --check
 
 ## Resetting the local environment
 
-To delete the Compose containers and volumes, generated keys and the ZITADEL
-API token, and move `.env` aside as `.env.old`:
+To delete the Compose containers and volumes and the generated keys, and move
+`.env` aside as `.env.old`:
 
 ```bash
 ./reset.sh
