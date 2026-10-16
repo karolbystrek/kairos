@@ -50,10 +50,10 @@
 ## Durable knowledge and task records
 
 - Store tracked task discussions, designs, implementation plans, progress and
-  audit reports in GitHub issue comments and PRs, not committed task `.md` files,
-  including when a skill normally asks for a local plan or spec. Keep issue
-  descriptions focused on context, goals and acceptance criteria. Small
-  issue-exempt work can keep its scope and validation in the conversation and PR.
+  audit reports in GitHub issue comments and PRs, not committed task `.md` files.
+  Keep issue descriptions focused on context, goals and acceptance criteria.
+  Small issue-exempt work can keep its scope and validation in the
+  conversation and PR.
 - Update documentation with the implementation it describes. Keep reusable
   setup documentation; remove obsolete or duplicate records after moving
   unfinished work to GitHub. Preserve accepted decisions in requirements.
