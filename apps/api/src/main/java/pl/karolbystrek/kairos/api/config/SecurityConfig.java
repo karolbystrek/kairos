@@ -140,6 +140,8 @@ public class SecurityConfig {
                                 "/tenant-registrations/v1",
                                 "/auth/v1/verification",
                                 "/auth/v1/verification/resend",
+                                "/auth/v1/password-reset",
+                                "/auth/v1/password-reset/confirmation",
                                 "/account-invitation-previews/v1",
                                 "/account-invitation-redemptions/v1"
                         ).permitAll()

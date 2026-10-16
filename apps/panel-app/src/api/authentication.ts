@@ -125,3 +125,33 @@ export async function changePassword(
   });
   resetCsrf();
 }
+
+// The API answers the same way whether or not the email has an account.
+export async function requestPasswordReset(email: string): Promise<void> {
+  await apiFetch(
+    "/api/auth/v1/password-reset",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: requiredEmailInputSchema.parse(email) }),
+    },
+    { notifyUnauthorized: false },
+  );
+}
+export async function resetPassword(input: {
+  email: string;
+  code: string;
+  password: string;
+  passwordConfirmation: string;
+}): Promise<void> {
+  await apiFetch(
+    "/api/auth/v1/password-reset/confirmation",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    },
+    { notifyUnauthorized: false },
+  );
+  resetCsrf();
+}
