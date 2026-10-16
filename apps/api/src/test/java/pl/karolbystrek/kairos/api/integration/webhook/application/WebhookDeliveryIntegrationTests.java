@@ -207,7 +207,7 @@ class WebhookDeliveryIntegrationTests extends RedisListenerIsolatedIntegrationTe
                 attemptedAt,
                 attemptedAt.plusMillis(10),
                 new WebhookHttpResult(
-                        503,
+                        404,
                         "bad\0body",
                         false,
                         "NON_2XX_RESPONSE",
@@ -220,7 +220,7 @@ class WebhookDeliveryIntegrationTests extends RedisListenerIsolatedIntegrationTe
                 attemptedAt,
                 attemptedAt.plusMillis(10),
                 new WebhookHttpResult(
-                        503,
+                        404,
                         "bad\0body",
                         false,
                         "NON_2XX_RESPONSE",
@@ -244,6 +244,57 @@ class WebhookDeliveryIntegrationTests extends RedisListenerIsolatedIntegrationTe
                 Long.class,
                 tenant.tenantId()
         )).isEqualTo(2);
+    }
+
+    @Test
+    void retriesTransientFailuresWithBackoffThenDelivers() {
+        createOrders(1);
+        fanOutAll();
+        var first = claimService.claimAvailable().getFirst();
+        var before = Instant.now();
+        complete(first, new WebhookHttpResult(503, "down", false, "NON_2XX_RESPONSE", "down"));
+
+        assertThat(status(first)).isEqualTo("PENDING");
+        assertThat(jdbcTemplate.queryForObject("SELECT attempt_count FROM webhook_deliveries WHERE id = ?", Integer.class, first.id())).isOne();
+        assertThat(jdbcTemplate.queryForObject("SELECT next_attempt_at FROM webhook_deliveries WHERE id = ?", Timestamp.class, first.id()).toInstant())
+                .isAfter(before.plusSeconds(25)).isBefore(before.plusSeconds(60));
+        assertThat(claimService.claimAvailable()).isEmpty();
+
+        makeDue(first);
+        var second = claimService.claimAvailable().getFirst();
+        assertThat(second.id()).isEqualTo(first.id());
+        complete(second, new WebhookHttpResult(204, null, false, null, null));
+        assertThat(status(second)).isEqualTo("SUCCEEDED");
+    }
+
+    @Test
+    void deadLettersClientErrorsImmediatelyButRetriesRateLimits() {
+        createOrders(2);
+        fanOutAll();
+        var claimed = claimService.claimAvailable();
+        complete(claimed.getFirst(), new WebhookHttpResult(404, null, false, "NON_2XX_RESPONSE", "missing"));
+        complete(claimed.getLast(), new WebhookHttpResult(429, null, false, "NON_2XX_RESPONSE", "slow down"));
+
+        assertThat(status(claimed.getFirst())).isEqualTo("DEAD_LETTERED");
+        assertThat(status(claimed.getLast())).isEqualTo("PENDING");
+    }
+
+    @Test
+    void deadLettersWhenRetriesAreExhausted() {
+        createOrders(1);
+        fanOutAll();
+        var delivery = claimService.claimAvailable().getFirst();
+        for (var attempt = 1; attempt < 5; attempt++) {
+            complete(delivery, new WebhookHttpResult(null, null, false, "TIMEOUT", "timed out"));
+            assertThat(status(delivery)).isEqualTo("PENDING");
+            makeDue(delivery);
+            delivery = claimService.claimAvailable().getFirst();
+        }
+        complete(delivery, new WebhookHttpResult(null, null, false, "TIMEOUT", "timed out"));
+
+        assertThat(status(delivery)).isEqualTo("DEAD_LETTERED");
+        assertThat(jdbcTemplate.queryForObject("SELECT attempt_count FROM webhook_deliveries WHERE id = ?", Integer.class, delivery.id())).isEqualTo(5);
+        assertThat(jdbcTemplate.queryForObject("SELECT error_type FROM webhook_deliveries WHERE id = ?", String.class, delivery.id())).isEqualTo("TIMEOUT");
     }
 
     @Test
@@ -314,6 +365,20 @@ class WebhookDeliveryIntegrationTests extends RedisListenerIsolatedIntegrationTe
                     forbiddenId, events.getLast(), subscriptionId, "http://127.0.0.1:9080/events", "{}");
         })).isInstanceOf(DataAccessException.class);
         assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM webhook_deliveries WHERE id = ?", Long.class, forbiddenId)).isZero();
+    }
+
+    private void complete(ClaimedWebhookDelivery delivery, WebhookHttpResult result) {
+        var now = Instant.now();
+        assertThat(completionService.complete(delivery.id(), delivery.claimToken(), now, now, result)).isTrue();
+    }
+
+    private String status(ClaimedWebhookDelivery delivery) {
+        return jdbcTemplate.queryForObject("SELECT status FROM webhook_deliveries WHERE id = ?", String.class, delivery.id());
+    }
+
+    private void makeDue(ClaimedWebhookDelivery delivery) {
+        jdbcTemplate.update("UPDATE webhook_deliveries SET next_attempt_at = ? WHERE id = ?",
+                Timestamp.from(Instant.now().minusSeconds(1)), delivery.id());
     }
 
     private void createOrders(int count) {

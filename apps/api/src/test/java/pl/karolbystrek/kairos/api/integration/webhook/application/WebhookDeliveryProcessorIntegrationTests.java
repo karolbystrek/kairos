@@ -70,7 +70,7 @@ class WebhookDeliveryProcessorIntegrationTests
             receivedSignature.set(exchange.getRequestHeaders().getFirst("Kairos-Signature"));
             receivedPayload.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
             var response = "recipient failed".getBytes(StandardCharsets.UTF_8);
-            exchange.sendResponseHeaders(503, response.length);
+            exchange.sendResponseHeaders(400, response.length);
             try (var body = exchange.getResponseBody()) {
                 body.write(response);
             }
@@ -132,7 +132,7 @@ class WebhookDeliveryProcessorIntegrationTests
                         Instant.ofEpochSecond(timestamp), claimed.payload(),
                         List.of(issued.signingSecret().getBytes(StandardCharsets.UTF_8)));
                 assertThat(receivedSignature.get()).isEqualTo(expectedSignature);
-                assertThat(jdbcTemplate.queryForObject("SELECT response_status FROM webhook_deliveries WHERE id = ?", Integer.class, claimed.id())).isEqualTo(503);
+                assertThat(jdbcTemplate.queryForObject("SELECT response_status FROM webhook_deliveries WHERE id = ?", Integer.class, claimed.id())).isEqualTo(400);
                 assertThat(jdbcTemplate.queryForObject("SELECT error_type FROM webhook_deliveries WHERE id = ?", String.class, claimed.id())).isEqualTo("NON_2XX_RESPONSE");
                 assertThat(jdbcTemplate.queryForObject("SELECT response_body FROM webhook_deliveries WHERE id = ?", String.class, claimed.id())).isEqualTo("recipient failed");
             }
