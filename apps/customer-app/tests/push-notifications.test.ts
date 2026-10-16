@@ -96,6 +96,7 @@ it("shows a background transition once and opens its order on click", async () =
   expect(showNotification).toHaveBeenCalledExactlyOnceWith("Kairos", {
     body: "Twoje zamówienie jest gotowe do odbioru",
     tag: `kairos-order-${REFERENCE}`,
+    renotify: true,
     data: { eventId: payload.eventId, orderUrl: `/orders/${REFERENCE}` },
   });
   expect((await readTrackedOrder(REFERENCE))?.status).toBe("READY");
@@ -196,6 +197,7 @@ it("shows a privacy-preserving fallback for an invalid payload", async () => {
   expect(showNotification).toHaveBeenCalledExactlyOnceWith("Kairos", {
     body: "Status zamówienia się zmienił. Otwórz Kairos, aby sprawdzić aktualny status.",
     tag: "kairos-generic-order-update",
+    renotify: true,
     data: { orderUrl: "/" },
   });
 });

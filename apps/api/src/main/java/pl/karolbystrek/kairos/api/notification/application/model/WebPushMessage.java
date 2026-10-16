@@ -6,7 +6,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 public record WebPushMessage(
-        @NonNull UUID eventId,
+        @NonNull UUID orderId,
         @NonNull String endpoint,
         byte @NonNull [] p256dhKey,
         byte @NonNull [] authSecret,

@@ -29,7 +29,7 @@ public class CustomerPushDeliveryProcessor {
             WebPushResult result;
             try {
                 result = sender.send(new WebPushMessage(
-                        delivery.eventId(),
+                        delivery.orderId(),
                         delivery.endpoint(),
                         delivery.p256dhKey(),
                         delivery.authSecret(),
