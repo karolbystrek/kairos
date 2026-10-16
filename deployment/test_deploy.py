@@ -301,9 +301,10 @@ sys.exit(deploy.main(sys.argv[1:]))
         resolved = subprocess.run(
             [DOCKER, *config_call[1:]], capture_output=True, text=True, check=True,
             env={**os.environ, "KAIROS_IMAGE_REGISTRY": "ghcr.io/karolbystrek/kairos",
-                 "KAIROS_RELEASE_VERSION": REVISION},
+                 "KAIROS_RELEASE_VERSION": REVISION, "KAIROS_API_USER": "1000:1000"},
         )
         services = json.loads(resolved.stdout)["services"]
+        self.assertEqual("1000:1000", services["api"]["user"])
         postgres = services["postgres"]
         self.assertNotIn("postgres-bootstrap", services)
         self.assertNotIn("POSTGRES_USER", services["api"]["environment"])

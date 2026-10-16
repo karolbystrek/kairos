@@ -208,7 +208,8 @@ def main(arguments=None):
     try:
         release, env_file, manifest = inputs(sys.argv[1:] if arguments is None else arguments)
         env = {**os.environ, "COMPOSE_PROJECT_NAME": "kairos",
-               "KAIROS_IMAGE_REGISTRY": "ghcr.io/karolbystrek/kairos"}
+               "KAIROS_IMAGE_REGISTRY": "ghcr.io/karolbystrek/kairos",
+               "KAIROS_API_USER": f"{os.getuid()}:{os.getgid()}"}
         stage = "host lock"
         STATE_DIRECTORY.mkdir(parents=True, exist_ok=True)
         with (STATE_DIRECTORY / "deploy.lock").open("a") as lock:

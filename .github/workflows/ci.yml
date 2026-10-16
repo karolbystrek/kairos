@@ -144,6 +144,7 @@ jobs:
       COMPOSE_FILE: compose.yaml:compose.production.yaml
       KAIROS_IMAGE_REGISTRY: ghcr.io/karolbystrek/kairos
       KAIROS_RELEASE_VERSION: ci
+      KAIROS_API_USER: "1000:1000"
       KAIROS_CUSTOMER_APP_HOST: customer.example.com
       KAIROS_PANEL_APP_HOST: panel.example.com
       KAIROS_API_HOST: api.example.com

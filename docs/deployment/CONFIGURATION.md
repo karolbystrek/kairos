@@ -70,6 +70,7 @@ outside the VPS for a fresh rebuild; runtime configuration already lives in GitH
 | `EMAIL_DELIVERY_MODE`, `RESEND_API_KEY` | Hosted mode `RESEND` and a Resend sending key; the API refuses production startup without it. Local/test mode `LOG` sends no mail and logs no message secrets. |
 | `VAPID_SUBJECT` | Operator-owned `mailto:` contact or public HTTPS contact URL |
 | `KAIROS_IMAGE_REGISTRY`, `KAIROS_RELEASE_VERSION` | deploy.py supplies repository registry and manifest revision; operator values are not used for its digest selection |
+| `KAIROS_API_USER` | `uid:gid` the API container runs as so it can read the owner-only secret files; deploy.py and `setup.sh --prod` set it to the current user |
 | `NGINX_ENVSUBST_FILTER` | Keep `^KAIROS_`; hosted overlay supplies TLS and trusted-proxy settings |
 
 Generate database and Redis passwords with a password manager or
