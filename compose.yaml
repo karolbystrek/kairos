@@ -1,115 +1,6 @@
+# Shared infrastructure. Locally it is the whole Compose stack and the applications run on
+# the host with hot reload; compose.production.yaml adds the application images and NGINX.
 services:
-  nginx:
-    image: nginx:1.28-alpine
-    environment:
-      KAIROS_API_HOST:
-      KAIROS_CUSTOMER_APP_HOST:
-      KAIROS_NGINX_LISTEN: "443 ssl"
-      KAIROS_NGINX_REAL_IP_CONFIGURATION: ""
-      KAIROS_NGINX_TLS_CONFIGURATION: |-
-        ssl_certificate /run/secrets/tls/tls.crt;
-        ssl_certificate_key /run/secrets/tls/tls.key;
-      KAIROS_PANEL_APP_HOST:
-      NGINX_ENVSUBST_FILTER:
-    secrets:
-      - tls
-    volumes:
-      - type: bind
-        source: ./nginx/default.conf.template
-        target: /etc/nginx/templates/default.conf.template
-        read_only: true
-        bind:
-          create_host_path: false
-    depends_on:
-      api:
-        condition: service_healthy
-      customer-app:
-        condition: service_healthy
-      panel-app:
-        condition: service_healthy
-    networks:
-      - gateway
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/health || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 10s
-    restart: unless-stopped
-
-  customer-app:
-    image: kairos-customer-app:local
-    depends_on:
-      api:
-        condition: service_healthy
-    networks:
-      - gateway
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/ || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 20s
-    restart: unless-stopped
-
-  panel-app:
-    image: kairos-panel-app:local
-    depends_on:
-      api:
-        condition: service_healthy
-    networks:
-      - gateway
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/ || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 20s
-    restart: unless-stopped
-
-  api:
-    image: kairos-api:local
-    environment:
-      EMAIL_DELIVERY_MODE:
-      EMAIL_VERIFICATION_ENABLED: "${EMAIL_VERIFICATION_ENABLED:-true}"
-      RESEND_API_KEY:
-      REVIEW_INVITATION_DELAY: "${REVIEW_INVITATION_DELAY:-30m}"
-      NEXT_PUBLIC_API_BASE_URL:
-      NEXT_PUBLIC_CUSTOMER_APP_URL:
-      PANEL_APP_URL:
-      POSTGRES_DB:
-      KAIROS_DB_OWNER_USER:
-      KAIROS_DB_OWNER_PASSWORD:
-      KAIROS_DB_RUNTIME_USER:
-      KAIROS_DB_RUNTIME_PASSWORD:
-      PUSH_DESTINATION_POLICY:
-      REDIS_HOST:
-      REDIS_PASSWORD:
-      REDIS_PORT:
-      VAPID_SUBJECT:
-      WEBHOOK_DESTINATION_POLICY:
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    secrets:
-      - email-encryption.bin
-      - webhook-encryption.bin
-      - vapid-private.pem
-      - vapid-public.pem
-      - push-subscription-encryption.bin
-    networks:
-      - gateway
-      - data
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/api/actuator/health || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 30s
-    restart: unless-stopped
-
   postgres:
     image: postgres:18-alpine
     environment:
@@ -120,6 +11,8 @@ services:
       KAIROS_DB_OWNER_PASSWORD:
       KAIROS_DB_RUNTIME_USER:
       KAIROS_DB_RUNTIME_PASSWORD:
+    ports:
+      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql
       - ./deployment/postgres/bootstrap.sh:/docker-entrypoint-initdb.d/10-kairos-roles.sh:ro
@@ -147,6 +40,8 @@ services:
         "--requirepass",
         "${REDIS_PASSWORD}",
       ]
+    ports:
+      - "127.0.0.1:6379:6379"
     networks:
       - data
     healthcheck:
@@ -161,25 +56,8 @@ services:
       start_period: 5s
     restart: unless-stopped
 
-# File secrets are read-only bind mounts at /run/secrets/<name>; a missing source fails startup.
-secrets:
-  email-encryption.bin:
-    file: ${KAIROS_APPLICATION_SECRETS_DIRECTORY:-./secrets}/email-encryption.bin
-  webhook-encryption.bin:
-    file: ${KAIROS_APPLICATION_SECRETS_DIRECTORY:-./secrets}/webhook-encryption.bin
-  vapid-private.pem:
-    file: ${KAIROS_APPLICATION_SECRETS_DIRECTORY:-./secrets}/vapid-private.pem
-  vapid-public.pem:
-    file: ${KAIROS_APPLICATION_SECRETS_DIRECTORY:-./secrets}/vapid-public.pem
-  push-subscription-encryption.bin:
-    file: ${KAIROS_APPLICATION_SECRETS_DIRECTORY:-./secrets}/push-subscription-encryption.bin
-  tls:
-    file: ${KAIROS_TLS_DIRECTORY:-./secrets/tls}
-
 volumes:
   pgdata:
 
 networks:
-  gateway:
   data:
-    internal: true

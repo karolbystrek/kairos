@@ -55,7 +55,8 @@ service; existing explicit approval remains valid within its stated scope.
 
 - PostgreSQL is authoritative, Redis Pub/Sub distributes customer events,
   the API owns staff credentials and sessions.
-- `compose.yaml`: shared Docker Compose topology with NGINX HTTPS ingress.
+- `compose.yaml`: shared infrastructure (PostgreSQL, Redis) on loopback ports;
+  `compose.production.yaml` adds the application images and NGINX HTTPS ingress.
   Applications own their manifests and Dockerfiles; the two frontends share
   `apps/panel-app/Dockerfile`.
 

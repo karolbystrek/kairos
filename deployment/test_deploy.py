@@ -15,7 +15,7 @@ REVISION = "a" * 40
 SERVICES = ("customer-app", "panel-app", "api")
 DOCKER = shutil.which("docker")
 RUNTIME_FILES = (
-    "compose.yaml", "compose.deployment.yaml", "nginx/default.conf.template",
+    "compose.yaml", "compose.production.yaml", "nginx/default.conf.template",
     "nginx/cloudflare-real-ip.conf",
     "deployment/postgres/bootstrap.sh",
 )
@@ -269,6 +269,14 @@ sys.exit(deploy.main(sys.argv[1:]))
             "RESEND_API_KEY=fixture-resend-key",
             "KAIROS_APPLICATION_SECRETS_DIRECTORY=" + str(self.secrets),
             "KAIROS_TLS_DIRECTORY=" + str(self.secrets),
+            # Local .env.example has no gateway; supply the production-only NGINX values and origins.
+            "NEXT_PUBLIC_CUSTOMER_APP_URL=https://customer.kairos.localhost",
+            "PANEL_APP_URL=https://panel.kairos.localhost",
+            "NEXT_PUBLIC_API_BASE_URL=https://api.kairos.localhost",
+            "KAIROS_CUSTOMER_APP_HOST=customer.kairos.localhost",
+            "KAIROS_PANEL_APP_HOST=panel.kairos.localhost",
+            "KAIROS_API_HOST=api.kairos.localhost",
+            "NGINX_ENVSUBST_FILTER=^KAIROS_",
         ]) + "\n")
         result = self.run_deploy(REAL_COMPOSE=DOCKER)
         self.assertEqual(result.returncode, 0, result.stderr)

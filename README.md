@@ -23,38 +23,52 @@ The system consists of three applications:
 
 ## Local development
 
-Install [Docker](https://docs.docker.com/get-docker/) and
-[mkcert](https://github.com/FiloSottile/mkcert), then trust the local certificate
-authority once:
+Install [Docker](https://docs.docker.com/get-docker/), Node.js 22 and Java 25.
+Docker runs only the infrastructure (PostgreSQL and Redis); the applications run
+on your machine with hot reload over plain HTTP.
 
 ```bash
-mkcert -install
+./setup.sh --dev
 ```
 
-Prepare the local configuration and development keys:
+`--dev` creates `.env` from `.env.example` (an existing `.env` is kept),
+generates development keys in `secrets/`, installs the frontend dependencies and
+starts PostgreSQL and Redis on loopback ports. Rerunning it is safe. Run
+`./setup.sh` without a preset to answer each step yourself.
+
+Then start each application in its own terminal (or from your IDE, with
+`apps/api` as the API's working directory):
 
 ```bash
-./setup.sh
+(cd apps/api && ./mvnw spring-boot:run)
 ```
-
-Setup prompts before replacing an existing `.env`, asks for the secrets
-directory with `secrets/` as its default, and asks whether to generate the local
-TLS certificate. Pressing Enter accepts the displayed default.
-Setup keeps existing secrets and TLS directories in place and leaves reused
-files untouched. Generated replacements are validated before installation;
-failed installations restore the previous file contents.
-
-Build and start Kairos:
 
 ```bash
-docker compose up --build
+npm --prefix apps/customer-app run dev
 ```
 
-The applications are available at:
+```bash
+npm --prefix apps/panel-app run dev
+```
 
-* Customer app: https://customer.kairos.localhost
-* Staff panel: https://panel.kairos.localhost
-* API: https://api.kairos.localhost
+* Customer app: http://localhost:3000
+* Staff panel: http://localhost:3001
+* API: http://localhost:8080/api
+
+The frontends use Fast Refresh. The API uses Spring Boot DevTools and restarts
+in about a second after a recompile (build in your IDE, or run
+`./mvnw compile` in `apps/api`). Session cookies are `Secure`, which Chrome and
+Firefox accept on `http://localhost`; Safari does not, so use Chrome or Firefox.
+
+The API reads the same configuration keys locally and in production: locally
+from `.env`, in production from the environment that `compose.production.yaml`
+passes to its container. NGINX, TLS and the application images exist only in
+that production overlay.
+
+Upgrading a checkout that used the earlier stack keeps the database: run
+`docker compose down --remove-orphans` (without `-v`) to remove the old gateway,
+application and ZITADEL containers, then `./setup.sh --dev --replace-env`, which
+replaces `.env` from `.env.example`, so re-apply any personal edits.
 
 The API handles email/password authentication itself and stores password
 hashes in PostgreSQL; there is no separate identity service to run. No Google
@@ -82,14 +96,13 @@ git diff --check
 
 ## Resetting the local environment
 
-To reset the local containers, persisted data, configuration, and generated key
-material:
+To delete the Compose containers and volumes, generated keys and the ZITADEL
+API token, and move `.env` aside as `.env.old`:
 
 ```bash
 ./reset.sh
+./setup.sh --dev
 ```
-
-This deletes the Compose volumes and generated keys.
 
 ## Documentation
 

@@ -1,4 +1,8 @@
 spring:
+  config:
+    # The host-run API (./mvnw spring-boot:run in apps/api) reads the repository .env;
+    # containers have no such file and receive the same keys as environment variables.
+    import: "optional:file:../../.env[.properties]"
   session:
     timeout: 30d
     jdbc:
@@ -22,7 +26,7 @@ spring:
         # A long purge or analytics run must not delay email and heartbeats; kept small for one VPS.
         size: 2
   datasource:
-    url: "jdbc:postgresql://postgres:5432/${POSTGRES_DB}"
+    url: "jdbc:postgresql://${POSTGRES_HOST:postgres}:5432/${POSTGRES_DB}"
     username: "${KAIROS_DB_RUNTIME_USER}"
     password: "${KAIROS_DB_RUNTIME_PASSWORD}"
     hikari:
@@ -61,7 +65,7 @@ kairos:
   email:
     mode: ${EMAIL_DELIVERY_MODE:RESEND}
     api-key: ${RESEND_API_KEY:}
-    encryption-key-location: ${EMAIL_ENCRYPTION_KEY_LOCATION:file:/run/secrets/email-encryption.bin}
+    encryption-key-location: "file:${KAIROS_SECRETS_DIRECTORY:/run/secrets}/email-encryption.bin"
   monitoring:
     token-location: "${KAIROS_MONITORING_TOKEN_LOCATION:file:/run/secrets/metrics-token}"
   origins:
@@ -71,7 +75,7 @@ kairos:
     email-verification-enabled: ${EMAIL_VERIFICATION_ENABLED:true}
   webhooks:
     signing:
-      encryption-key-location: "file:/run/secrets/webhook-encryption.bin"
+      encryption-key-location: "file:${KAIROS_SECRETS_DIRECTORY:/run/secrets}/webhook-encryption.bin"
       rotation-overlap: 24h
     delivery:
       total-timeout: 10s
@@ -91,11 +95,11 @@ kairos:
     purge-initial-delay: 10m
   customer-notifications:
     vapid:
-      public-key-location: "file:/run/secrets/vapid-public.pem"
-      private-key-location: "file:/run/secrets/vapid-private.pem"
+      public-key-location: "file:${KAIROS_SECRETS_DIRECTORY:/run/secrets}/vapid-public.pem"
+      private-key-location: "file:${KAIROS_SECRETS_DIRECTORY:/run/secrets}/vapid-private.pem"
       subject: "${VAPID_SUBJECT:mailto:kairos@localhost}"
     subscription:
-      encryption-key-location: "file:/run/secrets/push-subscription-encryption.bin"
+      encryption-key-location: "file:${KAIROS_SECRETS_DIRECTORY:/run/secrets}/push-subscription-encryption.bin"
       maximum-enrollments-per-order: 10
       dormant-retention: 30d
     delivery:
