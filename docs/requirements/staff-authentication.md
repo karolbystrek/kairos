@@ -44,12 +44,10 @@ email. Existing pending code delivery is canceled on completion. Identity and
 Account eligibility checks still apply, and invitation redemption is unchanged.
 Re-enabling verification does not undo emails already marked verified.
 
-The registration form has no step counter, progress bar, Next/Back controls, or
-persistent password-requirement paragraph. Account fields retain submitted values
-on recoverable failure and show corrective errors beside the affected control.
-Public Sign in ends with **Don't have an account? Create one.**, with only
-**Create one.** linked to the public `/registration` page. Registration ends with **Already have an
-account? Sign in.**, with only **Sign in.** linked to `/login`.
+Registration is a single form without steps. Account fields retain submitted
+values on recoverable failure and show corrective errors for the affected
+control. Public sign-in links to `/registration`, and registration links back to
+`/login`.
 
 The panel root `/` is the public restaurant-owner landing page. It checks the
 existing API session in the browser and redirects signed-in visitors to

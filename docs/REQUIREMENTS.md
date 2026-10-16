@@ -24,7 +24,7 @@ Do not skip an applicable requirement because it lives in another file.
 
 | Topic | When to read |
 | --- | --- |
-| [Purpose, technology and ownership](requirements/overview-technology.md) | All work: scope, stack and ownership; frontend visual conventions |
+| [Purpose, technology and ownership](requirements/overview-technology.md) | All work: scope, stack and ownership; frontend design principles, popup and accessibility rules |
 | [Anonymous order analytics](requirements/order-analytics.md) | Durable counts/durations, worker processing, deployment boundary and analytics retention |
 | [Operational metrics](requirements/operational-metrics.md) | Protected export, bounded instrumentation, worker backlog and collector limits |
 | [Anonymous panel and review usage](requirements/usage-analytics.md) | Browser action definitions, authorized ingestion, approximate counts and retention |
