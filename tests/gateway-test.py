@@ -139,7 +139,8 @@ def main():
                 raise AssertionError('unknown host accepted')
             except (OSError, urllib.error.URLError):
                 pass
-            protected = ['/api/auth/v1/login', '/api/auth/v1/password',
+            protected = ['/api/auth/v1/login', '/api/auth/v1/password', '/api/auth/v1/password-reset',
+                         '/api/auth/v1/password-reset/confirmation',
                          '/api/auth/v1/verification', '/api/auth/v1/verification/resend',
                          '/api/tenant-registrations/v1', '/api/account-invitation-redemptions/v1']
             statuses = [request(protected[i % len(protected)], client=f'203.0.113.{i + 1}', method='POST')[0] for i in range(24)]

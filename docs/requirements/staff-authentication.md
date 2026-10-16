@@ -79,8 +79,18 @@ Account resumes verification. Registering an email held by such an abandoned
 identity replaces it; an existing Account is never replaced.
 
 Managers/operators register through emailed, recipient-bound member invitations.
-Redemption verifies the fixed email without a separate code step. Forgotten-password
-recovery remains deferred. The password policy is a minimum of 12 characters
+Redemption verifies the fixed email without a separate code step.
+
+Forgotten passwords are reset from the login page with an emailed 6-digit code,
+under the same code rules as registration (one-hour lifetime, hashed, latest
+code only, five wrong attempts, 60-second resend cooldown). The request answers
+identically whether or not the email belongs to an Account that may sign in, and
+disabled or archived Accounts receive no code. A correct code sets the new
+password, marks the email verified and revokes every existing session of the
+Account; the user then signs in. An Account without stored credentials (created
+before the API owned them) gains them through this flow.
+
+The password policy is a minimum of 12 characters
 without mandatory character classes or scheduled password expiry. Registration
 and password change validate that minimum, and registration also email syntax,
 confirmation and the 200-character input bounds, in the panel and API. Identity
