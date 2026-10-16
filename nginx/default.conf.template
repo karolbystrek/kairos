@@ -35,7 +35,7 @@ limit_conn_status 429;
 # Empty keys leave preflight, read, CSRF and unrelated requests unthrottled.
 map "$request_method:$uri" $kairos_auth_client {
     default "";
-    ~^POST:/api/(auth/v1/(login|password|verification(/resend)?)|tenant-registrations/v1|account-invitation-redemptions/v1)/?$ $binary_remote_addr;
+    ~^POST:/api/(auth/v1/(login|password|password-reset(/confirmation)?|verification(/resend)?)|tenant-registrations/v1|account-invitation-redemptions/v1)/?$ $binary_remote_addr;
 }
 map $uri $kairos_external_client {
     default "";

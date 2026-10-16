@@ -35,6 +35,7 @@ public class AuthenticationController {
     private final StaffAuthenticationService authentication;
     private final Clock clock;
     private final CsrfTokenService csrf;
+    private final PasswordResetService passwordResets;
 
     @GetMapping("/auth/v1/csrf")
     CsrfTokenResponse csrf(HttpServletRequest request) { return new CsrfTokenResponse(csrf.current(request).getToken()); }
@@ -137,6 +138,21 @@ public class AuthenticationController {
             HttpServletRequest request, HttpServletResponse response) {
         identities.changePassword(current.providerSubject(principal), input.currentPassword(), input.password());
         sessions.logoutAll(principal);
+        sessions.logout(request);
+        csrf.rotate(request, response);
+    }
+
+    @PostMapping("/auth/v1/password-reset")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    void requestPasswordReset(@Valid @RequestBody PasswordResetRequest input) {
+        passwordResets.request(normalize(input.email()));
+    }
+
+    @PostMapping("/auth/v1/password-reset/confirmation")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void resetPassword(@Valid @RequestBody PasswordResetConfirmationRequest input,
+            HttpServletRequest request, HttpServletResponse response) {
+        passwordResets.reset(normalize(input.email()), input.code(), input.password());
         sessions.logout(request);
         csrf.rotate(request, response);
     }

@@ -36,7 +36,7 @@ call the API origin `http://localhost:8080` directly.
   address from trusted ranges. It replaces them with a canonical client address,
   host, HTTPS scheme, and port.
 * NGINX applies per-client request throttling. POST login, password
-  change, email verification/code resend, tenant registration, and invitation redemption share an initial budget
+  change, password reset, email verification/code resend, tenant registration, and invitation redemption share an initial budget
   of 5 requests/minute with burst 5. External `/api/external/` requests use
   10 requests/second with burst 20. Bursts are accepted immediately (`nodelay`);
   excess requests return `429`. CSRF bootstrap, browser reads, preflight, logout,
