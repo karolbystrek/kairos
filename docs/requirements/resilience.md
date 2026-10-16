@@ -55,6 +55,12 @@
   its unverified staff identity, unless an account already uses that identity.
 * Sent and failed email deliveries are deleted 30 days after completion once no
   invitation or pending registration references them.
+* Succeeded and dead-lettered webhook deliveries are deleted 30 days after
+  completion. Order outbox events are deleted once both fan-outs finished more
+  than 30 days ago and no webhook or push delivery references them. Orders and
+  their history remain.
+* The same worker expires orders left active and unchanged for 24 hours (see
+  [order lifecycle](orders-customer.md)).
 * Invitation creation/replacement and its email outbox acceptance commit
   atomically. Replacement cancels queued old delivery, invalidates the old token
   and reserves the tenant/email for only one active invitation.

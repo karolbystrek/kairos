@@ -13,6 +13,8 @@ import pl.karolbystrek.kairos.api.integration.testsupport.IntegrationTestFixture
 import pl.karolbystrek.kairos.api.integration.testsupport.MutableTestClock;
 import pl.karolbystrek.kairos.api.integration.testsupport.MutableTestClockConfiguration;
 import pl.karolbystrek.kairos.api.order.application.OrderService;
+import pl.karolbystrek.kairos.api.order.domain.InvalidOrderTransitionException;
+import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
 import pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase;
 import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
 
@@ -53,6 +55,32 @@ class RetentionPurgeIntegrationTests extends RedisListenerIsolatedIntegrationTes
     void createFixture() {
         clock.setInstant(ARCHIVED_AT);
         tenant = new IntegrationTestFixture(jdbcTemplate).createTenant();
+    }
+
+    @Test
+    void expiresOrdersUnchangedForADayAndLaterPurgesTheirFinishedEvents() {
+        var stale = orderService.createOrder(tenant.administrator(), tenant.firstLocationId(), null, List.of());
+        clock.setInstant(ARCHIVED_AT.plus(Duration.ofHours(23)));
+        var recent = orderService.createOrder(tenant.administrator(), tenant.firstLocationId(), null, List.of());
+        assertThatThrownBy(() -> orderService.updateStatus(tenant.administrator(), recent.id(), OrderStatus.EXPIRED))
+                .isInstanceOf(InvalidOrderTransitionException.class);
+
+        clock.setInstant(ARCHIVED_AT.plus(Duration.ofHours(25)));
+        purgeService.purge();
+        assertThat(jdbcTemplate.queryForObject("SELECT status FROM orders WHERE id = ?", String.class, stale.id())).isEqualTo("EXPIRED");
+        assertThat(jdbcTemplate.queryForObject("SELECT status FROM orders WHERE id = ?", String.class, recent.id())).isEqualTo("IN_PREPARATION");
+        assertThat(count("SELECT count(*) FROM order_history WHERE order_id = ? AND status = 'EXPIRED' AND initiator_type = 'SYSTEM'", stale.id())).isOne();
+        assertThat(count("SELECT count(*) FROM order_outbox_events WHERE order_id = ? AND event_type = 'ORDER_EXPIRED'", stale.id())).isOne();
+
+        jdbcTemplate.update("UPDATE order_outbox_events SET webhook_fanout_completed_at = created_at, push_fanout_completed_at = created_at WHERE order_id = ?",
+                stale.id());
+        clock.setInstant(ARCHIVED_AT.plus(Duration.ofDays(30)));
+        purgeService.purge();
+        assertThat(count("SELECT count(*) FROM order_outbox_events WHERE order_id = ?", stale.id())).isEqualTo(2);
+        clock.setInstant(ARCHIVED_AT.plus(Duration.ofDays(32)));
+        purgeService.purge();
+        assertThat(count("SELECT count(*) FROM order_outbox_events WHERE order_id = ?", stale.id())).isZero();
+        assertThat(count("SELECT count(*) FROM orders WHERE id = ?", stale.id())).isOne();
     }
 
     @Test

@@ -64,6 +64,12 @@ public class CustomerPushOutboxFanoutService {
             event.completePushFanout(now);
             return;
         }
+        // Customers are alerted to what staff do; an order that lapsed unattended just stops being tracked.
+        if (event.getEventType() == OrderEventType.ORDER_EXPIRED) {
+            enrollmentRepository.deleteAllByOrderId(event.getOrderId());
+            event.completePushFanout(now);
+            return;
+        }
         var currentOrder = orderRepository.findById(event.getOrderId()).orElse(null);
         if (currentOrder == null || currentOrder.getStatus() != event.getStatus()) {
             event.completePushFanout(now);

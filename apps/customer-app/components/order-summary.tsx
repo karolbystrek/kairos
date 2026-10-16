@@ -9,6 +9,7 @@ const statusCopy: Record<OrderStatus, string> = {
   READY: "Gotowe do odbioru",
   COMPLETED: "Zamówienie zrealizowane",
   CANCELED: "Zamówienie anulowane",
+  EXPIRED: "Zamówienie zamknięte",
 };
 
 export function OrderSummary({

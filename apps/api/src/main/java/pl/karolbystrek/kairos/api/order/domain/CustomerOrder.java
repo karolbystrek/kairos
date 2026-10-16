@@ -143,6 +143,16 @@ public class CustomerOrder {
                 && reviewConfigurationId.equals(location.getReviewConfigurationId());
     }
 
+    /** Lapses an active order nobody closed; staff and integrations can never choose this status. */
+    public boolean expire(@NonNull Instant now) {
+        if (!status.isActive()) {
+            return false;
+        }
+        status = OrderStatus.EXPIRED;
+        updatedAt = now;
+        return true;
+    }
+
     public boolean transitionTo(@NonNull OrderStatus target, @NonNull Instant now) {
         if (status == target) {
             return false;
