@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { customerMutation } from "@/src/api/customer-notifications";
-import { apiUrl } from "@/src/api/api-url";
+import { apiUrl, requestSignal } from "@/src/api/api-url";
 import { orderStatusSchema } from "@/src/orders/order-status";
 
 const reviewInvitationSchema = z.object({
@@ -51,6 +51,7 @@ export async function getTrackedOrder(
 ): Promise<CustomerOrder> {
   const response = await fetch(
     apiUrl(`/api/tracked-orders/v1/${encodeURIComponent(trackingReference)}`),
+    { signal: requestSignal() },
   );
 
   if (!response.ok) {
