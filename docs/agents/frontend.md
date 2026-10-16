@@ -4,17 +4,16 @@
 
 - [Frontend conventions](#frontend-conventions)
 - [Contents](#contents)
-- [Using skills](#using-skills)
+- [Project conventions first](#project-conventions-first)
 - [Components and effects](#components-and-effects)
 - [Authenticated client state](#authenticated-client-state)
 
-## Using skills
+## Project conventions first
 
-Use installed skills when useful, respecting their invocation scope.
-Project requirements and conventions take precedence over generic skill advice:
+Project requirements and conventions take precedence over generic advice:
 retain HeroUI, Phosphor Icons, shared tokens and existing state/API patterns. Apply only
 task-relevant rules; do not add dependencies, abstractions or animations solely
-because a skill suggests them. Before using view transitions, verify support in
+because generic advice suggests them. Before using view transitions, verify support in
 the installed React/Next.js versions and configuration, preserve reduced-motion
 handling and provide a usable fallback.
 

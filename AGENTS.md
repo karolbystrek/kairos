@@ -5,47 +5,42 @@ orders, staff manage queues, and external systems use REST APIs and webhooks.
 Repository: [https://github.com/karolbystrek/kairos](https://github.com/karolbystrek/kairos).
 Use `gh` for all GitHub operations.
 
-## Required workflow
+## Workflow
 
-For every task, invoke the `/grilling` skill before starting the task discussion
-with the user. Use it to guide the discussion toward shared understanding.
+Every task moves through the stages below, from idea to shipped PR. Use the
+installed skills that fit each stage (brainstorming, planning, debugging,
+test-driven development, review, PR writing and so on); this file sets the
+stages and rules, not the tools. Scale each stage to the task's size and risk.
 
-Establish shared understanding with the user of the problem, scope, constraints,
-and acceptance criteria before proposing an implementation plan. For every task,
-discuss the implementation plan and implementation details with the user until
-both reach shared understanding, before starting implementation. For each area
-of the task, propose a short list of possible solutions, always identify one
-recommended solution, and explain why it is recommended. Resolve questions and
-trade-offs with the user rather than silently choosing an approach. Scale planning
-and review to the task's complexity and risk. Track substantial work in GitHub
-issues; small documentation edits and mechanical cleanups do not require an
-issue. Issues describe context, goals and acceptance criteria, not implementation
-details. Discuss implementation choices when implementing the issue.
-
-When working on a GitHub issue, set the conversation title to that issue's exact
-title.
-
-Create a new `<issue>-<topic>` branch from current `main` for tracked work, or a
-descriptive branch for issue-exempt work. Validate, commit all task changes in
-one Conventional Commit, and open a PR to `main`. Stop for user verification
-and merge; never develop directly on `main` or merge the PR yourself. Keep
-tracked task plans/progress in GitHub, not committed `.md` files. See
-[the full workflow](docs/agents/issue-tracker.md) before changes.
-
-Handle small tasks that can be completed quickly in the current session yourself.
-Use implementation subagents only for larger tasks with substantial, independent
-work where parallel execution meaningfully reduces completion time. Avoid delegation when
-coordination costs outweigh the benefit or changes overlap. Delegation alone
-never requires a separate issue or branch.
-
-For major tasks whose implementation spans multiple modules or services, run a
-read-only review-focused subagent after implementation and before finalizing
-the work. Do not spawn a review subagent for simple changes or documentation-only
-tasks. The reviewer must use `ponytail-review`. Address actionable
-findings and rerun affected checks before handing the work to the user.
-
-Do not run full test suites locally unless the user explicitly requests them.
-Use focused checks for the affected scope; rely on PR CI for full-suite coverage.
+1. **Understand.** Read the relevant requirements and source first. Trivial
+   tasks need no discussion. For non-trivial tasks, confirm the goal and agree
+   on an approach with the user before changing files. For large or risky
+   tasks, discuss scope, constraints and acceptance criteria, offer a few
+   options with one recommendation and its reason, and resolve open questions
+   with the user rather than choosing silently.
+2. **Track.** Substantial work (features, notable bugs, multi-step work) gets a
+   GitHub issue, reusing an existing one when it fits. Issues state context,
+   goal and acceptance criteria, not implementation details; split large work
+   into sub-issues. Small fixes go straight to a PR. Keep plans and progress in
+   issue and PR comments, never in committed task `.md` files. When working on
+   an issue, set the conversation title to the issue's exact title.
+3. **Branch.** Check `git status --short` and leave unrelated changes alone.
+   Branch from current `origin/main` as `<issue>-<topic>`, or with a
+   descriptive name when there is no issue. Never work on `main`.
+4. **Build.** Implement only the agreed scope, following existing patterns. For
+   bug fixes and logic changes, write a failing test first when practical.
+   Update documentation and requirements in the same change as the behavior
+   they describe. Split work across parallel agents only when it is large, the
+   pieces touch different files, and parallelism clearly saves time.
+5. **Verify.** Run focused checks for the affected scope plus `git diff --check`;
+   leave full suites to CI unless the user asks. Self-review the diff. For large
+   or cross-module changes, also get an independent review, address its
+   findings and rerun the affected checks.
+6. **Ship.** Use Conventional Commit messages; PRs are squash-merged, so the PR
+   title is a Conventional Commit too. Open a PR to `main` describing the
+   outcome and the checks run, link the issue with a closing keyword, get CI
+   green, and stop. The user verifies,
+   merges and decides when to deploy; never merge or deploy yourself.
 
 ## Cloud resource approval
 
@@ -72,8 +67,7 @@ service; existing explicit approval remains valid within its stated scope.
   the topic files together form the canonical specification.
 - [Architecture](docs/agents/architecture.md): before changes across application,
   API, security, persistence, or real-time boundaries.
-- [Frontend conventions](docs/agents/frontend.md): before frontend changes,
-  including how generic skill advice yields to project conventions.
+- [Frontend conventions](docs/agents/frontend.md): before frontend changes.
 - [Backend conventions](docs/agents/backend.md): before API/Java changes.
 - [Validation](docs/agents/validation.md): before selecting tests/checks and
   before declaring work complete.
@@ -84,9 +78,8 @@ service; existing explicit approval remains valid within its stated scope.
 - [Documentation maintenance](docs/agents/documentation.md): before documentation
   changes or recording accepted decisions. Keep agent guidance focused by purpose
   and update this index whenever it changes; keep task records in GitHub.
-- [Issue workflow](docs/agents/issue-tracker.md): before planning or changing files,
-  creating commits/PRs, or auditing issues.
-- [Triage labels](docs/agents/triage-labels.md): when setting issue readiness.
+- [GitHub issues](docs/agents/issue-tracker.md): before creating, linking
+  or auditing issues.
 - [Thesis framing](docs/PROBLEM_DESCRIPTION.md): when discussing thesis scope.
 - [Authentication operations](docs/authentication-setup.md): before provider
   setup, credential rotation, or live authentication acceptance.
