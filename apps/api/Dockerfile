@@ -31,7 +31,9 @@ ENV TZ=UTC
 # The JVM default heap is a quarter of the container limit; the API is the container's only process.
 ENV JAVA_TOOL_OPTIONS="-Duser.timezone=UTC -XX:MaxRAMPercentage=75"
 
+RUN addgroup -S kairos && adduser -S -G kairos -H -s /sbin/nologin kairos
 COPY --from=builder /app/target/*.jar app.jar
+USER kairos
 
 EXPOSE 8080
 
