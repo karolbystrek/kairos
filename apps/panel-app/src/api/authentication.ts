@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { ApiError, apiFetch, resetCsrf, request } from "./api-fetch";
 import { requiredEmailInputSchema } from "./account-input";
+import { setSessionHint } from "./session-hint";
 
 export const currentAccountSchema = z.object({
   accountId: z.uuid(),
@@ -82,8 +83,19 @@ const loginSchema = z.object({
 });
 
 export type LoginCredentials = z.input<typeof loginSchema>;
-export function getCurrentAccount(): Promise<CurrentAccount> {
-  return request("/api/auth/v1/me", currentAccountSchema);
+export async function getCurrentAccount(): Promise<CurrentAccount> {
+  try {
+    const account = await request("/api/auth/v1/me", currentAccountSchema);
+
+    setSessionHint(true);
+
+    return account;
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 401) {
+      setSessionHint(false);
+    }
+    throw error;
+  }
 }
 export async function login(
   credentials: LoginCredentials,
@@ -110,6 +122,7 @@ export async function logout(): Promise<boolean> {
     { notifyUnauthorized: false },
   );
   resetCsrf();
+  setSessionHint(false);
 
   return true;
 }

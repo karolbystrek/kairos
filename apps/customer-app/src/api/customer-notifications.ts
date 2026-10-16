@@ -2,7 +2,7 @@ import type { SerializedPushSubscription } from "@/src/pwa/storage";
 
 import { z } from "zod";
 
-import { apiUrl } from "@/src/api/api-url";
+import { apiUrl, requestSignal } from "@/src/api/api-url";
 
 const CSRF_HEADER_NAME = "X-XSRF-TOKEN";
 const CSRF_PROBLEM_TYPES = new Set([
@@ -70,6 +70,7 @@ export async function getNotificationConfiguration(): Promise<{
 }> {
   const response = await fetch(
     apiUrl("/api/customer-notifications/v1/configuration"),
+    { signal: requestSignal() },
   );
 
   if (!response.ok) {
@@ -138,6 +139,7 @@ async function bootstrapCsrfToken(): Promise<string> {
   const response = await fetch(apiUrl("/api/auth/v1/csrf"), {
     credentials: "include",
     headers: { Accept: "application/json" },
+    signal: requestSignal(),
   });
 
   if (!response.ok) {
@@ -193,6 +195,7 @@ function sendNotificationMutation(
       [CSRF_HEADER_NAME]: token,
     },
     body: JSON.stringify(body),
+    signal: requestSignal(),
   });
 }
 
