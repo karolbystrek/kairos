@@ -36,16 +36,18 @@ call the API origin `http://localhost:8080` directly.
   address from trusted ranges. It replaces them with a canonical client address,
   host, HTTPS scheme, and port.
 * NGINX applies per-client request throttling. POST login, password
-  change, email verification/code resend, tenant registration, and invitation redemption share an initial budget
-  of 5 requests/minute with burst 5. External `/api/external/` requests use
+  change, password reset, email verification/code resend, tenant registration, and invitation redemption share an initial budget
+  of 5 requests/minute with burst 20. External `/api/external/` requests use
   10 requests/second with burst 20. Bursts are accepted immediately (`nodelay`);
   excess requests return `429`. CSRF bootstrap, browser reads, preflight, logout,
-  invitation preview, and customer SSE do not consume the authentication budget.
+  invitation preview, and customer and staff SSE do not consume the authentication budget.
   These are initial operational defaults; tune the shared template through a
   reviewed source change. The existing 100 concurrent connections/client bound
   remains in place.
-* Request-body, header, connection, and timeout bounds apply. Customer SSE disables
-  proxy buffering and uses a read timeout longer than the 30-minute emitter lifetime.
+* Request-body, header, connection, and timeout bounds apply. Customer and staff SSE disable
+  proxy buffering and use a read timeout longer than the 30-minute emitter lifetime.
+* The customer and panel hosts add HSTS, `X-Content-Type-Options: nosniff` and
+  `X-Frame-Options: DENY`; the API sends the same through Spring Security.
 * `compose.yaml` holds only PostgreSQL and Redis, published on `127.0.0.1`.
   Locally the applications run on the host with hot reload (`./mvnw
   spring-boot:run` with Spring Boot DevTools, `next dev`) and read the same

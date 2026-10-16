@@ -34,8 +34,9 @@ one hour, permit five wrong attempts and can be resent after 60 seconds.
 Unverified sign-in without an Account resumes this step; a new registration can
 replace an abandoned unverified identity without an Account. Member registration
 consumes an emailed invitation bound to its recipient and marks that email
-verified without a separate code step. Password recovery, social login and MFA
-remain deferred.
+verified without a separate code step. A forgotten password is reset from the
+login page with an emailed code under the same rules, which also ends every
+existing session. Social login and MFA remain deferred.
 
 Kairos sends Polish mail through Resend from
 `Kairos <no-reply@kairos.karolbystrek.pl>` with no Reply-To or open/click tracking.

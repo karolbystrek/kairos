@@ -10,7 +10,6 @@ import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
 import pl.karolbystrek.kairos.api.account.domain.TenantRole;
 import pl.karolbystrek.kairos.api.analytics.infrastructure.web.UsageRateLimiter;
 import java.nio.charset.StandardCharsets;
-import java.time.Clock;
 import java.util.UUID;
 import java.util.Collections;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -22,7 +21,7 @@ class UsageAnalyticsControllerTests {
     @Test
     void rejectsInvalidPanelBatchesIncludingNestedFieldsAndUuid() {
         var service = mock(UsageAnalyticsService.class);
-        var controller = new UsageAnalyticsController(service, new UsageRateLimiter(Clock.systemUTC()), JsonMapper.builder().build());
+        var controller = new UsageAnalyticsController(service, mock(UsageRateLimiter.class), JsonMapper.builder().build());
         var principal = new StaffPrincipal(UUID.randomUUID(), UUID.randomUUID(), TenantRole.ADMIN);
         for (var body : new String[]{"null", "{\"actions\":[]}", "{\"actions\":[null]}",
                 "{\"actions\":[{\"event\":\"queue_opened\",\"locationId\":\"invalid\"}]}",
@@ -39,7 +38,7 @@ class UsageAnalyticsControllerTests {
     @Test
     void rejectsOversizedAndInvalidRequestsBeforeRecording() {
         var service = mock(UsageAnalyticsService.class);
-        var controller = new UsageAnalyticsController(service, new UsageRateLimiter(Clock.systemUTC()), JsonMapper.builder().build());
+        var controller = new UsageAnalyticsController(service, mock(UsageRateLimiter.class), JsonMapper.builder().build());
         for (var body : new String[]{" ".repeat(8193), "null", "{\"event\":\"unknown\"}",
                 "{\"event\":\"review_link_clicked\",\"orderId\":\"extra\"}",
                 "{\"event\":\"review_link_clicked\"} {}"}) {

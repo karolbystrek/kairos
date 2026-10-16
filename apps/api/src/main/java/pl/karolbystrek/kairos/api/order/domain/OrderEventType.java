@@ -8,7 +8,8 @@ public enum OrderEventType {
     ORDER_CREATED("order.created"),
     ORDER_READY("order.ready"),
     ORDER_COMPLETED("order.completed"),
-    ORDER_CANCELED("order.canceled");
+    ORDER_CANCELED("order.canceled"),
+    ORDER_EXPIRED("order.expired");
 
     private final String cloudEventType;
 
@@ -34,6 +35,7 @@ public enum OrderEventType {
             case READY -> ORDER_READY;
             case COMPLETED -> ORDER_COMPLETED;
             case CANCELED -> ORDER_CANCELED;
+            case EXPIRED -> ORDER_EXPIRED;
             case IN_PREPARATION -> throw new IllegalArgumentException(
                     "IN_PREPARATION is represented by the order.created event"
             );

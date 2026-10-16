@@ -108,6 +108,17 @@ public class StaffIdentityStore {
         database.update("UPDATE staff_identities SET password_hash=? WHERE subject=?", PASSWORDS.encode(replacement), subject);
     }
 
+    /** Sets a proven owner's password, creating the credentials of an account that has none. */
+    public void resetPassword(String subject, String email, String password) {
+        // An abandoned unverified registration may hold the email; the account owner has now proven it.
+        database.update("DELETE FROM staff_identities WHERE email=? AND subject<>?", email, subject);
+        database.update("""
+            INSERT INTO staff_identities(subject,email,password_hash,email_verified) VALUES (?,?,?,true)
+            ON CONFLICT (subject) DO UPDATE SET email=EXCLUDED.email,password_hash=EXCLUDED.password_hash,
+                email_verified=true,verification_code_hash=NULL,verification_code_expires_at=NULL
+            """, subject, email, PASSWORDS.encode(password));
+    }
+
     public void deleteUser(String subject) {
         database.update("DELETE FROM staff_identities WHERE subject=?", subject);
     }

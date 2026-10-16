@@ -53,6 +53,7 @@ kairos:
     destination-policy: LOCAL_DEVELOPMENT
   retention:
     grace-period: 30d
+    order-expiry: 24h
     batch-size: 10
     purge-delay: 1h
     purge-initial-delay: 24h
