@@ -13,7 +13,7 @@ Use this runbook for operator provisioning and approved releases. Repository
 preparation does not provision a VM, configure DNS or GitHub protection, or
 establish public-launch readiness. Those actions require operator inputs and
 explicit authorization. The current VPS is a disposable development environment:
-all orders, accounts and ZITADEL state may be lost after host failure. Runtime
+all orders, accounts and credentials may be lost after host failure. Runtime
 configuration lives in the GitHub `production` Environment; keep keys and TLS
 material outside the host for a fresh rebuild; database recovery
 is deferred under the [operations policy](../requirements/routing-releases.md#development-operations-policy).
@@ -47,5 +47,5 @@ step and check its prerequisites. Public launch still requires every launch gate
 - [Ubuntu VM bootstrap](BOOTSTRAP.md): repeatable host packages, account and keys.
 - [Native Lightsail email alarms](MONITORING.md): reduced development coverage and activation.
 - [AWS OIDC and temporary SSH](AWS-SSH.md): approved firewall lifecycle and recovery.
-- [Authentication operations](../authentication-setup.md): provider acceptance and credentials.
+- [Authentication operations](../authentication-setup.md): staff sign-in, verification and sessions.
 - [Requirements topic map](../REQUIREMENTS.md): contracts and outstanding launch gates.

@@ -43,12 +43,11 @@ python3 "/srv/kairos/releases/${KAIROS_REVISION}/deployment/deploy.py" \
 
 The command validates inputs/Compose and external read-only secrets, writes a
 release-owned `compose.images.json` override, pulls images, then waits in order
-for PostgreSQL/Redis, ZITADEL, the recreated provider bootstrap, API, frontends
+for PostgreSQL/Redis, API, frontends
 and recreated NGINX. Fresh PostgreSQL startup initializes its restricted roles
-through the standard entrypoint; Spring Flyway applies V1 automatically. Existing
+through the standard entrypoint; Spring Flyway applies migrations automatically. Existing
 volumes retain their schema and roles; see [database initialization](DATABASE.md).
-Provider bootstrap initializes missing credentials
-and preserves existing ones. Never start the API first with `--no-deps` on an
+Never start the API first with `--no-deps` on an
 empty host. No setup or key generation is part of deployment.
 
 Readiness stages allow 300 seconds each, bootstrap execution 360 seconds and

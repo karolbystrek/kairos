@@ -15,9 +15,9 @@
 - Keep REST as the boundary between frontends, External Integrations, and the
   API. Browser families use `/api/{resource-family}/v1`; external families use
   `/api/external/{resource-family}/v1`.
-- Local browser-facing API and SSE traffic goes directly to the dedicated API
-  HTTPS origin through the shared NGINX gateway, with explicit credentialed
-  CORS scoped by frontend origin and browser resource family.
+- Browser-facing API and SSE traffic goes directly to the dedicated API origin
+  (through NGINX HTTPS in production, `http://localhost:8080` locally), with
+  explicit credentialed CORS scoped by frontend origin and browser resource family.
 - Frontends use small handwritten request modules and response types with
   native `fetch`. Use SWR for REST-backed client state and Zod for
   frontend-owned input and event validation.
@@ -36,7 +36,7 @@
 - Enforce security and tenant access in the API. Frontend redirects and hidden
   controls are user-experience features, not authorization controls.
 - Keep authentication credentials unavailable to JavaScript; browser sessions
-  use secure HttpOnly cookies, with provider credentials confined to the API.
+  use secure HttpOnly cookies, with password hashes confined to the API and database.
 - Keep production migrations free of environment-specific seed data.
 - A change adding a required (blank) key to `deployment/production.env.example`
   must also map it in the `deploy.yml` deploy step and tell the user to set it in

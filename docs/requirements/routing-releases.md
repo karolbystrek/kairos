@@ -13,12 +13,16 @@
 
 ## 7. Local and Hosted Routing
 
-The local Docker Compose stack uses NGINX HTTPS ingress with mkcert certificates.
-Application and data services do not publish host ports. Browser REST and SSE
-requests go directly to the dedicated API origin through the gateway.
+Production Compose (`compose.yaml` plus `compose.production.yaml`) uses NGINX
+HTTPS ingress. Application and data services do not publish host ports. Browser
+REST and SSE requests go directly to the dedicated API origin through the gateway.
+Local development has no gateway: `compose.yaml` publishes infrastructure
+ports on `127.0.0.1`, the applications run on the host over HTTP, and browsers
+call the API origin `http://localhost:8080` directly.
 
-* The root environment file configures the customer, panel, and API origins and
-  exact gateway hostnames; `.env.example` records the configuration surface.
+* The root environment file configures the customer, panel, and API origins;
+  production adds exact gateway hostnames. `.env.example` records the local
+  configuration surface and `deployment/production.env.example` the hosted one.
 * Spring scopes credentialed CORS by frontend origin and browser resource family.
   External Integration APIs and internal management endpoints have no browser
   CORS policy. Next.js services render frontend concerns only.
@@ -28,9 +32,10 @@ requests go directly to the dedicated API origin through the gateway.
   forwards `/api/`; frontend hostnames reject that namespace.
 * NGINX and applications share the gateway network. Only the API also joins the
   internal data network containing PostgreSQL and Redis.
-* Local traffic does not trust supplied forwarding headers. NGINX replaces them
-  with a canonical client address, host, HTTPS scheme, and port.
-* Both overlays share per-client NGINX request throttling. POST login, password
+* NGINX does not trust supplied forwarding headers, except the Cloudflare client
+  address from trusted ranges. It replaces them with a canonical client address,
+  host, HTTPS scheme, and port.
+* NGINX applies per-client request throttling. POST login, password
   change, email verification/code resend, tenant registration, and invitation redemption share an initial budget
   of 5 requests/minute with burst 5. External `/api/external/` requests use
   10 requests/second with burst 20. Bursts are accepted immediately (`nodelay`);
@@ -41,12 +46,22 @@ requests go directly to the dedicated API origin through the gateway.
   remains in place.
 * Request-body, header, connection, and timeout bounds apply. Customer SSE disables
   proxy buffering and uses a read timeout longer than the 30-minute emitter lifetime.
-* Local Compose builds application images, mounts private secrets at `/run/secrets`,
-  and publishes only NGINX HTTPS on `127.0.0.1`. Redis Pub/Sub is nondurable and
-  has no volume; PostgreSQL and provider credential material remain persistent.
-* `setup.sh` prepares `.env`, validates the complete key set with explicit handling
-  of existing files, preserves the provider master key, and optionally generates
-  local TLS material. Secret directories use `0700` and application key files `0400`.
+* `compose.yaml` holds only PostgreSQL and Redis, published on `127.0.0.1`.
+  Locally the applications run on the host with hot reload (`./mvnw
+  spring-boot:run` with Spring Boot DevTools, `next dev`) and read the same
+  configuration keys as production: the API imports the repository `.env`, the
+  frontends their committed `.env.development`. `compose.production.yaml` adds the
+  application images, NGINX, private networking and limits. Rate limits, header
+  replacement and SSE proxy settings are therefore exercised only by the
+  production overlay and `tests/gateway-test.py`. Redis Pub/Sub is nondurable and
+  has no volume; PostgreSQL data remains persistent.
+* `setup.sh` validates the complete key set with explicit handling of existing
+  files. Without a preset it asks about each step; `--dev` prepares `.env` and
+  `secrets/` without prompts, installs frontend dependencies and starts the
+  infrastructure, and `--prod` prepares `/srv/kairos/secrets` without writing an
+  environment file. Secret directories use `0700` and application key files
+  `0400`. `reset.sh` has no modes: it removes the Compose project, its volumes and
+  the generated keys in the configured secrets directory.
 
 ### Validation and immutable publication
 
@@ -71,9 +86,9 @@ That artifact contains `release.json` with a full 40-character lowercase Git
 `revision` and `images` entries for `customer-app`, `panel-app`, and `api`, each
 using `ghcr.io/karolbystrek/kairos/<service>@sha256:<64 lowercase hex>`.
 `release.tar.gz` contains the same manifest plus the exact checkout's shared and
-hosted Compose files, both NGINX configuration files, and the ZITADEL bootstrap
-script, PostgreSQL entrypoint role initialization script,
-exact V1 SQL, and the deployment shell command/Python helper. An explicit file allowlist
+hosted Compose files, both NGINX configuration files, the PostgreSQL entrypoint
+role initialization script,
+exact SQL migrations, and the deployment shell command/Python helper. An explicit file allowlist
 excludes environment files, certificates and private keys. The separate
 `deploy.yml` workflow runs only by manual dispatch on `main`, with no revision
 input; every job refuses other refs. It uses the main revision captured at
@@ -142,11 +157,9 @@ directories. A nonblocking host-wide `flock` at `/srv/kairos/deploy.lock` reject
 concurrent deployments; Python's stdlib `fcntl.flock` provides the lock without
 an additional host command dependency.
 
-Deployment pulls the complete stack, waits for PostgreSQL/Redis health, completes
-then waits for ZITADEL and completes its recreated provider bootstrap before
+Deployment pulls the complete stack and waits for PostgreSQL/Redis health before
 starting the API. Fresh PostgreSQL initializes the restricted database roles
-through its standard entrypoint; Spring Flyway applies V1 automatically. The
-provider bootstrap preserves existing credentials. Existing database volumes do
+through its standard entrypoint; Spring Flyway applies migrations automatically. Existing database volumes do
 not rerun initialization; see [database initialization](../deployment/DATABASE.md).
 Ordinary deployment never resets volumes or repairs Flyway history. Only after API health
 passes does it replace the frontends and recreate NGINX so configuration bind
@@ -182,8 +195,7 @@ It refuses unsupported hosts, invalid public keys and conflicting Docker package
 rather than removing existing infrastructure. Installed packages are retained on
 reruns; upgrades remain deliberately scheduled maintenance.
 
-Host preparation reuses this checkout's `setup.sh` with `--keep-env --keep-keys
---no-tls`, preserves existing key bytes, rejects invalid/partial key sets, and
+Host preparation reuses this checkout's `setup.sh --prod`, preserves existing key bytes, rejects invalid/partial key sets, and
 removes temporary setup inputs even on failure. Bootstrap never creates or
 changes `production.env`. The GitHub `production` Environment owns production
 configuration: each deployment writes `/srv/kairos/production.env` atomically
@@ -204,7 +216,7 @@ acceptance remain operator verification.
 ### Development operations policy
 
 The owner accepts the public single-VM deployment as a disposable development
-environment with no users. All orders, accounts and ZITADEL state may be lost
+environment with no users. All orders, accounts and credentials may be lost
 after host failure and recreated. Scheduled database backups, off-host backup
 storage/encryption/retention, destructive-migration backup procedures, data-loss
 and recovery targets, and replacement-host restore rehearsals are deferred.
@@ -226,8 +238,7 @@ A healthy instance can still have an application outage. Certificate expiry
 remains an operator maintenance check.
 
 Before onboarding real users or retaining valuable data, agree and implement
-backups for both Kairos and ZITADEL databases, roles, provider credentials and
-matching encryption/signing/master keys; define retention and recovery targets
+backups for the Kairos database, roles and matching encryption/signing keys; define retention and recovery targets
 and verify replacement-host restoration. Reassess application and capacity
 monitoring coverage then. Separate database/Redis instances require their own
 plan and do not themselves establish recoverability. Independent security,

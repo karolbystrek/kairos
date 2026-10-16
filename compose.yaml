@@ -1,192 +1,6 @@
+# Shared infrastructure. Locally it is the whole Compose stack and the applications run on
+# the host with hot reload; compose.production.yaml adds the application images and NGINX.
 services:
-  nginx:
-    image: nginx:1.28-alpine
-    environment:
-      KAIROS_API_HOST:
-      KAIROS_CUSTOMER_APP_HOST:
-      KAIROS_NGINX_LISTEN: "443 ssl"
-      KAIROS_NGINX_REAL_IP_CONFIGURATION: ""
-      KAIROS_NGINX_TLS_CONFIGURATION: |-
-        ssl_certificate /run/secrets/tls/tls.crt;
-        ssl_certificate_key /run/secrets/tls/tls.key;
-      KAIROS_PANEL_APP_HOST:
-      NGINX_ENVSUBST_FILTER:
-    secrets:
-      - tls
-    volumes:
-      - type: bind
-        source: ./nginx/default.conf.template
-        target: /etc/nginx/templates/default.conf.template
-        read_only: true
-        bind:
-          create_host_path: false
-    depends_on:
-      api:
-        condition: service_healthy
-      customer-app:
-        condition: service_healthy
-      panel-app:
-        condition: service_healthy
-    networks:
-      - gateway
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/health || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 10s
-    restart: unless-stopped
-
-  customer-app:
-    image: kairos-customer-app:local
-    depends_on:
-      api:
-        condition: service_healthy
-    networks:
-      - gateway
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/ || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 20s
-    restart: unless-stopped
-
-  panel-app:
-    image: kairos-panel-app:local
-    depends_on:
-      api:
-        condition: service_healthy
-    networks:
-      - gateway
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/ || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 20s
-    restart: unless-stopped
-
-  api:
-    image: kairos-api:local
-    environment:
-      EMAIL_DELIVERY_MODE:
-      EMAIL_VERIFICATION_ENABLED: "${EMAIL_VERIFICATION_ENABLED:-true}"
-      RESEND_API_KEY:
-      REVIEW_INVITATION_DELAY: "${REVIEW_INVITATION_DELAY:-30m}"
-      ZITADEL_API_URL:
-      ZITADEL_TOKEN_LOCATION:
-      NEXT_PUBLIC_API_BASE_URL:
-      NEXT_PUBLIC_CUSTOMER_APP_URL:
-      PANEL_APP_URL:
-      POSTGRES_DB:
-      KAIROS_DB_OWNER_USER:
-      KAIROS_DB_OWNER_PASSWORD:
-      KAIROS_DB_RUNTIME_USER:
-      KAIROS_DB_RUNTIME_PASSWORD:
-      PUSH_DESTINATION_POLICY:
-      REDIS_HOST:
-      REDIS_PASSWORD:
-      REDIS_PORT:
-      VAPID_SUBJECT:
-      WEBHOOK_DESTINATION_POLICY:
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      zitadel-bootstrap:
-        condition: service_completed_successfully
-    secrets:
-      - email-encryption.bin
-      - webhook-encryption.bin
-      - vapid-private.pem
-      - vapid-public.pem
-      - push-subscription-encryption.bin
-    volumes:
-      - zitadel-api-credentials:/run/zitadel:ro
-    networks:
-      - gateway
-      - data
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/api/actuator/health || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 30s
-    restart: unless-stopped
-
-  zitadel:
-    image: ghcr.io/zitadel/zitadel:v4.19.4
-    user: "0"
-    command: ["start-from-init", "--masterkeyFile", "/run/secrets/zitadel-masterkey", "--tlsMode", "disabled"]
-    environment:
-      ZITADEL_EXTERNALDOMAIN:
-      ZITADEL_EXTERNALPORT:
-      ZITADEL_EXTERNALSECURE:
-      ZITADEL_TLS_ENABLED:
-      ZITADEL_DATABASE_POSTGRES_HOST:
-      ZITADEL_DATABASE_POSTGRES_PORT:
-      ZITADEL_DATABASE_POSTGRES_DATABASE: ${ZITADEL_DB}
-      ZITADEL_DATABASE_POSTGRES_USER_USERNAME: ${ZITADEL_DB_USER}
-      ZITADEL_DATABASE_POSTGRES_USER_PASSWORD: ${ZITADEL_DB_PASSWORD:?Set ZITADEL_DB_PASSWORD}
-      ZITADEL_DATABASE_POSTGRES_USER_SSL_MODE:
-      ZITADEL_DATABASE_POSTGRES_ADMIN_USERNAME: ${POSTGRES_USER}
-      ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD: ${POSTGRES_PASSWORD}
-      ZITADEL_DATABASE_POSTGRES_ADMIN_SSL_MODE:
-      ZITADEL_FIRSTINSTANCE_ORG_NAME:
-      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD:
-      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_USERNAME:
-      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_NAME:
-      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_PAT_EXPIRATIONDATE:
-      ZITADEL_FIRSTINSTANCE_PATPATH:
-      ZITADEL_DEFAULTINSTANCE_DOMAINPOLICY_USERLOGINMUSTBEDOMAIN:
-      ZITADEL_DEFAULTINSTANCE_PASSWORDCOMPLEXITYPOLICY_MINLENGTH:
-      ZITADEL_DEFAULTINSTANCE_PASSWORDCOMPLEXITYPOLICY_HASLOWERCASE:
-      ZITADEL_DEFAULTINSTANCE_PASSWORDCOMPLEXITYPOLICY_HASUPPERCASE:
-      ZITADEL_DEFAULTINSTANCE_PASSWORDCOMPLEXITYPOLICY_HASNUMBER:
-      ZITADEL_DEFAULTINSTANCE_PASSWORDCOMPLEXITYPOLICY_HASSYMBOL:
-      ZITADEL_DEFAULTINSTANCE_PASSWORDAGEPOLICY_MAXAGEDAYS:
-      ZITADEL_DEFAULTINSTANCE_LOGINPOLICY_ALLOWEXTERNALIDP:
-      ZITADEL_DEFAULTINSTANCE_LOGINPOLICY_ALLOWREGISTER:
-      ZITADEL_DEFAULTINSTANCE_SECRETGENERATORS_EMAILVERIFICATIONCODE_LENGTH: 6
-      ZITADEL_DEFAULTINSTANCE_SECRETGENERATORS_EMAILVERIFICATIONCODE_INCLUDELOWERLETTERS: false
-      ZITADEL_DEFAULTINSTANCE_SECRETGENERATORS_EMAILVERIFICATIONCODE_INCLUDEUPPERLETTERS: false
-      ZITADEL_DEFAULTINSTANCE_SECRETGENERATORS_EMAILVERIFICATIONCODE_INCLUDEDIGITS: true
-      ZITADEL_DEFAULTINSTANCE_SECRETGENERATORS_EMAILVERIFICATIONCODE_INCLUDESYMBOLS: false
-      ZITADEL_DEFAULTINSTANCE_NOTIFICATIONPOLICY_PASSWORDCHANGE:
-      ZITADEL_LOGSTORE_ACCESS_STDOUT_ENABLED:
-    secrets:
-      - zitadel-masterkey
-    volumes:
-      - zitadel-bootstrap-credentials:/bootstrap
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - data
-    healthcheck:
-      test: ["CMD", "/app/zitadel", "ready"]
-      interval: 10s
-      timeout: 5s
-      retries: 20
-      start_period: 30s
-    restart: unless-stopped
-
-  zitadel-bootstrap:
-    image: python:3.14-alpine
-    command: ["python", "/bootstrap-script/bootstrap.py"]
-    volumes:
-      - zitadel-bootstrap-credentials:/bootstrap:ro
-      - zitadel-api-credentials:/credentials
-      - ./deployment/zitadel/bootstrap.py:/bootstrap-script/bootstrap.py:ro
-    depends_on:
-      zitadel:
-        condition: service_healthy
-    networks:
-      - data
-    restart: "no"
-
   postgres:
     image: postgres:18-alpine
     environment:
@@ -197,6 +11,8 @@ services:
       KAIROS_DB_OWNER_PASSWORD:
       KAIROS_DB_RUNTIME_USER:
       KAIROS_DB_RUNTIME_PASSWORD:
+    ports:
+      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql
       - ./deployment/postgres/bootstrap.sh:/docker-entrypoint-initdb.d/10-kairos-roles.sh:ro
@@ -224,6 +40,8 @@ services:
         "--requirepass",
         "${REDIS_PASSWORD}",
       ]
+    ports:
+      - "127.0.0.1:6379:6379"
     networks:
       - data
     healthcheck:
@@ -238,29 +56,8 @@ services:
       start_period: 5s
     restart: unless-stopped
 
-# File secrets are read-only bind mounts at /run/secrets/<name>; a missing source fails startup.
-secrets:
-  email-encryption.bin:
-    file: ${KAIROS_APPLICATION_SECRETS_DIRECTORY:-./secrets}/email-encryption.bin
-  webhook-encryption.bin:
-    file: ${KAIROS_APPLICATION_SECRETS_DIRECTORY:-./secrets}/webhook-encryption.bin
-  vapid-private.pem:
-    file: ${KAIROS_APPLICATION_SECRETS_DIRECTORY:-./secrets}/vapid-private.pem
-  vapid-public.pem:
-    file: ${KAIROS_APPLICATION_SECRETS_DIRECTORY:-./secrets}/vapid-public.pem
-  push-subscription-encryption.bin:
-    file: ${KAIROS_APPLICATION_SECRETS_DIRECTORY:-./secrets}/push-subscription-encryption.bin
-  zitadel-masterkey:
-    file: ${KAIROS_APPLICATION_SECRETS_DIRECTORY:-./secrets}/zitadel-masterkey
-  tls:
-    file: ${KAIROS_TLS_DIRECTORY:-./secrets/tls}
-
 volumes:
   pgdata:
-  zitadel-bootstrap-credentials:
-  zitadel-api-credentials:
 
 networks:
-  gateway:
   data:
-    internal: true

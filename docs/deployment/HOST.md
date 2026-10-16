@@ -16,7 +16,7 @@ Use [the production runbook](RUNBOOK.md) for prerequisites and the sequence.
 Record the provider, supported Linux release, region, capacity, three hostnames
 under one parent domain, administrator access path, and operational owner.
 AWS Lightsail is a possible provider, not a requirement. Use x86-64 to match
-`linux/amd64` images. Allow memory/CPU/disk headroom for PostgreSQL, ZITADEL,
+`linux/amd64` images. Allow memory/CPU/disk headroom for PostgreSQL,
 Java and both frontends; the overlay's limits are bounds, not a VM sizing target.
 
 Install Docker Engine and its Compose plugin using the
@@ -69,11 +69,11 @@ chmod 0700 /srv/kairos /srv/kairos/releases /srv/kairos/tls
 | `/srv/kairos/releases/<revision>/` | Disposable exact-revision bundle, private to deployment account |
 | `/srv/kairos/deploy.lock` | Host-wide deployment lock |
 | `/srv/kairos/deployed-release.json` | Last fully verified revision and three digests |
-| Docker named volumes | `kairos_pgdata`, `kairos_zitadel-bootstrap-credentials`, `kairos_zitadel-api-credentials` |
+| Docker named volumes | `kairos_pgdata` |
 
-Compose always uses project name `kairos`. PostgreSQL stores both databases in
-`pgdata`; the two provider volumes store different PATs. Keep Docker's data root
-on persistent storage and preserve these volumes across release directories.
+Compose always uses project name `kairos`. PostgreSQL stores its data in
+`pgdata`. Keep Docker's data root
+on persistent storage and preserve this volume across release directories.
 Redis is nondurable. Secrets, certificates and database state never belong in a
 release archive, image, issue, PR, or Actions log.
 

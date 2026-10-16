@@ -10,8 +10,7 @@ export KAIROS_TEST_DOCKER="$(command -v docker)"
 cat > "${test_directory}/.env.example" <<'ENV'
 COMPOSE_FILE=compose.yaml
 POSTGRES_USER=default-user
-ZITADEL_DB_USER=zitadel
-ZITADEL_DB_PASSWORD=local-password
+REDIS_PASSWORD=local-password
 ENV
 cat > "${test_directory}/.env" <<'ENV'
 COMPOSE_FILE=compose.custom.yaml
@@ -25,8 +24,7 @@ services:
     image: postgres:18-alpine
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
-      ZITADEL_DB_USER: ${ZITADEL_DB_USER}
-      ZITADEL_DB_PASSWORD: ${ZITADEL_DB_PASSWORD:?Set ZITADEL_DB_PASSWORD}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD}
 YAML
 # Substitute read-only Compose rendering for teardown; never contact the daemon.
 cat > "${test_directory}/bin/docker" <<'PY'
@@ -44,18 +42,17 @@ config = json.loads(result.stdout)
 assert config['name'] == 'kairos-reset-test'
 environment = config['services']['postgres']['environment']
 assert environment['POSTGRES_USER'] == 'existing-user'
-assert environment['ZITADEL_DB_USER'] == 'zitadel'
-assert environment['ZITADEL_DB_PASSWORD'] == 'local-password'
+assert environment['REDIS_PASSWORD'] == 'local-password'
 PY
 chmod +x "${test_directory}/bin/docker"
-# Every Compose-mounted generated key plus local TLS must be removed.
-mkdir -p "${test_directory}/secrets/tls"
-keys="$(sed -n 's|.*:-\./secrets}/||p' "${repository_directory}/compose.yaml") tls/tls.crt tls/tls.key"
-[ "$(echo "${keys}" | wc -w)" -ge 8 ]
+# Every Compose-mounted generated key must be removed.
+mkdir -p "${test_directory}/secrets"
+keys="$(sed -n 's|.*:-\./secrets}/||p' "${repository_directory}/compose.production.yaml")"
+[ "$(echo "${keys}" | wc -w)" -ge 5 ]
 for key in ${keys}; do echo fixture > "${test_directory}/secrets/${key}"; done
 PATH="${test_directory}/bin:${PATH}" sh "${test_directory}/reset.sh" > "${test_directory}/output"
 cmp "${test_directory}/expected-env" "${test_directory}/.env.old"
-cmp "${test_directory}/.env.example" "${test_directory}/.env"
+[ ! -e "${test_directory}/.env" ]
 for key in ${keys}; do
     [ ! -e "${test_directory}/secrets/${key}" ] || { echo "reset.sh kept secrets/${key}" >&2; exit 1; }
 done

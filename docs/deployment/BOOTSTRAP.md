@@ -170,7 +170,7 @@ systemctl is-active docker
 ```
 
 Run the same full playbook again. Existing packages are not upgraded; production
-configuration and all six application key contents are preserved. Temporary
+configuration and all five application key contents are preserved. Temporary
 setup tasks still report changes because they allocate and remove a private
 workspace; zero changes in the recap is not the acceptance criterion. Invalid
 or partial key sets stop bootstrap rather than being replaced. Public-key
@@ -180,7 +180,7 @@ rotation/revocation is separate maintenance.
 Bootstrap never creates or changes `/srv/kairos/production.env`; each deployment
 writes it from GitHub. Keys are stored under `/srv/kairos/secrets` with directory
 mode `0700` and file mode `0400`; release and TLS directories use `0700`. The
-six-key set includes `email-encryption.bin` for pending transactional mail;
+five-key set includes `email-encryption.bin` for pending transactional mail;
 [configuration](CONFIGURATION.md) describes adding this file to an older host
 without replacing its existing keys and installing the required Resend key.
 
@@ -189,17 +189,14 @@ without replacing its existing keys and installing the required Resend key.
 Production configuration lives in the GitHub `production` Environment, not on
 the host; each deployment writes `/srv/kairos/production.env` from it and the
 committed template. See [configuration](CONFIGURATION.md) for the rules.
-Set the six passwords (`POSTGRES_PASSWORD`, `KAIROS_DB_OWNER_PASSWORD`,
-`KAIROS_DB_RUNTIME_PASSWORD`, `REDIS_PASSWORD`, `ZITADEL_DB_PASSWORD`,
-`ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD`) to different strong values, plus
-`ZITADEL_FIRSTINSTANCE_ORG_MACHINE_PAT_EXPIRATIONDATE` (UTC ISO 8601) and
+Set the four passwords (`POSTGRES_PASSWORD`, `KAIROS_DB_OWNER_PASSWORD`,
+`KAIROS_DB_RUNTIME_PASSWORD`, `REDIS_PASSWORD`) to different strong values, plus
 `RESEND_API_KEY` (see [transactional email](CONFIGURATION.md#transactional-email-resend)),
 as secrets, and `VAPID_SUBJECT` (your `mailto:` contact) as a variable:
 
 ```sh
 for name in POSTGRES_PASSWORD KAIROS_DB_OWNER_PASSWORD KAIROS_DB_RUNTIME_PASSWORD \
-  REDIS_PASSWORD ZITADEL_DB_PASSWORD ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD \
-  ZITADEL_FIRSTINSTANCE_ORG_MACHINE_PAT_EXPIRATIONDATE RESEND_API_KEY; do
+  REDIS_PASSWORD RESEND_API_KEY; do
   gh secret set "$name" --env production --repo karolbystrek/kairos
 done
 gh variable set VAPID_SUBJECT --env production --repo karolbystrek/kairos
@@ -210,7 +207,7 @@ while one is missing. On a host whose databases were already initialized from a
 hand-edited `production.env`, copy its existing passwords, PAT expiry and other
 non-default values into GitHub instead, and keep a protected copy of that file
 before the first deployment overwrites it; new passwords would not match the
-initialized PostgreSQL roles or ZITADEL administrator. Hostnames and browser origins must match Cloudflare and
+initialized PostgreSQL roles. Hostnames and browser origins must match Cloudflare and
 the GitHub build variables. Deployment supplies the blank registry/release fields.
 
 Owner and runtime database roles must differ from each other and from the

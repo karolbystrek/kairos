@@ -54,8 +54,9 @@ service; existing explicit approval remains valid within its stated scope.
 ## Repository and stack
 
 - PostgreSQL is authoritative, Redis Pub/Sub distributes customer events,
-  ZITADEL owns identity.
-- `compose.yaml`: shared Docker Compose topology with NGINX HTTPS ingress.
+  the API owns staff credentials and sessions.
+- `compose.yaml`: shared infrastructure (PostgreSQL, Redis) on loopback ports;
+  `compose.production.yaml` adds the application images and NGINX HTTPS ingress.
   Applications own their manifests and Dockerfiles; the two frontends share
   `apps/panel-app/Dockerfile`.
 
@@ -81,8 +82,8 @@ service; existing explicit approval remains valid within its stated scope.
 - [GitHub issues](docs/agents/issue-tracker.md): before creating, linking
   or auditing issues.
 - [Thesis framing](docs/PROBLEM_DESCRIPTION.md): when discussing thesis scope.
-- [Authentication operations](docs/authentication-setup.md): before provider
-  setup, credential rotation, or live authentication acceptance.
+- [Authentication operations](docs/authentication-setup.md): before changing
+  staff sign-in, verification codes or session operations.
 
 Keep all repository documentation Markdown under `docs/`, except the root
 `AGENTS.md` and `README.md`. Deployment guides belong in `docs/deployment/`.

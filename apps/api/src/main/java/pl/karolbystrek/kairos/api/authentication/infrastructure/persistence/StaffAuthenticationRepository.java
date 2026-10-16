@@ -4,7 +4,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
 import pl.karolbystrek.kairos.api.account.domain.Account;
 
-import java.time.OffsetDateTime;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -21,6 +21,6 @@ public interface StaffAuthenticationRepository extends Repository<Account, UUID>
         UUID getAccountId();
         UUID getTenantId();
         String getTenantRole();
-        OffsetDateTime getAuthenticationCutoff();
+        Instant getAuthenticationCutoff();
     }
 }

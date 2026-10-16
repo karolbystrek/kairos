@@ -2,7 +2,8 @@
 
 Run: python3 tests/gateway-test.py (requires Docker and OpenSSL).
 Catches missing throttling, spoofable client identity, routing leaks and TLS/port
-regressions in the local and hosted Compose overlays.
+regressions in the production Compose overlay, and checks that local Compose has no
+gateway and publishes only loopback ports.
 """
 import concurrent.futures
 import ipaddress
@@ -36,7 +37,16 @@ def main():
             'RESEND_API_KEY=gateway-test-placeholder',
             f'KAIROS_APPLICATION_SECRETS_DIRECTORY={work}',
             f'KAIROS_TLS_DIRECTORY={work}',
+            'KAIROS_CUSTOMER_APP_HOST=customer.kairos.localhost',
+            'KAIROS_PANEL_APP_HOST=panel.kairos.localhost',
+            'KAIROS_API_HOST=api.kairos.localhost',
+            'NGINX_ENVSUBST_FILTER=^KAIROS_',
         ]) + '\n')
+        local = json.loads(run('docker', 'compose', '--env-file', str(env), '-f', str(ROOT / 'compose.yaml'),
+                               'config', '--format', 'json'))
+        assert set(local['services']) == {'postgres', 'redis'}, local['services'].keys()
+        assert all(port['host_ip'] == '127.0.0.1' for service in local['services'].values()
+                   for port in service.get('ports', [])), 'local Compose published a non-loopback port'
         run('openssl', 'req', '-x509', '-newkey', 'rsa:2048', '-nodes',
             '-keyout', str(work / 'tls.key'), '-out', str(work / 'tls.crt'),
             '-days', '1', '-subj', '/CN=api.kairos.localhost')
@@ -56,115 +66,114 @@ def main():
             run('docker', 'run', '-d', '--name', containers[-1], '--network', name,
                 '--network-alias', 'api', '--network-alias', 'customer-app',
                 '--network-alias', 'panel-app', '-v', f'{backend}:/etc/nginx/conf.d/default.conf:ro', IMAGE)
-            for mode in ('local', 'deployment'):
-                compose = ('docker', 'compose', '--env-file', str(env), '-f', str(ROOT / 'compose.yaml'),
-                           '-f', str(ROOT / f'compose.{mode}.yaml'))
-                run(*compose, 'config', '--quiet')
-                config = json.loads(run(*compose, 'config', '--format', 'json'))
-                nginx = config['services']['nginx']
-                ports = nginx['ports']
-                assert len(ports) == 1 and ports[0]['target'] == 443, ports
-                assert ports[0].get('host_ip', '') == ('127.0.0.1' if mode == 'local' else ''), ports
-                assert all(not service.get('ports') for key, service in config['services'].items() if key != 'nginx')
-                assert set(config['networks']) == {'gateway', 'data'}
-                assert config['networks']['data']['internal']
-                # File secrets are read-only binds whose missing source fails startup.
-                assert nginx['secrets'] == [{'source': 'tls', 'target': '/run/secrets/tls'}], nginx['secrets']
-                assert config['secrets']['tls']['file'] == str(work)
-                trust = work / 'cloudflare-real-ip.conf'
-                source = ROOT / 'nginx/cloudflare-real-ip.conf'
-                trust.write_text(source.read_text())
-                gateway = name + '-' + mode
-                containers.append(gateway)
-                args = ['docker', 'run', '-d', '--name', gateway, '--network', name,
-                        '-p', '127.0.0.1::443',
-                        '-v', f'{ROOT / "nginx/default.conf.template"}:/etc/nginx/templates/default.conf.template:ro',
-                        '-v', f'{work}:/run/secrets/tls:ro',
-                        '-v', f'{trust}:/etc/nginx/cloudflare-real-ip.conf:ro']
-                for key, value in nginx['environment'].items():
-                    args += ['-e', f'{key}={value}']
-                run(*args, IMAGE)
-                port = run('docker', 'port', gateway, '443/tcp').rsplit(':', 1)[1]
-                context = ssl._create_unverified_context()
+            mode = 'production'
+            compose = ('docker', 'compose', '--env-file', str(env), '-f', str(ROOT / 'compose.yaml'),
+                       '-f', str(ROOT / f'compose.{mode}.yaml'))
+            run(*compose, 'config', '--quiet')
+            config = json.loads(run(*compose, 'config', '--format', 'json'))
+            nginx = config['services']['nginx']
+            ports = nginx['ports']
+            assert len(ports) == 1 and ports[0]['target'] == 443, ports
+            assert ports[0].get('host_ip', '') == '', ports
+            assert all(not service.get('ports') for key, service in config['services'].items() if key != 'nginx')
+            assert set(config['networks']) == {'gateway', 'data'}
+            assert config['networks']['data']['internal']
+            # File secrets are read-only binds whose missing source fails startup.
+            assert nginx['secrets'] == [{'source': 'tls', 'target': '/run/secrets/tls'}], nginx['secrets']
+            assert config['secrets']['tls']['file'] == str(work)
+            trust = work / 'cloudflare-real-ip.conf'
+            source = ROOT / 'nginx/cloudflare-real-ip.conf'
+            trust.write_text(source.read_text())
+            gateway = name + '-' + mode
+            containers.append(gateway)
+            args = ['docker', 'run', '-d', '--name', gateway, '--network', name,
+                    '-p', '127.0.0.1::443',
+                    '-v', f'{ROOT / "nginx/default.conf.template"}:/etc/nginx/templates/default.conf.template:ro',
+                    '-v', f'{work}:/run/secrets/tls:ro',
+                    '-v', f'{trust}:/etc/nginx/cloudflare-real-ip.conf:ro']
+            for key, value in nginx['environment'].items():
+                args += ['-e', f'{key}={value}']
+            run(*args, IMAGE)
+            port = run('docker', 'port', gateway, '443/tcp').rsplit(':', 1)[1]
+            context = ssl._create_unverified_context()
 
-                def request(path, host='api.kairos.localhost', client='203.0.113.1', method='GET'):
-                    headers = {'Host': host, 'CF-Connecting-IP': client,
-                               'X-Forwarded-For': '198.51.100.10', 'Forwarded': 'for=198.51.100.10'}
-                    req = urllib.request.Request(f'https://127.0.0.1:{port}{path}', headers=headers, method=method)
-                    try:
-                        with urllib.request.urlopen(req, context=context, timeout=5) as response:
-                            return response.status, response.read().decode(), response.headers
-                    except urllib.error.HTTPError as error:
-                        return error.code, '', error.headers
-
-                for attempt in range(40):
-                    try:
-                        if request('/api/auth/v1/csrf')[0] == 200:
-                            break
-                    except (OSError, urllib.error.URLError):
-                        time.sleep(0.1)
-                else:
-                    raise AssertionError('gateway did not start')
-                run('docker', 'exec', gateway, 'nginx', '-t')
-                status, body, _ = request('/api/auth/v1/csrf')
-                fields = body.split('|')
-                peer = fields[1]
-                ipaddress.ip_address(peer)
-                assert status == 200 and fields == ['8080', peer, peer, 'https', '443', '', '', 'api.kairos.localhost'], body
-                assert request('/', 'customer.kairos.localhost')[1].startswith('3000|')
-                assert request('/', 'panel.kairos.localhost')[1].startswith('3000|')
-                for path in ('/api', '/api/orders/v1'):
-                    assert request(path, 'customer.kairos.localhost')[0] == 404
-                    assert request(path, 'panel.kairos.localhost')[0] == 404
-                for path in ('/', '/health', '/actuator/health', '/api/actuator', '/api/actuator/health',
-                             '/api/actuator/env', '/api/actuator/prometheus/extra'):
-                    assert request(path)[0] == 404, path
-                status, body, headers = request('/api/actuator/prometheus')
-                assert status == 200 and body.startswith('8080|'), 'metrics route did not reach API'
-                assert headers['Cache-Control'] == 'no-store'
-                for host in ('customer.kairos.localhost', 'panel.kairos.localhost'):
-                    assert request('/api/actuator/prometheus', host)[0] == 404
+            def request(path, host='api.kairos.localhost', client='203.0.113.1', method='GET'):
+                headers = {'Host': host, 'CF-Connecting-IP': client,
+                           'X-Forwarded-For': '198.51.100.10', 'Forwarded': 'for=198.51.100.10'}
+                req = urllib.request.Request(f'https://127.0.0.1:{port}{path}', headers=headers, method=method)
                 try:
-                    request('/', 'unknown.invalid')
-                    raise AssertionError('unknown host accepted')
+                    with urllib.request.urlopen(req, context=context, timeout=5) as response:
+                        return response.status, response.read().decode(), response.headers
+                except urllib.error.HTTPError as error:
+                    return error.code, '', error.headers
+
+            for attempt in range(40):
+                try:
+                    if request('/api/auth/v1/csrf')[0] == 200:
+                        break
                 except (OSError, urllib.error.URLError):
-                    pass
-                protected = ['/api/auth/v1/login', '/api/auth/v1/password',
-                             '/api/auth/v1/verification', '/api/auth/v1/verification/resend',
-                             '/api/tenant-registrations/v1', '/api/account-invitation-redemptions/v1']
-                statuses = [request(protected[i % len(protected)], client=f'203.0.113.{i + 1}', method='POST')[0] for i in range(9)]
-                assert statuses[:6] == [200] * 6 and statuses[6:] == [429] * 3, (mode, statuses)
-                for path, method in (
-                    ('/api/auth/v1/csrf', 'GET'), ('/api/auth/v1/me', 'GET'),
-                    ('/api/orders/v1', 'GET'), ('/api/orders/v1', 'POST'),
-                    ('/api/auth/v1/login', 'GET'), ('/api/auth/v1/login', 'OPTIONS'),
-                    ('/api/auth/v1/logout', 'POST'),
-                    ('/api/auth/v1/verification', 'GET'),
-                    ('/api/auth/v1/verification/resend', 'OPTIONS'),
-                    ('/api/account-invitation-previews/v1', 'POST'),
-                ):
-                    assert request(path, method=method)[0] == 200, (path, method)
-                status, _, headers = request('/api/tracked-orders/v1/test/events')
-                assert status == 200 and headers['X-Accel-Buffering'] == 'no'
-                with concurrent.futures.ThreadPoolExecutor(max_workers=16) as pool:
-                    external = list(pool.map(lambda _: request('/api/external/orders/v1')[0], range(60)))
-                assert 200 in external and 429 in external and set(external) == {200, 429}, external
-                if mode == 'deployment':
-                    # Trust only this disposable fixture's actual peer for the positive case.
-                    with trust.open('a') as file:
-                        file.write(f'\nset_real_ip_from {peer};\n')
-                    run('docker', 'exec', gateway, 'nginx', '-t')
-                    run('docker', 'exec', gateway, 'nginx', '-s', 'reload')
-                    time.sleep(0.3)
-                    assert request('/api/auth/v1/csrf', client='2001:db8::1')[1].split('|')[1:3] == ['2001:db8::1'] * 2
-                    for i, path in enumerate(protected):
-                        client = f'203.0.113.{100 + i}'
-                        statuses = [request(path, client=client, method='POST')[0] for _ in range(7)]
-                        assert statuses == [200] * 6 + [429], statuses
-                    assert request('/api/auth/v1/csrf', client='203.0.113.100')[0] == 200
-                print(f'{mode}: Compose, TLS, routing, header trust, throttling and SSE checks passed')
-                run('docker', 'rm', '-f', gateway)
-                containers.remove(gateway)
+                    time.sleep(0.1)
+            else:
+                raise AssertionError('gateway did not start')
+            run('docker', 'exec', gateway, 'nginx', '-t')
+            status, body, _ = request('/api/auth/v1/csrf')
+            fields = body.split('|')
+            peer = fields[1]
+            ipaddress.ip_address(peer)
+            assert status == 200 and fields == ['8080', peer, peer, 'https', '443', '', '', 'api.kairos.localhost'], body
+            assert request('/', 'customer.kairos.localhost')[1].startswith('3000|')
+            assert request('/', 'panel.kairos.localhost')[1].startswith('3000|')
+            for path in ('/api', '/api/orders/v1'):
+                assert request(path, 'customer.kairos.localhost')[0] == 404
+                assert request(path, 'panel.kairos.localhost')[0] == 404
+            for path in ('/', '/health', '/actuator/health', '/api/actuator', '/api/actuator/health',
+                         '/api/actuator/env', '/api/actuator/prometheus/extra'):
+                assert request(path)[0] == 404, path
+            status, body, headers = request('/api/actuator/prometheus')
+            assert status == 200 and body.startswith('8080|'), 'metrics route did not reach API'
+            assert headers['Cache-Control'] == 'no-store'
+            for host in ('customer.kairos.localhost', 'panel.kairos.localhost'):
+                assert request('/api/actuator/prometheus', host)[0] == 404
+            try:
+                request('/', 'unknown.invalid')
+                raise AssertionError('unknown host accepted')
+            except (OSError, urllib.error.URLError):
+                pass
+            protected = ['/api/auth/v1/login', '/api/auth/v1/password',
+                         '/api/auth/v1/verification', '/api/auth/v1/verification/resend',
+                         '/api/tenant-registrations/v1', '/api/account-invitation-redemptions/v1']
+            statuses = [request(protected[i % len(protected)], client=f'203.0.113.{i + 1}', method='POST')[0] for i in range(9)]
+            assert statuses[:6] == [200] * 6 and statuses[6:] == [429] * 3, (mode, statuses)
+            for path, method in (
+                ('/api/auth/v1/csrf', 'GET'), ('/api/auth/v1/me', 'GET'),
+                ('/api/orders/v1', 'GET'), ('/api/orders/v1', 'POST'),
+                ('/api/auth/v1/login', 'GET'), ('/api/auth/v1/login', 'OPTIONS'),
+                ('/api/auth/v1/logout', 'POST'),
+                ('/api/auth/v1/verification', 'GET'),
+                ('/api/auth/v1/verification/resend', 'OPTIONS'),
+                ('/api/account-invitation-previews/v1', 'POST'),
+            ):
+                assert request(path, method=method)[0] == 200, (path, method)
+            status, _, headers = request('/api/tracked-orders/v1/test/events')
+            assert status == 200 and headers['X-Accel-Buffering'] == 'no'
+            with concurrent.futures.ThreadPoolExecutor(max_workers=16) as pool:
+                external = list(pool.map(lambda _: request('/api/external/orders/v1')[0], range(60)))
+            assert 200 in external and 429 in external and set(external) == {200, 429}, external
+            # Trust only this disposable fixture's actual peer for the positive case.
+            with trust.open('a') as file:
+                file.write(f'\nset_real_ip_from {peer};\n')
+            run('docker', 'exec', gateway, 'nginx', '-t')
+            run('docker', 'exec', gateway, 'nginx', '-s', 'reload')
+            time.sleep(0.3)
+            assert request('/api/auth/v1/csrf', client='2001:db8::1')[1].split('|')[1:3] == ['2001:db8::1'] * 2
+            for i, path in enumerate(protected):
+                client = f'203.0.113.{100 + i}'
+                statuses = [request(path, client=client, method='POST')[0] for _ in range(7)]
+                assert statuses == [200] * 6 + [429], statuses
+            assert request('/api/auth/v1/csrf', client='203.0.113.100')[0] == 200
+            print(f'{mode}: Compose, TLS, routing, header trust, throttling and SSE checks passed')
+            run('docker', 'rm', '-f', gateway)
+            containers.remove(gateway)
         finally:
             for container in reversed(containers):
                 subprocess.run(['docker', 'rm', '-f', container], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

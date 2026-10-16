@@ -16,7 +16,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
 import pl.karolbystrek.kairos.api.account.domain.TenantRole;
-import pl.karolbystrek.kairos.api.authentication.infrastructure.zitadel.ZitadelClient;
 import pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase;
 import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
 import tools.jackson.databind.ObjectMapper;
@@ -67,11 +66,6 @@ class AccountInvitationApiIntegrationTests extends RedisListenerIsolatedIntegrat
 
     @BeforeEach
     void createAdministratorFixture() {
-        Mockito.when(identityProvider.createUser(ArgumentMatchers.anyString(), ArgumentMatchers.anyString()))
-            .thenAnswer(call -> call.getArgument(0));
-        Mockito.doAnswer(call -> new ZitadelClient.ProviderSession(
-                UUID.randomUUID().toString(), call.getArgument(0)))
-            .when(identityProvider).signIn(ArgumentMatchers.anyString(), ArgumentMatchers.anyString());
         tenantId = UUID.randomUUID();
         locationId = UUID.randomUUID();
         var accountId = UUID.randomUUID();
@@ -212,7 +206,7 @@ class AccountInvitationApiIntegrationTests extends RedisListenerIsolatedIntegrat
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(redemptionJson(tokenFrom(created), "", "someone.else@example.com")), csrfCookie()))
             .andExpect(status().isBadRequest());
-        Mockito.verify(identityProvider, Mockito.never()).createUser(ArgumentMatchers.anyString(), ArgumentMatchers.anyString());
+        Mockito.verify(identities, Mockito.never()).createUser(ArgumentMatchers.anyString(), ArgumentMatchers.anyString());
         assertThat(invitationState(UUID.fromString(created.get("id").asText()))).isEqualTo("PENDING");
     }
 

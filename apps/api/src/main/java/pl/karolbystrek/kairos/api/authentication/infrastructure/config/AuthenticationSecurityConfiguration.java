@@ -1,6 +1,5 @@
 package pl.karolbystrek.kairos.api.authentication.infrastructure.config;
 
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.session.web.http.CookieHttpSessionIdResolver;
@@ -8,7 +7,6 @@ import org.springframework.session.web.http.DefaultCookieSerializer;
 import org.springframework.session.web.http.HttpSessionIdResolver;
 
 @Configuration(proxyBeanMethods = false)
-@EnableConfigurationProperties(AuthenticationProperties.class)
 public class AuthenticationSecurityConfiguration {
     public static final int INACTIVITY_SECONDS = 30 * 24 * 60 * 60;
 

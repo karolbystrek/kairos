@@ -175,24 +175,18 @@
             prefix: .bootstrap.
           register: bootstrap_workspace
 
-        - name: Copy setup inputs from this checkout
+        - name: Copy the setup command from this checkout
           ansible.builtin.copy:
-            src: "{{ playbook_dir }}/../{{ item.source }}"
-            dest: "{{ bootstrap_workspace.path }}/{{ item.destination }}"
+            src: "{{ playbook_dir }}/../setup.sh"
+            dest: "{{ bootstrap_workspace.path }}/setup.sh"
             mode: '0600'
-          loop:
-            - {source: setup.sh, destination: setup.sh}
-            - {source: deployment/production.env.example, destination: .env.example}
 
         - name: Generate or validate application keys without replacing them
           ansible.builtin.command:
             argv:
               - sh
               - "{{ bootstrap_workspace.path }}/setup.sh"
-              - --non-interactive
-              - --keep-env
-              - --keep-keys
-              - --no-tls
+              - --prod
               - --secrets-directory
               - "{{ kairos_directory }}/secrets"
           register: setup_result

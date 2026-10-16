@@ -48,7 +48,7 @@ electronic service.
 
 | Data | Subjects | Purpose | Basis |
 | --- | --- | --- | --- |
-| Email, password hash (ZITADEL), role, assignments, status | Staff | Account and service | Art. 6(1)(b) |
+| Email, password hash, role, assignments, status | Staff | Account and service | Art. 6(1)(b) |
 | Invitation email, role, location | Invited staff | Team onboarding | Art. 6(1)(b)/(f) |
 | Session and CSRF cookies, IP, security events | Staff | Sign-in and abuse protection | Art. 6(1)(b)/(f) |
 | Tracking reference, order number and label, status | Customers | Order tracking (restaurant's purpose) | Processor |
@@ -60,7 +60,7 @@ electronic service.
 Recipients: AWS Lightsail in `eu-central-1` (hosting) and Cloudflare (proxy,
 possible US transfer under the EU-US Data Privacy Framework or SCCs). Browser
 push services carry encrypted payloads selected by the customer's browser.
-ZITADEL is self-hosted on the same VM. Resend processes staff recipient email
+Password hashes are stored in the Kairos database on the same VM. Resend processes staff recipient email
 addresses and transactional verification messages; provider terms, retention
 and international-transfer arrangements require legal review before real users. Server-side [anonymous order
 analytics](order-analytics.md) contain business counts and durations without user,
@@ -101,9 +101,9 @@ them. The trade-off is that customers who close the app never see it.
   [resilience](resilience.md)).
 - Account and Location Delete block access immediately. Thirty days later the
   [retention purge](resilience.md#retention-purge) deletes the account with its
-  ZITADEL identity and invitations, or the location with its orders and push
+  credentials and invitations, or the location with its orders and push
   data. Until then an archived account's email stays reserved.
-- Abandoned registrations, with their unverified ZITADEL identity, are
+- Abandoned registrations, with their unverified credentials, are
   deleted 30 days after the last code; finished email delivery records are
   deleted 30 days after completion once nothing references them.
 - Security events: invitations are deleted 30 days after they end, staff
@@ -130,8 +130,6 @@ them. The trade-off is that customers who close the app never see it.
 - Whether the operator is a joint or independent controller for push
   subscriptions, since one browser subscription can span orders from several
   restaurants.
-- Whether ZITADEL's event store, which keeps events of deleted users, needs
-  its own retention limit.
 - Whether a browser-only terms checkbox is sufficient evidence of acceptance,
   or acceptance should be recorded server-side.
 - Confirm the cited PKE provisions (art. 398 and art. 399 ust. 3) against

@@ -20,11 +20,11 @@ with the same rules as Account email, and records it alongside the owning tenant
 fixed location and assignment role, and issuing account. The invitation fixes
 that email but does not reserve a globally unique Account identity before
 redemption. Kairos emails the link to that mailbox; possession proves access to
-the invited email. Redemption marks that provider email verified without a
+the invited email. Redemption marks that email verified without a
 separate code step. Redemption displays the email read-only and
 collects password and confirmation. The API rejects a different normalized email
-before provider provisioning and rechecks the binding during atomic redemption.
-After verified password sign-in it atomically creates an enabled member account
+before creating an identity and rechecks the binding during atomic redemption.
+It then atomically creates the identity and an enabled member account
 with an assignment to the enabled location while consuming the invitation. No
 further administrator approval is required.
 
@@ -65,7 +65,7 @@ fixed location and role; losing that authority makes its outstanding
 invitations unusable. Disabling an issuing account revokes its pending
 invitations in the same transaction and records an internal reason, while the
 redemption-time check still protects future role or assignment changes.
-Invalid registration input and email or provider-identity conflicts do not consume an
+Invalid registration input and email or identity conflicts do not consume an
 invitation, while concurrent redemption is
 serialized so exactly one successful submission can create an account. An
 existing account cannot redeem an invitation to gain another location or role.
@@ -116,12 +116,12 @@ increment.
 Deleting a manageable member Account is an irreversible archival operation,
 not physical row deletion. It removes the account from ordinary management,
 invalidates earlier authentication and revokes every pending
-invitation it issued, and retains its stable identity, provider subject and
+invitation it issued, and retains its stable identity, identity subject and
 email for the [retention grace period](resilience.md#retention-purge). During
 that period the email address remains reserved, and an archived account cannot
 authenticate, be enabled, or be restored. Delete may transition an enabled or
 disabled account directly to archived and applies all shutdown effects
-atomically. After the grace period the account, its provider identity, its
+atomically. After the grace period the account, its staff identity, its
 assignment and the invitations it issued or redeemed are deleted; order history
 keeps only the account's random ID as attribution.
 

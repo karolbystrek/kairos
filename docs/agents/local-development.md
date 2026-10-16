@@ -21,12 +21,29 @@
 
 ## Setup
 
-Run `./setup.sh` to prepare local configuration and externally managed key
-files. Start Compose separately with `docker compose up --build`. Use
-`./reset.sh` only when the user has authorized resetting containers or data.
-Source is not synchronized into the production-mode containers; rebuild and
-recreate only affected services when runtime verification requires updated
-code.
+Run `./setup.sh --dev` to prepare `.env` and development keys, install frontend
+dependencies and start PostgreSQL and Redis (`compose.yaml`, loopback ports
+`5432` and `6379`). Run the applications on the host:
+
+- API: `./mvnw spring-boot:run` from `apps/api`, on `http://localhost:8080/api`.
+  It imports `../../.env` (the same keys production passes as environment
+  variables) and reads keys from `KAIROS_SECRETS_DIRECTORY` (`../../secrets`).
+  The Maven plugin activates the `local` profile, which permits logged email.
+  DevTools restarts it after a recompile.
+- Frontends: `npm run dev` in `apps/customer-app` (`http://localhost:3000`) and
+  `apps/panel-app` (`http://localhost:3001`). Each committed `.env.development`
+  holds the app's `PORT` and local origins; the dev script exports it before
+  starting Next.js, which binds its port before reading `.env` files.
+
+NGINX, TLS, Cloudflare trust and the application images exist only in
+`compose.production.yaml`; `tests/gateway-test.py` covers them. Web Push is
+disabled under `next dev`; check it with a production build (`npm run build &&
+npm start`). A phone cannot reach `localhost`, so phone testing needs a tunnel
+or a LAN-reachable origin set in `.env` and `.env.development`.
+
+For runtime verification use the default `kairos` Compose project, never a
+separately named stack. Use `./reset.sh` only when the user has authorized
+resetting containers or data.
 
 Backend verification requires a running Docker engine. Run `./mvnw --batch-mode verify`
 from `apps/api` (or `apps/api/mvnw -f apps/api/pom.xml --batch-mode verify`

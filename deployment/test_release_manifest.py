@@ -46,9 +46,9 @@ class ReleaseManifestTest(unittest.TestCase):
         self.assertEqual(manifest, {"revision": REVISION, "images": self.images})
         with tarfile.open(self.output / "release.tar.gz") as archive:
             self.assertEqual(set(archive.getnames()), {
-                "release.json", "compose.yaml", "compose.deployment.yaml",
+                "release.json", "compose.yaml", "compose.production.yaml",
                 "nginx/default.conf.template", "nginx/cloudflare-real-ip.conf",
-                "deployment/zitadel/bootstrap.py", "deployment/deploy.py",
+                "deployment/deploy.py",
                 "deployment/postgres/bootstrap.sh",
             })
             self.assertEqual(json.load(archive.extractfile("release.json")), manifest)

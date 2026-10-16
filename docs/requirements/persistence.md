@@ -17,12 +17,15 @@ The database schema must include tables covering the following concepts. Names a
   at creation. Delete archives the row rather than physically
   removing its stable identity or historical relationships.
 * **Accounts:** stable UUID, normalized globally unique email, unique immutable
-  ZITADEL provider subject, optional authentication cutoff, tenant ownership,
+  staff identity subject (`provider_subject`), optional authentication cutoff, tenant ownership,
   tenant role, enabled/disabled/archived status, and audit timestamps. Archived
-  email and provider identities remain reserved until the retention purge. Provider subject is required.
+  email and identities remain reserved until the retention purge. The identity subject is required.
+* **Staff identities:** opaque subject, unique normalized email, PBKDF2 password
+  hash, email-verified flag and the hashed current verification code with its
+  expiry ([staff credentials](staff-credentials.md)).
 * **Browser sessions:** standard Spring Session JDBC identity, creation/access
   timestamps, rolling inactivity expiry, Account principal index and server-only
-  provider session attributes. No custom refresh-session table.
+  identity-subject session attributes. No custom refresh-session table.
 * **Account Invitations:** separate authority to create one member account,
   including stable identity, normalized recipient email, direct tenant ownership,
   fixed target location and
@@ -82,7 +85,7 @@ The database schema must include tables covering the following concepts. Names a
   accepted, superseded, canceled, expired, or terminal dead-letter state.
 * **External order creation identity:** integration-and-location-scoped idempotency value and canonical creation-input fingerprint associated with the created order.
 
-Tenant ownership may be direct or derived through an unambiguous relationship such as order to location to tenant. Tables must carry enough association for RLS enforcement and efficient access checks without duplicating ownership data by default. Passwords and External Integration bearer secrets must never be stored in plaintext. Standard Spring Session JDBC stores opaque session IDs and identity references; protect the database and backups as authentication-bearing data. Provider session bearer tokens are discarded, and provider service credentials remain in private mounted files.
+Tenant ownership may be direct or derived through an unambiguous relationship such as order to location to tenant. Tables must carry enough association for RLS enforcement and efficient access checks without duplicating ownership data by default. Passwords and External Integration bearer secrets must never be stored in plaintext. Standard Spring Session JDBC stores opaque session IDs and identity references, and `staff_identities` stores password and verification-code hashes; protect the database and backups as authentication-bearing data.
 
 Order labels are optional, trimmed, single-line text of at most 80 characters; blank input is stored as no label. Labels preserve casing, may contain ordinary Unicode text, and are not unique; the daily number identifies the order. Labels, numbers and items cannot be edited after order creation.
 

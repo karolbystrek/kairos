@@ -1,7 +1,6 @@
 package pl.karolbystrek.kairos.api.authentication.application;
 
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -10,16 +9,15 @@ import org.springframework.web.server.ResponseStatusException;
 import pl.karolbystrek.kairos.api.account.application.AccountInvitationService;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
 import pl.karolbystrek.kairos.api.authentication.application.exception.RegistrationValidationException;
-import pl.karolbystrek.kairos.api.authentication.infrastructure.zitadel.ZitadelClient;
+import pl.karolbystrek.kairos.api.authentication.infrastructure.persistence.StaffIdentityStore;
 
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class OnboardingService {
-    public record Registration(StaffPrincipal principal, ZitadelClient.ProviderSession session) {}
+    public record Registration(StaffPrincipal principal, String subject) {}
     private final AccountInvitationService invitations;
     private final OneTimeBearerTokenService tokens;
-    private final ZitadelClient provider;
+    private final StaffIdentityStore identities;
     private final RegistrationVerificationService verification;
     private final PlatformTransactionManager transactions;
 
@@ -28,13 +26,14 @@ public class OnboardingService {
         return verification.nested(() -> new TransactionTemplate(transactions).execute(status -> provision(email, password, invitation)));
     }
 
+    // The identity shares the redemption transaction, so a failed redemption leaves no identity behind.
     private Registration provision(String email, String password, String invitation) {
         var preview = invitations.preview(invitation);
         AccountInvitationService.requireRecipientEmail(preview.email(), email);
         verification.prepareIdentity(email);
         String subject;
         try {
-            subject = provider.createUser(email, password);
+            subject = identities.createUser(email, password);
         }
         catch (ResponseStatusException exception) {
             if (exception.getStatusCode().value() == 409) {
@@ -42,18 +41,7 @@ public class OnboardingService {
             }
             throw exception;
         }
-        ZitadelClient.ProviderSession session = null;
-        try {
-            session = provider.signIn(email, password);
-            if (!subject.equals(session.userId())) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
-            provider.markEmailVerified(subject, email);
-            var principal = invitations.redeem(tokens.hash(invitation), email, subject);
-            return new Registration(principal, session);
-        } catch (RuntimeException exception) {
-            if (session != null) provider.terminate(session);
-            try { provider.deleteUser(subject); }
-            catch (RuntimeException cleanup) { log.error("ZITADEL registration cleanup failed for user {}", subject); }
-            throw exception;
-        }
+        identities.markEmailVerified(subject, email);
+        return new Registration(invitations.redeem(tokens.hash(invitation), email, subject), subject);
     }
 }

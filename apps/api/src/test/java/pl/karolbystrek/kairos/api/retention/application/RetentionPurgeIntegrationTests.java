@@ -1,18 +1,14 @@
 package pl.karolbystrek.kairos.api.retention.application;
 
-import io.micrometer.core.instrument.MeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentMatchers;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
-import org.springframework.web.server.ResponseStatusException;
 import pl.karolbystrek.kairos.api.integration.testsupport.IntegrationTestFixture;
 import pl.karolbystrek.kairos.api.integration.testsupport.MutableTestClock;
 import pl.karolbystrek.kairos.api.integration.testsupport.MutableTestClockConfiguration;
@@ -32,9 +28,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @SpringBootTest
 @Import(MutableTestClockConfiguration.class)
 class RetentionPurgeIntegrationTests extends RedisListenerIsolatedIntegrationTest {
-
-    @Autowired
-    private MeterRegistry meters;
 
     private static final Instant ARCHIVED_AT = Instant.parse("2026-07-26T12:00:00Z");
 
@@ -63,10 +56,12 @@ class RetentionPurgeIntegrationTests extends RedisListenerIsolatedIntegrationTes
     }
 
     @Test
-    void purgesArchivedAccountAndItsProviderIdentityOnlyAfterTheGracePeriod() {
+    void purgesArchivedAccountAndItsIdentityOnlyAfterTheGracePeriod() {
         var accountId = tenant.manager().accountId();
         var subject = jdbcTemplate.queryForObject(
                 "SELECT provider_subject FROM accounts WHERE id = ?", String.class, accountId);
+        jdbcTemplate.update("INSERT INTO staff_identities(subject,email,password_hash) VALUES (?,?,'unused')",
+                subject, subject + "@example.com");
         insertInvitation(tenant.firstLocationId(), accountId, "REVOKED", ARCHIVED_AT.minus(Duration.ofDays(1)), ARCHIVED_AT);
         jdbcTemplate.update("UPDATE accounts SET status = 'ARCHIVED', archived_at = ?, updated_at = ? WHERE id = ?",
                 Timestamp.from(ARCHIVED_AT), Timestamp.from(ARCHIVED_AT), accountId);
@@ -74,56 +69,15 @@ class RetentionPurgeIntegrationTests extends RedisListenerIsolatedIntegrationTes
         clock.setInstant(ARCHIVED_AT.plus(Duration.ofDays(29)));
         purgeService.purge();
         assertThat(count("SELECT count(*) FROM accounts WHERE id = ?", accountId)).isOne();
-        Mockito.verify(identityProvider, Mockito.never()).deleteUser(ArgumentMatchers.anyString());
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM staff_identities WHERE subject = ?", Integer.class, subject)).isOne();
 
-        var failures = meters.counter("kairos.worker.failures", "worker", "retention");
-        var before = failures.count();
-
-        // A provider outage defers the purge; the account must not lose its row while its identity survives.
         clock.setInstant(ARCHIVED_AT.plus(Duration.ofDays(31)));
-        Mockito.doThrow(new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE))
-                .when(identityProvider).deleteUser(subject);
         purgeService.purge();
-        assertThat(count("SELECT count(*) FROM accounts WHERE id = ?", accountId)).isOne();
-
-        assertThat(failures.count()).isEqualTo(before + 1);
-
-        // An identity already missing at the provider counts as deleted.
-        Mockito.doThrow(new ResponseStatusException(HttpStatus.NOT_FOUND))
-                .when(identityProvider).deleteUser(subject);
-        purgeService.purge();
-        assertThat(failures.count()).isEqualTo(before + 1);
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM staff_identities WHERE subject = ?", Integer.class, subject)).isZero();
         assertThat(count("SELECT count(*) FROM accounts WHERE id = ?", accountId)).isZero();
         assertThat(count("SELECT count(*) FROM location_assignments WHERE account_id = ?", accountId)).isZero();
         assertThat(count("SELECT count(*) FROM account_invitations WHERE issued_by_account_id = ?", accountId)).isZero();
         assertThat(count("SELECT count(*) FROM accounts WHERE id = ?", tenant.administrator().accountId())).isOne();
-    }
-
-    @Test
-    void deferredAccountBlocksOnlyItsOwnLocationAndNotTheRestOfTheCycle() {
-        var otherTenant = new IntegrationTestFixture(jdbcTemplate).createTenant();
-        var stuck = tenant.manager().accountId();
-        var other = otherTenant.manager().accountId();
-        var expiredInvitation = insertInvitation(tenant.secondLocationId(), tenant.administrator().accountId(), "PENDING",
-                ARCHIVED_AT.minus(Duration.ofDays(38)), null);
-        for (var account : new UUID[]{stuck, other}) {
-            jdbcTemplate.update("UPDATE accounts SET status = 'ARCHIVED', archived_at = ?, updated_at = ? WHERE id = ?",
-                    Timestamp.from(ARCHIVED_AT), Timestamp.from(ARCHIVED_AT), account);
-        }
-        jdbcTemplate.update("UPDATE locations SET status = 'ARCHIVED', archived_at = ?, updated_at = ? WHERE id = ?",
-                Timestamp.from(ARCHIVED_AT), Timestamp.from(ARCHIVED_AT), tenant.firstLocationId());
-        var stuckSubject = jdbcTemplate.queryForObject(
-                "SELECT provider_subject FROM accounts WHERE id = ?", String.class, stuck);
-        Mockito.doThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST))
-                .when(identityProvider).deleteUser(stuckSubject);
-
-        clock.setInstant(ARCHIVED_AT.plus(Duration.ofDays(31)));
-        purgeService.purge();
-
-        assertThat(count("SELECT count(*) FROM accounts WHERE id = ?", stuck)).isOne();
-        assertThat(count("SELECT count(*) FROM locations WHERE id = ?", tenant.firstLocationId())).isOne();
-        assertThat(count("SELECT count(*) FROM accounts WHERE id = ?", other)).isZero();
-        assertThat(count("SELECT count(*) FROM account_invitations WHERE id = ?", expiredInvitation)).isZero();
     }
 
     @Test
@@ -229,9 +183,9 @@ class RetentionPurgeIntegrationTests extends RedisListenerIsolatedIntegrationTes
 
         purgeService.purge();
 
-        Mockito.verify(identityProvider).deleteUser("abandoned-subject");
-        Mockito.verify(identityProvider, Mockito.never()).deleteUser(provisionedSubject);
-        Mockito.verify(identityProvider, Mockito.never()).deleteUser("recent-subject");
+        Mockito.verify(identities).deleteUser("abandoned-subject");
+        Mockito.verify(identities, Mockito.never()).deleteUser(provisionedSubject);
+        Mockito.verify(identities, Mockito.never()).deleteUser("recent-subject");
         assertThat(jdbcTemplate.queryForList("SELECT subject FROM pending_registrations", String.class))
                 .containsExactly("recent-subject");
         assertThat(count("SELECT count(*) FROM email_deliveries WHERE id = ?", abandoned)).isZero();

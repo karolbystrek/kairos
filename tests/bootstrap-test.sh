@@ -44,7 +44,7 @@ printf '%s\n' 'deployment-owned-production-configuration' > "$test_directory/hos
 cp "$test_directory/host/production.env" "$test_directory/expected.env"
 run_configuration || { cat "$test_directory/output" >&2; exit 1; }
 cmp "$test_directory/expected.env" "$test_directory/host/production.env"
-for key in zitadel-masterkey webhook-encryption.bin vapid-private.pem vapid-public.pem push-subscription-encryption.bin; do
+for key in webhook-encryption.bin vapid-private.pem vapid-public.pem push-subscription-encryption.bin; do
     cmp "$test_directory/expected-secrets/$key" "$test_directory/host/secrets/$key"
 done
 python3 - "$test_directory/host" <<'PY'
