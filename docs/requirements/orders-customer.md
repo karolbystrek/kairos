@@ -43,9 +43,8 @@ The customer application must:
 * poll REST approximately every 15 seconds while the event stream is disconnected, and stop fallback polling when it reconnects;
 * reconcile through REST on focus and browser connectivity restoration;
 * make an active order's current status the dominant content, its number the
-  primary identifier and its label, when present, a quieter secondary line, express the current state once as a centered
-  message without a duplicate status label, decorative status symbol, or
-  explanatory paragraph, show a status timestamp only when the displayed data
+  primary identifier and its label, when present, a secondary line, express the
+  current state once without a duplicate status label, show a status timestamp only when the displayed data
   is explicitly stale, and rely on automatic reconciliation rather than an
   always-visible manual refresh;
 * provide clear terminal views for completed, canceled, or unknown orders;
@@ -91,11 +90,8 @@ backend. Local tracking does not establish customer identity or order ownership.
 
 #### Current order and scanner default page
 
-The default page shows one horizontally and vertically centered **Scan QR code**
-action, with Notifications and Appearance in the trailing utility group. Its
-label and icon scale together, with the large label above an oversized QR icon.
-The control has no resting container and reveals its button surface on hover,
-keyboard focus, or press. There is no order collection, history, Home control,
+The default page shows one **Scan QR code** action alongside the Notifications
+and Appearance utilities. There is no order collection, history, Home control,
 swipe disclosure, or stop-tracking action.
 
 Opening an order records it as the current destination before REST succeeds.
@@ -149,8 +145,7 @@ terminal orders are removed after their final notification delivery has been
 materialized. The API limits a subscription to ten contexts per order.
 
 Three seconds after the first order loads successfully, the application shows a
-compact, dismissible notification popup with only a title and actions when
-permission can be requested, or
+dismissible notification popup when permission can be requested, or
 an illustrated installation guide on Apple mobile devices requiring Home Screen
 installation. Navigation away cancels the delay. Enabled, granted, blocked, and
 unsupported browser states skip the automatic permission invitation. Dismissal
@@ -163,12 +158,11 @@ other contexts enable directly or show inline blocked/unsupported guidance.
 The bell immediately reflects the requested state after permission is granted,
 with a pending label until subscription persistence finishes. Disabling receives
 the same immediate feedback. Pending actions prevent duplicate taps, while
-failure restores the confirmed state and shows inline error guidance. Icon
-changes use a short crossfade with reduced-motion support.
+failure restores the confirmed state and shows inline error guidance.
 Tracking remains usable without installation or notifications.
 
-The application exposes one persistent notification control in the top-right
-corner of every customer view. Its icon distinguishes enabled notifications
+The application exposes one persistent notification control in every customer
+view. Its icon distinguishes enabled notifications
 from all off or unavailable states: a normal bell offers notification enabling,
 while a crossed bell indicates that notifications are currently enabled and
 the action will disable them. Disabling notifications durably retires the current
@@ -178,10 +172,8 @@ does not make a false backend-cleanup promise.
 Browser-initiated subscription replacement is reconciled once from the service
 worker and idempotently retried on the next application start if needed.
 
-Transient in-app notification guidance aligns to the customer content width and
-uses the same flat secondary surface and corner scale as the rest of the
-interface. Every such message provides a trailing, icon-only Dismiss action
-that clears the current message without changing notification settings.
+Every transient in-app notification message provides a Dismiss action that
+clears the current message without changing notification settings.
 
 #### Push payloads and application badges
 
