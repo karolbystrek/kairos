@@ -225,6 +225,8 @@ function notificationBody(status: OrderStatus): string {
       return "Twoje zamówienie jest gotowe do odbioru";
     case "CANCELED":
       return "Twoje zamówienie zostało anulowane";
+    case "EXPIRED":
+      return "Twoje zamówienie zostało zamknięte";
     case "COMPLETED":
       return "Twoje zamówienie zostało zrealizowane";
     case "IN_PREPARATION":

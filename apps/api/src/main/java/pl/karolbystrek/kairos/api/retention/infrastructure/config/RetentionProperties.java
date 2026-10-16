@@ -12,7 +12,8 @@ import java.time.Duration;
 @ConfigurationProperties("kairos.retention")
 public record RetentionProperties(
         @NotNull Duration gracePeriod,
-        @Min(1) int batchSize
+        @Min(1) int batchSize,
+        @NotNull Duration orderExpiry
 ) {
 
     @AssertTrue(message = "Retention grace period must be positive")

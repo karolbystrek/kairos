@@ -9,6 +9,7 @@ const orderStatusSchema = z.enum([
   "READY",
   "COMPLETED",
   "CANCELED",
+  "EXPIRED",
 ]);
 
 export const activeOrderStatusSchema = z.enum(["IN_PREPARATION", "READY"]);

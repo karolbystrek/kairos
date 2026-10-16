@@ -26,6 +26,10 @@ public record OrderInitiator(
         }
     }
 
+    public static OrderInitiator system() {
+        return new OrderInitiator(InitiatorType.SYSTEM, null, null);
+    }
+
     public static OrderInitiator user(@NonNull UUID accountId) {
         return new OrderInitiator(InitiatorType.USER, accountId, null);
     }

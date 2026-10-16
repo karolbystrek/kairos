@@ -90,6 +90,7 @@ kairos:
     delay: "${REVIEW_INVITATION_DELAY:30m}"
   retention:
     grace-period: 30d
+    order-expiry: 24h
     batch-size: 50
     purge-delay: 1h
     purge-initial-delay: 10m

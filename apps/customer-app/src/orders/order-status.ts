@@ -5,6 +5,7 @@ export const orderStatusSchema = z.enum([
   "READY",
   "COMPLETED",
   "CANCELED",
+  "EXPIRED",
 ]);
 
 export type OrderStatus = z.infer<typeof orderStatusSchema>;
@@ -21,6 +22,7 @@ export function canApplyStatus(
     current === candidate ||
     (current === "IN_PREPARATION" && candidate !== "IN_PREPARATION") ||
     (current === "READY" &&
-      (candidate === "COMPLETED" || candidate === "CANCELED"))
+      candidate !== "IN_PREPARATION" &&
+      candidate !== "READY")
   );
 }

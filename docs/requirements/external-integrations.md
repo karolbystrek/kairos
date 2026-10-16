@@ -57,7 +57,8 @@ integration can choose valid item names; locations outside the key return `403`
 as for other location-scoped requests.
 
 Webhook subscriptions independently select at least one location and supported
-order event type. Creation starts with every supported event type selected so
+order event type (`order.created`, `order.ready`, `order.completed`,
+`order.canceled` or `order.expired`). Creation starts with every supported event type selected so
 the administrator can remove only events the recipient does not need. A new
 subscription is disabled until its one-time signing
 secret has been copied and the recipient configured. Each delivery uses a

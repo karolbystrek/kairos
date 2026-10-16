@@ -6,7 +6,9 @@ public enum OrderStatus {
     IN_PREPARATION,
     READY,
     COMPLETED,
-    CANCELED;
+    CANCELED,
+    // Set only by the system, for an active order nobody closed.
+    EXPIRED;
 
     private static final Set<OrderStatus> ACTIVE_STATUSES = Set.of(IN_PREPARATION, READY);
 
@@ -14,7 +16,7 @@ public enum OrderStatus {
         return switch (this) {
             case IN_PREPARATION -> target == READY || target == CANCELED;
             case READY -> target == COMPLETED || target == CANCELED;
-            case COMPLETED, CANCELED -> false;
+            case COMPLETED, CANCELED, EXPIRED -> false;
         };
     }
 

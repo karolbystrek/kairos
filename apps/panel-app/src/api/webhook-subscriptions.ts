@@ -8,6 +8,7 @@ const webhookEventTypeSchema = z.enum([
   "order.ready",
   "order.completed",
   "order.canceled",
+  "order.expired",
 ]);
 
 const webhookSigningSecretVersionSchema = z.object({
