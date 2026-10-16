@@ -65,4 +65,4 @@
 * Security events: staff sessions expire after 30 idle days and Spring Session
   removes expired rows. Production container logs, which hold IP addresses and
   security events, rotate at three 10 MB files per service
-  (`compose.deployment.yaml`).
+  (`compose.production.yaml`).

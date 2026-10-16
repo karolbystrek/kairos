@@ -14,8 +14,8 @@ customer, panel, and API hostnames with Full (strict) encryption. There is no tu
 service or edge network. The hosted overlay mounts an externally managed Origin
 CA certificate directory supplied as absolute `KAIROS_TLS_DIRECTORY`, containing
 `tls.crt` and `tls.key`, read-only at `/run/secrets/tls`. Keep certificates and
-private keys outside the release checkout. Local development keeps mkcert and
-loopback-only port publication. Origin CA certificates are for Cloudflare's
+private keys outside the release checkout. Local development has no gateway or TLS and
+publishes loopback-only ports over HTTP. Origin CA certificates are for Cloudflare's
 connection to the origin; direct browser access is not supported.
 
 Only the hosted overlay includes `nginx/cloudflare-real-ip.conf`. It accepts

@@ -6,10 +6,10 @@ repository_directory="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)"
 environment_example="${repository_directory}/.env.example"
 environment_file="${repository_directory}/.env"
 
+preset=""
 non_interactive=false
 environment_action=""
 key_action=""
-tls_action=""
 secrets_argument=""
 
 temporary_environment_file=""
@@ -18,7 +18,17 @@ installed_files=""
 
 usage() {
     cat <<EOF
-Usage: $0 [OPTIONS]
+Usage: $0 [--dev | --prod] [OPTIONS]
+
+Without a preset, setup asks about each step.
+
+Presets (explicit options below still take precedence):
+  --dev                          Local development: keep or create .env from
+                                 .env.example and keep or create keys in secrets/,
+                                 install frontend dependencies and start the
+                                 PostgreSQL and Redis containers.
+  --prod                         Production host: keep or create keys in
+                                 /srv/kairos/secrets; deployment owns production.env.
 
 Options:
   --secrets-directory DIRECTORY  Store generated material in DIRECTORY.
@@ -26,8 +36,6 @@ Options:
   --keep-env                     Preserve an existing .env.
   --replace-keys                 Replace an existing application key set.
   --keep-keys                    Reuse an existing complete, valid key set.
-  --tls                          Generate or replace the local TLS certificate.
-  --no-tls                       Do not generate a TLS certificate.
   --non-interactive              Fail instead of prompting for missing choices.
   -h, --help                     Show this help.
 EOF
@@ -76,14 +84,9 @@ while [ "$#" -gt 0 ]; do
             key_action=keep
             shift
             ;;
-        --tls)
-            set_action "${tls_action}" generate TLS
-            tls_action=generate
-            shift
-            ;;
-        --no-tls)
-            set_action "${tls_action}" skip TLS
-            tls_action=skip
+        --dev|--prod)
+            [ -z "${preset}" ] || fail "Choose only one of --dev and --prod." 2
+            preset="${1#--}"
             shift
             ;;
         --non-interactive)
@@ -100,6 +103,21 @@ while [ "$#" -gt 0 ]; do
             ;;
     esac
 done
+
+case "${preset}" in
+    dev)
+        non_interactive=true
+        : "${environment_action:=keep}"
+        : "${key_action:=keep}"
+        : "${secrets_argument:=secrets}"
+        ;;
+    prod)
+        non_interactive=true
+        : "${environment_action:=skip}"
+        : "${key_action:=keep}"
+        : "${secrets_argument:=/srv/kairos/secrets}"
+        ;;
+esac
 
 cleanup() {
     if [ -n "${temporary_environment_file}" ] && [ -f "${temporary_environment_file}" ]; then
@@ -171,7 +189,9 @@ write_environment_file() {
     temporary_environment_file=""
 }
 
-if [ -e "${environment_file}" ] || [ -L "${environment_file}" ]; then
+if [ "${environment_action}" = skip ]; then
+    echo "Skipped .env; deployment writes production.env."
+elif [ -e "${environment_file}" ] || [ -L "${environment_file}" ]; then
     if [ ! -f "${environment_file}" ] && [ ! -L "${environment_file}" ]; then
         fail ".env exists but is not a file."
     fi
@@ -276,7 +296,6 @@ is_key_name() {
 }
 
 existing_key_count=0
-existing_tls_count=0
 
 if [ -d "${secrets_directory}" ]; then
     for entry in \
@@ -295,38 +314,14 @@ if [ -d "${secrets_directory}" ]; then
             existing_key_count=$((existing_key_count + 1))
         elif [ -f "${entry}" ] && [ ! -L "${entry}" ]; then
             : # Externally managed files are preserved; setup does not own them.
-        elif [ "${entry_name}" = tls ]; then
+        elif [ "${entry_name}" = zitadel ] || [ "${entry_name}" = tls ]; then
+            # Legacy ZITADEL credential and local TLS directories from older setups stay untouched.
             if [ -L "${entry}" ] || [ ! -d "${entry}" ]; then
-                fail "The TLS secrets entry must be a regular directory."
+                fail "The secrets entry must be a regular directory: ${entry_name}"
             fi
         else
             fail "The secrets directory contains an unrelated entry: ${entry_name}"
         fi
-    done
-fi
-
-tls_directory="${secrets_directory}/tls"
-if [ -d "${tls_directory}" ]; then
-    for entry in \
-        "${tls_directory}"/* \
-        "${tls_directory}"/.[!.]* \
-        "${tls_directory}"/..?*; do
-        if [ ! -e "${entry}" ] && [ ! -L "${entry}" ]; then
-            continue
-        fi
-
-        entry_name="$(basename -- "${entry}")"
-        case "${entry_name}" in
-            tls.crt|tls.key)
-                if [ -L "${entry}" ] || [ ! -f "${entry}" ]; then
-                    fail "The TLS secrets entry is not a regular file: ${entry_name}"
-                fi
-                existing_tls_count=$((existing_tls_count + 1))
-                ;;
-            *)
-                fail "The TLS secrets directory contains an unrelated entry: ${entry_name}"
-                ;;
-        esac
     done
 fi
 
@@ -373,28 +368,6 @@ validate_key_set() {
     done
 
     return 0
-}
-
-validate_tls_pair() {
-    certificate="$1"
-    private_key="$2"
-    validation_directory="${working_directory}/validation"
-    mkdir -p "${validation_directory}"
-
-    openssl x509 \
-        -in "${certificate}" \
-        -pubkey \
-        -noout \
-        > "${validation_directory}/tls-certificate-public.pem" \
-        2>/dev/null || return 1
-    openssl pkey \
-        -in "${private_key}" \
-        -pubout \
-        -out "${validation_directory}/tls-private-public.pem" \
-        >/dev/null 2>&1 || return 1
-    cmp -s \
-        "${validation_directory}/tls-certificate-public.pem" \
-        "${validation_directory}/tls-private-public.pem" || return 1
 }
 
 key_set_status=absent
@@ -464,40 +437,6 @@ case "${key_action}" in
         ;;
 esac
 
-if [ -z "${tls_action}" ]; then
-    if [ "${non_interactive}" = true ]; then
-        fail "--tls or --no-tls is required in non-interactive mode."
-    fi
-    prompt_yes_no "Generate or replace the TLS certificate?" yes
-    if [ "${prompt_result}" = yes ]; then
-        tls_action=generate
-    else
-        tls_action=skip
-    fi
-fi
-
-existing_tls_status=absent
-if [ "${existing_tls_count}" -eq 2 ]; then
-    if validate_tls_pair "${tls_directory}/tls.crt" "${tls_directory}/tls.key"; then
-        existing_tls_status=valid
-    else
-        existing_tls_status=invalid
-    fi
-elif [ "${existing_tls_count}" -ne 0 ]; then
-    existing_tls_status=partial
-fi
-
-if [ "${tls_action}" = skip ]; then
-    case "${existing_tls_status}" in
-        partial)
-            fail "Cannot preserve a partial TLS key pair."
-            ;;
-        invalid)
-            fail "Cannot preserve the existing invalid TLS key pair."
-            ;;
-    esac
-fi
-
 new_secrets_directory="${working_directory}/secrets"
 mkdir "${new_secrets_directory}"
 chmod 0700 "${new_secrets_directory}"
@@ -532,42 +471,6 @@ done
 
 validate_key_set "${new_secrets_directory}" || fail "The prepared application key set failed validation."
 
-if [ "${tls_action}" = generate ]; then
-    command -v mkcert >/dev/null 2>&1 || fail "mkcert is required when TLS generation is enabled."
-
-    new_tls_directory="${new_secrets_directory}/tls"
-    mkdir "${new_tls_directory}"
-    chmod 0700 "${new_tls_directory}"
-    mkcert_output="${working_directory}/mkcert-output.txt"
-    if ! mkcert \
-        -cert-file "${new_tls_directory}/tls.crt" \
-        -key-file "${new_tls_directory}/tls.key" \
-        customer.kairos.localhost \
-        panel.kairos.localhost \
-        api.kairos.localhost \
-        > "${mkcert_output}" \
-        2>&1; then
-        cat "${mkcert_output}" >&2
-        fail "mkcert could not generate the TLS certificate."
-    fi
-    chmod 0644 "${new_tls_directory}/tls.crt"
-    chmod 0600 "${new_tls_directory}/tls.key"
-    validate_tls_pair \
-        "${new_tls_directory}/tls.crt" \
-        "${new_tls_directory}/tls.key" || fail "The generated TLS certificate and private key do not form a pair."
-elif [ "${existing_tls_status}" = valid ]; then
-    new_tls_directory="${new_secrets_directory}/tls"
-    mkdir "${new_tls_directory}"
-    chmod 0700 "${new_tls_directory}"
-    cp "${tls_directory}/tls.crt" "${new_tls_directory}/tls.crt"
-    cp "${tls_directory}/tls.key" "${new_tls_directory}/tls.key"
-    chmod 0644 "${new_tls_directory}/tls.crt"
-    chmod 0600 "${new_tls_directory}/tls.key"
-    validate_tls_pair \
-        "${new_tls_directory}/tls.crt" \
-        "${new_tls_directory}/tls.key" || fail "The preserved TLS certificate and private key failed validation."
-fi
-
 # Keep directory identities stable for Docker Desktop bind mounts.
 mkdir -p "${secrets_directory}"
 chmod 0700 "${secrets_directory}"
@@ -577,13 +480,8 @@ if [ "${final_key_action}" = generate ]; then
         replacement_files="${replacement_files} ${key_name}"
     done
 fi
-if [ "${tls_action}" = generate ]; then
-    mkdir -p "${tls_directory}"
-    chmod 0700 "${tls_directory}"
-    replacement_files="${replacement_files} tls/tls.crt tls/tls.key"
-fi
 
-mkdir -p "${working_directory}/backup/tls"
+mkdir -p "${working_directory}/backup"
 for replacement_file in ${replacement_files}; do
     if [ -f "${secrets_directory}/${replacement_file}" ]; then
         cp -p "${secrets_directory}/${replacement_file}" "${working_directory}/backup/${replacement_file}"
@@ -606,16 +504,18 @@ else
     echo "Reused and validated the complete application key set in ${secrets_directory}."
 fi
 
-case "${tls_action}:${existing_tls_status}" in
-    generate:*)
-        echo "Generated and validated the TLS certificate in ${secrets_directory}/tls."
-        ;;
-    skip:valid)
-        echo "Preserved and validated the TLS certificate in ${secrets_directory}/tls."
-        ;;
-    skip:*)
-        echo "Skipped TLS certificate generation."
-        ;;
-esac
 
 trap - EXIT HUP INT TERM
+
+# A local checkout also gets frontend dependencies and running infrastructure; copies without Compose (tests) skip this.
+if [ "${preset}" = dev ] && [ -f "${repository_directory}/compose.yaml" ]; then
+    for app in customer-app panel-app; do
+        [ -d "${repository_directory}/apps/${app}/node_modules" ] || npm --prefix "${repository_directory}/apps/${app}" ci
+    done
+    docker compose --project-directory "${repository_directory}" up -d --wait
+    echo
+    echo "Infrastructure is running. Start the applications with hot reload:"
+    echo "  (cd apps/api && ./mvnw spring-boot:run)   # http://localhost:8080/api"
+    echo "  npm --prefix apps/customer-app run dev     # http://localhost:3000"
+    echo "  npm --prefix apps/panel-app run dev        # http://localhost:3001"
+fi
