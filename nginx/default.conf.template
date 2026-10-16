@@ -94,6 +94,10 @@ server {
 
     ${KAIROS_NGINX_TLS_CONFIGURATION}
 
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+
     location = /api {
         return 404;
     }
@@ -112,6 +116,10 @@ server {
     server_name ${KAIROS_PANEL_APP_HOST};
 
     ${KAIROS_NGINX_TLS_CONFIGURATION}
+
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
 
     location = /api {
         return 404;
@@ -146,7 +154,8 @@ server {
         return 404;
     }
 
-    location ~ ^/api/tracked-orders/v1/[^/]+/events$ {
+    # Customer and staff event streams must reach the browser as soon as the API writes them.
+    location ~ ^/api/(tracked-orders/v1/[^/]+|orders/v1)/events$ {
         proxy_pass http://kairos_api;
         proxy_buffering off;
         proxy_cache off;
@@ -155,7 +164,8 @@ server {
     }
 
     # Apply at the API server so all proxy locations keep the same policy.
-    limit_req zone=kairos_auth burst=5 nodelay;
+    # Staff of one restaurant often share an IP, so allow a burst of sign-ins at once.
+    limit_req zone=kairos_auth burst=20 nodelay;
     limit_req zone=kairos_external burst=20 nodelay;
 
     location /api/ {

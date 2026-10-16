@@ -21,7 +21,8 @@ RUN ./mvnw package -DskipTests -B
 FROM eclipse-temurin:25-jre-alpine AS runner
 WORKDIR /app
 ENV TZ=UTC
-ENV JAVA_TOOL_OPTIONS="-Duser.timezone=UTC"
+# The JVM default heap is a quarter of the container limit; the API is the container's only process.
+ENV JAVA_TOOL_OPTIONS="-Duser.timezone=UTC -XX:MaxRAMPercentage=75"
 
 COPY --from=builder /app/target/*.jar app.jar
 

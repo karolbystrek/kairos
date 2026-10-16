@@ -173,17 +173,12 @@ class SecurityFilterChainIntegrationTests extends RedisListenerIsolatedIntegrati
                 .contentType(MediaType.APPLICATION_JSON).content(" ".repeat(8193))
                 .with(request -> { request.removeHeader("Content-Length"); request.addHeader("Transfer-Encoding", "chunked"); return request; }))
                 .andExpect(status().isPayloadTooLarge());
-        mockMvc.perform(apiPost(reviewPath).secure(true).cookie(csrf).header(CSRF_HEADER, csrf.getValue())
-                .contentType(MediaType.APPLICATION_JSON).content("{\"event\":\"review_link_clicked\"}"))
-                .andExpect(status().isNotFound());
-        for (var request = 0; request < 58; request++) {
+        // An unknown reference never uses rate-limit budget, so made-up references cannot fill the limiter.
+        for (var request = 0; request < 61; request++) {
             mockMvc.perform(apiPost(reviewPath).secure(true).cookie(csrf).header(CSRF_HEADER, csrf.getValue())
-                    .contentType(MediaType.APPLICATION_JSON).content("{}"))
-                    .andExpect(status().isBadRequest());
+                    .contentType(MediaType.APPLICATION_JSON).content("{\"event\":\"review_link_clicked\"}"))
+                    .andExpect(status().isNotFound());
         }
-        mockMvc.perform(apiPost(reviewPath).secure(true).cookie(csrf).header(CSRF_HEADER, csrf.getValue())
-                .contentType(MediaType.APPLICATION_JSON).content("{}"))
-                .andExpect(status().isTooManyRequests());
     }
 
     @Test
