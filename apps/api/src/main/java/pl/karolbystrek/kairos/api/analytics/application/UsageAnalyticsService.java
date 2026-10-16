@@ -42,7 +42,8 @@ public class UsageAnalyticsService {
     }
 
     @Transactional
-    public void review(UUID reference, String event) {
+    /** {@code limit} runs only for a real, due invitation, so made-up references cannot use rate-limit budget. */
+    public void review(UUID reference, String event, Runnable limit) {
         access.trackedOrders(List.of(reference));
         var order = orders.findByTrackingReference(reference)
                 .orElseThrow(() -> new ResourceNotFoundException("Tracked order was not found"));
@@ -50,6 +51,7 @@ public class UsageAnalyticsService {
         if (!order.isReviewEligible() || order.getReviewDueAt().isAfter(now)) {
             throw new ResourceNotFoundException("Review invitation was not found");
         }
+        limit.run();
         if (!database.record(order.getLocation().getTenantId(), order.getLocation().getId(), event, Timestamp.from(now))) {
             throw new ResourceNotFoundException("Review invitation was not found");
         }

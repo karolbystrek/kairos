@@ -47,7 +47,7 @@ for `/sw.js` on the customer hostname. Do not apply cache-everything to applicat
 pages. Exclude anonymous customer and External Integration API traffic from
 interactive challenges/Access login, while retaining the origin gateway limits.
 The shared limits are authentication/registration/redemption/password POSTs at
-5 requests/minute per client, burst 5, and external API at 10 requests/second,
+5 requests/minute per client, burst 20, and external API at 10 requests/second,
 burst 20, returning `429`. CSRF/read/SSE paths remain outside auth throttling.
 See [Cache Rules settings](https://developers.cloudflare.com/cache/how-to/cache-rules/settings/).
 Verify edge REST cache bypass, service-worker update behavior, cross-origin
