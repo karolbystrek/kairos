@@ -48,10 +48,9 @@ class UsageAnalyticsController {
     @PostMapping(path = "/tracked-orders/v1/{trackingReference}/review-actions", consumes = "application/json")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     void review(@PathVariable UUID trackingReference, HttpServletRequest request) throws IOException {
-        limiter.acquire("tracking:" + trackingReference);
         var body = read(request, ReviewRequest.class);
         if (body == null || body.event() == null || !REVIEW_EVENTS.contains(body.event())) throw invalid();
-        service.review(trackingReference, body.event());
+        service.review(trackingReference, body.event(), () -> limiter.acquire("tracking:" + trackingReference));
     }
 
     private <T> T read(HttpServletRequest request, Class<T> type) throws IOException {

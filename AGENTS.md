@@ -60,6 +60,15 @@ service; existing explicit approval remains valid within its stated scope.
   Applications own their manifests and Dockerfiles; the two frontends share
   `apps/panel-app/Dockerfile`.
 
+## Local development
+
+`./setup.sh --dev` creates `.env` and keys, installs frontend dependencies and
+starts PostgreSQL and Redis in Docker. Run the API with `(cd apps/api && ./mvnw
+spring-boot:run)` and each frontend with `npm --prefix apps/<app> run dev`.
+`docker compose stop` stops the infrastructure and keeps its data; `./reset.sh`
+deletes data, keys and `.env`, so run it only when the user asks. Details:
+[local development](docs/agents/local-development.md).
+
 ## Read when relevant
 
 - [Requirements topic map](docs/REQUIREMENTS.md): start with purpose/ownership

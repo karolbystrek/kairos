@@ -7,7 +7,7 @@
 - [Local development](#local-development)
 - [Hosted VM preparation](#hosted-vm-preparation)
 - [Repository checks](#repository-checks)
-- [Resetting the local environment](#resetting-the-local-environment)
+- [Stopping and resetting the local environment](#stopping-and-resetting-the-local-environment)
 - [Documentation](#documentation)
 
 Kairos is a virtual pager system for restaurants. Customers scan an
@@ -94,7 +94,11 @@ npm --prefix apps/panel-app run check
 git diff --check
 ```
 
-## Resetting the local environment
+## Stopping and resetting the local environment
+
+Stop each application with Ctrl-C. `docker compose stop` stops PostgreSQL and
+Redis and keeps their data; `docker compose up -d --wait` starts them again.
+
 
 To delete the Compose containers and volumes and the generated keys, and move
 `.env` aside as `.env.old`:
