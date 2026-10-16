@@ -22,6 +22,11 @@ declare global {
   interface WorkerGlobalScope extends SerwistGlobalConfig {
     __SW_MANIFEST: (PrecacheEntry | string)[] | undefined;
   }
+
+  // Supported by browsers but missing from TypeScript's DOM library.
+  interface NotificationOptions {
+    renotify?: boolean;
+  }
 }
 
 declare const self: ServiceWorkerGlobalScope;
@@ -116,6 +121,7 @@ async function handlePush(event: PushEvent): Promise<void> {
     await self.registration.showNotification("Kairos", {
       body: "Status zamówienia się zmienił. Otwórz Kairos, aby sprawdzić aktualny status.",
       tag: "kairos-generic-order-update",
+      renotify: true,
       data: { orderUrl: "/" },
     });
 
@@ -129,6 +135,8 @@ async function handlePush(event: PushEvent): Promise<void> {
   await self.registration.showNotification("Kairos", {
     body: notificationBody(payload.status),
     tag: `kairos-order-${payload.trackingReference}`,
+    // Without renotify a later status silently replaces the earlier one.
+    renotify: true,
     data: {
       eventId: payload.eventId,
       orderUrl: payload.orderUrl,

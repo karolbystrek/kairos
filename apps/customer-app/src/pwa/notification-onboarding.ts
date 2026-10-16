@@ -38,7 +38,8 @@ export function shouldShowNotificationGuide({
   automatic: boolean;
 }): boolean {
   return (
-    (installationRequired ||
+    // Installation is explained only on request; Apple browsers never get it automatically.
+    ((installationRequired && !automatic) ||
       (automatic &&
         (state === "disabled" || state === "error") &&
         permission === "default")) &&

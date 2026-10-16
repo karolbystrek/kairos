@@ -22,6 +22,10 @@ describe("notification onboarding", () => {
     expect(shouldShowNotificationGuide({ state, installationRequired: false, dismissed: false, automatic: false })).toBe(false);
   });
 
+  it("never opens the installation guide automatically", () => {
+    expect(shouldShowNotificationGuide({ state: "installation-required", installationRequired: true, dismissed: false, automatic: true })).toBe(false);
+  });
+
   it.each(["loading", "enabled"] as const)("does not interrupt %s notifications", (state) => {
     expect(shouldShowNotificationGuide({ state, installationRequired: true, dismissed: false, automatic: true })).toBe(false);
   });

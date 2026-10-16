@@ -9,7 +9,7 @@ public record ClaimedCustomerPushDelivery(
         @NonNull UUID id,
         @NonNull UUID claimToken,
         @NonNull UUID subscriptionId,
-        @NonNull UUID eventId,
+        @NonNull UUID orderId,
         @NonNull String endpoint,
         byte @NonNull [] p256dhKey,
         byte @NonNull [] authSecret,

@@ -147,7 +147,7 @@ public class CustomerPushDeliveryClaimService {
                     delivery.getId(),
                     claimToken,
                     subscription.getId(),
-                    event.getId(),
+                    delivery.getOrderId(),
                     endpoint,
                     subscription.getP256dhKey(),
                     authSecret,

@@ -30,7 +30,7 @@ const storedOrderSchema = z
 const tombstoneSchema = z
   .object({
     trackingReference: z.string().min(1),
-    mode: z.enum(["terminal", "suppressed"]),
+    mode: z.literal("terminal"),
     status: orderStatusSchema.optional(),
     transitionedAt: z.iso.datetime({ offset: true }).optional(),
     notificationPending: z.boolean().optional(),
@@ -477,11 +477,10 @@ async function applyPushTransitionInTransaction(
     tombstoneResult.data.notificationPending === true;
 
   if (
-    (tombstoneResult.success && tombstoneResult.data.mode === "suppressed") ||
-    (!pendingTerminalNotification &&
-      !(metadata.enrolledTrackingReferences ?? []).includes(
-        transition.trackingReference,
-      ))
+    !pendingTerminalNotification &&
+    !(metadata.enrolledTrackingReferences ?? []).includes(
+      transition.trackingReference,
+    )
   ) {
     return false;
   }

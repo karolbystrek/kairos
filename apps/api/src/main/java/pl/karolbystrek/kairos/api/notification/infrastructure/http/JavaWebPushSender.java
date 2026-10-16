@@ -144,7 +144,7 @@ public class JavaWebPushSender implements WebPushSender {
         request.setHeader("Content-Encoding", "aes128gcm");
         request.setHeader("TTL", Long.toString(ttlSeconds));
         request.setHeader("Urgency", "high");
-        request.setHeader("Topic", topic(message.eventId()));
+        request.setHeader("Topic", topic(message.orderId()));
         request.setEntity(new ByteArrayEntity(encrypted, ContentType.APPLICATION_OCTET_STREAM));
         try (client) {
             return client.execute(request, response -> {
@@ -248,10 +248,10 @@ public class JavaWebPushSender implements WebPushSender {
         }
     }
 
-    private static String topic(UUID eventId) {
+    private static String topic(UUID orderId) {
         try {
             var digest = MessageDigest.getInstance("SHA-256")
-                    .digest(eventId.toString().getBytes(StandardCharsets.US_ASCII));
+                    .digest(orderId.toString().getBytes(StandardCharsets.US_ASCII));
             return Base64.getUrlEncoder().withoutPadding().encodeToString(digest).substring(0, 32);
         } catch (GeneralSecurityException exception) {
             throw new IllegalStateException("SHA-256 is unavailable", exception);
