@@ -35,8 +35,7 @@ checkout is described in [production configuration](docs/deployment/CONFIGURATIO
 hosted releases use the [production runbook](docs/deployment/RUNBOOK.md).
 
 To delete the Compose containers and volumes and the generated keys, and move
-`.env` aside as `.env.old` (refuses to run in production mode, asks before
-deleting unless given the skip flag):
+`.env` aside as `.env.old` (it refuses to run in production mode):
 
 ```bash
 ./reset.sh

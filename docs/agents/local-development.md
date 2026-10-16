@@ -45,16 +45,16 @@ are required. Setup selects `compose.yaml` plus `compose.local.yaml` in `.env`;
   registration completes without a code and opens first-location onboarding.
   Set it to `true` in `.env` and restart the API to exercise verification.
 - No email is sent locally: `compose.local.yaml` sets `EMAIL_DELIVERY_MODE=LOG`.
-  Verification codes, password-reset codes and invitation links are printed in
-  `docker compose logs -f api`.
+  The API logs each email attempt with its content redacted, so codes and
+  invitation links are not available locally; keep verification disabled.
 - Single services use the Compose names `api`, `panel-app`, `customer-app`,
   `postgres` and `redis`:
   - `docker compose up --build -d api` rebuilds and restarts one service.
   - `docker compose logs -f panel-app` follows one service.
   - `docker compose restart customer-app` restarts without rebuilding.
   - `docker compose ps` shows state and health.
-- `./reset.sh` deletes containers, volumes and keys, so it asks once before
-  deleting local data and refuses to run when `COMPOSE_FILE` selects production.
+- `./reset.sh` deletes containers, volumes and keys, without asking
+  and refuses to run when `COMPOSE_FILE` selects production.
 
 ## Runtime limits and test safety
 
