@@ -109,16 +109,21 @@ describe("order event stream", () => {
     await renderOrder("IN_PREPARATION");
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
     const source = FakeEventSource.instances[0];
-    await act(async () => new Promise((resolve) => setTimeout(resolve, 0)));
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"] });
     act(() => source.onopen?.());
     await act(async () => source.listeners.get("order-status-changed")?.(new MessageEvent("order-status-changed", { data: JSON.stringify({ eventId: crypto.randomUUID(), trackingReference: TRACKING_REFERENCE, number: 12, label: "A12", status: "READY", updatedAt: "2026-10-09T20:01:00Z" }) })));
     const connectedFetches = fetchOrder.mock.calls.length;
     await act(async () => vi.advanceTimersByTimeAsync(30_000));
     expect(fetchOrder.mock.calls.length).toBe(connectedFetches);
+    let releasePoll!: (response: Response) => void;
+    const staleResponse = new Promise<Response>((resolve) => { releasePoll = resolve; });
+    fetchOrder.mockImplementation(() => staleResponse);
     act(() => source.onerror?.());
     await act(async () => vi.advanceTimersByTimeAsync(15_000));
-    expect(fetchOrder.mock.calls.length).toBeGreaterThan(connectedFetches);
+    // The polling clock does not drain IndexedDB's separate task queue.
+    vi.useRealTimers();
+    await waitFor(() => expect(fetchOrder.mock.calls.length).toBe(connectedFetches + 1));
+    await act(async () => releasePoll(Response.json({ number: 12, label: "A12", status: "IN_PREPARATION", updatedAt: "2026-10-09T20:00:00Z" })));
     expect(screen.getByText("Gotowe do odbioru")).toBeTruthy();
   });
 
