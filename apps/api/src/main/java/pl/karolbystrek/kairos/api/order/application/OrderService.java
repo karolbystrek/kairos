@@ -38,6 +38,15 @@ public class OrderService {
     private final Clock clock;
     private final DatabaseAccessContext databaseAccess;
 
+    /** The access part of {@link #listOrders} without the query, for re-checking open queue streams. */
+    @Transactional(readOnly = true)
+    public void requireQueueAccess(StaffPrincipal principal, UUID locationId) {
+        var access = staffAccessService.resolve(principal);
+        if (locationId != null) {
+            requireAccessibleLocation(access, locationId);
+        }
+    }
+
     @Transactional(readOnly = true)
     public List<OrderView> listOrders(
             StaffPrincipal principal,

@@ -14,6 +14,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.clearInvocations;
@@ -71,9 +72,43 @@ class StaffOrderSseEmitterRegistryTests {
         doThrow(new StaffAccessDeniedException("Session was revoked")).when(authentication)
                 .authenticate("staff", signedInAt);
 
-        registry.refresh();
+        registry.revalidate();
 
         verify(emitter).complete();
+    }
+
+    @Test
+    void closesTheStreamWhenItsLocationAccessWasRevoked() {
+        var location = UUID.randomUUID();
+        when(orders.listOrders(principal, location, null)).thenReturn(List.of());
+        registry.subscribe(principal, "staff", signedInAt, location);
+        doThrow(new StaffAccessDeniedException("Assignment removed")).when(orders).requireQueueAccess(principal, location);
+
+        registry.revalidate();
+
+        verify(emitter).complete();
+        assertThat(registry.groupCount()).isZero();
+    }
+
+    @Test
+    void devicesWatchingOneLocationShareOneQueryPerChange() throws Exception {
+        var location = UUID.randomUUID();
+        var colleague = new StaffPrincipal(UUID.randomUUID(), principal.tenantId(), TenantRole.MEMBER);
+        var first = mock(SseEmitter.class);
+        var second = mock(SseEmitter.class);
+        var emitters = new java.util.ArrayDeque<>(List.of(first, second));
+        var shared = new StaffOrderSseEmitterRegistry(orders, authentication, ignored -> emitters.removeFirst());
+        when(orders.listOrders(any(), any(), any())).thenReturn(List.of());
+        shared.subscribe(principal, "owner", signedInAt, location);
+        shared.subscribe(colleague, "staff", signedInAt, location);
+        clearInvocations(orders, first, second);
+
+        shared.forward(event(principal.tenantId(), location));
+
+        verify(orders, times(1)).listOrders(any(), any(), any());
+        verify(first).send(any(SseEmitter.SseEventBuilder.class));
+        verify(second).send(any(SseEmitter.SseEventBuilder.class));
+        assertThat(shared.groupCount()).isOne();
     }
 
     @Test

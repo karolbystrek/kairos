@@ -37,10 +37,13 @@ Status precedence, rather than wall-clock timestamp order, prevents regression.
 Authenticated staff use `/api/orders/v1/events` with an optional `locationId`,
 matching the queue REST endpoint's location and tenant-wide access rules. The
 `order-queue` event carries the full current active queue on opening/reopening
-and after relevant committed creations or transitions. Queue refresh and
-snapshot delivery are serialized per connection so an older snapshot cannot
-replace a newer queue. Access is rechecked before each refresh, including every periodic re-sync; denied connections end. Active revocation on assignment or
-session changes remains out of scope. Staff state stays scoped to the signed-in
+and after relevant committed creations or transitions. Connections watching the
+same location share one queue query per change; a tenant-wide stream shares only
+with the same account's devices. Coalesced refreshes deliver the newest queue
+last, and at most four queue queries run at once per instance, so a Redis
+resubscribe cannot exhaust the database pool. The session cutoff and location
+access are checked on opening and rechecked on every periodic re-sync; a revoked
+session or removed assignment ends the stream within one interval. Staff state stays scoped to the signed-in
 account and queue, with REST recovery while disconnected. Servlet async and
 error redispatches preserve the original request's authorization decision.
 

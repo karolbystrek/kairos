@@ -10,6 +10,7 @@ import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 import pl.karolbystrek.kairos.api.email.infrastructure.http.ResendEmailSender;
 import pl.karolbystrek.kairos.api.email.infrastructure.security.EmailPayloadCipher;
+import pl.karolbystrek.kairos.api.worker.CoalescingWorker;
 
 import java.sql.Timestamp;
 import java.time.Clock;
@@ -30,7 +31,14 @@ public class EmailDeliveryWorker {
     private final ResendEmailSender sender;
     private final Clock clock;
 
+    // Sends run off the scheduler threads: a slow provider can take minutes and must not delay stream heartbeats.
+    private final CoalescingWorker worker = new CoalescingWorker(this::cycle);
+
     @Scheduled(fixedDelayString = "${kairos.email.poll-delay:1000}", initialDelayString = "${kairos.email.initial-delay:1000}")
+    void poll() {
+        worker.wake();
+    }
+
     public void deliverAvailable() {
         var transaction = new TransactionTemplate(transactions);
         transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
@@ -59,5 +67,10 @@ public class EmailDeliveryWorker {
                 "SELECT public.complete_email_delivery(?,?,?,?,?)", Boolean.class,
                 claimed.id(), token, state, Timestamp.from(now), Timestamp.from(retry)));
         }
+    }
+
+    private boolean cycle() {
+        deliverAvailable();
+        return false;
     }
 }

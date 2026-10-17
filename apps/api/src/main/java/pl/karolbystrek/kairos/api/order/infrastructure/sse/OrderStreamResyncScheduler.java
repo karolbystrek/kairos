@@ -17,6 +17,6 @@ class OrderStreamResyncScheduler {
     @Scheduled(fixedDelayString = "${kairos.live-updates.resync-interval:60s}")
     void resync() {
         customerStreams.refresh(orders);
-        staffStreams.refresh();
+        staffStreams.revalidate();
     }
 }
