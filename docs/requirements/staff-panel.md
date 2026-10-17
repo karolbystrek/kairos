@@ -48,7 +48,9 @@ explaining QR-based order tracking and queue management without physical
 pagers or a customer app download. Its plain-language Polish copy covers how
 it works in three steps, benefits for owners and guests, a short FAQ and a
 registration call to action, and never promises more than the product does
-(iPhone notifications require adding Kairos to the Home Screen). An interactive
+(iPhone notifications require adding Kairos to the Home Screen). The page
+always uses the light appearance, regardless of the stored or browser theme
+preference. An interactive
 demo runs entirely in the browser without API calls: it holds one order at a
 time that the visitor adds, scans with a simulated guest phone mirroring the
 customer application, and marks ready and picked up while the phone shows the

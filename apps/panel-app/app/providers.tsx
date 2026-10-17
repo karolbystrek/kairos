@@ -5,6 +5,7 @@ import type { ThemeProviderProps } from "next-themes";
 import * as React from "react";
 import { I18nProvider, ToastProvider } from "@heroui/react";
 import { IconContext } from "@phosphor-icons/react";
+import { usePathname } from "next/navigation";
 import { ThemeProvider as NextThemesProvider } from "next-themes";
 import { SWRConfig, type SWRConfiguration } from "swr";
 
@@ -50,11 +51,13 @@ function useToastPlacement() {
 
 export function Providers({ children, themeProps }: ProvidersProps) {
   const toastPlacement = useToastPlacement();
+  // The public landing page is always light; the stored preference still applies elsewhere.
+  const forcedTheme = usePathname() === "/" ? "light" : undefined;
 
   return (
     <I18nProvider locale="pl-PL">
       <IconContext.Provider value={iconDefaults}>
-        <NextThemesProvider {...themeProps}>
+        <NextThemesProvider {...themeProps} forcedTheme={forcedTheme}>
           <SWRConfig value={swrDefaults}>{children}</SWRConfig>
           <ToastProvider placement={toastPlacement} />
         </NextThemesProvider>
