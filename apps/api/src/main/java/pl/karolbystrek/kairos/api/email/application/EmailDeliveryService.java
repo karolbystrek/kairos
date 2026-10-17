@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import pl.karolbystrek.kairos.api.email.domain.EmailDeliveryState;
+import pl.karolbystrek.kairos.api.email.infrastructure.config.EmailProperties;
 import pl.karolbystrek.kairos.api.email.infrastructure.security.EmailPayloadCipher;
 import tools.jackson.databind.ObjectMapper;
 
@@ -22,6 +23,7 @@ public class EmailDeliveryService {
     private final EmailPayloadCipher cipher;
     private final ObjectMapper json;
     private final Clock clock;
+    private final EmailProperties properties;
 
     @Transactional(propagation = Propagation.MANDATORY)
     public UUID enqueue(String to, String subject, String text) {
@@ -31,7 +33,7 @@ public class EmailDeliveryService {
     @Transactional(propagation = Propagation.MANDATORY)
     public UUID enqueue(@NonNull String to, @NonNull String subject, @NonNull String text, UUID locationId) {
         var id = UUID.randomUUID();
-        var payload = cipher.encrypt(id, json.writeValueAsBytes(Map.of("from", "Kairos <no-reply@kairos.karolbystrek.pl>",
+        var payload = cipher.encrypt(id, json.writeValueAsBytes(Map.of("from", properties.sender(),
             "to", to, "subject", subject, "text", text)));
         var now = Timestamp.from(clock.instant());
         database.update("""

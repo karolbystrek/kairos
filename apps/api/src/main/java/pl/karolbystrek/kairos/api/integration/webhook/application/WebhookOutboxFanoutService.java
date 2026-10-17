@@ -1,6 +1,7 @@
 package pl.karolbystrek.kairos.api.integration.webhook.application;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
@@ -19,9 +20,12 @@ import pl.karolbystrek.kairos.api.persistence.infrastructure.WorkerOperation;
 import pl.karolbystrek.kairos.api.persistence.infrastructure.WorkerDiscoveryRepository;
 
 import java.time.Clock;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class WebhookOutboxFanoutService {
 
     private final OrderOutboxEventRepository outboxRepository;
@@ -40,14 +44,26 @@ public class WebhookOutboxFanoutService {
         transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         var processed = 0;
         for (; processed < properties.worker().batchSize(); processed++) {
-            var found = transaction.execute(status -> {
-                var eventId = workerDiscoveryRepository.nextWebhookFanout();
-                if (eventId == null || !databaseAccess.worker(WorkerOperation.WEBHOOK_FANOUT, eventId, null)) {
-                    return false;
-                }
-                fanOut(outboxRepository.findById(eventId).orElseThrow());
-                return true;
-            });
+            var selected = new AtomicReference<UUID>();
+            Boolean found;
+            try {
+                found = transaction.execute(status -> {
+                    var eventId = workerDiscoveryRepository.nextWebhookFanout();
+                    if (eventId == null || !databaseAccess.worker(WorkerOperation.WEBHOOK_FANOUT, eventId, null)) {
+                        return false;
+                    }
+                    selected.set(eventId);
+                    fanOut(outboxRepository.findById(eventId).orElseThrow());
+                    return true;
+                });
+            } catch (RuntimeException exception) {
+                if (selected.get() == null) throw exception;
+                log.warn("Webhook fan-out failed for outbox event {}", selected.get(), exception);
+                // The failed transaction rolled back; count the failure on its own so repeated ones skip the event.
+                transaction.executeWithoutResult(status -> workerDiscoveryRepository.recordFanoutFailure(
+                        selected.get(), WorkerOperation.WEBHOOK_FANOUT, clock.instant(), exception.toString()));
+                break;
+            }
             if (!Boolean.TRUE.equals(found)) break;
         }
         return processed;

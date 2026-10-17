@@ -2,13 +2,13 @@ package pl.karolbystrek.kairos.api.notification.infrastructure.security;
 
 import lombok.NonNull;
 import org.springframework.core.io.Resource;
+import pl.karolbystrek.kairos.api.util.Hashing;
 
 import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.KeyFactory;
-import java.security.MessageDigest;
 import java.security.Signature;
 import java.security.interfaces.ECPrivateKey;
 import java.security.interfaces.ECPublicKey;
@@ -43,7 +43,7 @@ public final class VapidKeyLoader {
                     .encodeToString(applicationServerKey);
             var fingerprint = Base64.getUrlEncoder()
                     .withoutPadding()
-                    .encodeToString(MessageDigest.getInstance("SHA-256").digest(applicationServerKey));
+                    .encodeToString(Hashing.sha256(applicationServerKey));
             return new VapidKeyMaterial(
                     publicKey,
                     privateKey,

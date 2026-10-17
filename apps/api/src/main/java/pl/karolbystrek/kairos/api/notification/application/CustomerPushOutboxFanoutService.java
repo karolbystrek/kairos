@@ -1,6 +1,7 @@
 package pl.karolbystrek.kairos.api.notification.application;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
@@ -20,9 +21,12 @@ import pl.karolbystrek.kairos.api.persistence.infrastructure.WorkerDiscoveryRepo
 import pl.karolbystrek.kairos.api.persistence.infrastructure.WorkerOperation;
 
 import java.time.Clock;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class CustomerPushOutboxFanoutService {
 
     private final OrderOutboxEventRepository outboxRepository;
@@ -42,14 +46,26 @@ public class CustomerPushOutboxFanoutService {
         transactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         var count = 0;
         for (var index = 0; index < properties.worker().batchSize(); index++) {
-            var processed = transactionTemplate.execute(status -> {
-                var id = workerDiscoveryRepository.nextPushFanout();
-                if (id == null || !databaseAccessContext.worker(WorkerOperation.PUSH_FANOUT, id, null)) {
-                    return false;
-                }
-                fanOut(outboxRepository.findById(id).orElseThrow());
-                return true;
-            });
+            var selected = new AtomicReference<UUID>();
+            Boolean processed;
+            try {
+                processed = transactionTemplate.execute(status -> {
+                    var id = workerDiscoveryRepository.nextPushFanout();
+                    if (id == null || !databaseAccessContext.worker(WorkerOperation.PUSH_FANOUT, id, null)) {
+                        return false;
+                    }
+                    selected.set(id);
+                    fanOut(outboxRepository.findById(id).orElseThrow());
+                    return true;
+                });
+            } catch (RuntimeException exception) {
+                if (selected.get() == null) throw exception;
+                log.warn("Customer Push fan-out failed for outbox event {}", selected.get(), exception);
+                // The failed transaction rolled back; count the failure on its own so repeated ones skip the event.
+                transactionTemplate.executeWithoutResult(status -> workerDiscoveryRepository.recordFanoutFailure(
+                        selected.get(), WorkerOperation.PUSH_FANOUT, clock.instant(), exception.toString()));
+                break;
+            }
             if (!Boolean.TRUE.equals(processed)) {
                 break;
             }

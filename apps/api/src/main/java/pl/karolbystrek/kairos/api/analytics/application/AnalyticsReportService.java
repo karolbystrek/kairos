@@ -8,9 +8,9 @@ import org.springframework.web.server.ResponseStatusException;
 import pl.karolbystrek.kairos.api.account.application.StaffAccessService;
 import pl.karolbystrek.kairos.api.account.application.exception.StaffAccessDeniedException;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
-import pl.karolbystrek.kairos.api.account.domain.assignment.AssignmentRole;
 import pl.karolbystrek.kairos.api.analytics.infrastructure.persistence.AnalyticsReportRepository;
 import pl.karolbystrek.kairos.api.persistence.infrastructure.DatabaseAccessContext;
+import pl.karolbystrek.kairos.api.util.TimeZones;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -125,7 +125,7 @@ public class AnalyticsReportService {
     }
 
     static ZoneId zone(String zone) {
-        if (zone == null || !ZoneId.getAvailableZoneIds().contains(zone)) {
+        if (zone == null || !TimeZones.isSupported(zone)) {
             throw invalid("The reporting time zone must be an IANA time zone");
         }
         return ZoneId.of(zone);

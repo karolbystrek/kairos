@@ -30,8 +30,9 @@ export function ReviewInvitation() {
 
       return Math.min(
         2_147_483_647,
+        // Once due, the reviews-changed event and focus keep the list fresh.
         next.isDue
-          ? 15000
+          ? 0
           : Math.max(1000, Date.parse(next.invitation.dueAt) - Date.now()),
       );
     },
@@ -71,6 +72,8 @@ export function ReviewInvitation() {
     consumedActions.current.add(current.trackingReference);
     recordReviewAction(current.trackingReference, event);
     setConsumed((previous) => new Set(previous).add(current.trackingReference));
+    // Polling stops while an invitation is due; refetch to schedule the next one.
+    void mutate();
     void consumeReviewInvitation(current.trackingReference).catch(() => {
       // Keep dismissal in memory if browser storage becomes unavailable.
     });

@@ -54,7 +54,8 @@ are required. Setup selects `compose.yaml` plus `compose.local.yaml` in `.env`;
   - `docker compose restart customer-app` restarts without rebuilding.
   - `docker compose ps` shows state and health.
 - `./reset.sh` deletes containers, volumes and keys, without asking
-  and refuses to run when `COMPOSE_FILE` selects production.
+  and refuses to run when `COMPOSE_FILE`, in `.env` or exported in the environment, selects
+  production.
 
 ## Runtime limits and test safety
 
@@ -64,8 +65,8 @@ acceptance. Phone testing needs reachable origins rather than `localhost`.
 Session cookies work over `http://localhost` in Chrome and Firefox; Safari
 requires HTTPS.
 
-For runtime verification use the default `kairos` Compose project, never a
-separately named stack. Use `./reset.sh` only when the user has authorized
+For runtime verification use the `kairos` Compose project (`name: kairos` in
+`compose.yaml`), never a separately named stack. Use `./reset.sh` only when the user has authorized
 resetting containers or data.
 
 Backend verification requires a running Docker engine; the command is in

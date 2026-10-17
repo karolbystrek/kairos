@@ -9,13 +9,21 @@ import java.net.InetAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.UnknownHostException;
+import java.time.Duration;
 import java.util.Locale;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * SSRF guard for outbound Web Push and webhook requests: normalizes the URL and, outside local
  * development, requires HTTPS and only public resolved addresses.
  */
 public class PublicDestinationPolicy {
+
+    private static final Duration DNS_TIMEOUT = Duration.ofSeconds(3);
 
     private final boolean localDevelopment;
     private final String subject;
@@ -91,14 +99,26 @@ public class PublicDestinationPolicy {
         }
     }
 
+    // getAllByName has no timeout of its own; unauthenticated callers must not tie up request threads on slow DNS.
     private InetAddress[] resolve(String host) {
+        var lookup = CompletableFuture.supplyAsync(() -> {
+            try {
+                return InetAddress.getAllByName(host);
+            } catch (UnknownHostException exception) {
+                throw new CompletionException(exception);
+            }
+        }, Thread::startVirtualThread);
         try {
-            var addresses = InetAddress.getAllByName(host);
+            var addresses = lookup.get(DNS_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
             if (addresses.length == 0) {
                 throw invalid("host did not resolve");
             }
             return addresses;
-        } catch (UnknownHostException exception) {
+        } catch (ExecutionException | TimeoutException exception) {
+            lookup.cancel(true);
+            throw new InvalidDestinationException(subject + " host could not be resolved", exception);
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
             throw new InvalidDestinationException(subject + " host could not be resolved", exception);
         }
     }

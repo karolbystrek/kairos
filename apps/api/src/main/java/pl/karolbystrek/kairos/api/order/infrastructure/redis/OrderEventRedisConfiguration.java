@@ -6,6 +6,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
+import org.springframework.core.task.VirtualThreadTaskExecutor;
 
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
@@ -24,6 +25,8 @@ class OrderEventRedisConfiguration {
     ) {
         var container = new RedisMessageListenerContainer();
         container.setConnectionFactory(connectionFactory);
+        container.setTaskExecutor(new VirtualThreadTaskExecutor("order-redis-"));
+        container.setRecoveryInterval(5_000);
         container.addMessageListener(subscriber, new ChannelTopic(ORDER_STATUS_CHANNEL));
         return container;
     }

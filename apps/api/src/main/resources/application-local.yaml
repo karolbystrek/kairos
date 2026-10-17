@@ -1,3 +1,8 @@
+spring:
+  config:
+    # The host-run API (./mvnw spring-boot:run in apps/api) reads the repository .env; containers have no
+    # such file and receive the same keys as environment variables. Local-only so tests never see a developer's .env.
+    import: "optional:file:../../.env[.properties]"
 kairos:
   email:
     mode: LOG

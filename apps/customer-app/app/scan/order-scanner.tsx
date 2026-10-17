@@ -186,7 +186,7 @@ export function OrderScanner() {
           </Alert.Content>
         </Alert>
         <Button variant="secondary" onPress={cancel}>
-          <XIcon aria-hidden="true" size={18} /> Wróć do skanera
+          <XIcon aria-hidden="true" size={18} /> Wróć
         </Button>
       </section>
     );

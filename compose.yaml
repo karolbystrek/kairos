@@ -1,5 +1,7 @@
-# Shared infrastructure. Locally it is the whole Compose stack and the applications run on
-# the host with hot reload; compose.production.yaml adds the application images and NGINX.
+# Shared infrastructure. compose.local.yaml adds the applications in Docker with hot reload;
+# compose.production.yaml adds the application images and NGINX.
+name: kairos
+
 services:
   postgres:
     image: postgres:18-alpine

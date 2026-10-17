@@ -29,7 +29,7 @@ class OrderStatusRedisAdapterTests {
     @Test
     void publishesVersionedJsonAndIsolatesRedisFailures() {
         var redisTemplate = new RecordingStringRedisTemplate();
-        var publisher = new OrderStatusRedisPublisher(redisTemplate, objectMapper);
+        var publisher = new OrderStatusRedisPublisher(redisTemplate, objectMapper, Runnable::run);
         var event = event(OrderStatus.READY);
 
         publisher.publish(event);

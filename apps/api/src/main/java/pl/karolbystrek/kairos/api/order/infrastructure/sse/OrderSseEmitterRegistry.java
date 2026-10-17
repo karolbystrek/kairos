@@ -1,27 +1,37 @@
 package pl.karolbystrek.kairos.api.order.infrastructure.sse;
 
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import pl.karolbystrek.kairos.api.order.api.model.CustomerOrderEventResponse;
 import pl.karolbystrek.kairos.api.order.application.OrderService;
 import pl.karolbystrek.kairos.api.order.application.model.OrderStatusChangedEvent;
+import pl.karolbystrek.kairos.api.order.application.model.TrackedOrderView;
 import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
 import pl.karolbystrek.kairos.api.worker.CoalescingWorker;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Stream;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.function.LongFunction;
 
+@Slf4j
 public class OrderSseEmitterRegistry {
     public static final String STATUS_CHANGED_EVENT_NAME = "order-status-changed";
+    static final int MAXIMUM_STREAMS_PER_REFERENCE = 5;
     // Keyed by tracking reference so an event reaches only its own order's streams.
     private final ConcurrentHashMap<UUID, Map<SseEmitter, Connection>> connections = new ConcurrentHashMap<>();
     private final LongFunction<SseEmitter> emitterFactory;
     private final Executor executor;
+    private final CoalescingWorker recovery;
+    private volatile OrderService orders;
 
     protected OrderSseEmitterRegistry(LongFunction<SseEmitter> emitterFactory) {
         this(emitterFactory, Runnable::run);
@@ -30,24 +40,18 @@ public class OrderSseEmitterRegistry {
     OrderSseEmitterRegistry(LongFunction<SseEmitter> emitterFactory, Executor executor) {
         this.emitterFactory = emitterFactory;
         this.executor = executor;
+        recovery = new CoalescingWorker(executor, () -> {
+            recover();
+            return false;
+        });
     }
 
     private final class Connection {
         private final SseConnection delivery;
-        private final CoalescingWorker recovery;
-        private volatile OrderService orders;
         private OrderStatus latest;
 
         private Connection(UUID reference, SseEmitter emitter) {
             delivery = new SseConnection(emitter, () -> remove(reference, emitter), executor);
-            recovery = new CoalescingWorker(executor, () -> {
-                try {
-                    accept(OrderStatusChangedEvent.snapshot(reference, orders.findTrackedOrder(reference)));
-                } catch (RuntimeException exception) {
-                    delivery.close();
-                }
-                return false;
-            });
         }
 
         private synchronized void accept(OrderStatusChangedEvent event) {
@@ -65,7 +69,6 @@ public class OrderSseEmitterRegistry {
         try {
             var initial = orders.findTrackedOrder(reference);
             if (connection != null) {
-                connection.orders = orders;
                 connection.accept(OrderStatusChangedEvent.snapshot(reference, initial));
             }
             return emitter;
@@ -76,21 +79,49 @@ public class OrderSseEmitterRegistry {
     }
 
     public void refresh(OrderService orders) {
-        all().forEach(connection -> {
-            connection.orders = orders;
-            connection.recovery.wake();
+        this.orders = orders;
+        recovery.wake();
+    }
+
+    // One batched read per cycle, fanned out to every stream of each tracking reference.
+    private void recover() {
+        var references = Set.copyOf(connections.keySet());
+        if (references.isEmpty()) return;
+        Map<UUID, TrackedOrderView> tracked;
+        try {
+            tracked = orders.findTrackedOrders(references);
+        } catch (RuntimeException exception) {
+            log.warn("Could not refresh customer streams; the next cycle retries", exception);
+            return;
+        }
+        references.forEach(reference -> {
+            var streams = List.copyOf(connections.getOrDefault(reference, Map.of()).values());
+            var order = tracked.get(reference);
+            streams.forEach(connection -> {
+                if (order == null) {
+                    connection.delivery.close();
+                } else {
+                    connection.accept(OrderStatusChangedEvent.snapshot(reference, order));
+                }
+            });
         });
     }
 
     public SseEmitter register(UUID reference) {
         var emitter = emitterFactory.apply(Duration.ofMinutes(30).toMillis());
         var connection = new Connection(reference, emitter);
+        var refused = new boolean[1];
         // compute keeps the add atomic with a concurrent removal of the reference's last stream.
         connections.compute(reference, (ignored, streams) -> {
             var current = streams == null ? new ConcurrentHashMap<SseEmitter, Connection>() : streams;
-            current.put(emitter, connection);
+            // Refusing (not evicting) ends with a closed EventSource, so extra tabs back off instead of evicting each other.
+            refused[0] = current.size() >= MAXIMUM_STREAMS_PER_REFERENCE;
+            if (!refused[0]) current.put(emitter, connection);
             return current;
         });
+        if (refused[0]) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many streams for this order");
+        }
         connection.delivery.send(SseEmitter.event().comment("connected"), false);
         return emitter;
     }

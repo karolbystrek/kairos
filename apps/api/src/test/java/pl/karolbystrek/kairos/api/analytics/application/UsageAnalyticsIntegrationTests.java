@@ -4,7 +4,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -14,7 +13,6 @@ import org.springframework.dao.DataAccessException;
 import pl.karolbystrek.kairos.api.analytics.application.UsageAnalyticsService.Action;
 import pl.karolbystrek.kairos.api.integration.testsupport.IntegrationTestFixture;
 import pl.karolbystrek.kairos.api.integration.testsupport.MutableTestClock;
-import pl.karolbystrek.kairos.api.integration.testsupport.MutableTestClockConfiguration;
 import pl.karolbystrek.kairos.api.order.application.OrderService;
 import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
 import pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase;
@@ -32,7 +30,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
-@Import(MutableTestClockConfiguration.class)
 class UsageAnalyticsIntegrationTests extends RedisListenerIsolatedIntegrationTest {
     @Autowired private UsageAnalyticsService usage;
     @Autowired private OrderService orders;

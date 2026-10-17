@@ -4,7 +4,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -16,7 +15,6 @@ import pl.karolbystrek.kairos.api.integration.application.exception.IntegrationN
 import pl.karolbystrek.kairos.api.integration.domain.ExternalIntegrationStatus;
 import pl.karolbystrek.kairos.api.integration.testsupport.IntegrationTestFixture;
 import pl.karolbystrek.kairos.api.integration.testsupport.MutableTestClock;
-import pl.karolbystrek.kairos.api.integration.testsupport.MutableTestClockConfiguration;
 import pl.karolbystrek.kairos.api.persistence.infrastructure.DatabaseAccessContext;
 import pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase;
 import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
@@ -31,7 +29,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
-@Import(MutableTestClockConfiguration.class)
 class ExternalIntegrationManagementIntegrationTests
         extends RedisListenerIsolatedIntegrationTest {
 

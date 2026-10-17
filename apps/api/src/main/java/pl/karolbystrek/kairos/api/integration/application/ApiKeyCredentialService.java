@@ -2,13 +2,12 @@ package pl.karolbystrek.kairos.api.integration.application;
 
 import org.springframework.stereotype.Component;
 import pl.karolbystrek.kairos.api.integration.application.model.IssuedApiKeyCredential;
+import pl.karolbystrek.kairos.api.util.Hashing;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.Base64;
-import java.util.HexFormat;
 import java.util.UUID;
 
 @Component
@@ -62,13 +61,7 @@ public class ApiKeyCredentialService {
     }
 
     private String hash(String credential) {
-        try {
-            var digest = MessageDigest.getInstance("SHA-256")
-                    .digest(credential.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(digest);
-        } catch (NoSuchAlgorithmException exception) {
-            throw new IllegalStateException("SHA-256 is unavailable", exception);
-        }
+        return Hashing.sha256Hex(credential);
     }
 
     private static boolean isNotBase64UrlCharacter(int character) {

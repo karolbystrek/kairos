@@ -14,6 +14,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
 import pl.karolbystrek.kairos.api.account.domain.TenantRole;
+import pl.karolbystrek.kairos.api.authentication.application.AuthenticationSessionService;
 import pl.karolbystrek.kairos.api.order.application.OrderService;
 import pl.karolbystrek.kairos.api.order.application.model.OrderView;
 import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
@@ -58,6 +59,7 @@ class OrderApiIntegrationTests extends RedisListenerIsolatedIntegrationTest {
 
     private UUID locationId;
     private StaffPrincipal principal;
+    private String providerSubject;
 
     @BeforeEach
     void createAdministratorFixture() {
@@ -65,6 +67,7 @@ class OrderApiIntegrationTests extends RedisListenerIsolatedIntegrationTest {
         var accountId = UUID.randomUUID();
         locationId = UUID.randomUUID();
         principal = new StaffPrincipal(accountId, tenantId, TenantRole.ADMIN);
+        providerSubject = UUID.randomUUID().toString();
         var now = Instant.parse("2026-07-24T12:00:00Z");
         jdbcTemplate.update("INSERT INTO tenants (id) VALUES (?)", tenantId);
         jdbcTemplate.update(
@@ -79,7 +82,7 @@ class OrderApiIntegrationTests extends RedisListenerIsolatedIntegrationTest {
                 INSERT INTO accounts (id, provider_subject, tenant_id, email, tenant_role, status, created_at, updated_at) VALUES (?, ?, ?, ?, 'ADMIN', 'ENABLED', ?, ?)
                 """,
             accountId,
-            UUID.randomUUID().toString(),
+            providerSubject,
             tenantId,
             "order-api-admin-" + accountId + "@example.com",
             Timestamp.from(now),
@@ -171,11 +174,11 @@ class OrderApiIntegrationTests extends RedisListenerIsolatedIntegrationTest {
 
         mockMvc.perform(apiGet("/orders/v1/events"))
                 .andExpect(status().isUnauthorized());
-        mockMvc.perform(withAuthentication(apiGet("/orders/v1/events")
-                        .queryParam("locationId", UUID.randomUUID().toString())))
+        mockMvc.perform(withSignedInSession(withAuthentication(apiGet("/orders/v1/events")
+                        .queryParam("locationId", UUID.randomUUID().toString()))))
                 .andExpect(status().isNotFound());
-        var stream = mockMvc.perform(withAuthentication(apiGet("/orders/v1/events")
-                        .queryParam("locationId", locationId.toString())))
+        var stream = mockMvc.perform(withSignedInSession(withAuthentication(apiGet("/orders/v1/events")
+                        .queryParam("locationId", locationId.toString()))))
                 .andExpect(status().isOk())
                 .andExpect(request().asyncStarted())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM))
@@ -202,6 +205,13 @@ class OrderApiIntegrationTests extends RedisListenerIsolatedIntegrationTest {
                         "IN_PREPARATION",
                         "READY"
                 )));
+    }
+
+    // The stream re-checks the session cutoff, so it needs the sign-in the staff session filter would have recorded.
+    private MockHttpServletRequestBuilder withSignedInSession(MockHttpServletRequestBuilder request) {
+        return request
+                .requestAttr(AuthenticationSessionService.IDENTITY, providerSubject)
+                .requestAttr(AuthenticationSessionService.SIGNED_IN_AT, Instant.parse("2026-07-24T12:00:00Z"));
     }
 
     private MockHttpServletRequestBuilder withAuthenticationAndCsrf(

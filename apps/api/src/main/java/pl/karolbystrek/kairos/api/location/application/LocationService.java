@@ -31,6 +31,7 @@ import pl.karolbystrek.kairos.api.menu.infrastructure.persistence.LocationMenuRe
 import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
 import pl.karolbystrek.kairos.api.order.infrastructure.persistence.CustomerOrderRepository;
 import pl.karolbystrek.kairos.api.tenant.infrastructure.persistence.TenantRepository;
+import pl.karolbystrek.kairos.api.util.TimeZones;
 
 import java.net.URI;
 import java.time.Clock;
@@ -112,7 +113,7 @@ public class LocationService {
     }
 
     private static ZoneId parseTimeZone(String candidate) {
-        if (candidate == null || !ZoneId.getAvailableZoneIds().contains(candidate)) {
+        if (candidate == null || !TimeZones.isSupported(candidate)) {
             throw new InvalidLocationRequestException("Location time zone must be an IANA time zone");
         }
         return ZoneId.of(candidate);

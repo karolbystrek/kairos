@@ -1,17 +1,22 @@
 package pl.karolbystrek.kairos.api.testsupport;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.context.bean.override.convention.TestBean;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import pl.karolbystrek.kairos.api.authentication.infrastructure.persistence.StaffIdentityStore;
+import pl.karolbystrek.kairos.api.integration.testsupport.MutableTestClock;
+import pl.karolbystrek.kairos.api.integration.testsupport.MutableTestClockConfiguration;
 import pl.karolbystrek.kairos.api.notification.infrastructure.worker.CustomerPushWorker;
 import pl.karolbystrek.kairos.api.integration.webhook.infrastructure.worker.WebhookWorker;
 
 import java.time.Duration;
 
+@Import(MutableTestClockConfiguration.class)
 public abstract class RedisListenerIsolatedIntegrationTest {
     // Fixtures explicitly run durable workers; background commit listeners would race their assertions.
     @MockitoBean
@@ -23,8 +28,12 @@ public abstract class RedisListenerIsolatedIntegrationTest {
     @MockitoSpyBean
     protected StaffIdentityStore identities;
 
+    @Autowired
+    private MutableTestClock testClock;
+
     @BeforeEach
     void resetDatabase() {
+        testClock.useSystemTime();
         PostgresTestDatabase.ownerDatabase().execute("TRUNCATE tenants,customer_push_subscriptions,spring_session,staff_identities RESTART IDENTITY CASCADE");
     }
 

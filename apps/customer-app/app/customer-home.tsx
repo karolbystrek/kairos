@@ -2,14 +2,22 @@
 
 import { Button, Link, Spinner } from "@heroui/react";
 import { QrCodeIcon } from "@phosphor-icons/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { CustomerToolbar } from "@/components/customer-toolbar";
 import { resolveCustomerLaunchHref } from "@/src/pwa/launch-destination";
 import { isAppleMobile, isStandalone } from "@/src/pwa/notification-onboarding";
+import { INSTALL_ORDER_QUERY_PARAMETER } from "@/src/pwa/manifest";
 import { consumeInstallationBootstrap } from "@/src/pwa/recently-tracked-orders";
 import { readLastStableDestination } from "@/src/pwa/storage";
+
+// Read on the client so the page itself stays static.
+export function CustomerHomeFromUrl() {
+  const reference = useSearchParams().get(INSTALL_ORDER_QUERY_PARAMETER);
+
+  return <CustomerHome installationTrackingReference={reference} />;
+}
 
 export function CustomerHome({
   installationTrackingReference,

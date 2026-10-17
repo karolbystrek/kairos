@@ -5,12 +5,14 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
+import pl.karolbystrek.kairos.api.authentication.application.StaffAuthenticationService;
 import pl.karolbystrek.kairos.api.order.api.model.OrderResponse;
 import pl.karolbystrek.kairos.api.order.application.OrderService;
 import pl.karolbystrek.kairos.api.order.application.model.OrderStatusChangedEvent;
 import pl.karolbystrek.kairos.api.worker.CoalescingWorker;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
@@ -19,55 +21,86 @@ import java.util.function.LongFunction;
 @Component
 public class StaffOrderSseEmitterRegistry {
     private final OrderService orders;
+    private final StaffAuthenticationService authentication;
     private final LongFunction<SseEmitter> emitterFactory;
     private final Executor executor;
     private final ConcurrentHashMap<SseEmitter, Connection> connections = new ConcurrentHashMap<>();
 
     @Autowired
-    public StaffOrderSseEmitterRegistry(OrderService orders) {
-        this(orders, SseEmitter::new, Thread::startVirtualThread);
+    public StaffOrderSseEmitterRegistry(OrderService orders, StaffAuthenticationService authentication) {
+        this(orders, authentication, SseEmitter::new, Thread::startVirtualThread);
     }
 
-    StaffOrderSseEmitterRegistry(OrderService orders, LongFunction<SseEmitter> emitterFactory) {
-        this(orders, emitterFactory, Runnable::run);
+    StaffOrderSseEmitterRegistry(
+            OrderService orders,
+            StaffAuthenticationService authentication,
+            LongFunction<SseEmitter> emitterFactory
+    ) {
+        this(orders, authentication, emitterFactory, Runnable::run);
     }
 
-    StaffOrderSseEmitterRegistry(OrderService orders, LongFunction<SseEmitter> emitterFactory, Executor executor) {
+    StaffOrderSseEmitterRegistry(
+            OrderService orders,
+            StaffAuthenticationService authentication,
+            LongFunction<SseEmitter> emitterFactory,
+            Executor executor
+    ) {
         this.orders = orders;
+        this.authentication = authentication;
         this.emitterFactory = emitterFactory;
         this.executor = executor;
     }
 
     private final class Connection {
         private final StaffPrincipal principal;
+        private final String subject;
+        private final Instant signedInAt;
         private final UUID locationId;
         private final SseConnection delivery;
         private final CoalescingWorker refresh;
 
-        private Connection(StaffPrincipal principal, UUID locationId, SseEmitter emitter) {
+        private Connection(
+                StaffPrincipal principal,
+                String subject,
+                Instant signedInAt,
+                UUID locationId,
+                SseEmitter emitter
+        ) {
             this.principal = principal;
+            this.subject = subject;
+            this.signedInAt = signedInAt;
             this.locationId = locationId;
             delivery = new SseConnection(emitter, () -> connections.remove(emitter), executor);
             refresh = new CoalescingWorker(executor, () -> {
                 try {
-                    var queue = orders.listOrders(principal, locationId, null);
-                    delivery.send(SseEmitter.event().name("order-queue")
-                            .data(queue.stream().map(OrderResponse::from).toList()), false);
+                    push();
                 } catch (RuntimeException exception) {
                     delivery.close();
                 }
                 return false;
             });
         }
+
+        // Re-checks the session cutoff too, so a revoked session cannot keep a stream open.
+        private synchronized void push() {
+            authentication.authenticate(subject, signedInAt);
+            var queue = orders.listOrders(principal, locationId, null);
+            delivery.send(SseEmitter.event().name("order-queue")
+                    .data(queue.stream().map(OrderResponse::from).toList()), false);
+        }
     }
 
-    public SseEmitter subscribe(StaffPrincipal principal, UUID locationId) {
-        // Fail unauthorized requests synchronously, then query after registration to avoid missing a commit.
-        orders.listOrders(principal, locationId, null);
+    public SseEmitter subscribe(StaffPrincipal principal, String subject, Instant signedInAt, UUID locationId) {
+        // Register before the first query to avoid missing a commit; unauthorized requests fail synchronously.
         var emitter = emitterFactory.apply(Duration.ofMinutes(30).toMillis());
-        var connection = new Connection(principal, locationId, emitter);
+        var connection = new Connection(principal, subject, signedInAt, locationId, emitter);
         connections.put(emitter, connection);
-        connection.refresh.wake();
+        try {
+            connection.push();
+        } catch (RuntimeException exception) {
+            connections.remove(emitter);
+            throw exception;
+        }
         return emitter;
     }
 

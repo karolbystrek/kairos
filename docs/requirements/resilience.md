@@ -11,11 +11,14 @@
 * Concurrent commands for the same order are serialized before validating and persisting a transition, preventing stale state decisions without duplicating an application-managed version value.
 * Order transitions, required outbox events and anonymous measurement inputs are committed atomically. Analytics merge/consumption is retry-safe and independent of retained orders; see [anonymous order analytics](order-analytics.md).
 * SSE or Redis event loss does not prevent later REST recovery.
+* The API shuts down gracefully within 20 seconds (the production stop grace period is 25 seconds). Redis commands time out after 500 ms; the database pool holds 20 connections and the scheduler 4 threads.
 * Redis unavailability must not corrupt PostgreSQL state; event delivery may be delayed and recovered according to operational policy.
 * A webhook delivery is stored as success or a terminal dead-letter result. Timeouts, network errors, `429` and `5xx` responses are retried with backoff of 30 seconds, 2 minutes, 10 minutes and 30 minutes, for at most five attempts in total, then dead-lettered; other `4xx` responses, blocked destinations and signing failures dead-letter at once. v1 has no `Retry-After` handling.
 * Crash recovery may repeat an uncertain webhook attempt, and repeated external client commands are handled safely where an integration can legitimately retry.
 * Customer-push fan-out and delivery failure cannot roll back a committed order
   transition or block webhook fan-out.
+* A webhook or customer-push fan-out that fails is rolled back, counted on the outbox event with its last error, and
+  retried on later cycles; after five failures that fan-out is marked done (the error stays recorded) so it cannot block later events.
 * Customer-push delivery has a ten-minute freshness deadline and at most eight
   attempts. Transient network failures, `408`, `425`, `429`, and `5xx` use full
   jitter with a five-second exponential base capped at two minutes and honor a

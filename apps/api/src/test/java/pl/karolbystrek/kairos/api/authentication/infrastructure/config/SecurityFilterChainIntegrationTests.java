@@ -3,6 +3,7 @@ package pl.karolbystrek.kairos.api.authentication.infrastructure.config;
 import jakarta.servlet.DispatcherType;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
@@ -38,6 +39,17 @@ class SecurityFilterChainIntegrationTests extends RedisListenerIsolatedIntegrati
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Value("${server.servlet.context-path}")
+    private String contextPath;
+
+    @Test
+    void servesControllersAndTheActuatorUnderTheConfiguredApiContextPath() throws Exception {
+        assertThat(contextPath).isEqualTo(API_CONTEXT_PATH);
+        mockMvc.perform(apiGet("/auth/v1/csrf").secure(true)).andExpect(status().isOk());
+        // The health status itself depends on which backing services this context reaches; it must be served and reported.
+        mockMvc.perform(apiGet("/actuator/health").secure(true)).andExpect(jsonPath("$.status").exists());
+    }
 
     @Test
     void bootstrapsAHostOnlyCsrfCookieAndMatchingTokenAnonymously() throws Exception {

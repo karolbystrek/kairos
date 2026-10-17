@@ -1,13 +1,10 @@
 package pl.karolbystrek.kairos.api.authentication.application;
 
 import org.springframework.stereotype.Component;
+import pl.karolbystrek.kairos.api.util.Hashing;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.Base64;
-import java.util.HexFormat;
 
 @Component
 public class OneTimeBearerTokenService {
@@ -24,14 +21,7 @@ public class OneTimeBearerTokenService {
     }
 
     public String hash(String token) {
-        try {
-            var digest = MessageDigest.getInstance("SHA-256")
-                .digest(token.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(digest);
-        }
-        catch (NoSuchAlgorithmException exception) {
-            throw new IllegalStateException("SHA-256 is unavailable", exception);
-        }
+        return Hashing.sha256Hex(token);
     }
 
     public record GeneratedToken(String value, String hash) {

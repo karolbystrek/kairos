@@ -41,6 +41,7 @@ public class RegistrationVerificationService {
     private final JdbcTemplate database;
     private final DatabaseAccessContext access;
     private final PlatformTransactionManager transactions;
+    private final CodeGuessLimiter guesses;
     private final Clock clock;
     private Semaphore nestedFlows;
     @Value("${kairos.authentication.email-verification-enabled:true}")
@@ -131,6 +132,7 @@ public class RegistrationVerificationService {
     }
 
     public StaffPrincipal verify(Pending pending, String code) {
+        guesses.requireNotLocked("registration", pending.email());
         var result = nested(() -> new TransactionTemplate(transactions).execute(status -> {
             lockEmail(pending.email());
             if (!identities.exists(pending.subject())) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
@@ -163,7 +165,11 @@ public class RegistrationVerificationService {
             database.update("DELETE FROM pending_registrations WHERE subject=?", pending.subject());
             return new Completion(principal, null);
         }));
-        if (result.error() != null) throw result.error();
+        if (result.error() != null) {
+            guesses.recordFailure("registration", pending.email());
+            throw result.error();
+        }
+        guesses.clear("registration", pending.email());
         return result.principal();
     }
 

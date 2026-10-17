@@ -36,7 +36,8 @@ const webhookSubscriptionsSchema = z.array(webhookSubscriptionSchema);
 const webhookSubscriptionInputSchema = z.object({
   name: managedIntegrationNameSchema,
   destinationUrl: z
-    .url("Podaj poprawny adres URL odbiorcy.")
+    // The API's destination policy decides HTTPS-only; local development allows HTTP.
+    .url({ protocol: /^https?$/, error: "Podaj poprawny adres URL odbiorcy." })
     .max(2048, "Adres URL odbiorcy może mieć maksymalnie 2048 znaków."),
   locationIds: z.array(z.uuid()).min(1, "Wybierz co najmniej jeden lokal."),
   eventTypes: z

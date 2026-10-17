@@ -390,10 +390,6 @@ async function synchronizeGrantedSubscription(): Promise<void> {
     configuration.applicationServerKey,
   );
 
-  await navigator.serviceWorker.register("/sw.js", {
-    scope: "/",
-    updateViaCache: "none",
-  });
   const registration = await navigator.serviceWorker.ready;
   let subscription = await registration.pushManager.getSubscription();
   let replacedSubscription: SerializedPushSubscription | null = null;
@@ -416,7 +412,8 @@ async function synchronizeGrantedSubscription(): Promise<void> {
   const previousSubscription =
     metadata.pendingSubscriptionReplacement?.previous ?? replacedSubscription;
 
-  if (previousSubscription) {
+  // The API refuses a new subscription that tracks nothing; old enrollments retire with their orders.
+  if (previousSubscription && trackingReferences.length > 0) {
     await updateNotificationMetadata({
       pendingSubscriptionReplacement: {
         previous: previousSubscription,
@@ -429,7 +426,9 @@ async function synchronizeGrantedSubscription(): Promise<void> {
       trackingReferences,
     );
   }
-  await reconcilePushSubscription(serialized, trackingReferences);
+  if (trackingReferences.length > 0) {
+    await reconcilePushSubscription(serialized, trackingReferences);
+  }
 
   await updateNotificationMetadata({
     notificationsEnabled: true,

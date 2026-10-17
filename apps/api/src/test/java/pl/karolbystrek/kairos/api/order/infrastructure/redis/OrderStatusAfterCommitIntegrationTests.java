@@ -95,7 +95,7 @@ class OrderStatusAfterCommitIntegrationTests {
                 StringRedisTemplate redisTemplate,
                 ObjectMapper objectMapper
         ) {
-            return new OrderStatusRedisPublisher(redisTemplate, objectMapper);
+            return new OrderStatusRedisPublisher(redisTemplate, objectMapper, Runnable::run);
         }
 
         @Bean

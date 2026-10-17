@@ -5,13 +5,11 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import pl.karolbystrek.kairos.api.integration.testsupport.IntegrationTestFixture;
 import pl.karolbystrek.kairos.api.integration.testsupport.MutableTestClock;
-import pl.karolbystrek.kairos.api.integration.testsupport.MutableTestClockConfiguration;
 import pl.karolbystrek.kairos.api.order.application.OrderService;
 import pl.karolbystrek.kairos.api.order.domain.InvalidOrderTransitionException;
 import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
@@ -28,7 +26,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
-@Import(MutableTestClockConfiguration.class)
 class RetentionPurgeIntegrationTests extends RedisListenerIsolatedIntegrationTest {
 
     private static final Instant ARCHIVED_AT = Instant.parse("2026-07-26T12:00:00Z");

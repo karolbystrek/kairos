@@ -11,18 +11,21 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
+import pl.karolbystrek.kairos.api.authentication.application.AuthenticationSessionService;
 import pl.karolbystrek.kairos.api.order.api.model.CreateOrderRequest;
 import pl.karolbystrek.kairos.api.order.api.model.OrderResponse;
 import pl.karolbystrek.kairos.api.order.api.model.UpdateOrderStatusRequest;
 import pl.karolbystrek.kairos.api.order.application.OrderService;
 import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -36,8 +39,10 @@ class OrderController {
 
     @GetMapping(path = "/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     SseEmitter subscribe(@AuthenticationPrincipal StaffPrincipal principal,
-                         @RequestParam(required = false) UUID locationId) {
-        return emitterRegistry.subscribe(principal, locationId);
+                         @RequestParam(required = false) UUID locationId,
+                         @RequestAttribute(AuthenticationSessionService.IDENTITY) String subject,
+                         @RequestAttribute(AuthenticationSessionService.SIGNED_IN_AT) Instant signedInAt) {
+        return emitterRegistry.subscribe(principal, subject, signedInAt, locationId);
     }
 
     @GetMapping

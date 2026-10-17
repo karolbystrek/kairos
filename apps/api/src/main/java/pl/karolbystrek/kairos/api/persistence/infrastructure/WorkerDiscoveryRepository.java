@@ -29,6 +29,17 @@ public class WorkerDiscoveryRepository {
                 .getSingleResult();
     }
 
+    // Counts a failed fan-out so the event is skipped after repeated failures instead of blocking the queue.
+    public void recordFanoutFailure(UUID eventId, WorkerOperation operation, Instant now, String error) {
+        entityManager.createNativeQuery(
+                        "SELECT public.record_outbox_fanout_failure(:event, :kind, :now, :error)", Boolean.class)
+                .setParameter("event", eventId)
+                .setParameter("kind", operation.name())
+                .setParameter("now", now)
+                .setParameter("error", error)
+                .getSingleResult();
+    }
+
     public UUID nextWebhookFanout() {
         return (UUID) entityManager.createNativeQuery("SELECT public.next_webhook_fanout()", UUID.class)
                 .getSingleResult();

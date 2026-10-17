@@ -34,6 +34,15 @@ export function OneTimeSecret({
     return () => window.clearTimeout(timeout);
   }, [copyStatus]);
 
+  // The secret is never shown again, so warn before a reload or tab close loses it.
+  useEffect(() => {
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
+
+    window.addEventListener("beforeunload", warn);
+
+    return () => window.removeEventListener("beforeunload", warn);
+  }, []);
+
   async function copySecret() {
     try {
       await navigator.clipboard.writeText(secret.value);

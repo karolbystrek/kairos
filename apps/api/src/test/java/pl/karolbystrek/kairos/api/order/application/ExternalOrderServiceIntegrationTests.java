@@ -4,7 +4,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -17,7 +16,6 @@ import pl.karolbystrek.kairos.api.integration.application.model.ExternalIntegrat
 import pl.karolbystrek.kairos.api.integration.application.model.IssuedApiKeyView;
 import pl.karolbystrek.kairos.api.integration.testsupport.IntegrationTestFixture;
 import pl.karolbystrek.kairos.api.integration.testsupport.MutableTestClock;
-import pl.karolbystrek.kairos.api.integration.testsupport.MutableTestClockConfiguration;
 import pl.karolbystrek.kairos.api.menu.application.MenuService;
 import pl.karolbystrek.kairos.api.menu.application.model.MenuView;
 import pl.karolbystrek.kairos.api.order.application.exception.ExternalOrderConflictException;
@@ -40,7 +38,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
-@Import(MutableTestClockConfiguration.class)
 class ExternalOrderServiceIntegrationTests extends RedisListenerIsolatedIntegrationTest {
 
     @Autowired

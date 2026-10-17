@@ -4,21 +4,23 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Component;
 import pl.karolbystrek.kairos.api.authentication.application.exception.SignInThrottledException;
+import pl.karolbystrek.kairos.api.util.Hashing;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
-import java.util.HexFormat;
 import java.util.List;
 
-/** Per-account cap on failed staff sign-ins, shared by every API instance through Redis. */
+/**
+ * Caps failed staff sign-ins per (email, client address), so a stranger cannot lock an account out from elsewhere,
+ * plus a higher per-email ceiling against distributed guessing. Shared by every API instance through Redis.
+ */
 @Slf4j
 @Component
 public class SignInThrottle {
+    private static final String PREFIX = "kairos:sign-in-failures:";
     // INCR and EXPIRE in one script, so a counter can never be left without its expiry.
     private static final RedisScript<Long> INCREMENT = RedisScript.of("""
             local count = redis.call('INCR', KEYS[1])
@@ -28,47 +30,67 @@ public class SignInThrottle {
 
     private final StringRedisTemplate redis;
     private final int maximumFailures;
+    private final int maximumFailuresPerEmail;
     private final Duration window;
 
     public SignInThrottle(
             StringRedisTemplate redis,
             @Value("${kairos.authentication.sign-in-throttle.maximum-failures:10}") int maximumFailures,
+            @Value("${kairos.authentication.sign-in-throttle.maximum-failures-per-email:100}") int maximumFailuresPerEmail,
             @Value("${kairos.authentication.sign-in-throttle.window:15m}") Duration window
     ) {
         this.redis = redis;
         this.maximumFailures = maximumFailures;
+        this.maximumFailuresPerEmail = maximumFailuresPerEmail;
         this.window = window;
     }
 
-    /** Refuses the attempt before any password check while the account has used up its failures. */
-    public void requireNotThrottled(String email) {
-        String count;
+    /** Refuses the attempt before any password check while this client or the account has used up its failures. */
+    public void requireNotThrottled(String email, String clientAddress) {
         try {
-            count = redis.opsForValue().get(key(email));
+            if (exceeds(redis.opsForValue().get(clientKey(email, clientAddress)), maximumFailures)
+                    || exceeds(redis.opsForValue().get(emailKey(email)), maximumFailuresPerEmail)) {
+                throw new SignInThrottledException();
+            }
         } catch (DataAccessException exception) {
             // shortcut: fails open so a Redis outage does not lock staff out; the per-IP nginx limit still applies.
             log.warn("Sign-in throttle unavailable", exception);
-            return;
-        }
-        if (count != null && Long.parseLong(count) >= maximumFailures) {
-            throw new SignInThrottledException();
         }
     }
 
-    public void recordFailure(String email) {
+    public void recordFailure(String email, String clientAddress) {
         try {
-            redis.execute(INCREMENT, List.of(key(email)), String.valueOf(window.toSeconds()));
+            var seconds = String.valueOf(window.toSeconds());
+            redis.execute(INCREMENT, List.of(clientKey(email, clientAddress)), seconds);
+            redis.execute(INCREMENT, List.of(emailKey(email)), seconds);
         } catch (DataAccessException exception) {
             log.warn("Sign-in throttle unavailable", exception);
         }
     }
 
-    private static String key(String normalizedEmail) {
-        try {
-            var digest = MessageDigest.getInstance("SHA-256").digest(normalizedEmail.getBytes(StandardCharsets.UTF_8));
-            return "kairos:sign-in-failures:" + HexFormat.of().formatHex(digest);
-        } catch (NoSuchAlgorithmException exception) {
-            throw new IllegalStateException("SHA-256 is unavailable", exception);
+    /** Forgets every failure of the email, for example after the owner proved control by resetting the password. */
+    public void clear(String email) {
+        try (var keys = redis.scan(ScanOptions.scanOptions().match(emailPrefix(email) + "*").build())) {
+            var found = keys.stream().toList();
+            if (!found.isEmpty()) redis.delete(found);
+        } catch (DataAccessException exception) {
+            log.warn("Sign-in throttle unavailable", exception);
         }
+    }
+
+    private static boolean exceeds(String count, int maximum) {
+        return count != null && Long.parseLong(count) >= maximum;
+    }
+
+    private static String emailPrefix(String normalizedEmail) {
+        return PREFIX + Hashing.sha256Hex(normalizedEmail) + ":";
+    }
+
+    private static String emailKey(String normalizedEmail) {
+        return emailPrefix(normalizedEmail) + "total";
+    }
+
+    private static String clientKey(String normalizedEmail, String clientAddress) {
+        return emailPrefix(normalizedEmail) + "client:" + clientAddress;
     }
 }

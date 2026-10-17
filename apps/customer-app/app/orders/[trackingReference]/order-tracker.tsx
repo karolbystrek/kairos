@@ -56,32 +56,31 @@ function isActive(order: CustomerOrder | undefined): boolean {
   return isActiveOrderStatus(order?.status);
 }
 
+const reconnectDelays = { initial: 2_000, maximum: 30_000, attempts: 10 };
+
 function useOrderEventStream({
   enabled,
   trackingReference,
   applyOrder,
+  refetch,
   setConnected,
 }: {
   enabled: boolean;
   trackingReference: string;
   applyOrder: (order: CustomerOrder) => void;
+  refetch: () => void;
   setConnected: (connected: boolean) => void;
 }) {
   useSWRSubscription(
     enabled ? (["tracked-order-events", trackingReference] as const) : null,
     ([, reference]) => {
-      const eventSource = new EventSource(
-        apiUrl(
-          `/api/tracked-orders/v1/${encodeURIComponent(reference)}/events`,
-        ),
+      const url = apiUrl(
+        `/api/tracked-orders/v1/${encodeURIComponent(reference)}/events`,
       );
-
-      eventSource.onopen = () => {
-        setConnected(true);
-      };
-      eventSource.onerror = () => {
-        setConnected(false);
-      };
+      let eventSource: EventSource;
+      let timer: number | undefined;
+      let delay = reconnectDelays.initial;
+      let attempts = 0;
       const statusChanged = (event: MessageEvent<string>) => {
         try {
           const parsed = orderStatusChangedEventSchema.safeParse(
@@ -95,10 +94,32 @@ function useOrderEventStream({
           // Malformed stream data must not enter the customer state.
         }
       };
+      const connect = () => {
+        eventSource = new EventSource(url);
+        eventSource.onopen = () => {
+          delay = reconnectDelays.initial;
+          attempts = 0;
+          setConnected(true);
+          // The stream carries only changes, so catch up on any made before it opened.
+          refetch();
+        };
+        eventSource.onerror = () => {
+          setConnected(false);
+          // A closed source (HTTP error) never retries by itself.
+          if (eventSource.readyState !== EventSource.CLOSED) return;
+          eventSource.close();
+          // Persistent refusals (404, 429) leave the order to the polling fallback.
+          if (++attempts > reconnectDelays.attempts) return;
+          timer = window.setTimeout(connect, delay);
+          delay = Math.min(delay * 2, reconnectDelays.maximum);
+        };
+        eventSource.addEventListener("order-status-changed", statusChanged);
+      };
 
-      eventSource.addEventListener("order-status-changed", statusChanged);
+      connect();
 
       return () => {
+        window.clearTimeout(timer);
         eventSource.removeEventListener("order-status-changed", statusChanged);
         eventSource.close();
       };
@@ -234,6 +255,7 @@ export function OrderTracker({
         { revalidate: false },
       );
     },
+    refetch: () => void mutate(),
     setConnected: setIsStreamConnected,
   });
 
