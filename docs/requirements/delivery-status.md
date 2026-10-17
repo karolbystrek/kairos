@@ -6,7 +6,8 @@ The current walking vertical slice is implemented for local development:
 
 * persisted labeled-order creation and controlled transitions;
 * public restaurant-owner landing page at the panel application's `/`,
-  with direct registration/sign-in actions and secondary creator contact,
+  with plain-language copy, an in-browser order demo, direct
+  registration/sign-in actions and secondary creator contact,
   plus session-aware navigation to `/dashboard` and `/login`;
 * authenticated, tenant- and location-authorized staff operations;
 * API-owned email/password authentication with PostgreSQL-stored hashes, email-verified

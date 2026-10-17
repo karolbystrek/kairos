@@ -16,6 +16,7 @@
 @import "@heroui/styles/components/description.css" layer(components);
 @import "@heroui/styles/components/field-error.css" layer(components);
 @import "@heroui/styles/components/label.css" layer(components);
+@import "@heroui/styles/components/accordion.css" layer(components);
 @import "@heroui/styles/components/link.css" layer(components);
 @import "@heroui/styles/components/tabs.css" layer(components);
 @import "@heroui/styles/components/button.css" layer(components);
@@ -303,22 +304,394 @@ body {
 	padding-block: 0;
 }
 
-.panel-page:has(.welcome-page) {
+.panel-page:has(.landing-page) {
 	padding-block: 0;
 }
 
-.welcome-title {
-	font-size: var(--type-display);
-	font-weight: 650;
+/* Public landing page */
+.landing-page {
+	--landing-width: 67.5rem;
+	display: flex;
+	flex-direction: column;
+}
+
+.landing-container {
+	width: 100%;
+	max-width: var(--landing-width);
+	margin-inline: auto;
+}
+
+.landing-page section[id] {
+	scroll-margin-top: 4.5rem;
+}
+
+.landing-header {
+	position: sticky;
+	top: 0;
+	z-index: 20;
+	background: color-mix(in srgb, var(--background) 82%, transparent);
+	-webkit-backdrop-filter: saturate(180%) blur(20px);
+	backdrop-filter: saturate(180%) blur(20px);
+	border-bottom: 1px solid var(--separator);
+}
+
+.landing-nav-link {
+	min-height: var(--control-touch);
+	padding-inline: var(--space-2);
+	color: var(--text-secondary);
+	font-size: var(--type-caption);
+	text-decoration: none;
+}
+
+.landing-hero {
+	padding: 5.5rem 0 var(--space-8);
+	text-align: center;
+}
+
+.landing-title {
+	max-width: 14ch;
+	margin-inline: auto;
+	font-size: clamp(2.5rem, 7vw, 4.75rem);
+	font-weight: 700;
 	letter-spacing: -0.04em;
-	line-height: 1.2;
+	line-height: 1.04;
 	text-wrap: balance;
 }
 
-.welcome-page .button {
+.landing-lead {
+	max-width: 40ch;
+	margin: var(--space-6) auto 0;
+	color: var(--text-secondary);
+	font-size: clamp(1.125rem, 2.2vw, 1.375rem);
+	line-height: 1.45;
+}
+
+.landing-actions {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: var(--space-4);
+	margin-top: var(--space-8);
+}
+
+.landing-action.button {
 	height: auto;
 	min-height: var(--control-touch);
 	padding-block: var(--space-3);
+}
+
+.landing-eyebrow {
+	margin-bottom: var(--space-2);
+	font-size: var(--type-caption);
+	font-weight: 600;
+}
+
+.landing-demo .landing-eyebrow {
+	color: var(--text-secondary);
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+
+.landing-heading {
+	max-width: 18ch;
+	font-size: clamp(2rem, 4.5vw, 3.25rem);
+	font-weight: 700;
+	letter-spacing: -0.03em;
+	line-height: 1.08;
+	text-wrap: balance;
+}
+
+.landing-section {
+	padding-top: 7rem;
+}
+
+.landing-steps {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: var(--space-4);
+	margin-top: var(--space-12);
+}
+
+.landing-step {
+	padding: var(--space-8);
+	background: var(--surface-secondary);
+	border-radius: 1.75rem;
+}
+
+.landing-step-number {
+	display: grid;
+	place-items: center;
+	width: var(--control-regular);
+	height: var(--control-regular);
+	margin-bottom: var(--space-6);
+	border-radius: 999px;
+	background: var(--accent);
+	color: var(--accent-foreground);
+	font-weight: 700;
+}
+
+.landing-benefits {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: var(--space-4);
+	margin-top: var(--space-12);
+}
+
+.landing-benefit-group {
+	padding: 2.25rem;
+	border: 1px solid var(--separator);
+	border-radius: 1.75rem;
+}
+
+.landing-faq {
+	max-width: 47.5rem;
+	margin-top: var(--space-8);
+}
+
+.landing-cta {
+	padding: 7.5rem 0;
+	text-align: center;
+}
+
+.landing-footer {
+	padding-block: var(--space-6);
+	border-top: 1px solid var(--separator);
+}
+
+/* Landing demo: a simulated staff queue and guest phone, entirely in the browser. */
+.landing-demo-stage {
+	padding: var(--space-12);
+	background: var(--surface-secondary);
+	border-radius: 2.25rem;
+}
+
+.landing-demo {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--space-8);
+}
+
+.landing-demo-panel {
+	flex: 1 1 21rem;
+	min-width: 0;
+	min-height: 26rem;
+	padding: var(--space-6);
+	background: var(--background);
+	border: 1px solid var(--separator);
+	border-radius: 1rem;
+	container-type: inline-size;
+}
+
+.landing-demo-order {
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr) auto;
+	align-items: center;
+	gap: var(--space-4);
+	margin-top: var(--space-4);
+	padding: var(--space-3);
+	background: var(--surface-secondary);
+	border-radius: var(--radius-medium);
+}
+
+.landing-demo-order-number {
+	font-size: 1.75rem;
+	font-weight: 700;
+	line-height: 1;
+	font-variant-numeric: tabular-nums;
+}
+
+.landing-demo-order-actions {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	gap: var(--space-2);
+}
+
+@container (max-width: 27.5rem) {
+	.landing-demo-order {
+		grid-template-columns: auto minmax(0, 1fr);
+	}
+
+	.landing-demo-order-actions {
+		grid-column: 1 / -1;
+	}
+
+	.landing-demo-order-actions .button {
+		flex: 1;
+	}
+}
+
+.landing-demo-qr {
+	display: grid;
+	place-items: center;
+	width: 3.5rem;
+	height: 3.5rem;
+	overflow: hidden;
+	background: var(--white);
+	border-radius: var(--radius-small);
+}
+
+.landing-phone {
+	flex: none;
+	width: 17.5rem;
+	height: 35.5rem;
+	margin-inline: auto;
+	padding: var(--space-3);
+	background: var(--black);
+	border-radius: 3rem;
+	/* The ring keeps the black frame visible on the dark page. */
+	box-shadow: 0 0 0 1px var(--separator), var(--shadow-floating);
+}
+
+.landing-phone-screen {
+	position: relative;
+	height: 100%;
+	overflow: hidden;
+	background: var(--background);
+	border-radius: 2.3rem;
+	color: var(--foreground);
+	transition: background-color var(--interaction-duration) var(--interaction-easing);
+}
+
+.landing-phone-island {
+	position: absolute;
+	top: 0.625rem;
+	left: 50%;
+	z-index: 3;
+	width: 5.25rem;
+	height: 1.5rem;
+	background: var(--black);
+	border-radius: 999px;
+	transform: translateX(-50%);
+}
+
+.landing-phone-app {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	padding: 2.75rem var(--space-3) var(--space-4);
+}
+
+/* The phone keeps its own theme; mirror the customer app's toggle on its scope. */
+.landing-phone-theme {
+	--toggle-button-bg: var(--surface-secondary);
+	--toggle-button-bg-hover: var(--surface-secondary);
+	--toggle-button-bg-pressed: var(--surface-secondary);
+	--toggle-button-bg-selected: var(--accent-soft);
+	--toggle-button-bg-selected-hover: var(--accent-soft);
+	--toggle-button-bg-selected-pressed: var(--accent-soft);
+	--toggle-button-fg-selected: var(--accent-soft-foreground);
+}
+
+.landing-phone-scan.button {
+	flex-direction: column;
+	gap: var(--space-4);
+	width: 12.25rem;
+	height: 12.25rem;
+	background: transparent;
+	color: var(--foreground);
+}
+
+.landing-phone-scan.button > svg {
+	width: 6.5rem;
+	height: 6.5rem;
+	margin: 0;
+}
+
+.landing-phone-scan-label {
+	font-size: 1.25rem;
+	font-weight: 620;
+	letter-spacing: -0.02em;
+	line-height: 1.15;
+}
+
+.landing-phone-camera {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: var(--space-3);
+	margin: -2.75rem calc(-1 * var(--space-3)) calc(-1 * var(--space-4));
+	background: var(--black);
+	color: var(--white);
+	font-size: var(--type-caption);
+}
+
+.landing-phone-order-number {
+	font-size: 3.5rem;
+	font-weight: 650;
+	letter-spacing: -0.035em;
+	line-height: 1.15;
+	font-variant-numeric: tabular-nums;
+}
+
+.landing-phone-status {
+	max-width: 12ch;
+	font-size: 1.5rem;
+	font-weight: 600;
+	letter-spacing: -0.025em;
+	line-height: 1.25;
+}
+
+.landing-phone-notifications {
+	position: absolute;
+	top: 2.875rem;
+	right: var(--space-2);
+	left: var(--space-2);
+	z-index: 2;
+}
+
+.landing-phone-notification {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--space-3);
+	padding: var(--space-3);
+	background: color-mix(in srgb, var(--surface-secondary) 92%, transparent);
+	-webkit-backdrop-filter: blur(12px);
+	backdrop-filter: blur(12px);
+	border-radius: 1.125rem;
+	box-shadow: var(--shadow-floating);
+	line-height: 1.35;
+	animation: landing-notification-in 400ms var(--interaction-release-easing);
+}
+
+@keyframes landing-notification-in {
+	from {
+		opacity: 0;
+		transform: translateY(-1.5rem);
+	}
+}
+
+@media (max-width: 47.999rem) {
+	.landing-hero {
+		padding-top: var(--space-12);
+	}
+
+	.landing-section {
+		padding-top: 5rem;
+	}
+
+	.landing-steps,
+	.landing-benefits {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.landing-benefit-group {
+		padding: var(--space-6);
+	}
+
+	.landing-demo-stage {
+		margin-inline: calc(-1 * var(--space-2));
+		padding: var(--space-6) var(--space-4);
+		border-radius: 1.5rem;
+	}
+
+	.landing-demo-panel {
+		min-height: 0;
+		flex-basis: 100%;
+	}
 }
 
 .auth-form-layout {
