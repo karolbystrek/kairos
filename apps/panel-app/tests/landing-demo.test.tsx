@@ -1,11 +1,14 @@
-import { fireEvent, screen, within } from "@testing-library/react";
-import { expect, it } from "vitest";
+import { act, fireEvent, screen, within } from "@testing-library/react";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 import { renderWithSWR, stubFetch } from "./helpers";
 
 import { LandingDemo } from "@/components/landing-demo";
 
-it("runs one order from the queue to the guest's phone without calling the API", async () => {
+beforeEach(() => vi.useFakeTimers());
+afterEach(() => vi.useRealTimers());
+
+it("runs one order from the queue to the guest's phone without calling the API", () => {
   const calls = stubFetch(() => new Response(null, { status: 500 }));
 
   renderWithSWR(<LandingDemo />);
@@ -18,7 +21,8 @@ it("runs one order from the queue to the guest's phone without calling the API",
   expect(add.hasAttribute("disabled")).toBe(true);
 
   fireEvent.click(phone.getByRole("button", { name: "Zeskanuj kod QR" }));
-  await phone.findByText("Przygotowujemy Twoje zamówienie", {}, { timeout: 2000 });
+  act(() => vi.advanceTimersByTime(1100));
+  phone.getByText("Przygotowujemy Twoje zamówienie");
 
   fireEvent.click(panel.getByRole("button", { name: "Gotowe" }));
   phone.getByText("Gotowe do odbioru");
@@ -26,7 +30,8 @@ it("runs one order from the queue to the guest's phone without calling the API",
 
   fireEvent.click(panel.getByRole("button", { name: "Odebrane" }));
   // A completed order leaves the queue, freeing it for the next demo order.
-  await panel.findByText(/Brak zamówień/, {}, { timeout: 2500 });
+  act(() => vi.advanceTimersByTime(1500));
+  panel.getByText(/Brak zamówień/);
   expect(add.hasAttribute("disabled")).toBe(false);
 
   fireEvent.click(phone.getByRole("button", { name: "Zamknij zamówienie" }));

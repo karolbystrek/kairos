@@ -48,7 +48,8 @@ class StaffOrderSseEmitterRegistryTests {
         when(orders.listOrdersForRefresh(eq(principal), eq(location), anyMap())).thenReturn(List.of());
         registry.subscribe(principal, "staff", signedInAt, location);
         verify(emitter).send(any(SseEmitter.SseEventBuilder.class));
-        verify(orders, times(1)).listOrdersForRefresh(eq(principal), eq(location), anyMap());
+        // One synchronous access check, then the refresh worker's snapshot.
+        verify(orders, times(2)).listOrdersForRefresh(eq(principal), eq(location), anyMap());
         clearInvocations(orders, emitter);
 
         registry.forward(event(UUID.randomUUID(), location));
@@ -83,6 +84,18 @@ class StaffOrderSseEmitterRegistryTests {
         registry.refresh();
 
         verify(emitter).complete();
+    }
+
+    @Test
+    void authenticatesEachSessionOncePerCycle() {
+        when(orders.listOrdersForRefresh(eq(principal), isNull(), anyMap())).thenReturn(List.of());
+        registry.subscribe(principal, "staff", signedInAt, null);
+        registry.subscribe(principal, "staff", signedInAt, null);
+        clearInvocations(authentication);
+
+        registry.refresh();
+
+        verify(authentication, times(1)).authenticate("staff", signedInAt);
     }
 
     @Test

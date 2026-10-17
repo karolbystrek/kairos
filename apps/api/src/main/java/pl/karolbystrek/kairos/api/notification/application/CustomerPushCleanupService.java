@@ -32,7 +32,8 @@ public class CustomerPushCleanupService {
         transactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         var now = clock.instant();
         var count = 0;
-        for (var index = 0; index < properties.worker().batchSize(); index++) {
+        // Drains everything due in one cycle; each row commits on its own.
+        while (true) {
             var processed = transactionTemplate.execute(status -> {
                 var id = workerDiscoveryRepository.nextExpiredPushSubscription(now);
                 if (id == null) {
@@ -50,7 +51,7 @@ public class CustomerPushCleanupService {
             }
             count++;
         }
-        for (var index = 0; index < properties.worker().batchSize(); index++) {
+        while (true) {
             var processed = transactionTemplate.execute(status -> {
                 var id = workerDiscoveryRepository.nextTerminalPushDelivery(
                         now.minus(properties.delivery().successfulRetention()),

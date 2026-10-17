@@ -15,7 +15,6 @@ cp "${test_directory}/secrets/email-encryption.bin" "${test_directory}/expected-
 printf '%s' 'externally-supplied-credential' > "${test_directory}/secrets/external-secret.txt"
 cp "${test_directory}/secrets/external-secret.txt" "${test_directory}/expected-credential"
 cp "${test_directory}/secrets/webhook-encryption.bin" "${test_directory}/expected-webhook"
-mkdir "${test_directory}/secrets/zitadel"
 # Open directory/file descriptors expose replacements even if paths still exist.
 same_inode() {
     python3 - "$1" "$2" <<'CHECK'
@@ -25,17 +24,14 @@ assert (path.st_dev, path.st_ino) == (descriptor.st_dev, descriptor.st_ino), sys
 CHECK
 }
 exec 3< "${test_directory}/secrets"
-exec 4< "${test_directory}/secrets/zitadel"
 exec 5< "${test_directory}/secrets/webhook-encryption.bin"
 sh "${test_directory}/setup.sh" --non-interactive --keep-env --keep-keys --secrets-directory secrets > "${test_directory}/output"
 same_inode "${test_directory}/secrets" 3 || { echo "Setup replaced the secrets directory." >&2; exit 1; }
-same_inode "${test_directory}/secrets/zitadel" 4 || { echo "Setup replaced the ZITADEL credentials directory." >&2; exit 1; }
 same_inode "${test_directory}/secrets/webhook-encryption.bin" 5 || { echo "Setup replaced a reused key." >&2; exit 1; }
 cmp "${test_directory}/expected-email" "${test_directory}/secrets/email-encryption.bin"
 cmp "${test_directory}/expected-webhook" "${test_directory}/secrets/webhook-encryption.bin"
 sh "${test_directory}/setup.sh" --non-interactive --keep-env --replace-keys --secrets-directory secrets > "${test_directory}/output"
 same_inode "${test_directory}/secrets" 3
-same_inode "${test_directory}/secrets/zitadel" 4
 cmp "${test_directory}/expected-credential" "${test_directory}/secrets/external-secret.txt"
 if cmp -s "${test_directory}/expected-webhook" "${test_directory}/secrets/webhook-encryption.bin"; then
     echo "Application key replacement did not replace its keys." >&2
@@ -57,7 +53,12 @@ if PATH="${test_directory}/bin:${PATH}" sh "${test_directory}/setup.sh" --non-in
 fi
 diff -r "${test_directory}/expected-secrets" "${test_directory}/secrets"
 same_inode "${test_directory}/secrets" 3
-same_inode "${test_directory}/secrets/zitadel" 4
+# Bare invocation prints usage and fails instead of prompting.
+if sh "${test_directory}/setup.sh" > "${test_directory}/output" 2>&1 < /dev/null; then
+    echo "Setup ran without a mode." >&2
+    exit 1
+fi
+grep -q '^Usage:' "${test_directory}/output"
 # Presets need no other options: --dev creates .env and secrets/, --prod never writes .env.
 preset_directory="${test_directory}/preset"
 mkdir "${preset_directory}"

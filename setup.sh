@@ -20,7 +20,7 @@ usage() {
     cat <<EOF
 Usage: $0 [--dev | --prod] [OPTIONS]
 
-Without a preset, setup asks about each step.
+Choose --dev or --prod, or pass --non-interactive with explicit options.
 
 Presets (explicit options below still take precedence):
   --dev                          Select and start the Docker development stack
@@ -35,7 +35,7 @@ Options:
   --keep-env                     Preserve an existing .env.
   --replace-keys                 Replace an existing application key set.
   --keep-keys                    Reuse an existing complete, valid key set.
-  --non-interactive              Fail instead of prompting for missing choices.
+  --non-interactive              Run without a preset; every choice must be explicit.
   -h, --help                     Show this help.
 EOF
 }
@@ -103,6 +103,8 @@ while [ "$#" -gt 0 ]; do
     esac
 done
 
+[ -n "${preset}" ] || [ "${non_interactive}" = true ] || { usage >&2; exit 2; }
+
 # Write the directory into .env only when it was chosen now or .env had none; an existing value stays as written.
 write_secrets_directory=false
 [ -z "${secrets_argument}" ] || write_secrets_directory=true
@@ -130,12 +132,10 @@ fi
 
 case "${preset}" in
     dev)
-        non_interactive=true
         : "${environment_action:=keep}"
         : "${key_action:=keep}"
         ;;
     prod)
-        non_interactive=true
         : "${key_action:=keep}"
         if [ "${checkout_mode}" = true ]; then
             : "${environment_action:=keep}"
@@ -179,42 +179,6 @@ cleanup() {
 trap cleanup EXIT HUP INT TERM
 umask 077
 
-prompt_yes_no() {
-    prompt_text="$1"
-    default_answer="$2"
-
-    while :; do
-        if [ "${default_answer}" = yes ]; then
-            printf '%s [Y/n] ' "${prompt_text}"
-        else
-            printf '%s [y/N] ' "${prompt_text}"
-        fi
-
-        if ! IFS= read -r entered_answer; then
-            fail "Input ended before setup received an answer."
-        fi
-
-        normalized_answer="$(printf '%s' "${entered_answer}" | tr '[:upper:]' '[:lower:]')"
-        case "${normalized_answer}" in
-            "")
-                prompt_result="${default_answer}"
-                return
-                ;;
-            y|yes)
-                prompt_result=yes
-                return
-                ;;
-            n|no)
-                prompt_result=no
-                return
-                ;;
-            *)
-                echo "Enter yes or no." >&2
-                ;;
-        esac
-    done
-}
-
 write_environment_file() {
     [ -f "${environment_example}" ] || fail "The selected configuration template is missing: ${environment_example}"
 
@@ -232,17 +196,7 @@ elif [ -e "${environment_file}" ] || [ -L "${environment_file}" ]; then
         fail ".env exists but is not a file."
     fi
 
-    if [ -z "${environment_action}" ]; then
-        if [ "${non_interactive}" = true ]; then
-            fail "An existing .env requires --replace-env or --keep-env in non-interactive mode."
-        fi
-        prompt_yes_no "Replace .env from .env.example?" yes
-        if [ "${prompt_result}" = yes ]; then
-            environment_action=replace
-        else
-            environment_action=keep
-        fi
-    fi
+    [ -n "${environment_action}" ] || fail "An existing .env requires --replace-env or --keep-env in non-interactive mode."
 
     if [ "${environment_action}" = replace ]; then
         write_environment_file
@@ -260,10 +214,11 @@ fi
 
 set_environment_value() {
     temporary_environment_file="$(mktemp "${repository_directory}/.env.tmp.XXXXXX")"
-    awk -v key="$1" -v value="$2" '
-        index($0, key "=") == 1 { if (!written++) print key "=" value; next }
+    # ENVIRON, not -v, so backslashes in the value stay literal.
+    KEY="$1" VALUE="$2" awk '
+        index($0, ENVIRON["KEY"] "=") == 1 { if (!written++) print ENVIRON["KEY"] "=" ENVIRON["VALUE"]; next }
         { print }
-        END { if (!written) print key "=" value }
+        END { if (!written) print ENVIRON["KEY"] "=" ENVIRON["VALUE"] }
     ' "${environment_file}" > "${temporary_environment_file}"
     mv -f "${temporary_environment_file}" "${environment_file}"
     temporary_environment_file=""
@@ -295,19 +250,7 @@ if [ "${checkout_mode}" = true ]; then
     set_environment_value KAIROS_SECRETS_DIRECTORY /run/secrets
 fi
 
-if [ -z "${secrets_argument}" ]; then
-    if [ "${non_interactive}" = true ]; then
-        fail "--secrets-directory is required in non-interactive mode."
-    fi
-
-    printf 'Secrets directory [secrets/]: '
-    if ! IFS= read -r secrets_argument; then
-        fail "Input ended before setup received a secrets directory."
-    fi
-    if [ -z "${secrets_argument}" ]; then
-        secrets_argument="secrets"
-    fi
-fi
+[ -n "${secrets_argument}" ] || fail "--secrets-directory is required in non-interactive mode."
 
 case "${secrets_argument}" in
     /*)
@@ -387,8 +330,8 @@ if [ -d "${secrets_directory}" ]; then
             existing_key_count=$((existing_key_count + 1))
         elif [ -f "${entry}" ] && [ ! -L "${entry}" ]; then
             : # Externally managed files are preserved; setup does not own them.
-        elif [ "${entry_name}" = zitadel ] || [ "${entry_name}" = tls ]; then
-            # Legacy ZITADEL credential and local TLS directories from older setups stay untouched.
+        elif [ "${entry_name}" = tls ]; then
+            # The local TLS directory stays untouched.
             if [ -L "${entry}" ] || [ ! -d "${entry}" ]; then
                 fail "The secrets entry must be a regular directory: ${entry_name}"
             fi
@@ -480,31 +423,13 @@ case "${key_action}" in
                 final_key_action=generate
                 ;;
             valid)
-                if [ "${non_interactive}" = true ]; then
-                    fail "Existing application keys require --replace-keys or --keep-keys in non-interactive mode."
-                fi
-                prompt_yes_no "Replace the existing application key set?" no
-                if [ "${prompt_result}" = yes ]; then
-                    final_key_action=generate
-                else
-                    final_key_action=reuse
-                fi
+                fail "Existing application keys require --replace-keys or --keep-keys in non-interactive mode."
                 ;;
             partial)
-                if [ "${non_interactive}" = true ]; then
-                    fail "A partial application key set requires --replace-keys in non-interactive mode."
-                fi
-                prompt_yes_no "Replace the partial application key set (${existing_key_count} of 5 files)?" no
-                [ "${prompt_result}" = yes ] || fail "Setup stopped without replacing the partial application key set."
-                final_key_action=generate
+                fail "A partial application key set requires --replace-keys in non-interactive mode."
                 ;;
             invalid)
-                if [ "${non_interactive}" = true ]; then
-                    fail "An invalid application key set requires --replace-keys in non-interactive mode."
-                fi
-                prompt_yes_no "Replace the existing invalid application key set?" no
-                [ "${prompt_result}" = yes ] || fail "Setup stopped without replacing the invalid application key set."
-                final_key_action=generate
+                fail "An invalid application key set requires --replace-keys in non-interactive mode."
                 ;;
         esac
         ;;

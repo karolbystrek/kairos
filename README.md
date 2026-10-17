@@ -19,28 +19,13 @@ Install [Docker](https://docs.docker.com/get-docker/) with Compose 2.30 or newer
 ./setup.sh --dev
 ```
 
-This prepares configuration and keys, builds the images, and starts the API,
-both frontends, PostgreSQL and Redis in Docker. Source edits reload the
-applications automatically; no host Node.js or Java installation is needed.
-
-* Customer app: http://localhost:3000
-* Staff panel: http://localhost:3001
-* API: http://localhost:8080/api
-
-The first start builds the images and takes a few minutes. Register your first
-staff account at the panel URL. First login, daily commands, logs, single-service
-rebuilds and Web Push limits are in
+This prepares configuration and keys and starts all five services in Docker with
+hot reload (customer app on http://localhost:3000, panel on http://localhost:3001,
+API on http://localhost:8080/api). First login, daily commands, logs, resetting
+and Web Push limits are in
 [local development](docs/agents/local-development.md). Production from a source
 checkout is described in [production configuration](docs/deployment/CONFIGURATION.md);
 hosted releases use the [production runbook](docs/deployment/RUNBOOK.md).
-
-To delete the Compose containers and volumes and the generated keys, and move
-`.env` aside as `.env.old` (it refuses to run in production mode):
-
-```bash
-./reset.sh
-./setup.sh --dev
-```
 
 ## Hosted VM preparation
 

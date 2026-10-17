@@ -97,6 +97,7 @@ async function handlePush(event: PushEvent): Promise<void> {
   const metadata = await readNotificationMetadata();
 
   if (metadata.notificationsEnabled !== true) {
+    // shortcut: disabled-notification pushes show nothing and Chrome may show its generic notice if frequent, upgrade by having the server stop pushing for disabled orders.
     return;
   }
   let candidate: unknown;
@@ -130,6 +131,7 @@ async function handlePush(event: PushEvent): Promise<void> {
 
   await updateApplicationBadge(transition.activeOrderCount);
   if (!transition.shouldDisplay) {
+    // shortcut: redelivered/stale pushes show nothing and Chrome may show its generic notice if frequent, upgrade by having the server stop pushing for finished orders.
     return;
   }
   await self.registration.showNotification("Kairos", {

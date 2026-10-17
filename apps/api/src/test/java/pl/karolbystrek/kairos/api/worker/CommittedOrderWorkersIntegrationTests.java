@@ -22,9 +22,11 @@ import org.springframework.transaction.support.TransactionTemplate;
 import pl.karolbystrek.kairos.api.integration.webhook.application.WebhookDeliveryClaimService;
 import pl.karolbystrek.kairos.api.integration.webhook.application.WebhookDeliveryProcessor;
 import pl.karolbystrek.kairos.api.integration.webhook.application.WebhookOutboxFanoutService;
+import pl.karolbystrek.kairos.api.integration.webhook.infrastructure.config.WebhookProperties;
 import pl.karolbystrek.kairos.api.notification.application.CustomerPushDeliveryClaimService;
 import pl.karolbystrek.kairos.api.notification.application.CustomerPushDeliveryProcessor;
 import pl.karolbystrek.kairos.api.notification.application.CustomerPushOutboxFanoutService;
+import pl.karolbystrek.kairos.api.notification.infrastructure.config.CustomerNotificationProperties;
 import pl.karolbystrek.kairos.api.order.application.model.OrderStatusChangedEvent;
 import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
 import pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase;
@@ -32,6 +34,7 @@ import pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase;
 import java.time.Instant;
 import java.util.UUID;
 
+import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.after;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.inOrder;
@@ -128,5 +131,15 @@ class CommittedOrderWorkersIntegrationTests {
         @Bean WebhookOutboxFanoutService webhookFanout() { return mock(WebhookOutboxFanoutService.class); }
         @Bean WebhookDeliveryClaimService webhookClaims() { return mock(WebhookDeliveryClaimService.class); }
         @Bean WebhookDeliveryProcessor webhookProcessor() { return mock(WebhookDeliveryProcessor.class); }
+        @Bean WebhookProperties webhookProperties() {
+            var properties = mock(WebhookProperties.class, RETURNS_DEEP_STUBS);
+            when(properties.worker().batchSize()).thenReturn(50);
+            return properties;
+        }
+        @Bean CustomerNotificationProperties pushProperties() {
+            var properties = mock(CustomerNotificationProperties.class, RETURNS_DEEP_STUBS);
+            when(properties.worker().batchSize()).thenReturn(50);
+            return properties;
+        }
     }
 }

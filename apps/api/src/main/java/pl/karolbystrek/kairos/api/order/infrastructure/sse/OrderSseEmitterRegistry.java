@@ -19,6 +19,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Stream;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.Executor;
 import java.util.function.LongFunction;
 
@@ -125,7 +126,9 @@ public class OrderSseEmitterRegistry {
         if (refused[0]) {
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many streams for this order");
         }
-        connection.delivery.send(SseEmitter.event().comment("connected"), false);
+        // A random retry spreads the reconnects of every stream after an API restart.
+        var retry = 3_000 + ThreadLocalRandom.current().nextLong(10_000);
+        connection.delivery.send(SseEmitter.event().reconnectTime(retry).comment("connected"), false);
         return emitter;
     }
 

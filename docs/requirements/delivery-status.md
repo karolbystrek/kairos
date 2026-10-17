@@ -133,8 +133,10 @@ GitHub failed-workflow email delivery remains unverified.
 
 ### Deferred work
 
-Scheduled backups, retention/recovery targets and restore rehearsals are deferred
-until real users or valuable data under the
+Nightly on-host database dumps run with seven-day retention. Launch gate: before
+real users, enable Lightsail automatic snapshots and a disk-usage alarm (AWS
+changes needing explicit approval). Retention/recovery targets and restore
+rehearsals are deferred until real users or valuable data under the
 [operations policy](routing-releases.md#development-operations-policy). Disk-space,
 memory-pressure and public HTTPS availability alerts are also deferred in favor
 of native Lightsail status, CPU and CPU burst-capacity alarms. No custom host

@@ -1,4 +1,4 @@
-export type CameraScanner = {
+type CameraScanner = {
   destroy: () => void;
   stop: () => void;
 };

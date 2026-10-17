@@ -5,6 +5,7 @@ import { z } from "zod";
 import { apiUrl, requestSignal } from "@/src/api/api-url";
 
 const CSRF_HEADER_NAME = "X-XSRF-TOKEN";
+// Keep in sync with apps/panel-app/src/api/api-fetch.ts.
 const CSRF_PROBLEM_TYPES = new Set([
   "urn:kairos:problem:csrf-token-missing",
   "urn:kairos:problem:csrf-token-invalid",

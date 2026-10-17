@@ -61,7 +61,7 @@
   tasks:
     - name: Install Ubuntu host prerequisites
       ansible.builtin.apt:
-        name: [ca-certificates, curl, git, gh, bash, python3, openssl, openssh-server, tar, coreutils, acl]
+        name: [ca-certificates, curl, bash, python3, openssl, openssh-server, tar, coreutils, acl]
         state: present
         update_cache: true
         cache_valid_time: 3600
@@ -218,6 +218,23 @@
         that:
           - "'--wait-timeout' in compose_help.results[0].stdout"
           - "'--no-path-resolution' in compose_help.results[1].stdout"
+      tags: host
+
+    - name: Prepare the private database backup directory
+      ansible.builtin.file:
+        path: "{{ kairos_directory }}/backups"
+        state: directory
+        owner: root
+        group: root
+        mode: '0700'
+      tags: host
+
+    - name: Schedule nightly database dumps with seven-day retention
+      ansible.builtin.copy:
+        dest: /etc/cron.d/kairos-backup
+        mode: '0644'
+        content: |
+          30 3 * * * root umask 077; f={{ kairos_directory }}/backups/kairos-$(date +\%F).dump; docker exec kairos-postgres-1 sh -c 'pg_dump -U "$POSTGRES_USER" -Fc "$POSTGRES_DB"' > "$f.tmp" && mv "$f.tmp" "$f" && find {{ kairos_directory }}/backups -name 'kairos-*' -mtime +7 -delete
       tags: host
 
   handlers:

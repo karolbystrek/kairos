@@ -42,10 +42,10 @@
 
 * An hourly worker erases deleted data after a grace period of 30 days by
   default (`kairos.retention.grace-period`). Each kind is purged in batches of
-  `kairos.retention.batch-size` until a batch comes back short or the cycle
+  `kairos.retention.batch-size` until a batch comes back short or that kind's
   budget (`kairos.retention.cycle-budget`, 60 seconds by default) is spent, so a
-  backlog larger than one batch clears within the cycle and the rest continues
-  the next hour. An archived account is removed with
+  backlog of one kind cannot starve the others and the rest continues the next
+  hour. An archived account is removed with
   its staff identity, assignment and the invitations it issued or redeemed, in
   one transaction.
 * An archived location is removed once no account is assigned to it, together

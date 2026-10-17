@@ -63,13 +63,14 @@ service; existing explicit approval remains valid within its stated scope.
 
 ## Local development
 
-`./setup.sh --dev` prepares configuration and keys and starts all five services
-in Docker with hot reload. `./setup.sh --prod` selects and starts production
-once its configuration and TLS files are ready. Later, `docker compose up
---build -d` starts or rebuilds the selected mode; `docker compose stop` stops it
-and keeps data, and `docker compose logs -f` follows logs. `./reset.sh` deletes
-containers, volumes and keys and moves `.env` aside, refuses to run when
-`COMPOSE_FILE` (in `.env` or exported) selects production, and runs only when the user asks. Details: [local development](docs/agents/local-development.md).
+- `./setup.sh --dev`: first run; prepares config and keys, starts all five
+  services in Docker with hot reload. `--prod` selects production instead.
+- `docker compose up --build -d`: start or rebuild the selected mode.
+- `docker compose stop`: stop and keep data; `docker compose logs -f`: follow logs.
+- `./reset.sh`: delete containers, volumes and keys; refuses production; run only
+  when the user asks.
+
+Details: [local development](docs/agents/local-development.md).
 
 ## Read when relevant
 

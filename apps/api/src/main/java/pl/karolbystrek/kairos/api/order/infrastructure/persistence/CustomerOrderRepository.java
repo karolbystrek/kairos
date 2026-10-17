@@ -57,8 +57,9 @@ public interface CustomerOrderRepository
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<CustomerOrder> findForUpdateById(UUID orderId);
 
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    Optional<CustomerOrder> findForUpdateByTrackingReference(UUID trackingReference);
+    // Scalar read: no managed order is cached, so the later FOR UPDATE load sees fresh state.
+    @Query("select o.location.id from CustomerOrder o where o.id = :orderId")
+    Optional<UUID> findLocationIdById(UUID orderId);
 
     // Locks all referenced orders in one query, in a stable order so concurrent enrollments cannot deadlock.
     @Lock(LockModeType.PESSIMISTIC_WRITE)

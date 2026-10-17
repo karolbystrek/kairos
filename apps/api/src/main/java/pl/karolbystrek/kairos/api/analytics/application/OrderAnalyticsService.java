@@ -22,7 +22,8 @@ public class OrderAnalyticsService {
         var transaction = new TransactionTemplate(transactionManager);
         transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         var count = 0;
-        for (var index = 0; index < 1000; index++) {
+        // Drains the backlog in one cycle; each measurement commits on its own.
+        while (true) {
             var processed = transaction.execute(status -> {
                 var id = discovery.nextOrderMeasurement();
                 if (id == null || !accessContext.worker(WorkerOperation.ANALYTICS, id, null)) {

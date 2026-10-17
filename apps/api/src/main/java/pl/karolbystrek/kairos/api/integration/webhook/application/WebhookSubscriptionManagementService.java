@@ -83,9 +83,10 @@ public class WebhookSubscriptionManagementService {
         var name = parseName(candidateName);
         var destination = parseDestination(candidateDestination);
         validateSelections(access.tenantId(), locationIds, eventTypes);
-        if (subscriptionRepository.existsByIntegrationIdAndNormalizedName(
+        if (subscriptionRepository.existsByIntegrationIdAndNormalizedNameAndStatusNot(
                 integrationId,
-                name.normalizedValue()
+                name.normalizedValue(),
+                WebhookSubscriptionStatus.ARCHIVED
         )) {
             throw new IntegrationConflictException(
                     "A webhook subscription with this name already exists"
@@ -127,9 +128,10 @@ public class WebhookSubscriptionManagementService {
         var name = parseName(candidateName);
         var destination = parseDestination(candidateDestination);
         validateSelections(subscription.getTenantId(), locationIds, eventTypes);
-        if (subscriptionRepository.existsByIntegrationIdAndNormalizedNameAndIdNot(
+        if (subscriptionRepository.existsByIntegrationIdAndNormalizedNameAndStatusNotAndIdNot(
                 subscription.getIntegrationId(),
                 name.normalizedValue(),
+                WebhookSubscriptionStatus.ARCHIVED,
                 subscription.getId()
         )) {
             throw new IntegrationConflictException(

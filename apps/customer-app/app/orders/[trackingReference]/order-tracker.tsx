@@ -106,7 +106,8 @@ function useOrderEventStream({
           eventSource.close();
           // Persistent refusals (404, 429) leave the order to the polling fallback.
           if (++attempts > reconnectDelays.attempts) return;
-          timer = window.setTimeout(connect, delay);
+          // Jitter keeps clients from reconnecting in lockstep after an outage.
+          timer = window.setTimeout(connect, delay * (0.5 + Math.random()));
           delay = Math.min(delay * 2, reconnectDelays.maximum);
         };
         eventSource.addEventListener("order-status-changed", statusChanged);

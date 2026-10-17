@@ -18,6 +18,7 @@ import pl.karolbystrek.kairos.api.order.infrastructure.persistence.OrderOutboxEv
 import pl.karolbystrek.kairos.api.persistence.infrastructure.DatabaseAccessContext;
 import pl.karolbystrek.kairos.api.persistence.infrastructure.WorkerOperation;
 import pl.karolbystrek.kairos.api.persistence.infrastructure.WorkerDiscoveryRepository;
+import pl.karolbystrek.kairos.api.worker.WorkerCycles;
 
 import java.time.Clock;
 import java.util.UUID;
@@ -38,6 +39,7 @@ public class WebhookOutboxFanoutService {
     private final WorkerDiscoveryRepository workerDiscoveryRepository;
     private final PlatformTransactionManager transactionManager;
     private final DatabaseAccessContext databaseAccess;
+    private final WorkerCycles cycles;
 
     public int fanOutAvailable() {
         var transaction = new TransactionTemplate(transactionManager);
@@ -89,9 +91,11 @@ public class WebhookOutboxFanoutService {
                     now
             );
             if (signingVersions.isEmpty() || signingVersions.size() > 2) {
-                throw new IllegalStateException(
-                        "An enabled webhook subscription must have one or two active signing versions"
-                );
+                // Skips only this subscription, so its broken signing state cannot drop the event for the others.
+                cycles.recordFailure("webhook_fanout", "Webhook subscription " + subscription.getId()
+                        + " has " + signingVersions.size() + " active signing versions; skipped event " + event.getId(),
+                        new IllegalStateException("An enabled webhook subscription must have one or two active signing versions"));
+                continue;
             }
             var delivery = deliveryRepository.saveAndFlush(WebhookDelivery.create(
                     event.getId(),

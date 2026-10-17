@@ -44,9 +44,10 @@ public class ExternalIntegrationManagementService {
     public ExternalIntegrationView create(StaffPrincipal principal, String candidateName) {
         var access = staffAccessService.resolveForUpdate(principal).requireTenantAdmin(ADMINISTRATOR_REQUIRED);
         var name = parseName(candidateName);
-        if (integrationRepository.existsByTenantIdAndNormalizedName(
+        if (integrationRepository.existsByTenantIdAndNormalizedNameAndStatusNot(
                 access.tenantId(),
-                name.normalizedValue()
+                name.normalizedValue(),
+                ExternalIntegrationStatus.ARCHIVED
         )) {
             throw new IntegrationConflictException("An External Integration with this name already exists");
         }
@@ -65,9 +66,10 @@ public class ExternalIntegrationManagementService {
         var integration = requireManageableForUpdate(integrationId, access.tenantId());
         var name = parseName(candidateName);
         if (!integration.getNormalizedName().equals(name.normalizedValue())
-                && integrationRepository.existsByTenantIdAndNormalizedName(
+                && integrationRepository.existsByTenantIdAndNormalizedNameAndStatusNot(
                         access.tenantId(),
-                        name.normalizedValue()
+                        name.normalizedValue(),
+                        ExternalIntegrationStatus.ARCHIVED
                 )) {
             throw new IntegrationConflictException("An External Integration with this name already exists");
         }

@@ -1,7 +1,6 @@
 # Host preparation
 
-Agent execution of AWS/Cloudflare resource changes requires explicit user
-approval; read-only inspection is allowed. See [cloud operations](../agents/cloud-operations.md).
+Cloud changes need approval: see [cloud operations](../agents/cloud-operations.md).
 
 Use [the production runbook](RUNBOOK.md) for prerequisites and the sequence.
 
@@ -15,7 +14,7 @@ Java and both frontends; the overlay's limits are bounds, not a VM sizing target
 
 Install Docker Engine and its Compose plugin using the
 [official distribution instructions](https://docs.docker.com/engine/install/).
-The host also needs Git, GitHub CLI (`gh`), Bash, Python 3.9+, OpenSSL,
+The host also needs Bash, Python 3.9+, OpenSSL,
 curl supporting `--max-filesize`,
 OpenSSH server and GNU `tar`, `mv`, `cmp` and ordinary coreutils. Verify Compose
 supports `up --wait --wait-timeout` and `config --no-path-resolution`:
@@ -58,11 +57,11 @@ chmod 0700 /srv/kairos /srv/kairos/releases /srv/kairos/tls
 | Path | Purpose and access |
 | --- | --- |
 | `/srv/kairos/production.env` | Runtime configuration written by each deployment from GitHub, mode `0600`; never edit |
-| `/srv/kairos/secrets/` | Six application key files; directory `0700`, files `0400` |
+| `/srv/kairos/secrets/` | Five application key files; directory `0700`, files `0400` |
 | `/srv/kairos/tls/tls.crt`, `tls.key` | Origin certificate `0644`, private key `0600`; directory `0700` |
 | `/srv/kairos/releases/<revision>/` | Disposable exact-revision bundle, private to deployment account |
 | `/srv/kairos/deploy.lock` | Host-wide deployment lock |
-| `/srv/kairos/deployed-release.json` | Last fully verified revision and three digests |
+| `/srv/kairos/deployed-release.json` | Last verified release and recovery point; see [maintenance](MAINTENANCE.md) |
 | Docker named volumes | `kairos_pgdata` |
 
 Compose always uses project name `kairos`. PostgreSQL stores its data in

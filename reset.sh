@@ -46,8 +46,10 @@ echo "Stopping Kairos and removing its containers and volumes..."
 docker compose ${environment_files} down -v --remove-orphans
 
 if [ -f ".env" ] || [ -L ".env" ]; then
-    mv -f ".env" ".env.old"
-    echo "Saved the previous .env as .env.old."
+    saved=".env.old"
+    [ ! -e "${saved}" ] || saved=".env.old.$(date +%Y%m%d%H%M%S)"
+    mv ".env" "${saved}"
+    echo "Saved the previous .env as ${saved}."
 fi
 
 rm -f \

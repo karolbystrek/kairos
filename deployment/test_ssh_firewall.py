@@ -14,7 +14,7 @@ class FakeAWS:
         self.tag = None
         self.ports = [
             {'fromPort': 22, 'toPort': 22, 'protocol': 'tcp',
-             'cidrs': ['89.67.6.243/32'], 'ipv6Cidrs': [],
+             'cidrs': ['1.1.1.1/32'], 'ipv6Cidrs': [],
              'cidrListAliases': ['lightsail-connect']},
             {'fromPort': 443, 'toPort': 443, 'protocol': 'tcp',
              'cidrs': ['173.245.48.0/20'], 'ipv6Cidrs': [], 'cidrListAliases': []}]
@@ -24,7 +24,7 @@ class FakeAWS:
     def __call__(self, action, **options):
         assert options.get('instance_name', options.get('resource_name')) == 'kairos-production'
         if action == 'get-instance':
-            return {'instance': {'publicIpAddress': '52.58.250.75', 'ipv6Addresses': [],
+            return {'instance': {'publicIpAddress': '9.9.9.9', 'ipv6Addresses': [],
                     'tags': [] if self.tag is None else [{'key': 'kairos-deploy-ssh', 'value': self.tag}]}}
         if action == 'get-operations-for-resource':
             return {'operations': [{'operationType': 'OpenInstancePublicPorts',
@@ -63,8 +63,8 @@ class FirewallTests(unittest.TestCase):
         self.sleep = patch('ssh_firewall.time.sleep')
         self.sleep.start()
         self.addCleanup(self.sleep.stop)
-        self.firewall = ssh_firewall.Firewall('kairos-production', '89.67.6.243/32',
-                                             '123-1', '52.58.250.75')
+        self.firewall = ssh_firewall.Firewall('kairos-production', '1.1.1.1/32',
+                                             '123-1', '9.9.9.9')
 
     def test_success_or_failed_deployment_cleanup_preserves_permanent_rules(self):
         self.firewall.open('8.8.8.8')
@@ -74,10 +74,10 @@ class FirewallTests(unittest.TestCase):
         self.assertIsNone(self.aws.tag)
 
     def test_interrupted_run_is_recovered_before_new_access(self):
-        self.aws.tag = '122-1:1.1.1.1/32'
-        self.aws.ports[0]['cidrs'].append('1.1.1.1/32')
+        self.aws.tag = '122-1:4.4.4.4/32'
+        self.aws.ports[0]['cidrs'].append('4.4.4.4/32')
         self.firewall.open('8.8.8.8')
-        self.assertNotIn('1.1.1.1/32', self.aws.ports[0]['cidrs'])
+        self.assertNotIn('4.4.4.4/32', self.aws.ports[0]['cidrs'])
         self.assertEqual(self.aws.tag, '123-1:8.8.8.8/32')
         self.firewall.cleanup()
         self.assertEqual(self.aws.ports, self.original)
@@ -125,10 +125,10 @@ class FirewallTests(unittest.TestCase):
         self.assertEqual(self.aws.tag, '124-1:8.8.8.8/32')
 
     def test_invalid_or_admin_addresses_cannot_be_opened_or_cleaned(self):
-        for address in ('127.0.0.1', '0.0.0.0', '::1', '89.67.6.243', '8.8.8.8/24'):
+        for address in ('127.0.0.1', '0.0.0.0', '::1', '1.1.1.1', '8.8.8.8/24'):
             with self.subTest(address=address), self.assertRaises(ValueError):
                 self.firewall.open(address)
-        self.aws.tag = '122-1:89.67.6.243/32'
+        self.aws.tag = '122-1:1.1.1.1/32'
         with self.assertRaises(ValueError):
             self.firewall.open('8.8.8.8')
         self.assertEqual(self.aws.ports, self.original)
@@ -141,7 +141,7 @@ class FirewallTests(unittest.TestCase):
 
     def test_wrong_host_or_missing_admin_configuration_fails(self):
         with self.assertRaises(ValueError):
-            ssh_firewall.Firewall('kairos-production', '', '123-1', '52.58.250.75')
+            ssh_firewall.Firewall('kairos-production', '', '123-1', '9.9.9.9')
         self.firewall.host = '52.58.250.76'
         with self.assertRaises(ValueError):
             self.firewall.open('8.8.8.8')

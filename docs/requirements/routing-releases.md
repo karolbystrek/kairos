@@ -49,12 +49,11 @@ API origin `http://localhost:8080` directly; there is no local gateway.
   PostgreSQL data remains persistent.
 * `setup.sh --dev` prepares configuration and keys and starts the entire Docker
   development stack. `--prod` selects and starts production after checking its
-  supplied configuration. Both persist their Compose selection in `.env`, so
-  `docker compose up --build -d` subsequently starts the selected mode.
+  supplied configuration. Both persist their Compose selection in `.env`.
   Existing credentials, custom configuration and keys are preserved. Copies of
   setup without Compose retain the VM bootstrap's keys-only production behavior.
-  Secret directories use `0700` and application key files `0400`. `reset.sh`
-  removes containers, volumes and generated keys and moves `.env` aside.
+  Secret directories use `0700` and application key files `0400`. Daily commands
+  and `reset.sh`: [local development](../agents/local-development.md).
 
 ### Validation and immutable publication
 
@@ -93,8 +92,8 @@ The production job targets the `production` GitHub Environment, downloads its
 own workflow's release artifact, validates its manifest/archive against the dispatch
 revision, and transfers it over SSH
 with the supplied verified host keys and ephemeral `0700`/`0600` SSH files.
-The four Environment secrets are `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`,
-and `DEPLOY_KNOWN_HOSTS`; publication jobs receive none of these secrets.
+The deploy job reads the Environment secrets and variables listed in
+[configuration](../deployment/CONFIGURATION.md); publication jobs receive none of them.
 Before obtaining AWS credentials or opening SSH access, the job checks through
 `gh` that its run is the newest manual deployment dispatch on `main`. A newer
 dispatch supersedes an older pending run even if the newer run later fails or
@@ -157,7 +156,7 @@ directories. A nonblocking host-wide `flock` at `/srv/kairos/deploy.lock` reject
 concurrent deployments; Python's stdlib `fcntl.flock` provides the lock without
 an additional host command dependency.
 
-Deployment pulls the complete stack and waits for PostgreSQL/Redis health before
+Deployment pulls missing images (application images are digest-pinned and new per release; infrastructure images are not re-pulled) and waits for PostgreSQL/Redis health before
 starting the API. Fresh PostgreSQL initializes the restricted database roles
 through its standard entrypoint; Spring Flyway applies migrations automatically. Existing database volumes do
 not rerun initialization; see [database initialization](../deployment/DATABASE.md).
@@ -177,11 +176,9 @@ with the successful revision/digests. Failed stages retain the previous success
 record and report the failed stage with a safe validation reason, command exit
 status/timeout, or final probe HTTP status. Raw command arguments/output, response
 bodies, environment values and resolved configuration are not printed. A failed
-release makes the command automatically redeploy the previous recorded release
-(original runtime directory, digest-pinned images and protected environment
-snapshot, with the same checks) and still exit non-zero; migrations are not undone
-and must stay compatible with the previous release. Recovery of the cause uses a
-forward fix, never a reset; see [maintenance](../deployment/MAINTENANCE.md).
+rollout also prints container names, states and health (never logs). The command
+then redeploys the previous recorded release and exits non-zero; see
+[maintenance](../deployment/MAINTENANCE.md) for rollback and recovery.
 Command tests use fake Docker/curl and temporary state. First install, reboot
 recovery and real Cloudflare-path acceptance on the selected VM remain launch
 work requiring explicit runtime authorization.
@@ -204,7 +201,7 @@ is a separate operator action, not part of normal rollback or deployment.
 The operator can prepare an Ubuntu 24.04 x86-64 VM with
 `deployment/bootstrap.yml` from a trusted workstation over verified SSH. The
 playbook installs Docker Engine/Compose from Docker's official apt repository
-and the host tools, enables Docker on boot, creates the dedicated deployment
+and the host tools, schedules the nightly database dump, enables Docker on boot, creates the dedicated deployment
 `kairos-deploy` identity with a restricted SSH key, and prepares private `/srv/kairos` paths.
 It keeps the existing `ubuntu` administrator unchanged and rejects selecting
 `ubuntu` as the deployment identity.
@@ -234,9 +231,12 @@ acceptance remain operator verification.
 
 The owner accepts the public single-VM deployment as a disposable development
 environment with no users. All orders, accounts and credentials may be lost
-after host failure and recreated. Scheduled database backups, off-host backup
+after host failure and recreated. Bootstrap schedules nightly on-host
+`pg_dump` files with seven-day retention; off-host backup
 storage/encryption/retention, destructive-migration backup procedures, data-loss
 and recovery targets, and replacement-host restore rehearsals are deferred.
+Before real users, Lightsail automatic snapshots and a disk-usage alarm must be
+enabled (a launch gate in [delivery status](delivery-status.md#deferred-work)).
 Runtime configuration lives in the GitHub `production` Environment; keep
 protected application keys and TLS material outside the VPS to rebuild a fresh
 installation. This is not database restoration.

@@ -401,8 +401,19 @@ export function OrderManagement({
     trigger: triggerCreateOrder,
   } = useSWRMutation(
     currentOrdersKey,
-    (_, { arg }: { arg: { locationId: string; input: CreateOrderInput } }) =>
-      createOrderRequest(arg.locationId, arg.input),
+    async (
+      _,
+      { arg }: { arg: { locationId: string; input: CreateOrderInput } },
+    ) => {
+      try {
+        return await createOrderRequest(arg.locationId, arg.input);
+      } catch (error) {
+        // Without a server answer the order may exist; show it before staff retry.
+        if (!(error instanceof ApiError))
+          void mutateOrders().catch(() => undefined);
+        throw error;
+      }
+    },
     { throwOnError: false },
   );
   const {

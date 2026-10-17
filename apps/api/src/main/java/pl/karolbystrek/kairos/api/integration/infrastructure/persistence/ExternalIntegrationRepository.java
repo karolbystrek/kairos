@@ -19,7 +19,11 @@ public interface ExternalIntegrationRepository extends JpaRepository<ExternalInt
 
     Optional<ExternalIntegration> findByIdAndTenantId(UUID integrationId, UUID tenantId);
 
-    boolean existsByTenantIdAndNormalizedName(UUID tenantId, String normalizedName);
+    boolean existsByTenantIdAndNormalizedNameAndStatusNot(
+            UUID tenantId,
+            String normalizedName,
+            ExternalIntegrationStatus status
+    );
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<ExternalIntegration> findForUpdateByIdAndTenantId(UUID integrationId, UUID tenantId);

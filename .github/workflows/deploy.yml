@@ -12,6 +12,8 @@ jobs:
     name: CI
     if: github.ref == 'refs/heads/main'
     uses: ./.github/workflows/ci.yml
+    with:
+      skip-production-images: true # build below compiles the same Dockerfiles
 
   build:
     name: Build ${{ matrix.service }}

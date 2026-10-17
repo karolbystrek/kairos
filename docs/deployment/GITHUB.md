@@ -30,7 +30,7 @@ Environment variables. Frontend URLs are compiled into images; changing these
 variables requires a new source revision/build, because existing revision tags
 are immutable. Keep runtime origins consistent with those build inputs.
 
-Install these four secrets with `gh secret set --env production` from protected
+Install these deployment-connection secrets with `gh secret set --env production` from protected
 files or secure prompts, never literal secret arguments or repository-level copies:
 
 | Environment secret | Value |
@@ -40,7 +40,8 @@ files or secure prompts, never literal secret arguments or repository-level copi
 | `DEPLOY_SSH_KEY` | Matching private SSH key authorized for that account |
 | `DEPLOY_KNOWN_HOSTS` | Independently verified OpenSSH host-key entries |
 
-The same Environment also holds runtime configuration that deployment writes to
+The same Environment also holds the runtime secrets and variables (database and
+Redis passwords, `RESEND_API_KEY`, `VAPID_SUBJECT`) that deployment writes to
 the host; see [configuration](CONFIGURATION.md) for required keys.
 
 Do not reuse the GitHub publication token as host GHCR credentials. For a

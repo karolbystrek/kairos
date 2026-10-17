@@ -3,6 +3,8 @@ package pl.karolbystrek.kairos.api.order.api.model;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.UUID;
 
@@ -27,13 +29,11 @@ class CreateOrderRequestValidationTests {
         assertThat(custom.label()).isEqualTo("Stół 7");
     }
 
-    @Test
-    void rejectsMultilineControlAndOverLengthLabels() {
-        assertThat(validator.validate(new CreateOrderRequest(LOCATION_ID, "Line 1\nLine 2", null))).isNotEmpty();
-        assertThat(validator.validate(new CreateOrderRequest(LOCATION_ID, "Line 1\u2028Line 2", null))).isNotEmpty();
-        assertThat(validator.validate(new CreateOrderRequest(LOCATION_ID, "Line 1\u2029Line 2", null))).isNotEmpty();
-        assertThat(validator.validate(new CreateOrderRequest(LOCATION_ID, "Table\u00007", null))).isNotEmpty();
-        assertThat(validator.validate(new CreateOrderRequest(LOCATION_ID, "x".repeat(81), null))).isNotEmpty();
+    @ParameterizedTest
+    @ValueSource(strings = {"Line 1\nLine 2", "Line 1\u2028Line 2", "Line 1\u2029Line 2", "Table\u00007",
+            "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"})
+    void rejectsMultilineControlAndOverLengthLabels(String label) {
+        assertThat(validator.validate(new CreateOrderRequest(LOCATION_ID, label, null))).isNotEmpty();
     }
 
     @Test

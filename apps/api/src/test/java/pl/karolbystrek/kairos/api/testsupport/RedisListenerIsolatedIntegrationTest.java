@@ -2,6 +2,7 @@ package pl.karolbystrek.kairos.api.testsupport;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -17,6 +18,7 @@ import pl.karolbystrek.kairos.api.integration.webhook.infrastructure.worker.Webh
 
 import java.time.Duration;
 
+@AutoConfigureMockMvc
 @Import(MutableTestClockConfiguration.class)
 public abstract class RedisListenerIsolatedIntegrationTest {
     // Fixtures explicitly run durable workers; background commit listeners would race their assertions.

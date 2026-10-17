@@ -108,20 +108,6 @@ Bootstrap generates the dedicated 32-byte
 other keys: queued messages cannot be decrypted without it. Never print codes,
 invitation tokens or pending message contents.
 
-A host bootstrapped before this key existed holds five keys, and bootstrap
-refuses the partial set. Add only the missing key through administrator SSH,
-reusing an existing key's owner, then rerun bootstrap:
-
-```sh
-sudo openssl rand -out /srv/kairos/secrets/email-encryption.bin 32
-sudo chown --reference=/srv/kairos/secrets/webhook-encryption.bin \
-  /srv/kairos/secrets/email-encryption.bin
-sudo chmod 0400 /srv/kairos/secrets/email-encryption.bin
-```
-
-Never use `--replace-keys` to add this file: it regenerates every key, including
-the ones existing encrypted data depends on.
-
 After the first deployment with email, register with an inbox you control and
 confirm that the Polish verification code arrives from the sender above and
 completes registration. Then invite a second inbox and redeem the invitation
