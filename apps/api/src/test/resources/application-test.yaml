@@ -17,6 +17,10 @@ kairos:
     encryption-key-location: "classpath:keys/test-email-encryption.bin"
   analytics:
     initial-delay: 24h
+  monitoring:
+    backlog:
+      # Every cached test context would otherwise poll the outbox tables and deadlock with fixture TRUNCATEs.
+      initial-delay: 24h
   origins:
     customer: "http://localhost:3000"
     panel: "http://localhost:3001"
