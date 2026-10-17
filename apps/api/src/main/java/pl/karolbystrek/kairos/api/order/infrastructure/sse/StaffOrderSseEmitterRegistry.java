@@ -119,7 +119,13 @@ public class StaffOrderSseEmitterRegistry {
         var connection = new Connection(principal, subject, signedInAt, locationId, emitter);
         connections.put(emitter, connection);
         pending.add(connection);
-        refresh.wake();
+        try {
+            refresh.wake();
+        } catch (RuntimeException exception) {
+            connections.remove(emitter);
+            pending.remove(connection);
+            throw exception;
+        }
         return emitter;
     }
 

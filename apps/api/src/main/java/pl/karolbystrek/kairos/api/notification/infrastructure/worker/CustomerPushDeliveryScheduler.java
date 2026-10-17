@@ -1,11 +1,14 @@
 package pl.karolbystrek.kairos.api.notification.infrastructure.worker;
 
+import jakarta.annotation.PreDestroy;
 import org.springframework.stereotype.Component;
 import pl.karolbystrek.kairos.api.notification.application.CustomerPushDeliveryClaimService;
 import pl.karolbystrek.kairos.api.notification.application.CustomerPushDeliveryProcessor;
 import pl.karolbystrek.kairos.api.notification.infrastructure.config.CustomerNotificationProperties;
 import pl.karolbystrek.kairos.api.worker.DeliveryPool;
 import pl.karolbystrek.kairos.api.worker.WorkerCycles;
+
+import java.time.Duration;
 
 @Component
 class CustomerPushDeliveryScheduler {
@@ -34,5 +37,11 @@ class CustomerPushDeliveryScheduler {
                                 "Customer Push delivery " + delivery.id() + " failed unexpectedly", exception);
                     }
                 }));
+    }
+
+    // Runs before the data source closes, which the processor depends on.
+    @PreDestroy
+    void drain() throws InterruptedException {
+        pool.awaitIdle(Duration.ofSeconds(15));
     }
 }

@@ -76,8 +76,7 @@ in the panel. The API returns `409` until replacement is confirmed. Replacement
 requires authority over both the existing invitation and its new target; it
 records the previous entry as `REPLACED`, cancels its queued delivery and creates
 a new invitation with a fresh token and seven-day lifetime atomically. Resend
-uses this same confirmed replacement operation. Creation and resend return `409`
-when an account already exists for the invited email. Only active pending entries
+uses this same confirmed replacement operation. Only active pending entries
 can be resent, including entries whose delivery failed; expired entries require
 the ordinary new-invitation form. Previous links become unusable.
 

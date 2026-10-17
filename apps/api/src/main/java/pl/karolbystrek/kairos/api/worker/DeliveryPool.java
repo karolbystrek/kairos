@@ -1,7 +1,9 @@
 package pl.karolbystrek.kairos.api.worker;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -34,5 +36,12 @@ public final class DeliveryPool {
             });
         });
         return !claimed.isEmpty();
+    }
+
+    /** Waits for in-flight deliveries, so a shutdown does not resend them after their claim lease. */
+    public boolean awaitIdle(Duration timeout) throws InterruptedException {
+        if (!slots.tryAcquire(2 * batchSize, timeout.toMillis(), TimeUnit.MILLISECONDS)) return false;
+        slots.release(2 * batchSize);
+        return true;
     }
 }

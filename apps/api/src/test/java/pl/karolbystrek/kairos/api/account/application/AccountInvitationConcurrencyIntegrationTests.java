@@ -45,16 +45,6 @@ class AccountInvitationConcurrencyIntegrationTests extends RedisListenerIsolated
     private final JdbcTemplate jdbcTemplate = PostgresTestDatabase.ownerDatabase();
 
     @Test
-    void refusesToInviteAnEmailThatAlreadyHasAnAccount() {
-        var tenant = new IntegrationTestFixture(jdbcTemplate).createTenant();
-        var existing = jdbcTemplate.queryForObject("SELECT email FROM accounts WHERE id = ?", String.class,
-            tenant.manager().accountId());
-
-        assertThatThrownBy(() -> invitationService.create(tenant.administrator(), tenant.firstLocationId(),
-            AssignmentRole.OPERATOR, existing)).isInstanceOf(AccountConflictException.class);
-    }
-
-    @Test
     void atomicRedemptionRejectsAnEmailOutsideTheInvitation() throws Exception {
         var tenant = new IntegrationTestFixture(jdbcTemplate).createTenant();
         var email = "invited-" + UUID.randomUUID() + "@example.com";

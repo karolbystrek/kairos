@@ -123,10 +123,6 @@ public class AccountInvitationService {
 
     private CreatedAccountInvitation issue(StaffAccessContext access, Location location, AssignmentRole role,
         String email, String administratorEmail) {
-        // An existing account can never redeem, so fail now instead of emailing a dead link.
-        if (accountRepository.identityConflict(email, null)) {
-            throw new AccountConflictException("An account with the supplied identity already exists");
-        }
         var issuer = accountRepository.findById(access.accountId())
             .orElseThrow(() -> new StaffAccessDeniedException("The issuing account is not available"));
         var token = tokenService.generate();

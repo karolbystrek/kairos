@@ -37,4 +37,21 @@ class DeliveryPoolTests {
         }
         assertThat(delivered.await(5, TimeUnit.SECONDS)).isTrue();
     }
+
+    @Test
+    void awaitIdleWaitsForInFlightDeliveries() throws Exception {
+        var pool = new DeliveryPool(1);
+        var release = new CountDownLatch(1);
+        pool.dispatch(() -> List.of(1), item -> {
+            try {
+                release.await();
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+            }
+        });
+
+        assertThat(pool.awaitIdle(java.time.Duration.ofMillis(50))).isFalse();
+        release.countDown();
+        assertThat(pool.awaitIdle(java.time.Duration.ofSeconds(5))).isTrue();
+    }
 }
