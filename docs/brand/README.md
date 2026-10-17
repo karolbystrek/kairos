@@ -62,6 +62,9 @@ rendered from these masters:
   `kairos-app-icon.svg` at 32 and 48 px.
 - `icons/kairos-lockup.png` (240 px tall) renders `kairos-lockup.svg` for the
   share-preview images.
+- Order tracking QR codes in the panel embed `kairos-app-icon.svg` inline in
+  `apps/panel-app/src/order-qr-code.ts`, centred at 22 % of the code's width
+  on a white pad, with high (H) error correction so the codes still scan.
 
 ## Misuse
 

@@ -41,6 +41,7 @@ import {
 import { customerAppUrl } from "@/src/config/public-environment";
 import { recordPanelAction } from "@/src/api/usage-analytics";
 import { errorMessage } from "@/src/messages";
+import { orderQrCode } from "@/src/order-qr-code";
 import { toastError } from "@/src/toast";
 
 const tenantOrderScope = "tenant";
@@ -161,9 +162,7 @@ function OrderQrCode({
     isLoading,
   } = useSWR(
     [staffCachePrefix, accountId, "order-qr", trackingUrl] as const,
-    // The encoder loads only when an order's details first open.
-    async ([, , , url]) =>
-      (await import("qrcode")).toDataURL(url, { margin: 2, width: 640 }),
+    ([, , , url]) => orderQrCode(url),
     {
       revalidateOnFocus: false,
       revalidateOnReconnect: false,
