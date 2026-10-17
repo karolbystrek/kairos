@@ -4,7 +4,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Component;
 import pl.karolbystrek.kairos.api.authentication.application.exception.SignInThrottledException;
@@ -21,10 +20,12 @@ import java.util.List;
 @Component
 public class SignInThrottle {
     private static final String PREFIX = "kairos:sign-in-failures:";
-    // INCR and EXPIRE in one script, so a counter can never be left without its expiry.
+    private static final String TOTAL = "total";
+    // One hash per email, so clearing it is a single DEL. HINCRBY and HEXPIRE run in one script, so a counter can
+    // never be left without its expiry; the hash disappears once its last field expires.
     private static final RedisScript<Long> INCREMENT = RedisScript.of("""
-            local count = redis.call('INCR', KEYS[1])
-            if count == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end
+            local count = redis.call('HINCRBY', KEYS[1], ARGV[1], 1)
+            if count == 1 then redis.call('HEXPIRE', KEYS[1], ARGV[2], 'FIELDS', 1, ARGV[1]) end
             return count
             """, Long.class);
 
@@ -48,8 +49,8 @@ public class SignInThrottle {
     /** Refuses the attempt before any password check while this client or the account has used up its failures. */
     public void requireNotThrottled(String email, String clientAddress) {
         try {
-            if (exceeds(redis.opsForValue().get(clientKey(email, clientAddress)), maximumFailures)
-                    || exceeds(redis.opsForValue().get(emailKey(email)), maximumFailuresPerEmail)) {
+            var counts = redis.<String, String>opsForHash().multiGet(key(email), List.of(clientField(clientAddress), TOTAL));
+            if (exceeds(counts.get(0), maximumFailures) || exceeds(counts.get(1), maximumFailuresPerEmail)) {
                 throw new SignInThrottledException();
             }
         } catch (DataAccessException exception) {
@@ -61,8 +62,8 @@ public class SignInThrottle {
     public void recordFailure(String email, String clientAddress) {
         try {
             var seconds = String.valueOf(window.toSeconds());
-            redis.execute(INCREMENT, List.of(clientKey(email, clientAddress)), seconds);
-            redis.execute(INCREMENT, List.of(emailKey(email)), seconds);
+            redis.execute(INCREMENT, List.of(key(email)), clientField(clientAddress), seconds);
+            redis.execute(INCREMENT, List.of(key(email)), TOTAL, seconds);
         } catch (DataAccessException exception) {
             log.warn("Sign-in throttle unavailable", exception);
         }
@@ -70,9 +71,8 @@ public class SignInThrottle {
 
     /** Forgets every failure of the email, for example after the owner proved control by resetting the password. */
     public void clear(String email) {
-        try (var keys = redis.scan(ScanOptions.scanOptions().match(emailPrefix(email) + "*").build())) {
-            var found = keys.stream().toList();
-            if (!found.isEmpty()) redis.delete(found);
+        try {
+            redis.delete(key(email));
         } catch (DataAccessException exception) {
             log.warn("Sign-in throttle unavailable", exception);
         }
@@ -82,15 +82,11 @@ public class SignInThrottle {
         return count != null && Long.parseLong(count) >= maximum;
     }
 
-    private static String emailPrefix(String normalizedEmail) {
-        return PREFIX + Hashing.sha256Hex(normalizedEmail) + ":";
+    private static String key(String normalizedEmail) {
+        return PREFIX + Hashing.sha256Hex(normalizedEmail);
     }
 
-    private static String emailKey(String normalizedEmail) {
-        return emailPrefix(normalizedEmail) + "total";
-    }
-
-    private static String clientKey(String normalizedEmail, String clientAddress) {
-        return emailPrefix(normalizedEmail) + "client:" + clientAddress;
+    private static String clientField(String clientAddress) {
+        return "client:" + clientAddress;
     }
 }

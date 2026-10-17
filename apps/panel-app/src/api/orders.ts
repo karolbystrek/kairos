@@ -64,7 +64,8 @@ export function subscribeToOrderQueue(
       events.close();
       // Persistent refusals (401, 403) leave the queue to the polling fallback.
       if (++attempts > 10) return;
-      timer = setTimeout(connect, delay);
+      // Jitter keeps clients from reconnecting in lockstep after an outage.
+      timer = setTimeout(connect, delay * (0.5 + Math.random()));
       delay = Math.min(delay * 2, 30_000);
     };
   };

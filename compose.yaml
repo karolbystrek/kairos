@@ -39,6 +39,10 @@ services:
         "",
         "--appendonly",
         "no",
+        "--maxmemory",
+        "200mb",
+        "--maxmemory-policy",
+        "volatile-lru",
         "--requirepass",
         "${REDIS_PASSWORD}",
       ]

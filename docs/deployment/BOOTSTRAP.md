@@ -51,7 +51,7 @@ sudo cat /etc/ssh/ssh_host_ed25519_key.pub
 
 Add that independently obtained public key to your workstation's
 `~/.ssh/known_hosts` using the static IPv4 address as the host field. For example,
-the line has the form `52.58.250.75 ssh-ed25519 <public-key-from-console>`.
+the line has the form `198.51.100.7 ssh-ed25519 <public-key-from-console>`.
 Preserve existing entries. Do not substitute an unverified `ssh-keyscan` result.
 Ansible is run with strict host-key checking below.
 
@@ -65,9 +65,9 @@ second alias works after bootstrap creates `kairos-deploy`:
 
 ```sshconfig
 Host kairos
-    HostName 52.58.250.75
+    HostName 198.51.100.7
     User ubuntu
-    IdentityFile ~/.ssh/LightsailDefaultKey-eu-central-1.pem
+    IdentityFile ~/.ssh/LightsailDefaultKey-REGION.pem
     IdentitiesOnly yes
     StrictHostKeyChecking yes
     ControlMaster auto
@@ -75,7 +75,7 @@ Host kairos
     ControlPersist 5m
 
 Host kairos-deploy
-    HostName 52.58.250.75
+    HostName 198.51.100.7
     User kairos-deploy
     IdentityFile ~/.ssh/kairos-deploy
     IdentitiesOnly yes
@@ -89,8 +89,7 @@ keys or change its sudo permissions. Use `ssh kairos` for administration and
 ## Run the bootstrap
 
 Copy the example inventory to a private location outside the checkout and replace
-`YOUR_STATIC_IPV4` with the instance's static address (`52.58.250.75` for the
-instance shown in this setup):
+`YOUR_STATIC_IPV4` with the instance's static address (for example `198.51.100.7`):
 
 ```sh
 mkdir -p "$HOME/.config/kairos"
@@ -105,7 +104,7 @@ below. Replace the Lightsail key path with your downloaded administrator key:
 ```sh
 ansible-playbook -i "$HOME/.config/kairos/inventory.ini" deployment/bootstrap.yml \
   --ssh-common-args='-o StrictHostKeyChecking=yes' \
-  -e "ansible_ssh_private_key_file=$HOME/.ssh/LightsailDefaultKey-eu-central-1.pem" \
+  -e "ansible_ssh_private_key_file=$HOME/.ssh/LightsailDefaultKey-REGION.pem" \
   -e "kairos_deploy_public_key_file=$HOME/.ssh/kairos-deploy.pub"
 ```
 
@@ -146,7 +145,7 @@ ansible-playbook -i "$HOME/.config/kairos/inventory.ini" deployment/bootstrap.ym
 Connect as the deployment account using its separate private key:
 
 ```sh
-ssh -o StrictHostKeyChecking=yes -i "$HOME/.ssh/kairos-deploy" kairos-deploy@52.58.250.75 \
+ssh -o StrictHostKeyChecking=yes -i "$HOME/.ssh/kairos-deploy" kairos-deploy@198.51.100.7 \
   'docker info --format "{{.ServerVersion}}"; docker compose version; python3 --version'
 ```
 
@@ -170,8 +169,7 @@ Bootstrap never creates or changes `/srv/kairos/production.env`; each deployment
 writes it from GitHub. Keys are stored under `/srv/kairos/secrets` with directory
 mode `0700` and file mode `0400`; release and TLS directories use `0700`. The
 five-key set includes `email-encryption.bin` for pending transactional mail;
-[configuration](CONFIGURATION.md) describes adding this file to an older host
-without replacing its existing keys and installing the required Resend key.
+ [configuration](CONFIGURATION.md) describes installing the required Resend key.
 
 ## Set production configuration in GitHub
 
@@ -193,7 +191,7 @@ gh variable set VAPID_SUBJECT --env production --repo karolbystrek/kairos
 
 Each command prompts for its value. Deployment fails before any SSH connection
 while one is missing. On a host whose databases were already initialized from a
-hand-edited `production.env`, copy its existing passwords, PAT expiry and other
+hand-edited `production.env`, copy its existing passwords and other
 non-default values into GitHub instead, and keep a protected copy of that file
 before the first deployment overwrites it; new passwords would not match the
 initialized PostgreSQL roles. Hostnames and browser origins must match Cloudflare and

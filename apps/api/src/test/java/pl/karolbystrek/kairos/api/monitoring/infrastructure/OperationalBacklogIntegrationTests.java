@@ -18,7 +18,7 @@ import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest(properties = "kairos.monitoring.backlog.initial-delay=24h")
+@SpringBootTest
 class OperationalBacklogIntegrationTests extends RedisListenerIsolatedIntegrationTest {
     @Autowired JdbcTemplate runtime;
     @Autowired PlatformTransactionManager transactions;

@@ -167,7 +167,7 @@ def rollout(release, env_file, manifest, base_env, report):
     resolved = json.loads(command([*compose, "config", "--format", "json", "--no-path-resolution"], env, capture=True, timeout=60))
     origins = configuration(resolved, release, manifest["images"])
     report("pull")
-    command([*compose, "pull", "--policy", "always"], env)
+    command([*compose, "pull", "--policy", "missing"], env)
     up = [*compose, "up", "--no-deps", "--no-build", "--pull", "never"]
     healthy = [*up, "--wait", "--wait-timeout", "300"]
     for stage, args in (
@@ -178,7 +178,16 @@ def rollout(release, env_file, manifest, base_env, report):
     ):
         report(stage)
         print(f"Deployment stage: {stage}", flush=True)
-        command(args, env, timeout=360)
+        try:
+            command(args, env, timeout=360)
+        except (subprocess.SubprocessError, OSError):
+            # State only, never logs: Actions logs of this public repository are public.
+            try:
+                print(command([*compose, "ps", "-a", "--format", "table {{.Name}}\t{{.State}}\t{{.Health}}"],
+                              env, capture=True, timeout=60), file=sys.stderr)
+            except (subprocess.SubprocessError, OSError):
+                pass  # The stage failure below is the error that matters.
+            raise
     report("customer HTTPS probe")
     probe(origins[0] + "/", env)
     report("panel HTTPS probe")

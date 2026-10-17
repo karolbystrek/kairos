@@ -30,6 +30,7 @@ import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTe
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -325,6 +326,34 @@ class ExternalOrderServiceIntegrationTests extends RedisListenerIsolatedIntegrat
                 null,
                 null
         )).isInstanceOf(IntegrationAccessDeniedException.class);
+    }
+
+    @Test
+    void pagesAcrossLocationsWithoutDuplicatesOrGaps() {
+        var both = authenticationService.authenticate(apiKeyService.issue(
+                tenant.administrator(),
+                integration.id(),
+                "Two locations",
+                Set.of("orders:write"),
+                Set.of(tenant.firstLocationId(), tenant.secondLocationId()),
+                null
+        ).secret());
+        var expected = new ArrayList<UUID>();
+        for (var i = 0; i < 5; i++) {
+            var location = i % 2 == 0 ? tenant.firstLocationId() : tenant.secondLocationId();
+            expected.addFirst(orderService.create(both, location, null, List.of(), "multi-" + i).order().id());
+            clock.advance(Duration.ofSeconds(1));
+        }
+
+        var seen = new ArrayList<UUID>();
+        String cursor = null;
+        do {
+            var page = orderService.list(both, null, null, cursor, 2);
+            page.items().forEach(item -> seen.add(item.id()));
+            cursor = page.nextCursor();
+        } while (cursor != null);
+
+        assertThat(seen).containsExactlyElementsOf(expected);
     }
 
     @Test

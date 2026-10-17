@@ -5,6 +5,7 @@ import { notifyAuthenticationRequired } from "./auth-state";
 import { apiBaseUrl } from "@/src/config/public-environment";
 
 const csrfHeaderName = "X-XSRF-TOKEN";
+// Keep in sync with apps/customer-app/src/api/customer-notifications.ts.
 const csrfProblemTypes = new Set([
   "urn:kairos:problem:csrf-token-missing",
   "urn:kairos:problem:csrf-token-invalid",

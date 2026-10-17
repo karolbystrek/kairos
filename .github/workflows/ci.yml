@@ -7,6 +7,10 @@ on:
       - main
   workflow_dispatch:
   workflow_call:
+    inputs:
+      skip-production-images:
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -137,6 +141,7 @@ jobs:
 
   production-images:
     name: Production images
+    if: ${{ !inputs.skip-production-images }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:

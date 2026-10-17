@@ -74,6 +74,8 @@ it("tenant stream omits location and invalid snapshots or disconnects request RE
 
 it("recreates a permanently closed stream with backoff and stops after cleanup", () => {
   vi.useFakeTimers();
+  // Midpoint jitter keeps the delays exact.
+  vi.spyOn(Math, "random").mockReturnValue(0.5);
   const close = subscribeToOrderQueue(undefined, vi.fn(), vi.fn());
 
   FakeEventSource.last.readyState = FakeEventSource.CLOSED;

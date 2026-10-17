@@ -6,7 +6,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.boot.micrometer.metrics.test.autoconfigure.AutoConfigureMetrics;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.AuthorityUtils;
@@ -33,7 +32,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "management.endpoints.web.exposure.include=health,prometheus",
         "management.metrics.enable.http.client.requests=false"
 })
-@AutoConfigureMockMvc
 @AutoConfigureMetrics(export = true)
 class MetricsExportIntegrationTests extends RedisListenerIsolatedIntegrationTest {
 

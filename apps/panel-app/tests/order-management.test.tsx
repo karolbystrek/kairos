@@ -81,6 +81,15 @@ it("initial queue loading does not show headings or an empty queue", async () =>
   expect(await screen.findByText("Brak zamówień w przygotowaniu")).toBeTruthy();
 });
 
+it("a create that fails without a server answer revalidates the queue before a retry", async () => {
+  routes["POST /api/orders/v1"] = () => { throw new TypeError("network"); };
+  const view = queue();
+
+  await view.openForm();
+  await view.user.click(await within(await screen.findByRole("dialog")).findByRole("button", { name: "Utwórz" }));
+  await waitFor(() => expect(apiCalls(calls).filter((call) => call === "GET /api/orders/v1").length).toBeGreaterThan(1));
+});
+
 it("dismiss and reopen cannot duplicate order creation by switching the queue filter", async () => {
   const creation = deferred();
 

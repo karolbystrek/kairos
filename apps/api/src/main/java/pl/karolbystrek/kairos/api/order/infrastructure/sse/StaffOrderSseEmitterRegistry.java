@@ -15,6 +15,7 @@ import pl.karolbystrek.kairos.api.worker.CoalescingWorker;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -29,8 +30,6 @@ public class StaffOrderSseEmitterRegistry {
     private final StaffAuthenticationService authentication;
     private final LongFunction<SseEmitter> emitterFactory;
     private final Executor executor;
-    // Initial and refresh snapshots share ordering; socket writes remain on independent workers.
-    private final Object snapshotLock = new Object();
     private final Set<Connection> pending = ConcurrentHashMap.newKeySet();
     private final CoalescingWorker refresh;
     private final ConcurrentHashMap<SseEmitter, Connection> connections = new ConcurrentHashMap<>();
@@ -58,22 +57,25 @@ public class StaffOrderSseEmitterRegistry {
         this.authentication = authentication;
         this.emitterFactory = emitterFactory;
         this.executor = executor;
+        // One worker sends every snapshot, so they reach each stream in commit order.
         refresh = new CoalescingWorker(executor, () -> {
-            synchronized (snapshotLock) {
-                var cycle = List.copyOf(pending);
-                pending.removeAll(cycle);
-                var snapshots = new HashMap<OrderService.QueueScope, List<OrderView>>();
-                cycle.forEach(connection -> {
-                    if (connections.get(connection.delivery.emitter) != connection) return;
-                    try {
-                        connection.push(snapshots);
-                    } catch (RuntimeException exception) {
-                        connection.delivery.close();
-                    }
-                });
-            }
+            var cycle = List.copyOf(pending);
+            pending.removeAll(cycle);
+            var snapshots = new HashMap<OrderService.QueueScope, List<OrderView>>();
+            var authenticated = new HashSet<Session>();
+            cycle.forEach(connection -> {
+                if (connections.get(connection.delivery.emitter) != connection) return;
+                try {
+                    connection.push(snapshots, authenticated);
+                } catch (RuntimeException exception) {
+                    connection.delivery.close();
+                }
+            });
             return false;
         });
+    }
+
+    private record Session(String subject, Instant signedInAt) {
     }
 
     private final class Connection {
@@ -97,9 +99,13 @@ public class StaffOrderSseEmitterRegistry {
             delivery = new SseConnection(emitter, () -> connections.remove(emitter), executor);
         }
 
-        // Re-checks the session cutoff too, so a revoked session cannot keep a stream open.
-        private void push(Map<OrderService.QueueScope, List<OrderView>> snapshots) {
-            authentication.authenticate(subject, signedInAt);
+        // Re-checks the session cutoff once per session and cycle, so a revoked session cannot keep a stream open.
+        private void push(Map<OrderService.QueueScope, List<OrderView>> snapshots, Set<Session> authenticated) {
+            var session = new Session(subject, signedInAt);
+            if (!authenticated.contains(session)) {
+                authentication.authenticate(subject, signedInAt);
+                authenticated.add(session);
+            }
             var queue = orders.listOrdersForRefresh(principal, locationId, snapshots);
             delivery.send(SseEmitter.event().name("order-queue")
                     .data(queue.stream().map(OrderResponse::from).toList()), false);
@@ -107,16 +113,17 @@ public class StaffOrderSseEmitterRegistry {
     }
 
     public SseEmitter subscribe(StaffPrincipal principal, String subject, Instant signedInAt, UUID locationId) {
-        // Register before the first query to avoid missing a commit; unauthorized requests fail synchronously.
+        // Unauthorized requests fail here, synchronously; the refresh worker then sends the first snapshot.
+        orders.listOrdersForRefresh(principal, locationId, new HashMap<>());
         var emitter = emitterFactory.apply(Duration.ofMinutes(30).toMillis());
         var connection = new Connection(principal, subject, signedInAt, locationId, emitter);
         connections.put(emitter, connection);
+        pending.add(connection);
         try {
-            synchronized (snapshotLock) {
-                connection.push(new HashMap<>());
-            }
+            refresh.wake();
         } catch (RuntimeException exception) {
             connections.remove(emitter);
+            pending.remove(connection);
             throw exception;
         }
         return emitter;

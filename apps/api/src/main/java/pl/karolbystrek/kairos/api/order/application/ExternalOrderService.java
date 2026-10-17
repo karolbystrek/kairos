@@ -33,6 +33,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -66,18 +67,22 @@ public class ExternalOrderService {
         }
         var cursor = cursorCodec.decode(cursorValue);
         var limit = pageSize(requestedLimit);
-        var specification = orderSpecification(
-                principal,
-                requestedLocationId,
-                status,
-                cursor
-        );
+        var locationIds = requestedLocationId != null
+                ? List.of(requestedLocationId)
+                : List.copyOf(principal.locationIds());
         var sort = Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"));
-        // findBy avoids the COUNT query that findAll(spec, Pageable) runs on full pages.
-        var content = orderRepository.findBy(
-                specification,
-                query -> query.sortBy(sort).limit(limit + 1).all()
-        );
+        // One index-ordered query per location: a single IN query would sort the whole history.
+        var content = (locationIds.size() > 1 ? locationIds.stream().map(List::of) : Stream.of(locationIds))
+                .flatMap(ids -> orderRepository.findBy(
+                        // findBy avoids the COUNT query that findAll(spec, Pageable) runs on full pages.
+                        orderSpecification(ids, status, cursor),
+                        query -> query.sortBy(sort).limit(limit + 1).all()
+                ).stream())
+                // Ties compare ids as text: UUID.compareTo is signed, PostgreSQL compares bytes as the cursor does.
+                .sorted(Comparator.comparing(CustomerOrder::getCreatedAt)
+                        .thenComparing((CustomerOrder order) -> order.getId().toString()).reversed())
+                .limit(limit + 1)
+                .toList();
         var hasNext = content.size() > limit;
         var visibleOrders = hasNext ? content.subList(0, limit) : content;
         var items = visibleOrders.stream()
@@ -158,6 +163,10 @@ public class ExternalOrderService {
     ) {
         databaseAccess.integrationCommand(principal);
         principal.requireScope(ApiKeyScope.ORDERS_WRITE);
+        // Location before order, as create does, so the outbox FK check cannot deadlock.
+        var locationId = orderRepository.findLocationIdById(orderId)
+                .orElseThrow(ExternalOrderService::orderNotFound);
+        locationRepository.findForShareById(locationId);
         var order = orderRepository.findForUpdateByIdAndLocationIdIn(
                         orderId,
                         principal.locationIds()
@@ -176,20 +185,13 @@ public class ExternalOrderService {
     }
 
     private static Specification<CustomerOrder> orderSpecification(
-            ApiKeyPrincipal principal,
-            UUID requestedLocationId,
+            List<UUID> locationIds,
             OrderStatus status,
             ExternalOrderCursorCodec.Cursor cursor
     ) {
         return (root, query, criteriaBuilder) -> {
             var predicates = new ArrayList<Predicate>();
-            predicates.add(root.get("location").get("id").in(principal.locationIds()));
-            if (requestedLocationId != null) {
-                predicates.add(criteriaBuilder.equal(
-                        root.get("location").get("id"),
-                        requestedLocationId
-                ));
-            }
+            predicates.add(root.get("location").get("id").in(locationIds));
             if (status != null) {
                 predicates.add(criteriaBuilder.equal(root.get("status"), status));
             }

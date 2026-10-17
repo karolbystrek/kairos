@@ -10,7 +10,7 @@ import { ThemeProvider as NextThemesProvider } from "next-themes";
 import { ReviewInvitation } from "@/src/pwa/review-invitation";
 import { CustomerPwaProvider } from "@/src/pwa/notification-provider";
 
-export interface ProvidersProps {
+interface ProvidersProps {
   children: React.ReactNode;
   themeProps?: ThemeProviderProps;
 }

@@ -66,8 +66,7 @@ Session cookies work over `http://localhost` in Chrome and Firefox; Safari
 requires HTTPS.
 
 For runtime verification use the `kairos` Compose project (`name: kairos` in
-`compose.yaml`), never a separately named stack. Use `./reset.sh` only when the user has authorized
-resetting containers or data.
+`compose.yaml`), never a separately named stack.
 
 Backend verification requires a running Docker engine; the command is in
 [validation](validation.md). The JUnit launcher starts one disposable PostgreSQL 18

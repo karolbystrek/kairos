@@ -217,6 +217,9 @@ sys.exit(deploy.main(sys.argv[1:]))
                 result = self.run_deploy(FAIL_STAGE=stage)
                 self.assert_failed_safely(result)
                 self.assertIn(stage, result.stderr)
+                if stage != "pull":
+                    self.assertIn("api running unhealthy", result.stderr)
+                    self.assertTrue(any("ps" in call and "-a" in call for call in self.commands()))
                 updates = [call[-1] for call in self.commands() if "up" in call]
                 if stage in ("pull", "redis", "api"):
                     self.assertNotIn("panel-app", updates)

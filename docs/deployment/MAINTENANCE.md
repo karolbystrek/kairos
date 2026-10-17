@@ -36,6 +36,8 @@ fails or is cancelled; dispatch again deliberately to retry. The check fails
 closed when GitHub cannot verify the latest run. An already active deployment
 finishes under the existing production concurrency lock.
 
+Each deployment replaces the single API, frontend and NGINX replicas, so expect about a minute of errors and dropped live-update streams; deploy off-peak.
+
 Then fix forward: correct configuration or commit a fix, obtain a new validated
 release and approval, and rerun the normal command.
 A failed migration requires diagnosis, not removal of volumes, key regeneration,
@@ -43,11 +45,24 @@ checksum bypass or resetting production. Application redeployment cannot recover
 lost data. The current development VPS accepts that loss under the
 [operations policy](../requirements/routing-releases.md#development-operations-policy).
 
+## Database backups
+
+Bootstrap schedules `/etc/cron.d/kairos-backup`: every night at 03:30 it runs
+`pg_dump -Fc` inside the PostgreSQL container into
+`/srv/kairos/backups/kairos-YYYY-MM-DD.dump` (root-only `0700` directory) and
+deletes dumps older than seven days. After the operator authorizes stopping the
+API, restore with
+`docker exec -i kairos-postgres-1 sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists' < DUMP`
+(single quotes, so the container's variables are used). The dumps live on the same VM and
+volume, so they do not survive VM loss; off-host copies (Lightsail automatic
+snapshots) need an approved AWS change and are a launch gate in
+[delivery status](../requirements/delivery-status.md#deferred-work).
+
 | Maintenance | Procedure and verification |
 | --- | --- |
-| OS/Docker/infrastructure patches | Schedule an outage with the operator; review upstream changes, validate changed Compose/NGINX configuration and deploy a reviewed revision. Infrastructure tags can change independently of source; test upgrades deliberately and record pulled versions. Verify health and reboot recovery. |
+| OS/Docker/infrastructure patches | Schedule an outage with the operator; review upstream changes, validate changed Compose/NGINX configuration and deploy a reviewed revision. Infrastructure tags can change independently of source; deployments pull only missing images, so upgrade PostgreSQL, Redis and NGINX images deliberately with an explicit `docker compose pull` in the window, and record pulled versions. Verify health and reboot recovery. |
 | SSH/GHCR credentials | Install and verify replacement credentials through a trusted path before revoking old ones. Update the Environment SSH key/known_hosts after independently verifying any changed host key. Renew host registry credentials before expiry and verify all three pulls without exposing tokens. |
-| Staff credentials | Password hashes, verification-code hashes and session IDs live in PostgreSQL; protect the database and its backups as credential-bearing data. The retention purge deletes an account's credentials with its data. There is no staff service token to rotate. Changing database passwords in `.env` alone does not rotate existing PostgreSQL roles. |
+| Staff credentials | Password hashes, verification-code hashes and session IDs live in PostgreSQL; protect the database and its backups as credential-bearing data. The retention purge deletes an account's credentials with its data. There is no staff service token to rotate. Changing database passwords in `production.env` alone does not rotate existing PostgreSQL roles. |
 | Resend sending key | Replace the `RESEND_API_KEY` production Environment secret, deploy in an approved window and verify bounded delivery outcome metadata before revoking the old key. Never log codes, invitation tokens or email bodies. Queued messages survive API restarts; terminal delivery clears their encrypted contents. |
 | Origin CA certificate | Track expiry with `openssl x509 -in /srv/kairos/tls/tls.crt -noout -dates`. Provision a matching replacement covering all names into the external TLS directory, preserve permissions, recreate/reload NGINX in an approved window, verify Full (strict) paths, then retire the old certificate/key. Never disable strict TLS to hide an expiry failure. |
 | Encryption/VAPID keys | Do not overwrite keys in place as a routine rotation. Current encrypted webhook signing secrets, push subscriptions and pending email contents require their original keys; there is no multi-key decrypt/re-encrypt command. Plan a separately reviewed data transformation or explicit retirement of affected data/deliveries, with backup and retention implications. VAPID changes require browser subscription replacement and existing delivery acceptance. |
@@ -107,7 +122,7 @@ email alarms for status-check failures, sustained high CPU and low CPU burst
 capacity. Follow [alarm setup](MONITORING.md) for provisioning, notification tests
 and response guidance. Live alarms and email delivery were verified on 2026-10-08. Disk,
 memory and public HTTPS alerts are deferred; no custom host monitoring runs.
-Backups, retention/recovery targets and restore rehearsals are also deferred
+Off-host backups, retention/recovery targets and restore rehearsals are deferred
 until real users or valuable data; confirm those targets at that stage.
 
 Public launch also requires the independent RLS privilege/isolation work, live

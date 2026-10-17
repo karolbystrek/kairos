@@ -125,10 +125,6 @@ public class ApiKey {
                 .collect(Collectors.toUnmodifiableSet());
     }
 
-    public boolean grants(ApiKeyScope required) {
-        return scopes.stream().anyMatch(scope -> scope.grants(required));
-    }
-
     public boolean isDeleted() {
         return deletedAt != null;
     }

@@ -7,17 +7,13 @@ establish public-launch readiness. Those actions require operator inputs and
 explicit authorization. The current VPS is a disposable development environment:
 all orders, accounts and credentials may be lost after host failure. Runtime
 configuration lives in the GitHub `production` Environment; keep keys and TLS
-material outside the host for a fresh rebuild; database recovery
-is deferred under the [operations policy](../requirements/routing-releases.md#development-operations-policy).
+material outside the host for a fresh rebuild. Nightly on-host database dumps
+exist, but off-host recovery is a launch gate under the
+[operations policy](../requirements/routing-releases.md#development-operations-policy).
 Use synthetic data until the launch gates in
 [issue #9](https://github.com/karolbystrek/kairos/issues/9) are verified.
 
-## Approval before cloud changes
-
-Agents may inspect AWS and Cloudflare read-only. Resource changes require
-explicit user approval for the action and scope, including changes made by
-scripts or agent-triggered automation. Provisioning instructions are not
-permission to execute them. See [cloud operations](../agents/cloud-operations.md).
+Cloud changes need approval: see [cloud operations](../agents/cloud-operations.md).
 
 ## Operator sequence
 

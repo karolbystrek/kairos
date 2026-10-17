@@ -69,6 +69,7 @@ afterEach(() => {
   cleanup();
   vi.useRealTimers();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 describe("order exit controls", () => {
@@ -131,6 +132,8 @@ describe("order event stream", () => {
     await renderOrder("IN_PREPARATION");
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
     vi.useFakeTimers();
+    // Midpoint jitter keeps the delays exact.
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
 
     // A reconnecting (not closed) source recovers by itself and is left alone.
     FakeEventSource.instances[0].readyState = 0;

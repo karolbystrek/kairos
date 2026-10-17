@@ -86,6 +86,10 @@ public class OrderService {
     @Transactional
     public OrderView updateStatus(StaffPrincipal principal, UUID orderId, OrderStatus target) {
         var access = staffAccessService.resolveForUpdate(principal);
+        // Location before order, as create and lifecycle cascades do, so the outbox FK check cannot deadlock.
+        var locationId = orderRepository.findLocationIdById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order was not found"));
+        locationRepository.findForShareById(locationId);
         var order = orderRepository.findForUpdateById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order was not found"));
         access.requireLocationAccess(

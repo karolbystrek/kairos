@@ -85,7 +85,7 @@ gh variable set DEPLOY_INSTANCE --env production --repo karolbystrek/kairos --bo
 gh variable set DEPLOY_AWS_ACCOUNT_ID --env production --repo karolbystrek/kairos --body "$AWS_ACCOUNT_ID"
 gh variable set DEPLOY_AWS_ROLE_ARN --env production --repo karolbystrek/kairos \
   --body "arn:aws:iam::$AWS_ACCOUNT_ID:role/kairos-production-deploy-ssh"
-gh variable set DEPLOY_ADMIN_CIDRS --env production --repo karolbystrek/kairos --body '89.67.6.243/32'
+gh variable set DEPLOY_ADMIN_CIDRS --env production --repo karolbystrek/kairos --body '203.0.113.10/32'
 ```
 
 The 7200-second session covers the job's 70-minute timeout; do not shorten it below
@@ -110,8 +110,8 @@ trusted checkout on your workstation (AWS CLI credentials required):
 ```sh
 export AWS_REGION=eu-central-1
 export DEPLOY_INSTANCE=kairos-production
-export DEPLOY_HOST=52.58.250.75
-export DEPLOY_ADMIN_CIDRS=89.67.6.243/32
+export DEPLOY_HOST=198.51.100.7
+export DEPLOY_ADMIN_CIDRS=203.0.113.10/32
 export GITHUB_RUN_ID=0 GITHUB_RUN_ATTEMPT=0
 python3 deployment/ssh_firewall.py recover
 ```

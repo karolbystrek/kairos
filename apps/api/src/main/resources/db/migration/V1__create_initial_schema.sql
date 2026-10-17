@@ -85,9 +85,12 @@ CREATE TABLE external_integrations
     CONSTRAINT external_integrations_last_enabled_check CHECK (
         last_enabled_at >= created_at AND last_enabled_at <= updated_at
         ),
-    CONSTRAINT external_integrations_tenant_name_key UNIQUE (tenant_id, normalized_name),
     CONSTRAINT external_integrations_id_tenant_key UNIQUE (id, tenant_id)
 );
+
+-- Archived integrations free their names, as archived locations do.
+CREATE UNIQUE INDEX external_integrations_tenant_live_name_key ON external_integrations (tenant_id, normalized_name)
+    WHERE status <> 'ARCHIVED';
 
 CREATE INDEX external_integrations_tenant_status_idx
     ON external_integrations (tenant_id, status, created_at);
@@ -179,9 +182,12 @@ CREATE TABLE webhook_subscriptions
         last_enabled_at IS NULL
             OR (last_enabled_at >= created_at AND last_enabled_at <= updated_at)
         ),
-    CONSTRAINT webhook_subscriptions_integration_name_key UNIQUE (integration_id, normalized_name),
     CONSTRAINT webhook_subscriptions_id_tenant_key UNIQUE (id, tenant_id)
 );
+
+-- Archived subscriptions free their names, as archived locations do.
+CREATE UNIQUE INDEX webhook_subscriptions_integration_live_name_key ON webhook_subscriptions (integration_id, normalized_name)
+    WHERE status <> 'ARCHIVED';
 
 CREATE INDEX webhook_subscriptions_integration_status_idx
     ON webhook_subscriptions (integration_id, status, created_at);
@@ -622,6 +628,8 @@ CREATE TABLE order_hourly_analytics (
     CHECK (duration_count > 0 OR total_duration_ms=0)
 );
 CREATE INDEX order_hourly_analytics_hour_idx ON order_hourly_analytics(hour);
+-- Tenant-wide reports filter by tenant and hour; the primary key leads with location.
+CREATE INDEX order_hourly_analytics_tenant_hour_idx ON order_hourly_analytics(tenant_id,hour);
 
 -- Granted and revoked manually by the database owner; the runtime role can never write it.
 CREATE TABLE platform_administrators (
@@ -684,6 +692,9 @@ CREATE TABLE webhook_deliveries
 
 CREATE INDEX webhook_deliveries_available_idx
     ON webhook_deliveries (status, next_attempt_at, claim_until, created_at, id);
+-- Retention purges select finished rows by completion time.
+CREATE INDEX webhook_deliveries_finished_idx ON webhook_deliveries (completed_at, id)
+    WHERE status IN ('SUCCEEDED', 'DEAD_LETTERED');
 
 CREATE TABLE webhook_delivery_signing_versions
 (
@@ -764,6 +775,10 @@ ALTER TABLE customer_push_deliveries ADD CONSTRAINT push_delivery_event_order_fk
     FOREIGN KEY(outbox_event_id, order_id) REFERENCES order_outbox_events(id, order_id);
 
 CREATE INDEX customer_push_deliveries_subscription_idx ON customer_push_deliveries (subscription_id);
+-- Foreign-key checks on order and event deletes would otherwise scan these tables per row.
+CREATE INDEX customer_push_deliveries_order_idx ON customer_push_deliveries (order_id);
+CREATE INDEX customer_push_deliveries_outbox_event_idx ON customer_push_deliveries (outbox_event_id);
+CREATE INDEX order_outbox_events_order_idx ON order_outbox_events (order_id);
 CREATE INDEX webhook_deliveries_subscription_idx ON webhook_deliveries (subscription_id);
 CREATE INDEX order_outbox_events_location_idx ON order_outbox_events (location_id);
 CREATE INDEX order_outbox_events_finished_idx ON order_outbox_events (created_at, id)
@@ -1378,6 +1393,7 @@ CREATE TABLE usage_hourly_analytics (
     CHECK (hour=date_trunc('hour',hour AT TIME ZONE 'UTC') AT TIME ZONE 'UTC')
 );
 CREATE INDEX usage_hourly_analytics_hour_idx ON usage_hourly_analytics(hour);
+CREATE INDEX usage_hourly_analytics_tenant_hour_idx ON usage_hourly_analytics(tenant_id,hour);
 ALTER TABLE usage_hourly_analytics ENABLE ROW LEVEL SECURITY;
 CREATE POLICY scoped_select ON usage_hourly_analytics FOR SELECT USING (kairos_security.analytics_report(tenant_id,location_id));
 ALTER TABLE platform_administrators ENABLE ROW LEVEL SECURITY;
@@ -1473,6 +1489,7 @@ CREATE TABLE email_deliveries (
 );
 ALTER TABLE account_invitations ADD CONSTRAINT invitation_delivery_fk FOREIGN KEY (delivery_id) REFERENCES email_deliveries(id);
 CREATE INDEX email_deliveries_available_idx ON email_deliveries(next_attempt_at,created_at,id) WHERE state='QUEUED';
+CREATE INDEX email_deliveries_finished_idx ON email_deliveries(completed_at,id) WHERE state IN ('SENT','FAILED');
 CREATE FUNCTION kairos_security.email_access(owner_scope text,owner_identity text,tenant uuid,location uuid) RETURNS boolean
 LANGUAGE sql STABLE SET search_path=pg_catalog AS $$
     SELECT (owner_scope='verification' AND kairos_security.setting('scope')='verification'

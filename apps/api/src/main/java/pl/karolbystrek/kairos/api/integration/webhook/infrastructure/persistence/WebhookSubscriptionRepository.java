@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import pl.karolbystrek.kairos.api.integration.webhook.domain.WebhookSubscription;
+import pl.karolbystrek.kairos.api.integration.webhook.domain.WebhookSubscriptionStatus;
 
 import java.time.Instant;
 import java.util.Collection;
@@ -21,11 +22,16 @@ public interface WebhookSubscriptionRepository extends JpaRepository<WebhookSubs
 
     Optional<WebhookSubscription> findByIdAndTenantId(UUID id, UUID tenantId);
 
-    boolean existsByIntegrationIdAndNormalizedName(UUID integrationId, String normalizedName);
-
-    boolean existsByIntegrationIdAndNormalizedNameAndIdNot(
+    boolean existsByIntegrationIdAndNormalizedNameAndStatusNot(
             UUID integrationId,
             String normalizedName,
+            WebhookSubscriptionStatus status
+    );
+
+    boolean existsByIntegrationIdAndNormalizedNameAndStatusNotAndIdNot(
+            UUID integrationId,
+            String normalizedName,
+            WebhookSubscriptionStatus status,
             UUID excludedId
     );
 
@@ -62,7 +68,7 @@ public interface WebhookSubscriptionRepository extends JpaRepository<WebhookSubs
               AND location_access.location_id = :locationId
               AND event_selection.event_type = :eventType
             ORDER BY subscription.created_at, subscription.id
-            FOR UPDATE
+            FOR UPDATE OF subscription
             """, nativeQuery = true)
     List<WebhookSubscription> findMatchingForFanout(
             @Param("tenantId") UUID tenantId,
