@@ -1,5 +1,5 @@
 # Stage 1: Install dependencies
-FROM node:22-alpine AS deps
+FROM node:25-alpine AS deps
 WORKDIR /app
 
 COPY package.json package-lock.json* ./
@@ -12,7 +12,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 CMD ["sh", "-c", "npm ci --prefer-offline --no-audit --no-fund && npm run dev -- --hostname 0.0.0.0"]
 
 # Stage 2: Build the application
-FROM node:22-alpine AS builder
+FROM node:25-alpine AS builder
 WORKDIR /app
 
 ARG NEXT_PUBLIC_API_BASE_URL
@@ -25,7 +25,7 @@ COPY . .
 RUN --mount=type=cache,target=/app/.next/cache npm run build
 
 # Stage 3: Production runner
-FROM node:22-alpine AS runner
+FROM node:25-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
