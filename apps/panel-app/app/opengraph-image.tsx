@@ -44,11 +44,11 @@ export default async function OpenGraphImage() {
               lineHeight: 1.1,
             }}
           >
-            <span>Telefony Twoich gości.</span>
-            <span>Pagery Twojej restauracji.</span>
+            <span>Pager, który gość</span>
+            <span>ma już w kieszeni.</span>
           </div>
           <span style={{ fontSize: 36, color: "#6e6e73" }}>
-            Klienci skanują kod QR i śledzą zamówienia.
+            Gość skanuje kod QR i wie, kiedy odebrać zamówienie.
           </span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
