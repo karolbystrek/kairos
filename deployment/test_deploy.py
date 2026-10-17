@@ -41,7 +41,7 @@ class DeployTest(unittest.TestCase):
         self.state = self.root / "state"
         self.state.mkdir()
         self.record = self.state / "deployed-release.json"
-        self.record.write_text('{"revision":"previous-success"}\n')
+        self.record.write_text(json.dumps(self.manifest))
         self.original_record = self.record.read_bytes()
         self.secrets = self.root / "secrets"
         self.secrets.mkdir()
@@ -203,7 +203,7 @@ sys.exit(deploy.main(sys.argv[1:]))
             if call[0] == "docker":
                 self.assertIn("--project-name", call)
                 self.assertEqual(call[call.index("--project-name") + 1], "kairos")
-        self.assertEqual(json.loads(self.record.read_text()), self.manifest)
+        self.assertEqual({key: json.loads(self.record.read_text())[key] for key in self.manifest}, self.manifest)
         override = json.loads((self.release / "compose.images.json").read_text())
         self.assertEqual(override, {"services": {service: {"image": image} for service, image in self.manifest["images"].items()}})
         self.assertEqual([call[-1] for call in calls if call[0] == "curl"], [
@@ -223,21 +223,64 @@ sys.exit(deploy.main(sys.argv[1:]))
                     self.assertNotIn("nginx", updates)
                 self.assertFalse(any(call[0] == "curl" for call in self.commands()))
 
-    def test_failed_release_redeploys_previous_release_and_still_fails(self):
-        previous = {"revision": "b" * 40, "images": {
-            service: f"ghcr.io/karolbystrek/kairos/{service}@sha256:" + str(index + 4) * 64
-            for index, service in enumerate(SERVICES)}}
+    def test_failed_release_uses_previous_runtime_and_protected_environment(self):
+        self.record.unlink()
+        self.assertEqual(self.run_deploy().returncode, 0)
+        previous = json.loads(self.record.read_text())
+        previous_runtime = self.root / "previous runtime"
+        shutil.copytree(self.release, previous_runtime)
+        previous["release_directory"] = str(previous_runtime)
         self.record.write_text(json.dumps(previous))
-        # The Compose fixture resolves only the previous images, so the new release fails validation.
-        for service in SERVICES:
-            self.config["services"][service]["image"] = previous["images"][service]
-        result = self.run_deploy()
+        self.env_file.write_text("POSTGRES_PASSWORD=replacement-secret\n")
+        self.log.unlink()
+        changed = copy.deepcopy(self.manifest)
+        changed["revision"] = "b" * 40
+        changed["images"]["api"] = "ghcr.io/karolbystrek/kairos/api@sha256:" + "9" * 64
+        result = self.run_deploy(changed)
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("Rolling back to " + "b" * 40, result.stderr)
-        override = json.loads((self.release / "compose.images.json").read_text())
-        self.assertEqual(override["services"]["api"]["image"], previous["images"]["api"])
-        self.assertEqual(json.loads(self.record.read_text()), previous)
         self.assertIn("Rollback verified", result.stderr)
+        calls = [call for call in self.commands() if call[0] == "docker" and "up" in call]
+        self.assertTrue(calls)
+        for call in calls:
+            self.assertEqual(Path(call[call.index("--project-directory") + 1]).resolve(), previous_runtime.resolve())
+            snapshot = Path(call[call.index("--env-file") + 1])
+            self.assertEqual(snapshot.read_text(), "POSTGRES_PASSWORD=do-not-print-this-secret\n")
+            self.assertEqual(snapshot.stat().st_mode & 0o777, 0o600)
+        self.assertEqual(json.loads(self.record.read_text()), previous)
+        self.assertNotIn("replacement-secret", result.stdout + result.stderr)
+
+    def test_success_retains_previous_recovery_identity_and_retry_does_not_replace_it(self):
+        self.record.unlink()
+        self.assertEqual(self.run_deploy().returncode, 0)
+        first = json.loads(self.record.read_text())
+        old_runtime = self.root / "first runtime"
+        shutil.copytree(self.release, old_runtime)
+        first["release_directory"] = str(old_runtime.resolve())
+        self.record.write_text(json.dumps(first))
+        second_manifest = {**self.manifest, "revision": "b" * 40}
+        self.assertEqual(self.run_deploy(second_manifest).returncode, 0)
+        second = json.loads(self.record.read_text())
+        self.assertEqual(second["previous"], first)
+        self.assertEqual(self.run_deploy(second_manifest).returncode, 0)
+        self.assertEqual(json.loads(self.record.read_text())["previous"], first)
+
+    def test_invalid_recovery_snapshot_fails_before_docker_without_exposing_contents(self):
+        self.record.unlink()
+        self.assertEqual(self.run_deploy().returncode, 0)
+        original = json.loads(self.record.read_text())
+        for env_path in (str(self.env_file), "relative.env"):
+            with self.subTest(env_path=env_path):
+                self.log.unlink(missing_ok=True)
+                self.record.write_text(json.dumps({**original, "env_file": env_path}))
+                result = self.run_deploy()
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(self.commands(), [])
+                self.assertNotIn("do-not-print-this-secret", result.stdout + result.stderr)
+        self.record.write_text(json.dumps(original))
+        Path(original["env_file"]).chmod(0o644)
+        self.log.unlink(missing_ok=True)
+        self.assertNotEqual(self.run_deploy().returncode, 0)
+        self.assertEqual(self.commands(), [])
 
     def test_failed_external_probe_never_records_success(self):
         for extra in ({"FAIL_STAGE": "external"}, {"PROBE_STATUS": "302"},
@@ -296,7 +339,7 @@ sys.exit(deploy.main(sys.argv[1:]))
         ]) + "\n")
         result = self.run_deploy(REAL_COMPOSE=DOCKER)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(json.loads(self.record.read_text()), self.manifest)
+        self.assertEqual({key: json.loads(self.record.read_text())[key] for key in self.manifest}, self.manifest)
         config_call = next(call for call in self.commands() if "config" in call)
         resolved = subprocess.run(
             [DOCKER, *config_call[1:]], capture_output=True, text=True, check=True,

@@ -62,13 +62,11 @@ function useOrderEventStream({
   enabled,
   trackingReference,
   applyOrder,
-  refetch,
   setConnected,
 }: {
   enabled: boolean;
   trackingReference: string;
   applyOrder: (order: CustomerOrder) => void;
-  refetch: () => void;
   setConnected: (connected: boolean) => void;
 }) {
   useSWRSubscription(
@@ -100,8 +98,6 @@ function useOrderEventStream({
           delay = reconnectDelays.initial;
           attempts = 0;
           setConnected(true);
-          // The stream carries only changes, so catch up on any made before it opened.
-          refetch();
         };
         eventSource.onerror = () => {
           setConnected(false);
@@ -255,7 +251,6 @@ export function OrderTracker({
         { revalidate: false },
       );
     },
-    refetch: () => void mutate(),
     setConnected: setIsStreamConnected,
   });
 

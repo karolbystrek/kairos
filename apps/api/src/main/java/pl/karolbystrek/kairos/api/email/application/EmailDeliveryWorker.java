@@ -3,7 +3,6 @@ package pl.karolbystrek.kairos.api.email.application;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
@@ -30,8 +29,7 @@ public class EmailDeliveryWorker {
     private final ResendEmailSender sender;
     private final Clock clock;
 
-    @Scheduled(fixedDelayString = "${kairos.email.poll-delay:1000}", initialDelayString = "${kairos.email.initial-delay:1000}")
-    public void deliverAvailable() {
+    public boolean deliverAvailable() {
         var transaction = new TransactionTemplate(transactions);
         transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         for (var index = 0; index < 20; index++) {
@@ -40,7 +38,7 @@ public class EmailDeliveryWorker {
                 (row, number) -> new Claimed(row.getObject("id", UUID.class), row.getBytes("encrypted_payload"),
                     row.getBytes("payload_nonce"), row.getInt("attempt_count"), row.getTimestamp("first_attempt_at").toInstant()),
                 Timestamp.from(clock.instant()), token).stream().findFirst().orElse(null));
-            if (claimed == null) return;
+            if (claimed == null) return false;
             ResendEmailSender.Result result;
             try {
                 result = !clock.instant().isBefore(claimed.firstAttempt().plus(Duration.ofHours(23)))
@@ -59,5 +57,6 @@ public class EmailDeliveryWorker {
                 "SELECT public.complete_email_delivery(?,?,?,?,?)", Boolean.class,
                 claimed.id(), token, state, Timestamp.from(now), Timestamp.from(retry)));
         }
+        return true;
     }
 }

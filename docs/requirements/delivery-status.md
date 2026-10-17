@@ -41,9 +41,10 @@ The current walking vertical slice is implemented for local development:
   updates;
 * durable anonymous hourly order counts and versioned preparation/collection duration summaries, with transaction-safe collection and scoped background processing;
 * approximate anonymous panel opening and customer review click/dismissal counts, with bounded authorized ingestion and hourly aggregation;
-* one channel-neutral transactional order outbox with Spring API background
-  jobs for independent single-attempt webhook and durable retrying Web Push
-  delivery;
+* one channel-neutral transactional order outbox with independent, durable
+  retrying webhook and Web Push delivery under the [delivery policy](resilience.md);
+* asynchronous commit-triggered email delivery with recovery polling, shared
+  staff queue reads per refresh cycle and bounded customer stream recovery;
 * one API configuration with externally supplied private keys;
 * repository-owned local setup for configuration, complete key validation,
   restrictive permissions, and explicit existing-key handling;
@@ -143,7 +144,7 @@ Deferred operational and product work includes order archives and search, printa
 tracking-reference expiration, session-management UI, additional
 administrators, CAPTCHA, MFA,
 passkeys, webhook DLQ
-inspection and alerts, automatic webhook retry or redelivery, strict delivery
+inspection and alerts, manual webhook redelivery, strict delivery
 ordering, application-owned install prompts, and native mobile variants. Any of
 these requires an explicitly approved increment and synchronized changes to
 the [canonical requirements](../REQUIREMENTS.md).

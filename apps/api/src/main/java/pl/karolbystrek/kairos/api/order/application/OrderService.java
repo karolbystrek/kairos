@@ -51,12 +51,23 @@ public class OrderService {
             requireAccessibleLocation(access, locationId);
         }
         var scopedLocationId = locationId != null ? locationId : access.locationId();
-        var orders = scopedLocationId != null
-                ? orderRepository.findAllByLocationIdAndStatusInOrderByCreatedAtDesc(scopedLocationId, statuses)
-                : orderRepository.findAllByLocationTenantIdAndStatusInOrderByCreatedAtDesc(access.tenantId(), statuses);
-        return orders.stream()
-                .map(OrderView::from)
-                .toList();
+        return readOrders(access.tenantId(), scopedLocationId, statuses);
+    }
+
+    public record QueueScope(UUID tenantId, UUID locationId) { }
+
+    // The caller owns this map for one refresh cycle; authorization is always resolved before reuse.
+    @Transactional(readOnly = true)
+    public List<OrderView> listOrdersForRefresh(
+            StaffPrincipal principal,
+            UUID locationId,
+            Map<QueueScope, List<OrderView>> snapshots
+    ) {
+        var access = staffAccessService.resolve(principal);
+        if (locationId != null) requireAccessibleLocation(access, locationId);
+        var scope = new QueueScope(access.tenantId(), locationId != null ? locationId : access.locationId());
+        return snapshots.computeIfAbsent(scope,
+                ignored -> readOrders(scope.tenantId(), scope.locationId(), OrderStatus.activeStatuses()));
     }
 
     @Transactional
@@ -105,6 +116,13 @@ public class OrderService {
         databaseAccess.trackedOrders(trackingReferences);
         return orderRepository.findAllByTrackingReferenceIn(trackingReferences).stream()
                 .collect(Collectors.toMap(CustomerOrder::getTrackingReference, TrackedOrderView::from));
+    }
+
+    private List<OrderView> readOrders(UUID tenantId, UUID locationId, Set<OrderStatus> statuses) {
+        var orders = locationId != null
+                ? orderRepository.findAllByLocationIdAndStatusInOrderByCreatedAtDesc(locationId, statuses)
+                : orderRepository.findAllByLocationTenantIdAndStatusInOrderByCreatedAtDesc(tenantId, statuses);
+        return orders.stream().map(OrderView::from).toList();
     }
 
     private Location requireLocation(UUID locationId) {

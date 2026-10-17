@@ -9,6 +9,7 @@ import org.springframework.test.context.bean.override.convention.TestBean;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import pl.karolbystrek.kairos.api.authentication.infrastructure.persistence.StaffIdentityStore;
+import pl.karolbystrek.kairos.api.email.application.EmailWorker;
 import pl.karolbystrek.kairos.api.integration.testsupport.MutableTestClock;
 import pl.karolbystrek.kairos.api.integration.testsupport.MutableTestClockConfiguration;
 import pl.karolbystrek.kairos.api.notification.infrastructure.worker.CustomerPushWorker;
@@ -24,6 +25,9 @@ public abstract class RedisListenerIsolatedIntegrationTest {
 
     @MockitoBean
     private WebhookWorker webhookWorker;
+
+    @MockitoBean
+    private EmailWorker emailWorker;
 
     @MockitoSpyBean
     protected StaffIdentityStore identities;

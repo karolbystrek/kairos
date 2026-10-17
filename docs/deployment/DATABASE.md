@@ -22,8 +22,30 @@ Compose mounts `deployment/postgres/bootstrap.sh` into PostgreSQL's standard
 `docker-entrypoint-initdb.d` directory. On an empty database volume, PostgreSQL
 creates its initial database, runs this role initialization script, and becomes
 ready. Spring then connects as the owner to apply migrations through Flyway automatically.
-V1 is frozen: every schema change goes into a new `V<n>__*.sql` migration.
+The disposable pre-launch V1–V8 history was consolidated into one V1 baseline
+in [#230](https://github.com/karolbystrek/kairos/issues/230). The baseline creates
+the final schema directly, including credentials, password resets, expiry,
+webhook retries and fan-out failure handling. Future schema changes use new
+`V<n>__*.sql` migrations; do not keep rewriting V1.
 There is no separate database-bootstrap service or deployment stage.
+
+### Transition from the old development database
+
+The consolidated baseline deliberately changes V1's checksum and removes V2–V8.
+An existing database using that history cannot upgrade in place. Before the first
+release using this baseline, the operator must schedule an outage, stop the API
+and any other writers, and explicitly reset the disposable Kairos database.
+Recreate only that database under the existing migration owner, preserving
+database roles, external configuration, encryption/VAPID keys and TLS material;
+then start the new release so Flyway creates the schema from V1. All old
+accounts, orders, sessions and delivery records are discarded.
+
+Do not use Flyway repair, checksum overrides or baseline-on-migrate to disguise
+the incompatible history. Do not run the production-refusing local `reset.sh`
+or delete unrelated volumes. This repository change does not execute the reset.
+The old API images are not compatible rollback targets after this transition;
+establish a successful new-baseline deployment before relying on release
+recovery again. Afterward the normal migration compatibility rule resumes.
 
 Initialization scripts run only for an empty database volume. Editing environment
 passwords does not rotate existing roles. Coordinate credential changes through

@@ -33,13 +33,23 @@ stream events, Web Push messages and IndexedDB persistence share monotonic
 status reconciliation: `IN_PREPARATION` advances to `READY` or a terminal state,
 `READY` advances only to a terminal state, and a terminal state never changes.
 Status precedence, rather than wall-clock timestamp order, prevents regression.
+Customer recovery deduplicates tracking references and reads groups of at most
+500, each in a separate exact-reference transaction. A failed group remains
+connected for the next recovery cycle without preventing other groups from
+refreshing.
 
 Authenticated staff use `/api/orders/v1/events` with an optional `locationId`,
 matching the queue REST endpoint's location and tenant-wide access rules. The
 `order-queue` event carries the full current active queue on opening/reopening
 and after relevant committed creations or transitions. Queue refresh and
-snapshot delivery are serialized per connection so an older snapshot cannot
-replace a newer queue. Access is rechecked before each refresh, including every periodic re-sync; denied connections end. Active revocation on assignment or
+snapshot delivery are ordered across initial and refresh reads so an older
+snapshot cannot replace a newer queue. Within one refresh cycle, connections
+with the same verified tenant and effective location share one queue read;
+tenant-wide and location-scoped queues remain distinct. Session and persisted
+account/location authority are rechecked for each connection before sharing,
+including every periodic re-sync; denied connections end. The cycle-local
+snapshot is discarded afterward; there is no persistent response cache.
+Active revocation on assignment or
 session changes remains out of scope. Staff state stays scoped to the signed-in
 account and queue, with REST recovery while disconnected. Servlet async and
 error redispatches preserve the original request's authorization decision.
@@ -48,7 +58,14 @@ Push and webhook workers wake asynchronously after an order transaction
 commits, run fanout before delivery, and coalesce overlapping wakeups while
 draining available batches. PostgreSQL claim locks and delivery leases retain
 the existing multi-instance at-least-once guarantees. Five-second recovery
-cycles process abandoned work and due retries without frequent idle polling.
+cycles process abandoned work and due retries. Transactional email also wakes
+asynchronously after its enqueue transaction commits, drains available batches
+and coalesces wakeups. Its recovery poll (`kairos.email.poll-delay`, 30 seconds
+by default) handles missed wakeups, abandoned claims and due retries; retry and
+recovery pickup may be delayed by up to one poll interval plus worker backlog.
+These local wakeups assume the current combined API/worker process. A future
+worker-only process requires cross-instance signaling and separate worker
+enablement; disabling global scheduling would also stop stream maintenance.
 
 Web Push complements rather than replaces this foreground contract. `READY`,
 `COMPLETED`, and `CANCELED` order events are durably fanned out to enrolled

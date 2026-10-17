@@ -188,14 +188,44 @@ def rollout(release, env_file, manifest, base_env, report):
 
 
 def previous_release():
+    path = STATE_DIRECTORY / "deployed-release.json"
+    if not path.exists():
+        return None
+    record = json.loads(path.read_text())
+    # Legacy records contain only images and cannot safely recover runtime/configuration.
+    if set(record) == {"revision", "images"}:
+        return None
     try:
-        record = json.loads((STATE_DIRECTORY / "deployed-release.json").read_text())
-        images = record["images"]
-        if re.fullmatch(REVISION, record["revision"]) and set(images) == set(SERVICES):
-            return record
-    except (OSError, ValueError, KeyError, TypeError):
-        pass
-    return None
+        if set(record) not in ({"revision", "images", "release_directory", "env_file"},
+                               {"revision", "images", "release_directory", "env_file", "previous"}):
+            raise ValidationError("invalid recovery metadata")
+        if "previous" in record and (not isinstance(record["previous"], dict)
+                or set(record["previous"]) != {"revision", "images", "release_directory", "env_file"}):
+            raise ValidationError("invalid previous recovery metadata")
+        release = Path(record["release_directory"])
+        snapshot = Path(record["env_file"])
+        if (snapshot.is_symlink() or not snapshot.is_absolute()
+                or snapshot.parent != STATE_DIRECTORY / "environments"
+                or snapshot.stat().st_mode & 0o077):
+            raise ValidationError("invalid recovery environment snapshot")
+        _, _, manifest = inputs([str(release), str(snapshot)])
+        if manifest != {key: record[key] for key in ("revision", "images")}:
+            raise ValidationError("recovery runtime does not match its manifest")
+        return record
+    except (KeyError, TypeError):
+        raise ValidationError("invalid recovery metadata") from None
+
+
+def environment_snapshot(env_file):
+    directory = STATE_DIRECTORY / "environments"
+    directory.mkdir(mode=0o700, exist_ok=True)
+    if directory.is_symlink() or directory.stat().st_mode & 0o077:
+        raise ValidationError("recovery environment directory must be private")
+    with tempfile.NamedTemporaryFile(dir=directory, suffix=".env", delete=False) as file:
+        file.write(env_file.read_bytes())
+        file.flush()
+        os.fsync(file.fileno())
+        return Path(file.name)
 
 
 def main(arguments=None):
@@ -215,22 +245,32 @@ def main(arguments=None):
         with (STATE_DIRECTORY / "deploy.lock").open("a") as lock:
             # Host-wide flock, independent of the disposable release directory.
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            stage = "recovery metadata"
             previous = previous_release()
+            stage = "environment snapshot"
+            snapshot = environment_snapshot(env_file)
             try:
-                rollout(release, env_file, manifest, env, report)
+                rollout(release, snapshot, manifest, env, report)
             except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as error:
                 print(f"Deployment failed at {stage}: {failure_reason(error)}.", file=sys.stderr)
                 if previous is not None:
                     # Migrations are not undone; they must stay compatible with the previous release.
                     print(f"Rolling back to {previous['revision']}.", file=sys.stderr)
                     try:
-                        rollout(release, env_file, previous, env, report)
+                        rollout(Path(previous["release_directory"]), Path(previous["env_file"]),
+                                {key: previous[key] for key in ("revision", "images")}, env, report)
                         print(f"Rollback verified: {previous['revision']}", file=sys.stderr)
                     except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as rollback_error:
                         print(f"Rollback failed at {stage}: {failure_reason(rollback_error)}.", file=sys.stderr)
+                snapshot.unlink(missing_ok=True)
                 return 1
             stage = "success record"
-            atomic_json(STATE_DIRECTORY / "deployed-release.json", manifest)
+            record = {**manifest, "release_directory": str(release), "env_file": str(snapshot)}
+            if previous is not None:
+                prior = previous.get("previous") if previous["revision"] == manifest["revision"] else previous
+                if prior is not None:
+                    record["previous"] = {key: value for key, value in prior.items() if key != "previous"}
+            atomic_json(STATE_DIRECTORY / "deployed-release.json", record)
             print(f"Deployment verified: {manifest['revision']}")
         return 0
     except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as error:

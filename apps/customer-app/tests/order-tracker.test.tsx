@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import "fake-indexeddb/auto";
 
+import { IDBFactory } from "fake-indexeddb";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { SWRConfig } from "swr";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -27,7 +28,8 @@ class FakeEventSource {
   onopen?: () => void;
   onerror?: () => void;
   close = vi.fn();
-  addEventListener = vi.fn();
+  listeners = new Map<string, (event: MessageEvent<string>) => void>();
+  addEventListener = vi.fn((type: string, listener: (event: MessageEvent<string>) => void) => this.listeners.set(type, listener));
   removeEventListener = vi.fn();
   constructor(public url: string) {
     FakeEventSource.instances.push(this);
@@ -45,7 +47,7 @@ function respondWith(status: string) {
 async function renderOrder(status: string) {
   respondWith(status);
   render(
-    <SWRConfig value={{ provider: () => new Map() }}>
+    <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}>
       <CustomerPwaProvider>
         <OrderTracker trackingReference={TRACKING_REFERENCE} />
       </CustomerPwaProvider>
@@ -56,6 +58,8 @@ async function renderOrder(status: string) {
 
 beforeEach(() => {
   FakeEventSource.instances = [];
+  Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
+  vi.stubGlobal("indexedDB", new IDBFactory());
   fetchOrder.mockReset();
   vi.stubGlobal("EventSource", FakeEventSource);
   vi.stubGlobal("fetch", fetchOrder);
@@ -80,15 +84,47 @@ describe("order exit controls", () => {
 });
 
 describe("order event stream", () => {
-  it("refetches when the stream opens so a transition made before it opened is not lost", async () => {
+  it.each(["READY", "COMPLETED", "CANCELED"])("applies opening and reopening snapshots without REST when the order becomes %s", async (status) => {
     await renderOrder("IN_PREPARATION");
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+    const source = FakeEventSource.instances[0];
     const fetchesBeforeOpen = fetchOrder.mock.calls.length;
+    act(() => source.onopen?.());
+    const snapshot = (nextStatus: string) => source.listeners.get("order-status-changed")?.(new MessageEvent("order-status-changed", { data: JSON.stringify({ eventId: crypto.randomUUID(), trackingReference: TRACKING_REFERENCE, number: 12, label: "A12", status: nextStatus, updatedAt: "2026-10-09T20:01:00Z", reviewInvitation: null }) }));
+    await act(async () => snapshot(status));
+    await waitFor(() => expect(screen.queryByText("Zamknij zamówienie") !== null).toBe(status !== "READY"));
+    expect(fetchOrder.mock.calls.length).toBe(fetchesBeforeOpen);
+    if (status === "READY") {
+      expect(screen.getByText("Gotowe do odbioru")).toBeTruthy();
+      act(() => { source.onerror?.(); source.onopen?.(); });
+      await act(async () => snapshot("COMPLETED"));
+      await screen.findByText("Zamknij zamówienie");
+      await act(async () => snapshot("IN_PREPARATION"));
+      expect(screen.getByText("Zamknij zamówienie")).toBeTruthy();
+      expect(fetchOrder.mock.calls.length).toBe(fetchesBeforeOpen);
+    }
+  });
 
-    respondWith("READY");
-    act(() => FakeEventSource.instances[0].onopen?.());
-
-    await waitFor(() => expect(fetchOrder.mock.calls.length).toBeGreaterThan(fetchesBeforeOpen));
+  it("polls while disconnected and keeps a newer streamed state when REST is stale", async () => {
+    await renderOrder("IN_PREPARATION");
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+    const source = FakeEventSource.instances[0];
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"] });
+    act(() => source.onopen?.());
+    await act(async () => source.listeners.get("order-status-changed")?.(new MessageEvent("order-status-changed", { data: JSON.stringify({ eventId: crypto.randomUUID(), trackingReference: TRACKING_REFERENCE, number: 12, label: "A12", status: "READY", updatedAt: "2026-10-09T20:01:00Z" }) })));
+    const connectedFetches = fetchOrder.mock.calls.length;
+    await act(async () => vi.advanceTimersByTimeAsync(30_000));
+    expect(fetchOrder.mock.calls.length).toBe(connectedFetches);
+    let releasePoll!: (response: Response) => void;
+    const staleResponse = new Promise<Response>((resolve) => { releasePoll = resolve; });
+    fetchOrder.mockImplementation(() => staleResponse);
+    act(() => source.onerror?.());
+    await act(async () => vi.advanceTimersByTimeAsync(15_000));
+    // The polling clock does not drain IndexedDB's separate task queue.
+    vi.useRealTimers();
+    await waitFor(() => expect(fetchOrder.mock.calls.length).toBe(connectedFetches + 1));
+    await act(async () => releasePoll(Response.json({ number: 12, label: "A12", status: "IN_PREPARATION", updatedAt: "2026-10-09T20:00:00Z" })));
+    expect(screen.getByText("Gotowe do odbioru")).toBeTruthy();
   });
 
   it("recreates a permanently closed stream with doubling backoff", async () => {

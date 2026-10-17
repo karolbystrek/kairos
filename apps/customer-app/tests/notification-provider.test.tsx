@@ -1,163 +1,196 @@
-import type { ReactElement } from "react";
+// @vitest-environment jsdom
+import "fake-indexeddb/auto";
+
+import { IDBFactory, IDBObjectStore } from "fake-indexeddb";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
-import { CustomerPwaProvider } from "@/src/pwa/notification-provider";
-import type { NotificationMetadata } from "@/src/pwa/storage";
+import { CustomerPwaProvider, useCustomerNotifications } from "@/src/pwa/notification-provider";
+import { readNotificationMetadata, rememberTrackedOrder, updateNotificationMetadata } from "@/src/pwa/storage";
 
-const harness = vi.hoisted(() => ({
-  effects: [] as (() => void | (() => void))[],
-  metadata: { notificationsEnabled: true } as NotificationMetadata,
-  readMetadata: vi.fn(),
-  configuration: vi.fn(),
-  enroll: vi.fn(),
-  disable: vi.fn(),
-}));
-
-vi.mock("react", async (original) => ({
-  ...(await original<typeof import("react")>()),
-  useCallback: (callback: unknown) => callback,
-  useEffect: (effect: () => void | (() => void)) =>
-    harness.effects.push(effect),
-  useMemo: (factory: () => unknown) => factory(),
-  useRef: (current: unknown) => ({ current }),
-  useState: (initial: unknown) => [initial, vi.fn()],
-}));
-vi.mock("@/src/api/customer-notifications", () => ({
-  NotificationApiError: class extends Error {},
-  getNotificationConfiguration: harness.configuration,
-  fromBase64Url: () => new Uint8Array([1]),
-  serializePushSubscription: (subscription: unknown) => subscription,
-  reconcilePushSubscription: harness.enroll,
-  replacePushSubscription: vi.fn(),
-  disablePushSubscription: harness.disable,
-}));
-vi.mock("@/src/pwa/storage", () => ({
-  readNotificationMetadata: harness.readMetadata,
-  updateNotificationMetadata: async (patch: NotificationMetadata) => {
-    harness.metadata = { ...harness.metadata, ...patch };
-  },
-  readNotificationTrackingReferences: async () => ["order"],
-  pruneTerminalTrackedOrders: vi.fn(),
-}));
-vi.mock("@/src/pwa/badge", () => ({ updateApplicationBadge: vi.fn() }));
-vi.mock("@/src/pwa/notification-onboarding", () => ({
-  requiresNotificationInstallation: () => false,
-  shouldShowNotificationGuide: () => false,
-  readGuideDismissal: () => false,
-  rememberGuideDismissal: vi.fn(),
-}));
+vi.hoisted(() => vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "https://api.kairos.example"));
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((complete) => {
-    resolve = complete;
-  });
-
+  const promise = new Promise<T>((complete) => { resolve = complete; });
   return { promise, resolve };
 }
 
-let subscription: object | null;
+class InstallingWorker extends EventTarget {
+  state = "installing";
+  transition(state: string) {
+    this.state = state;
+    this.dispatchEvent(new Event("statechange"));
+  }
+}
+
+function Controls() {
+  const { state, pendingAction, message, enable, disable } = useCustomerNotifications();
+  return <><output data-testid="state">{state}</output><output data-testid="pending">{pendingAction}</output><p role="alert">{message}</p><button onClick={() => void enable()}>Enable</button><button onClick={() => void disable()}>Disable</button></>;
+}
+function Provider() { return <CustomerPwaProvider><Controls /></CustomerPwaProvider>; }
+
+let subscription: ReturnType<typeof makeSubscription> | null;
 let remoteEnabled: boolean;
-let online: () => void;
-const unsubscribe = vi.fn(async () => {
-  subscription = null;
-  return true;
-});
-const subscribe = vi.fn(async () => {
-  subscription = {
-    endpoint: "push",
-    options: { applicationServerKey: new Uint8Array([1]).buffer },
-    unsubscribe,
+const fetchMock = vi.fn();
+const subscribe = vi.fn();
+const register = vi.fn();
+const getRegistration = vi.fn();
+function makeSubscription(key = 1) {
+  return {
+    endpoint: `https://push.example/${key}`,
+    expirationTime: null,
+    options: { applicationServerKey: new Uint8Array([key]).buffer },
+    getKey: () => new Uint8Array([1]).buffer,
+    unsubscribe: vi.fn(async () => { subscription = null; return true; }),
   };
+}
+let registration: { active: object | null; installing: object | null; pushManager: { getSubscription: ReturnType<typeof vi.fn>; subscribe: typeof subscribe } };
 
-  return subscription;
-});
-
-beforeEach(() => {
+beforeEach(async () => {
   vi.clearAllMocks();
-  harness.effects = [];
-  harness.metadata = { notificationsEnabled: true };
-  harness.readMetadata.mockImplementation(async () => ({
-    ...harness.metadata,
-  }));
-  harness.configuration.mockResolvedValue({ applicationServerKey: "key" });
-  harness.enroll.mockImplementation(async () => {
-    remoteEnabled = true;
-  });
-  harness.disable.mockImplementation(async () => {
-    remoteEnabled = false;
-  });
+  vi.stubEnv("NODE_ENV", "production");
+  vi.stubGlobal("indexedDB", new IDBFactory());
+  vi.stubGlobal("Notification", { permission: "granted" });
+  vi.stubGlobal("PushManager", class {});
   subscription = null;
   remoteEnabled = false;
-  vi.stubEnv("NODE_ENV", "production");
-  vi.stubGlobal("Notification", { permission: "granted" });
-  vi.stubGlobal("window", {
-    PushManager: {},
-    Notification: {},
-    addEventListener: (_type: string, listener: () => void) => {
-      online = listener;
-    },
-    removeEventListener: vi.fn(),
+  subscribe.mockImplementation(async () => { subscription = makeSubscription(); return subscription; });
+  registration = { active: {}, installing: null, pushManager: { getSubscription: vi.fn(async () => subscription), subscribe } };
+  register.mockResolvedValue(registration);
+  getRegistration.mockResolvedValue(registration);
+  Object.defineProperty(navigator, "serviceWorker", { configurable: true, value: { register, getRegistration, ready: Promise.resolve(registration) } });
+  fetchMock.mockImplementation(async (url: string, options?: RequestInit) => {
+    if (url.endsWith("/configuration")) return Response.json({ applicationServerKey: "AQ" });
+    if (url.includes("csrf")) return Response.json({ token: "token" });
+    if (options?.method === "PUT" || options?.method === "POST") remoteEnabled = true;
+    if (options?.method === "DELETE") remoteEnabled = false;
+    return new Response(null, { status: 204 });
   });
-  vi.stubGlobal("navigator", {
-    onLine: true,
-    serviceWorker: {
-      register: vi.fn(),
-      ready: Promise.resolve({
-        pushManager: { getSubscription: async () => subscription, subscribe },
-      }),
-    },
+  vi.stubGlobal("fetch", fetchMock);
+  await updateNotificationMetadata({ notificationsEnabled: true });
+  await rememberTrackedOrder({ trackingReference: "order", number: 1, label: null, status: "IN_PREPARATION", updatedAt: "2026-10-09T20:00:00Z" });
+});
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); Reflect.deleteProperty(navigator, "serviceWorker"); });
+
+it.each(["absent registration", "inactive registration", "registration rejection"])("recovers notification controls after %s", async (failure) => {
+  if (failure === "inactive registration") registration.active = null;
+  getRegistration.mockResolvedValue(failure === "inactive registration" ? registration : undefined);
+  Object.defineProperty(navigator.serviceWorker, "ready", { value: new Promise(() => {}) });
+  if (failure === "registration rejection") register.mockRejectedValue(new Error("registration failed"));
+  const view = render(<Provider />);
+  await waitFor(() => expect(screen.getByTestId("state").textContent).toBe("error"));
+  expect(screen.getByRole("alert").textContent).toBeTruthy();
+  fireEvent.click(screen.getByText("Disable"));
+  await waitFor(() => expect(screen.getByTestId("pending").textContent).toBe(""));
+  expect((await readNotificationMetadata()).notificationsEnabled).toBe(true);
+  registration.active = {};
+  getRegistration.mockResolvedValue(registration);
+  view.rerender(<Provider />);
+  fireEvent.click(screen.getByText("Enable"));
+  await waitFor(() => {
+    expect(screen.getByTestId("state").textContent).toBe("enabled");
+    expect(screen.getByTestId("pending").textContent).toBe("");
   });
 });
-afterEach(() => {
-  vi.unstubAllGlobals();
-  vi.unstubAllEnvs();
+
+it("waits for a legitimately installing worker to activate", async () => {
+  const ready = deferred<typeof registration>();
+  registration.active = null;
+  const worker = new InstallingWorker();
+  const removed = vi.spyOn(worker, "removeEventListener");
+  registration.installing = worker;
+  Object.defineProperty(navigator.serviceWorker, "ready", { value: ready.promise });
+  render(<Provider />);
+  await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+  expect(screen.getByTestId("state").textContent).toBe("loading");
+  await act(async () => { registration.active = {}; registration.installing = null; ready.resolve(registration); });
+  await waitFor(() => expect(screen.getByTestId("state").textContent).toBe("enabled"));
+  expect(removed).toHaveBeenCalledWith("statechange", expect.any(Function));
 });
 
-it.each(["consent read", "configuration request"])(
-  "finishes opt-out after reconciliation blocked on %s",
-  async (boundary) => {
-    const entered = deferred<void>();
-    const release = deferred<void>();
-    const delayed =
-      boundary === "consent read"
-        ? harness.readMetadata
-        : harness.configuration;
+it.each([false, true])("recovers when worker installation fails (queued opt-out: %s)", async (optOut) => {
+  const worker = new InstallingWorker();
+  const removed = vi.spyOn(worker, "removeEventListener");
+  registration.active = null;
+  registration.installing = worker;
+  Object.defineProperty(navigator.serviceWorker, "ready", { value: new Promise(() => {}) });
+  render(<Provider />);
+  await waitFor(() => expect(getRegistration).toHaveBeenCalled());
+  if (optOut) fireEvent.click(screen.getByText("Disable"));
+  await act(async () => {
+    registration.installing = null;
+    worker.transition("redundant");
+  });
+  await waitFor(() => {
+    expect(screen.getByTestId("state").textContent).toBe(optOut ? "enabled" : "error");
+    expect(screen.getByTestId("pending").textContent).toBe("");
+  });
+  expect(screen.getByRole("alert").textContent).toBeTruthy();
+  expect((await readNotificationMetadata()).notificationsEnabled).toBe(true);
+  expect(removed).toHaveBeenCalledWith("statechange", expect.any(Function));
+  registration.active = {};
+  fireEvent.click(screen.getByText("Enable"));
+  await waitFor(() => {
+    expect(screen.getByTestId("state").textContent).toBe("enabled");
+    expect(screen.getByTestId("pending").textContent).toBe("");
+  });
+  expect(screen.getByRole("alert").textContent).toBe("");
+});
 
-    delayed.mockImplementationOnce(async () => {
-      const metadata = { ...harness.metadata };
-
-      entered.resolve();
-      await release.promise;
-
-      return boundary === "consent read"
-        ? metadata
-        : { applicationServerKey: "key" };
+it.each(["consent read", "configuration request", "subscription lookup"])("finishes opt-out after reconciliation blocked on %s", async (boundary) => {
+  const entered = deferred<void>();
+  const release = deferred<void>();
+  if (boundary === "consent read") {
+    const get = IDBObjectStore.prototype.get;
+    let metadataReads = 0;
+    vi.spyOn(IDBObjectStore.prototype, "get").mockImplementation(function (this: IDBObjectStore, key) {
+      const request = get.call(this, key);
+      // Badging reads consent first; pause the provider's following consent read.
+      if (key === "notification" && ++metadataReads === 2) {
+        Object.defineProperty(request, "onsuccess", {
+          set(listener: (event: Event) => void) {
+            request.addEventListener("success", async (event) => {
+              entered.resolve();
+              await release.promise;
+              listener.call(request, event);
+            });
+          },
+        });
+      }
+      return request;
     });
-    const element = CustomerPwaProvider({ children: null }) as ReactElement<{
-      value: { disable: () => Promise<void> };
-    }>;
-    const cleanup = harness.effects[0]();
+  } else if (boundary === "configuration request") {
+    const normalFetch = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation(async (url: string, options?: RequestInit) => {
+      if (url.endsWith("/configuration")) { entered.resolve(); await release.promise; }
+      return normalFetch(url, options);
+    });
+  } else {
+    registration.pushManager.getSubscription.mockImplementationOnce(async () => { entered.resolve(); await release.promise; return subscription; });
+  }
+  render(<Provider />);
+  await entered.promise;
+  fireEvent.click(screen.getByText("Disable"));
+  act(() => window.dispatchEvent(new Event("online")));
+  await act(async () => release.resolve());
+  await waitFor(() => expect(screen.getByTestId("state").textContent).toBe("disabled"));
+  act(() => window.dispatchEvent(new Event("online")));
+  await waitFor(async () => expect((await readNotificationMetadata()).enrolledTrackingReferences).toEqual([]));
+  expect(remoteEnabled).toBe(false);
+  expect(subscription).toBeNull();
+  expect((await readNotificationMetadata()).notificationsEnabled).toBe(false);
+  expect(screen.getByTestId("pending").textContent).toBe("");
+});
 
-    await entered.promise;
-    const disabling = element.props.value.disable();
-
-    online();
-    await Promise.resolve();
-    expect(harness.disable).not.toHaveBeenCalled();
-    release.resolve();
-    await disabling;
-    online();
-    await vi.waitFor(() =>
-      expect(harness.readMetadata).toHaveBeenCalledTimes(3),
-    );
-
-    expect(remoteEnabled).toBe(false);
-    expect(subscription).toBeNull();
-    expect(harness.metadata.notificationsEnabled).toBe(false);
-    expect(harness.metadata.enrolledTrackingReferences).toEqual([]);
-    expect(harness.enroll).toHaveBeenCalledTimes(1);
-    expect(harness.disable).toHaveBeenCalledTimes(1);
-    if (cleanup) cleanup();
-  },
-);
+it("replaces an old push key before reconciling and opting out", async () => {
+  subscription = makeSubscription(2);
+  const previous = subscription;
+  render(<Provider />);
+  await waitFor(() => expect(screen.getByTestId("state").textContent).toBe("enabled"));
+  expect(previous.unsubscribe).toHaveBeenCalledOnce();
+  expect(fetchMock.mock.calls.some(([url]) => url.endsWith("/subscription-replacement"))).toBe(true);
+  fireEvent.click(screen.getByText("Disable"));
+  await waitFor(() => expect(screen.getByTestId("state").textContent).toBe("disabled"));
+  expect(remoteEnabled).toBe(false);
+});

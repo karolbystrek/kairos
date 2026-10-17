@@ -2,6 +2,7 @@ package pl.karolbystrek.kairos.api.email.application;
 
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -19,11 +20,14 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class EmailDeliveryService {
+    public record Queued(UUID deliveryId) {}
+
     private final JdbcTemplate database;
     private final EmailPayloadCipher cipher;
     private final ObjectMapper json;
     private final Clock clock;
     private final EmailProperties properties;
+    private final ApplicationEventPublisher events;
 
     @Transactional(propagation = Propagation.MANDATORY)
     public UUID enqueue(String to, String subject, String text) {
@@ -43,6 +47,7 @@ public class EmailDeliveryService {
                 ?,
                 ?,?,?,?)
             """, id, locationId, payload.ciphertext(), payload.nonce(), now, now);
+        events.publishEvent(new Queued(id));
         return id;
     }
 
