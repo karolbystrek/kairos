@@ -62,6 +62,8 @@ rendered from these masters:
   `kairos-app-icon.svg` at 32 and 48 px.
 - `icons/kairos-lockup.png` (240 px tall) renders `kairos-lockup.svg` for the
   share-preview images.
+- `apps/panel-app/public/icons/kairos-app-icon.svg` is a copy of
+  `kairos-app-icon.svg`, placed in the centre of order tracking QR codes.
 
 ## Misuse
 
