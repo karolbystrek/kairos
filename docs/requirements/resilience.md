@@ -7,6 +7,8 @@
   the provider idempotency window, then records terminal failure. Reprocessing
   uses the same provider idempotency key and never sends a second message for
   one delivery. Sent/failed rows retain safe outcome metadata and erase secrets.
+  Delivery wakes after commit on an asynchronous worker, with a 30-second
+  recovery poll; see [worker timing](real-time.md).
 * Order transitions and their history are committed atomically.
 * Concurrent commands for the same order are serialized before validating and persisting a transition, preventing stale state decisions without duplicating an application-managed version value.
 * Order transitions, required outbox events and anonymous measurement inputs are committed atomically. Analytics merge/consumption is retry-safe and independent of retained orders; see [anonymous order analytics](order-analytics.md).

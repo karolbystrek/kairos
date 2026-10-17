@@ -111,7 +111,8 @@ they do not execute privileged database business workflows.
 
 Fresh PostgreSQL entrypoint initialization provisions restricted
 roles before Spring Flyway applies V1. See
-[database roles and initialization](../deployment/DATABASE.md). Volume resets are
+[database roles and initialization](../deployment/DATABASE.md), including the
+one-time reset required for the consolidated pre-launch baseline. Volume resets are
 separately authorized operator actions.
 
 Locations retain an optional Google review link and its configuration identity.

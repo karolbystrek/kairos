@@ -195,6 +195,11 @@ jobs:
           name: release-manifest
           path: ${{ runner.temp }}/release
 
+      - name: Reject superseded manual dispatch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 deployment/check_dispatch.py
+
       - name: AWS credentials for temporary SSH access
         id: aws
         uses: aws-actions/configure-aws-credentials@ec61189d14ec14c8efccab744f656cffd0e33f37 # v6.1.0

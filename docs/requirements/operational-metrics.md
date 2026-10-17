@@ -13,7 +13,7 @@ IP address, destination, payload, credential or free text is a metric dimension.
 
 ## Workers and backlog
 
-`kairos.worker.cycle.duration` times analytics, webhook/push fan-out and delivery,
+`kairos.worker.cycle.duration` times email delivery, analytics, webhook/push fan-out and delivery,
 push cleanup and retention cycles. `kairos.worker.failures` counts unexpected
 cycle/task failures, deferred retention-provider failures, push preparation
 failures and failed backlog snapshots. Delivery attempts have a

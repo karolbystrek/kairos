@@ -9,10 +9,15 @@ import pl.karolbystrek.kairos.api.authentication.application.StaffAuthentication
 import pl.karolbystrek.kairos.api.order.api.model.OrderResponse;
 import pl.karolbystrek.kairos.api.order.application.OrderService;
 import pl.karolbystrek.kairos.api.order.application.model.OrderStatusChangedEvent;
+import pl.karolbystrek.kairos.api.order.application.model.OrderView;
 import pl.karolbystrek.kairos.api.worker.CoalescingWorker;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
@@ -24,6 +29,10 @@ public class StaffOrderSseEmitterRegistry {
     private final StaffAuthenticationService authentication;
     private final LongFunction<SseEmitter> emitterFactory;
     private final Executor executor;
+    // Initial and refresh snapshots share ordering; socket writes remain on independent workers.
+    private final Object snapshotLock = new Object();
+    private final Set<Connection> pending = ConcurrentHashMap.newKeySet();
+    private final CoalescingWorker refresh;
     private final ConcurrentHashMap<SseEmitter, Connection> connections = new ConcurrentHashMap<>();
 
     @Autowired
@@ -49,6 +58,22 @@ public class StaffOrderSseEmitterRegistry {
         this.authentication = authentication;
         this.emitterFactory = emitterFactory;
         this.executor = executor;
+        refresh = new CoalescingWorker(executor, () -> {
+            synchronized (snapshotLock) {
+                var cycle = List.copyOf(pending);
+                pending.removeAll(cycle);
+                var snapshots = new HashMap<OrderService.QueueScope, List<OrderView>>();
+                cycle.forEach(connection -> {
+                    if (connections.get(connection.delivery.emitter) != connection) return;
+                    try {
+                        connection.push(snapshots);
+                    } catch (RuntimeException exception) {
+                        connection.delivery.close();
+                    }
+                });
+            }
+            return false;
+        });
     }
 
     private final class Connection {
@@ -57,7 +82,6 @@ public class StaffOrderSseEmitterRegistry {
         private final Instant signedInAt;
         private final UUID locationId;
         private final SseConnection delivery;
-        private final CoalescingWorker refresh;
 
         private Connection(
                 StaffPrincipal principal,
@@ -71,20 +95,12 @@ public class StaffOrderSseEmitterRegistry {
             this.signedInAt = signedInAt;
             this.locationId = locationId;
             delivery = new SseConnection(emitter, () -> connections.remove(emitter), executor);
-            refresh = new CoalescingWorker(executor, () -> {
-                try {
-                    push();
-                } catch (RuntimeException exception) {
-                    delivery.close();
-                }
-                return false;
-            });
         }
 
         // Re-checks the session cutoff too, so a revoked session cannot keep a stream open.
-        private synchronized void push() {
+        private void push(Map<OrderService.QueueScope, List<OrderView>> snapshots) {
             authentication.authenticate(subject, signedInAt);
-            var queue = orders.listOrders(principal, locationId, null);
+            var queue = orders.listOrdersForRefresh(principal, locationId, snapshots);
             delivery.send(SseEmitter.event().name("order-queue")
                     .data(queue.stream().map(OrderResponse::from).toList()), false);
         }
@@ -96,7 +112,9 @@ public class StaffOrderSseEmitterRegistry {
         var connection = new Connection(principal, subject, signedInAt, locationId, emitter);
         connections.put(emitter, connection);
         try {
-            connection.push();
+            synchronized (snapshotLock) {
+                connection.push(new HashMap<>());
+            }
         } catch (RuntimeException exception) {
             connections.remove(emitter);
             throw exception;
@@ -108,13 +126,15 @@ public class StaffOrderSseEmitterRegistry {
         connections.values().forEach(connection -> {
             if (connection.principal.tenantId().equals(event.tenantId())
                     && (connection.locationId == null || connection.locationId.equals(event.locationId()))) {
-                connection.refresh.wake();
+                pending.add(connection);
             }
         });
+        refresh.wake();
     }
 
     public void refresh() {
-        connections.values().forEach(connection -> connection.refresh.wake());
+        pending.addAll(connections.values());
+        refresh.wake();
     }
 
     @Scheduled(fixedRate = 15_000)

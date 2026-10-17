@@ -209,7 +209,7 @@ CREATE TABLE webhook_subscription_event_types
     event_type      VARCHAR(32) NOT NULL,
     PRIMARY KEY (subscription_id, event_type),
     CONSTRAINT webhook_subscription_event_types_type_check CHECK (
-        event_type IN ('ORDER_CREATED', 'ORDER_READY', 'ORDER_COMPLETED', 'ORDER_CANCELED')
+        event_type IN ('ORDER_CREATED', 'ORDER_READY', 'ORDER_COMPLETED', 'ORDER_CANCELED', 'ORDER_EXPIRED')
         )
 );
 
@@ -375,6 +375,24 @@ CREATE TABLE SPRING_SESSION_ATTRIBUTES (
     PRIMARY KEY (SESSION_PRIMARY_ID, ATTRIBUTE_NAME)
 );
 
+CREATE TABLE staff_identities (
+    subject varchar(128) PRIMARY KEY,
+    email varchar(200) NOT NULL UNIQUE,
+    password_hash varchar(255) NOT NULL,
+    email_verified boolean NOT NULL DEFAULT false,
+    verification_code_hash char(64),
+    verification_code_expires_at timestamptz
+);
+
+CREATE TABLE password_resets (
+    subject varchar(128) PRIMARY KEY REFERENCES accounts (provider_subject) ON DELETE CASCADE,
+    code_hash char(64) NOT NULL,
+    expires_at timestamptz NOT NULL,
+    attempts integer NOT NULL DEFAULT 0 CHECK (attempts BETWEEN 0 AND 5),
+    resend_available_at timestamptz NOT NULL,
+    delivery_id uuid NOT NULL
+);
+
 CREATE TABLE orders
 (
     review_due_at TIMESTAMP WITH TIME ZONE,
@@ -397,7 +415,7 @@ CREATE TABLE orders
     CONSTRAINT orders_label_not_blank_check CHECK (TRIM(label) <> ''),
     CONSTRAINT orders_label_stripped_check CHECK (label = TRIM(label)),
     CONSTRAINT orders_status_check CHECK (
-        status IN ('IN_PREPARATION', 'READY', 'COMPLETED', 'CANCELED')
+        status IN ('IN_PREPARATION', 'READY', 'COMPLETED', 'CANCELED', 'EXPIRED')
         ),
     CONSTRAINT orders_external_creation_check CHECK (
         (external_integration_id IS NULL
@@ -417,6 +435,9 @@ CREATE TABLE orders
 );
 
 CREATE INDEX orders_location_created_at_idx ON orders (location_id, created_at DESC);
+CREATE INDEX orders_active_updated_at_idx ON orders (updated_at, id) WHERE status IN ('IN_PREPARATION','READY');
+CREATE INDEX orders_active_location_created_at_idx ON orders (location_id, created_at DESC)
+    WHERE status IN ('IN_PREPARATION', 'READY');
 
 -- Selected menu items are a snapshot; later menu edits never change them.
 CREATE TABLE order_items
@@ -538,20 +559,25 @@ CREATE TABLE order_outbox_events
     created_at                  TIMESTAMP WITH TIME ZONE NOT NULL,
     webhook_fanout_completed_at TIMESTAMP WITH TIME ZONE,
     push_fanout_completed_at    TIMESTAMP WITH TIME ZONE,
+    webhook_fanout_failures      INTEGER NOT NULL DEFAULT 0,
+    push_fanout_failures         INTEGER NOT NULL DEFAULT 0,
+    last_fanout_error            TEXT,
+    last_fanout_failed_at        TIMESTAMP WITH TIME ZONE,
     CONSTRAINT order_outbox_location_tenant_fk
         FOREIGN KEY (location_id, tenant_id)
             REFERENCES locations (id, tenant_id),
     CONSTRAINT order_outbox_event_type_check CHECK (
-        event_type IN ('ORDER_CREATED', 'ORDER_READY', 'ORDER_COMPLETED', 'ORDER_CANCELED')
+        event_type IN ('ORDER_CREATED', 'ORDER_READY', 'ORDER_COMPLETED', 'ORDER_CANCELED', 'ORDER_EXPIRED')
         ),
     CONSTRAINT order_outbox_status_check CHECK (
-        status IN ('IN_PREPARATION', 'READY', 'COMPLETED', 'CANCELED')
+        status IN ('IN_PREPARATION', 'READY', 'COMPLETED', 'CANCELED', 'EXPIRED')
         ),
     CONSTRAINT order_outbox_event_status_check CHECK (
         (event_type = 'ORDER_CREATED' AND status = 'IN_PREPARATION')
         OR (event_type = 'ORDER_READY' AND status = 'READY')
         OR (event_type = 'ORDER_COMPLETED' AND status = 'COMPLETED')
         OR (event_type = 'ORDER_CANCELED' AND status = 'CANCELED')
+        OR (event_type = 'ORDER_EXPIRED' AND status = 'EXPIRED')
         ),
     CONSTRAINT order_outbox_webhook_payload_not_blank_check
         CHECK (TRIM(webhook_payload) <> ''),
@@ -628,6 +654,8 @@ CREATE TABLE webhook_deliveries
     response_truncated BOOLEAN                  NOT NULL DEFAULT FALSE,
     error_type         VARCHAR(64),
     error_detail       VARCHAR(1024),
+    attempt_count      INTEGER NOT NULL DEFAULT 0,
+    next_attempt_at    TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT webhook_deliveries_event_subscription_key UNIQUE (outbox_event_id, subscription_id),
     CONSTRAINT webhook_deliveries_destination_not_blank_check CHECK (TRIM(destination_url) <> ''),
     CONSTRAINT webhook_deliveries_payload_not_blank_check CHECK (TRIM(payload) <> ''),
@@ -655,7 +683,7 @@ CREATE TABLE webhook_deliveries
 );
 
 CREATE INDEX webhook_deliveries_available_idx
-    ON webhook_deliveries (status, claim_until, created_at, id);
+    ON webhook_deliveries (status, next_attempt_at, claim_until, created_at, id);
 
 CREATE TABLE webhook_delivery_signing_versions
 (
@@ -734,6 +762,12 @@ ALTER TABLE order_outbox_events ADD CONSTRAINT order_outbox_order_identity_fk
 ALTER TABLE order_outbox_events ADD CONSTRAINT order_outbox_id_order_key UNIQUE(id, order_id);
 ALTER TABLE customer_push_deliveries ADD CONSTRAINT push_delivery_event_order_fk
     FOREIGN KEY(outbox_event_id, order_id) REFERENCES order_outbox_events(id, order_id);
+
+CREATE INDEX customer_push_deliveries_subscription_idx ON customer_push_deliveries (subscription_id);
+CREATE INDEX webhook_deliveries_subscription_idx ON webhook_deliveries (subscription_id);
+CREATE INDEX order_outbox_events_location_idx ON order_outbox_events (location_id);
+CREATE INDEX order_outbox_events_finished_idx ON order_outbox_events (created_at, id)
+    WHERE webhook_fanout_completed_at IS NOT NULL AND push_fanout_completed_at IS NOT NULL;
 
 CREATE SCHEMA kairos_security;
 REVOKE ALL ON SCHEMA kairos_security FROM PUBLIC;
@@ -866,11 +900,12 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
 $$;
 CREATE FUNCTION kairos_security.order_access(order_id uuid, writing boolean DEFAULT false, customer boolean DEFAULT false) RETURNS boolean
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
-    SELECT EXISTS(SELECT 1 FROM public.orders o JOIN public.locations l ON l.id=o.location_id WHERE o.id=order_access.order_id
+    SELECT kairos_security.worker('ORDER_EXPIRY',order_access.order_id) OR EXISTS(SELECT 1 FROM public.orders o
+        JOIN public.locations l ON l.id=o.location_id WHERE o.id=order_access.order_id
         AND (kairos_security.staff_location(l.id) OR kairos_security.integration_location(l.id,writing)
         OR (NOT writing AND customer AND kairos_security.setting('scope') IN ('tracking','push')
             AND kairos_security.includes('references',o.tracking_reference)
-            AND (l.status='ENABLED' OR o.status IN ('COMPLETED','CANCELED')))
+            AND (l.status='ENABLED' OR o.status IN ('COMPLETED','CANCELED','EXPIRED')))
         OR (NOT writing AND EXISTS(SELECT 1 FROM public.order_outbox_events e WHERE e.order_id=o.id AND kairos_security.event_access(e.id)))))
 $$;
 CREATE FUNCTION kairos_security.subscription_access(subscription uuid) RETURNS boolean
@@ -1061,7 +1096,9 @@ CREATE POLICY scoped_delete ON webhook_signing_secret_versions FOR DELETE USING 
 ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
 CREATE POLICY scoped_select ON orders FOR SELECT USING (kairos_security.order_access(id,false,true));
 CREATE POLICY scoped_insert ON orders FOR INSERT WITH CHECK (kairos_security.staff_location(location_id) OR kairos_security.integration_location(location_id,true));
-CREATE POLICY scoped_update ON orders FOR UPDATE USING (kairos_security.order_access(id,false,true)) WITH CHECK (kairos_security.staff_location(location_id) OR kairos_security.integration_location(location_id,true));
+CREATE POLICY scoped_update ON orders FOR UPDATE USING (kairos_security.order_access(id,false,true))
+    WITH CHECK (kairos_security.staff_location(location_id) OR kairos_security.integration_location(location_id,true)
+        OR kairos_security.worker('ORDER_EXPIRY',id));
 ALTER TABLE order_items ENABLE ROW LEVEL SECURITY;
 CREATE POLICY scoped_select ON order_items FOR SELECT USING (kairos_security.order_access(order_id,false,false));
 CREATE POLICY scoped_insert ON order_items FOR INSERT WITH CHECK (kairos_security.order_access(order_id,true,false));
@@ -1073,8 +1110,11 @@ ALTER TABLE order_history ENABLE ROW LEVEL SECURITY;
 CREATE POLICY scoped_select ON order_history FOR SELECT USING (kairos_security.order_access(order_id,false,false));
 CREATE POLICY scoped_insert ON order_history FOR INSERT WITH CHECK (kairos_security.order_access(order_id,true,false));
 ALTER TABLE order_outbox_events ENABLE ROW LEVEL SECURITY;
-CREATE POLICY scoped_select ON order_outbox_events FOR SELECT USING (kairos_security.staff_location(location_id) OR kairos_security.integration_location(location_id,true) OR kairos_security.event_access(id));
-CREATE POLICY scoped_insert ON order_outbox_events FOR INSERT WITH CHECK (kairos_security.staff_location(location_id) OR kairos_security.integration_location(location_id,true));
+CREATE POLICY scoped_select ON order_outbox_events FOR SELECT USING (kairos_security.staff_location(location_id)
+    OR kairos_security.integration_location(location_id,true) OR kairos_security.event_access(id)
+    OR kairos_security.worker('ORDER_EXPIRY',order_id));
+CREATE POLICY scoped_insert ON order_outbox_events FOR INSERT WITH CHECK (kairos_security.staff_location(location_id)
+    OR kairos_security.integration_location(location_id,true) OR kairos_security.worker('ORDER_EXPIRY',order_id));
 CREATE POLICY scoped_update ON order_outbox_events FOR UPDATE USING (kairos_security.worker('WEBHOOK_FANOUT',id) OR kairos_security.worker('PUSH_FANOUT',id)) WITH CHECK (kairos_security.worker('WEBHOOK_FANOUT',id) OR kairos_security.worker('PUSH_FANOUT',id));
 ALTER TABLE webhook_deliveries ENABLE ROW LEVEL SECURITY;
 CREATE POLICY scoped_select ON webhook_deliveries FOR SELECT USING (kairos_security.worker('WEBHOOK_CLAIM',id) OR kairos_security.worker('WEBHOOK_COMPLETE',id) OR kairos_security.worker('WEBHOOK_FANOUT',outbox_event_id));
@@ -1129,7 +1169,7 @@ CREATE FUNCTION public.next_webhook_fanout() RETURNS uuid
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE selected uuid;
 BEGIN
-    SELECT id INTO selected FROM public.order_outbox_events WHERE webhook_fanout_completed_at IS NULL ORDER BY occurred_at,id LIMIT 1 FOR UPDATE SKIP LOCKED;
+    SELECT id INTO selected FROM public.order_outbox_events WHERE webhook_fanout_completed_at IS NULL AND webhook_fanout_failures<5 ORDER BY occurred_at,id LIMIT 1 FOR UPDATE SKIP LOCKED;
     IF selected IS NOT NULL THEN PERFORM set_config('kairos.selected','WEBHOOK_FANOUT:' || selected::text,true); END IF;
     RETURN selected;
 END $$;
@@ -1137,7 +1177,7 @@ CREATE FUNCTION public.next_push_fanout() RETURNS uuid
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE selected uuid;
 BEGIN
-    SELECT id INTO selected FROM public.order_outbox_events WHERE push_fanout_completed_at IS NULL ORDER BY occurred_at,id LIMIT 1 FOR UPDATE SKIP LOCKED;
+    SELECT id INTO selected FROM public.order_outbox_events WHERE push_fanout_completed_at IS NULL AND push_fanout_failures<5 ORDER BY occurred_at,id LIMIT 1 FOR UPDATE SKIP LOCKED;
     IF selected IS NOT NULL THEN PERFORM set_config('kairos.selected','PUSH_FANOUT:' || selected::text,true); END IF;
     RETURN selected;
 END $$;
@@ -1145,7 +1185,7 @@ CREATE FUNCTION public.next_webhook_delivery(at_time timestamptz) RETURNS uuid
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE selected uuid;
 BEGIN
-    SELECT id INTO selected FROM public.webhook_deliveries WHERE status='PENDING' OR (status='PROCESSING' AND claim_until<=at_time) ORDER BY created_at,id LIMIT 1 FOR UPDATE SKIP LOCKED;
+    SELECT id INTO selected FROM public.webhook_deliveries WHERE (status='PENDING' AND next_attempt_at<=at_time) OR (status='PROCESSING' AND claim_until<=at_time) ORDER BY created_at,id LIMIT 1 FOR UPDATE SKIP LOCKED;
     IF selected IS NOT NULL THEN PERFORM set_config('kairos.selected','WEBHOOK_CLAIM:' || selected::text,true); END IF;
     RETURN selected;
 END $$;
@@ -1260,7 +1300,7 @@ CREATE FUNCTION public.valid_worker(operation text,resource uuid,token uuid) RET
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
 BEGIN
     IF operation IN ('ANALYTICS','WEBHOOK_FANOUT','PUSH_FANOUT','WEBHOOK_CLAIM','PUSH_CLAIM','SUBSCRIPTION_RETIRE','PUSH_CLEANUP',
-        'ACCOUNT_PURGE','LOCATION_PURGE','INVITATION_PURGE') THEN
+        'ACCOUNT_PURGE','LOCATION_PURGE','INVITATION_PURGE','ORDER_EXPIRY') THEN
         RETURN kairos_security.setting('selected')=operation || ':' || resource::text;
     ELSIF operation='WEBHOOK_COMPLETE' THEN
         PERFORM 1 FROM public.webhook_deliveries d WHERE d.id=resource AND d.status='PROCESSING' AND d.claim_token=token FOR UPDATE;
@@ -1481,10 +1521,91 @@ BEGIN
     RETURN FOUND;
 END $$;
 
+ALTER TABLE password_resets ENABLE ROW LEVEL SECURITY;
+CREATE POLICY scoped_all ON password_resets
+    USING (kairos_security.setting('scope')='verification' AND subject=kairos_security.setting('identity'))
+    WITH CHECK (kairos_security.setting('scope')='verification' AND subject=kairos_security.setting('identity'));
+
+CREATE FUNCTION public.password_reset_subject(email text) RETURNS varchar
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
+    SELECT a.provider_subject FROM public.accounts a
+        WHERE a.email=password_reset_subject.email AND public.valid_staff(a.id,a.tenant_id,a.tenant_role)
+$$;
+
+CREATE FUNCTION public.revoke_reset_sessions(at_time timestamptz) RETURNS boolean
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE revoked uuid;
+BEGIN
+    IF kairos_security.setting('scope')<>'verification' OR NOT EXISTS(
+            SELECT 1 FROM public.password_resets r WHERE r.subject=kairos_security.setting('identity')) THEN
+        RETURN false;
+    END IF;
+    UPDATE public.accounts a SET authentication_cutoff=at_time
+        WHERE a.provider_subject=kairos_security.setting('identity') RETURNING a.id INTO revoked;
+    IF revoked IS NULL THEN RETURN false; END IF;
+    DELETE FROM public.spring_session s WHERE s.principal_name=revoked::text;
+    RETURN true;
+END $$;
+
+CREATE FUNCTION public.next_stale_order(cutoff timestamptz) RETURNS uuid
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE selected uuid;
+BEGIN
+    SELECT o.id INTO selected FROM public.orders o WHERE o.status IN ('IN_PREPARATION','READY') AND o.updated_at<cutoff
+        ORDER BY o.updated_at,o.id LIMIT 1 FOR UPDATE SKIP LOCKED;
+    IF selected IS NOT NULL THEN PERFORM set_config('kairos.selected','ORDER_EXPIRY:' || selected::text,true); END IF;
+    RETURN selected;
+END $$;
+
+CREATE FUNCTION public.purge_finished_webhook_deliveries(cutoff timestamptz,batch integer) RETURNS integer
+LANGUAGE sql SECURITY DEFINER SET search_path=pg_catalog AS $$
+    WITH selected AS (SELECT d.id FROM public.webhook_deliveries d
+            WHERE d.status IN ('SUCCEEDED','DEAD_LETTERED') AND d.completed_at<cutoff
+            ORDER BY d.completed_at,d.id LIMIT batch FOR UPDATE SKIP LOCKED),
+        versions AS (DELETE FROM public.webhook_delivery_signing_versions v USING selected s WHERE v.delivery_id=s.id),
+        purged AS (DELETE FROM public.webhook_deliveries d USING selected s WHERE d.id=s.id RETURNING 1)
+    SELECT count(*)::integer FROM purged
+$$;
+
+CREATE FUNCTION public.purge_finished_order_events(cutoff timestamptz,batch integer) RETURNS integer
+LANGUAGE sql SECURITY DEFINER SET search_path=pg_catalog AS $$
+    WITH purged AS (DELETE FROM public.order_outbox_events e WHERE e.id IN (
+        SELECT x.id FROM public.order_outbox_events x
+            WHERE x.webhook_fanout_completed_at<cutoff AND x.push_fanout_completed_at<cutoff
+            AND NOT EXISTS(SELECT 1 FROM public.webhook_deliveries d WHERE d.outbox_event_id=x.id)
+            AND NOT EXISTS(SELECT 1 FROM public.customer_push_deliveries d WHERE d.outbox_event_id=x.id)
+        ORDER BY x.created_at,x.id LIMIT batch FOR UPDATE SKIP LOCKED) RETURNING 1)
+    SELECT count(*)::integer FROM purged
+$$;
+
+CREATE FUNCTION public.record_outbox_fanout_failure(event uuid, kind text, at_time timestamptz, error text) RETURNS boolean
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
+BEGIN
+    IF kind='WEBHOOK_FANOUT' THEN
+        UPDATE public.order_outbox_events SET webhook_fanout_failures=webhook_fanout_failures+1,
+            webhook_fanout_completed_at=CASE WHEN webhook_fanout_failures+1>=5 THEN at_time END,
+            last_fanout_error=left(error,1000),last_fanout_failed_at=at_time
+            WHERE id=event AND webhook_fanout_completed_at IS NULL;
+    ELSIF kind='PUSH_FANOUT' THEN
+        UPDATE public.order_outbox_events SET push_fanout_failures=push_fanout_failures+1,
+            push_fanout_completed_at=CASE WHEN push_fanout_failures+1>=5 THEN at_time END,
+            last_fanout_error=left(error,1000),last_fanout_failed_at=at_time
+            WHERE id=event AND push_fanout_completed_at IS NULL;
+    ELSE
+        RETURN false;
+    END IF;
+    RETURN FOUND;
+END $$;
+
 REVOKE ALL ON ALL TABLES IN SCHEMA public FROM PUBLIC;
 REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM PUBLIC;
 REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA kairos_security FROM PUBLIC;
 REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA public FROM PUBLIC;
+GRANT SELECT,INSERT,UPDATE,DELETE ON staff_identities,password_resets TO "${runtimeUser}";
+GRANT EXECUTE ON FUNCTION public.password_reset_subject(text),public.revoke_reset_sessions(timestamptz),
+    public.next_stale_order(timestamptz),public.purge_finished_webhook_deliveries(timestamptz,integer),
+    public.purge_finished_order_events(timestamptz,integer),public.record_outbox_fanout_failure(uuid,text,timestamptz,text)
+    TO "${runtimeUser}";
 GRANT USAGE ON SCHEMA public,kairos_security TO "${runtimeUser}";
 GRANT SELECT,INSERT,UPDATE,DELETE ON tenants,locations,location_menus,menu_items,accounts,location_assignments,account_invitations,
     external_integrations,api_keys,api_key_scopes,api_key_location_access,

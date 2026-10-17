@@ -82,7 +82,8 @@ using `ghcr.io/karolbystrek/kairos/<service>@sha256:<64 lowercase hex>`.
 `release.tar.gz` contains the same manifest plus the exact checkout's shared and
 hosted Compose files, both NGINX configuration files, the PostgreSQL entrypoint
 role initialization script,
-exact SQL migrations, and the deployment shell command/Python helper. An explicit file allowlist
+and the deployment Python command. The API image contains its SQL migrations.
+An explicit file allowlist
 excludes environment files, certificates and private keys. The separate
 `deploy.yml` workflow runs only by manual dispatch on `main`, with no revision
 input; every job refuses other refs. It uses the main revision captured at
@@ -94,6 +95,11 @@ revision, and transfers it over SSH
 with the supplied verified host keys and ephemeral `0700`/`0600` SSH files.
 The four Environment secrets are `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`,
 and `DEPLOY_KNOWN_HOSTS`; publication jobs receive none of these secrets.
+Before obtaining AWS credentials or opening SSH access, the job checks through
+`gh` that its run is the newest manual deployment dispatch on `main`. A newer
+dispatch supersedes an older pending run even if the newer run later fails or
+is canceled; retry by making a fresh dispatch. An active deployment that already
+passed the guard finishes under the production concurrency lock.
 
 ### OIDC and temporary SSH
 
@@ -172,12 +178,26 @@ record and report the failed stage with a safe validation reason, command exit
 status/timeout, or final probe HTTP status. Raw command arguments/output, response
 bodies, environment values and resolved configuration are not printed. A failed
 release makes the command automatically redeploy the previous recorded release
-(digest-pinned, same checks) and still exit non-zero; migrations are not undone
+(original runtime directory, digest-pinned images and protected environment
+snapshot, with the same checks) and still exit non-zero; migrations are not undone
 and must stay compatible with the previous release. Recovery of the cause uses a
 forward fix, never a reset; see [maintenance](../deployment/MAINTENANCE.md).
 Command tests use fake Docker/curl and temporary state. First install, reboot
 recovery and real Cloudflare-path acceptance on the selected VM remain launch
 work requiring explicit runtime authorization.
+
+Each attempt snapshots the supplied environment under `/srv/kairos/environments`
+(`0700` directory, `0600` files). Successful metadata includes its runtime
+directory and snapshot path, plus the preceding distinct successful release;
+retrying the same revision retains that preceding recovery point. Legacy
+image-only metadata cannot safely restore configuration: one successful
+hardened deployment establishes full recovery. External keys, certificates and
+database credentials must remain compatible; snapshots preserve references,
+not copies of those external resources. Use the bounded
+[release/image cleanup procedure](../deployment/MAINTENANCE.md#bounded-release-and-image-cleanup)
+to retain both recovery points and all volumes. The intentional pre-launch
+[schema baseline reset](../deployment/DATABASE.md#transition-from-the-old-development-database)
+is a separate operator action, not part of normal rollback or deployment.
 
 ### Repeatable VM bootstrap
 

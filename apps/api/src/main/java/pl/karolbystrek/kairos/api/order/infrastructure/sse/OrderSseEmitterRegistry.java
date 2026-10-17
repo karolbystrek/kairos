@@ -26,6 +26,7 @@ import java.util.function.LongFunction;
 public class OrderSseEmitterRegistry {
     public static final String STATUS_CHANGED_EVENT_NAME = "order-status-changed";
     static final int MAXIMUM_STREAMS_PER_REFERENCE = 5;
+    private static final int RECOVERY_GROUP_SIZE = 500;
     // Keyed by tracking reference so an event reaches only its own order's streams.
     private final ConcurrentHashMap<UUID, Map<SseEmitter, Connection>> connections = new ConcurrentHashMap<>();
     private final LongFunction<SseEmitter> emitterFactory;
@@ -83,28 +84,30 @@ public class OrderSseEmitterRegistry {
         recovery.wake();
     }
 
-    // One batched read per cycle, fanned out to every stream of each tracking reference.
+    // Each group gets its own service transaction and exact-reference authority.
     private void recover() {
-        var references = Set.copyOf(connections.keySet());
-        if (references.isEmpty()) return;
-        Map<UUID, TrackedOrderView> tracked;
-        try {
-            tracked = orders.findTrackedOrders(references);
-        } catch (RuntimeException exception) {
-            log.warn("Could not refresh customer streams; the next cycle retries", exception);
-            return;
-        }
-        references.forEach(reference -> {
-            var streams = List.copyOf(connections.getOrDefault(reference, Map.of()).values());
-            var order = tracked.get(reference);
-            streams.forEach(connection -> {
-                if (order == null) {
-                    connection.delivery.close();
-                } else {
-                    connection.accept(OrderStatusChangedEvent.snapshot(reference, order));
-                }
+        var references = List.copyOf(connections.keySet());
+        for (var start = 0; start < references.size(); start += RECOVERY_GROUP_SIZE) {
+            var group = Set.copyOf(references.subList(start, Math.min(start + RECOVERY_GROUP_SIZE, references.size())));
+            Map<UUID, TrackedOrderView> tracked;
+            try {
+                tracked = orders.findTrackedOrders(group);
+            } catch (RuntimeException exception) {
+                log.warn("Could not refresh customer stream group; the next cycle retries", exception);
+                continue;
+            }
+            group.forEach(reference -> {
+                var streams = List.copyOf(connections.getOrDefault(reference, Map.of()).values());
+                var order = tracked.get(reference);
+                streams.forEach(connection -> {
+                    if (order == null) {
+                        connection.delivery.close();
+                    } else {
+                        connection.accept(OrderStatusChangedEvent.snapshot(reference, order));
+                    }
+                });
             });
-        });
+        }
     }
 
     public SseEmitter register(UUID reference) {

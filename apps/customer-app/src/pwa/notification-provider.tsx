@@ -254,7 +254,7 @@ export function CustomerPwaProvider({
     setPendingAction("disabling");
     try {
       await synchronizing.current?.catch(() => {});
-      const registration = await navigator.serviceWorker.ready;
+      const registration = await activeServiceWorkerRegistration();
       const subscription = await registration.pushManager.getSubscription();
 
       if (subscription) {
@@ -390,7 +390,7 @@ async function synchronizeGrantedSubscription(): Promise<void> {
     configuration.applicationServerKey,
   );
 
-  const registration = await navigator.serviceWorker.ready;
+  const registration = await activeServiceWorkerRegistration();
   let subscription = await registration.pushManager.getSubscription();
   let replacedSubscription: SerializedPushSubscription | null = null;
 
@@ -437,6 +437,38 @@ async function synchronizeGrantedSubscription(): Promise<void> {
     registeredEndpoint: subscription.endpoint,
   });
   await updateApplicationBadge();
+}
+
+async function activeServiceWorkerRegistration(): Promise<ServiceWorkerRegistration> {
+  const registration = await navigator.serviceWorker.getRegistration("/");
+
+  if (registration?.active) return registration;
+  const worker = registration?.installing ?? registration?.waiting;
+
+  if (!worker) {
+    throw new Error("No active notification service worker is available.");
+  }
+  let activationFailed!: () => void;
+  const activation = new Promise<ServiceWorkerRegistration>(
+    (resolve, reject) => {
+      activationFailed = () => {
+        if (worker.state === "redundant") {
+          reject(
+            new Error("The notification service worker failed to activate."),
+          );
+        }
+      };
+      worker.addEventListener("statechange", activationFailed);
+      void navigator.serviceWorker.ready.then(resolve, reject);
+      activationFailed();
+    },
+  );
+
+  try {
+    return await activation;
+  } finally {
+    worker.removeEventListener("statechange", activationFailed);
+  }
 }
 
 function supportsWebPush(): boolean {

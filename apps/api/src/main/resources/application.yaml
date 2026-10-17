@@ -66,6 +66,7 @@ management:
 kairos:
   email:
     mode: ${EMAIL_DELIVERY_MODE:RESEND}
+    poll-delay: 30s
     api-key: ${RESEND_API_KEY:}
     encryption-key-location: "file:${KAIROS_SECRETS_DIRECTORY:/run/secrets}/email-encryption.bin"
   monitoring:

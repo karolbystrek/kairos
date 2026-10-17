@@ -71,10 +71,10 @@ Order changes create one immutable, channel-neutral outbox event in the same
 database transaction as the order and history mutation. Independent background
 pipelines inside the Spring API fan out recipient-specific webhook and
 customer-push delivery rows.
-The webhook pipeline attempts each delivery once at the application-policy level.
-Any redirect, timeout, network failure, or non-`2xx` response is durably
-dead-lettered; v1 performs no automatic delivery retry. API process crash recovery
-may result in duplicate delivery, so consumers deduplicate by the stable
+Transient webhook failures retry automatically under the bounded
+[delivery policy](resilience.md#resilience-and-consistency); permanent failures
+and exhausted retries become durable dead letters. API process crash recovery
+may also result in duplicate delivery, so consumers deduplicate by the stable
 CloudEvent ID and reject stale order snapshots by state and timestamp. Delivery order is not
 guaranteed; consumers order events by the CloudEvents `time` and `id` fields.
 

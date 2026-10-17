@@ -12,6 +12,7 @@ import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
 import pl.karolbystrek.kairos.api.order.application.OrderService;
 import pl.karolbystrek.kairos.api.order.api.model.CustomerOrderEventResponse;
 import pl.karolbystrek.kairos.api.order.application.model.TrackedOrderView;
+import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -22,6 +23,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -71,6 +73,23 @@ class OrderSseEmitterRegistryTests {
         assertThat(second.events.getFirst().status()).isEqualTo(OrderStatus.READY);
         assertThat(first.completed).isFalse();
         verify(orders, times(1)).findTrackedOrders(Set.of(reference));
+    }
+
+    @Test
+    void boundsRecoveryReadsAndContinuesAfterAFailedGroup() {
+        var orders = mock(OrderService.class);
+        for (var index = 0; index < 1001; index++) registry.register(UUID.randomUUID());
+        var sizes = new ArrayList<Integer>();
+        when(orders.findTrackedOrders(anyCollection())).thenAnswer(invocation -> {
+            Collection<UUID> references = invocation.getArgument(0);
+            sizes.add(references.size());
+            if (sizes.size() == 1) throw new IllegalStateException("temporary failure");
+            return Map.of();
+        });
+
+        registry.refresh(orders);
+
+        assertThat(sizes).containsExactly(500, 500, 1);
     }
 
     @Test

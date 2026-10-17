@@ -6,6 +6,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
+import pl.karolbystrek.kairos.api.account.application.exception.StaffAccessDeniedException;
+import pl.karolbystrek.kairos.api.order.application.model.OrderView;
 import pl.karolbystrek.kairos.api.account.domain.TenantRole;
 import pl.karolbystrek.kairos.api.integration.testsupport.MutableTestClock;
 import pl.karolbystrek.kairos.api.order.domain.InvalidOrderTransitionException;
@@ -16,6 +18,7 @@ import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTe
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
+import java.util.HashMap;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -91,6 +94,18 @@ class OrderServiceIntegrationTests extends RedisListenerIsolatedIntegrationTest 
             UUID.class,
             created.id()
         )).containsOnly(principal.accountId());
+    }
+
+    @Test
+    void refreshSnapshotReuseStillChecksPersistedAccountEligibility() {
+        orderService.createOrder(principal, locationId, null, List.of());
+        var snapshots = new HashMap<OrderService.QueueScope, List<OrderView>>();
+        var first = orderService.listOrdersForRefresh(principal, null, snapshots);
+        assertThat(orderService.listOrdersForRefresh(principal, null, snapshots)).isSameAs(first);
+        jdbcTemplate.update("UPDATE accounts SET status = 'DISABLED' WHERE id = ?", principal.accountId());
+
+        assertThatThrownBy(() -> orderService.listOrdersForRefresh(principal, null, snapshots))
+                .isInstanceOf(StaffAccessDeniedException.class);
     }
 
     @Test
