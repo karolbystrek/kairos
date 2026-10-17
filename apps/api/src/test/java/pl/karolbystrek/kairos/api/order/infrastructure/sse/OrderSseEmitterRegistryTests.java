@@ -1,6 +1,10 @@
 package pl.karolbystrek.kairos.api.order.infrastructure.sse;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import pl.karolbystrek.kairos.api.order.application.model.OrderStatusChangedEvent;
 import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
@@ -9,6 +13,8 @@ import pl.karolbystrek.kairos.api.order.application.OrderService;
 import pl.karolbystrek.kairos.api.order.api.model.CustomerOrderEventResponse;
 import pl.karolbystrek.kairos.api.order.application.model.TrackedOrderView;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -17,12 +23,17 @@ import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 class OrderSseEmitterRegistryTests {
@@ -49,8 +60,8 @@ class OrderSseEmitterRegistryTests {
     void recoveryRefreshesEveryConnectedCustomerFromPostgres() {
         var reference = UUID.randomUUID();
         var orders = mock(OrderService.class);
-        when(orders.findTrackedOrder(reference)).thenReturn(new TrackedOrderView(
-                42L, "42", OrderStatus.READY, Instant.parse("2026-07-24T12:00:00Z"), null));
+        when(orders.findTrackedOrders(Set.of(reference))).thenReturn(Map.of(reference, new TrackedOrderView(
+                42L, "42", OrderStatus.READY, Instant.parse("2026-07-24T12:00:00Z"), null)));
         var first = (RecordingEmitter) registry.register(reference);
         var second = (RecordingEmitter) registry.register(reference);
 
@@ -59,6 +70,22 @@ class OrderSseEmitterRegistryTests {
         assertThat(first.events.getFirst().status()).isEqualTo(OrderStatus.READY);
         assertThat(second.events.getFirst().status()).isEqualTo(OrderStatus.READY);
         assertThat(first.completed).isFalse();
+        verify(orders, times(1)).findTrackedOrders(Set.of(reference));
+    }
+
+    @Test
+    void refusesASixthStreamForOneReference() {
+        var reference = UUID.randomUUID();
+        var emitters = new ArrayList<RecordingEmitter>();
+        for (var index = 0; index < 5; index++) {
+            emitters.add((RecordingEmitter) registry.register(reference));
+        }
+
+        assertThatThrownBy(() -> registry.register(reference))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("429");
+        assertThat(emitters).noneMatch(emitter -> emitter.completed);
+        assertThat(registry.connectionCount(reference)).isEqualTo(5);
     }
 
     @Test
@@ -111,43 +138,31 @@ class OrderSseEmitterRegistryTests {
         assertThat(registry.connectionCount(otherReference)).isEqualTo(1);
     }
 
-    @Test
-    void removesAConnectionAfterAHeartbeatFailureWithoutCompletingItAgain() {
-        var emitter = new FailingEmitter(2);
-        var failingRegistry = new OrderSseEmitterRegistry(ignored -> emitter);
-        var trackingReference = UUID.randomUUID();
-        failingRegistry.register(trackingReference);
-
-        failingRegistry.sendHeartbeats();
-
-        assertThat(failingRegistry.connectionCount(trackingReference)).isZero();
-        assertThat(emitter.completeWithErrorCalled).isFalse();
+    static Stream<Arguments> sendFailures() {
+        return Stream.of(
+                Arguments.of("heartbeat", 2, (BiConsumer<OrderSseEmitterRegistry, UUID>) (registry, reference) ->
+                        registry.sendHeartbeats()),
+                Arguments.of("status event", 2, (BiConsumer<OrderSseEmitterRegistry, UUID>) (registry, reference) ->
+                        registry.forward(new OrderStatusChangedEvent(UUID.randomUUID(), reference, OrderStatus.READY,
+                                Instant.parse("2026-07-24T12:00:00Z"), 42L, "42", null,
+                                UUID.randomUUID(), UUID.randomUUID()))),
+                Arguments.of("initial send", 1, (BiConsumer<OrderSseEmitterRegistry, UUID>) (registry, reference) -> { })
+        );
     }
 
-    @Test
-    void removesAConnectionAfterAStatusEventSendFailsWithoutCompletingItAgain() {
-        var emitter = new FailingEmitter(2);
-        var failingRegistry = new OrderSseEmitterRegistry(ignored -> emitter);
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("sendFailures")
+    void removesAConnectionAfterASendFailsWithoutCompletingItAgain(
+            String ignored,
+            int failingSend,
+            BiConsumer<OrderSseEmitterRegistry, UUID> trigger
+    ) {
+        var emitter = new FailingEmitter(failingSend);
+        var failingRegistry = new OrderSseEmitterRegistry(factoryArgument -> emitter);
         var trackingReference = UUID.randomUUID();
-
         failingRegistry.register(trackingReference);
-        failingRegistry.forward(new OrderStatusChangedEvent(
-                UUID.randomUUID(),
-                trackingReference,
-                OrderStatus.READY,
-                Instant.parse("2026-07-24T12:00:00Z"), 42L, "42", null, UUID.randomUUID(), UUID.randomUUID()));
 
-        assertThat(failingRegistry.connectionCount(trackingReference)).isZero();
-        assertThat(emitter.completeWithErrorCalled).isFalse();
-    }
-
-    @Test
-    void removesAConnectionAfterItsInitialSendFailsWithoutCompletingItAgain() {
-        var emitter = new FailingEmitter(1);
-        var failingRegistry = new OrderSseEmitterRegistry(ignored -> emitter);
-        var trackingReference = UUID.randomUUID();
-
-        failingRegistry.register(trackingReference);
+        trigger.accept(failingRegistry, trackingReference);
 
         assertThat(failingRegistry.connectionCount(trackingReference)).isZero();
         assertThat(emitter.completeWithErrorCalled).isFalse();

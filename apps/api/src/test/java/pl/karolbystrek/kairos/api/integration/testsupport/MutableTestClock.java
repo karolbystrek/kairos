@@ -9,15 +9,19 @@ import java.util.concurrent.atomic.AtomicReference;
 
 public final class MutableTestClock extends Clock {
 
-    private final AtomicReference<Instant> instant =
-            new AtomicReference<>(Instant.parse("2026-07-26T12:00:00Z"));
+    // Null means the clock follows system time, so tests that never pin it behave as under the real clock.
+    private final AtomicReference<Instant> instant = new AtomicReference<>();
 
     public void setInstant(Instant value) {
         instant.set(value);
     }
 
+    public void useSystemTime() {
+        instant.set(null);
+    }
+
     public void advance(Duration duration) {
-        instant.updateAndGet(current -> current.plus(duration));
+        instant.updateAndGet(current -> (current == null ? Instant.now() : current).plus(duration));
     }
 
     @Override
@@ -32,6 +36,7 @@ public final class MutableTestClock extends Clock {
 
     @Override
     public Instant instant() {
-        return instant.get();
+        var pinned = instant.get();
+        return pinned == null ? Instant.now() : pinned;
     }
 }

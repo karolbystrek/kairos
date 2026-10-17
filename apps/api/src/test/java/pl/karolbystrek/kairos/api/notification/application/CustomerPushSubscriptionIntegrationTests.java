@@ -7,15 +7,14 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.convention.TestBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import pl.karolbystrek.kairos.api.integration.testsupport.IntegrationTestFixture;
 import pl.karolbystrek.kairos.api.integration.testsupport.MutableTestClock;
-import pl.karolbystrek.kairos.api.integration.testsupport.MutableTestClockConfiguration;
 import pl.karolbystrek.kairos.api.notification.application.exception.CustomerPushEnrollmentLimitException;
 import pl.karolbystrek.kairos.api.location.application.LocationService;
 import pl.karolbystrek.kairos.api.notification.application.exception.InvalidCustomerPushSubscriptionException;
@@ -52,9 +51,10 @@ import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.doThrow;
 
 @SpringBootTest
-@Import(MutableTestClockConfiguration.class)
 class CustomerPushSubscriptionIntegrationTests extends RedisListenerIsolatedIntegrationTest {
 
     @Autowired
@@ -62,6 +62,9 @@ class CustomerPushSubscriptionIntegrationTests extends RedisListenerIsolatedInte
 
     @Autowired
     private CustomerPushOutboxFanoutService fanoutService;
+
+    @MockitoSpyBean
+    private CustomerPushPayloadFactory payloadFactory;
 
     @Autowired
     private CustomerPushDeliveryClaimService claimService;
@@ -170,6 +173,41 @@ class CustomerPushSubscriptionIntegrationTests extends RedisListenerIsolatedInte
         jdbcTemplate.update("DELETE FROM locations WHERE tenant_id = ?", tenantId);
         jdbcTemplate.update("DELETE FROM tenants WHERE id = ?", tenantId);
         endpointHashes.clear();
+    }
+
+    @Test
+    void skipsAnOutboxEventWhoseFanOutKeepsFailingAndStillDeliversLaterEvents() {
+        var poison = createOrder();
+        var healthy = createOrder();
+        subscriptionService.reconcile(newSubscription(), List.of(poison.trackingReference(), healthy.trackingReference()));
+        orderService.updateStatus(tenant.administrator(), poison.id(), OrderStatus.READY);
+        orderService.updateStatus(tenant.administrator(), healthy.id(), OrderStatus.READY);
+        doThrow(new IllegalStateException("cannot build payload")).when(payloadFactory)
+                .create(argThat(event -> event.getOrderId().equals(poison.id())));
+
+        for (var cycle = 0; cycle < 10; cycle++) {
+            fanoutService.fanOutAvailable();
+        }
+
+        var poisonEvent = jdbcTemplate.queryForMap("""
+                SELECT push_fanout_failures, push_fanout_completed_at, last_fanout_error
+                FROM order_outbox_events WHERE order_id = ? AND status = 'READY'
+                """, poison.id());
+        assertThat(poisonEvent.get("push_fanout_failures")).isEqualTo(5);
+        // Marked done so the backlog metric and purge stop counting it.
+        assertThat(poisonEvent.get("push_fanout_completed_at")).isNotNull();
+        assertThat(poisonEvent.get("last_fanout_error")).asString().contains("cannot build payload");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM customer_push_deliveries WHERE order_id = ?", Integer.class, healthy.id())).isOne();
+    }
+
+    @Test
+    void refusesToCreateASubscriptionThatTracksNoExistingOrder() {
+        var input = newSubscription();
+
+        assertThatThrownBy(() -> subscriptionService.reconcile(input, List.of(UUID.randomUUID())))
+                .isInstanceOf(InvalidCustomerPushSubscriptionException.class);
+        assertThat(count("customer_push_subscriptions")).isZero();
     }
 
     @Test

@@ -1,6 +1,10 @@
 const TRACKING_REFERENCE_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+export function isTrackingReference(value: string): boolean {
+  return TRACKING_REFERENCE_PATTERN.test(value);
+}
+
 export function getTrackedOrderHref(trackingReference: string): string {
   return `/orders/${encodeURIComponent(trackingReference)}`;
 }
@@ -25,7 +29,7 @@ export function parseScannedOrderUrl(
       candidate.search ||
       candidate.hash ||
       !match?.[1] ||
-      !TRACKING_REFERENCE_PATTERN.test(match[1])
+      !isTrackingReference(match[1])
     ) {
       return null;
     }

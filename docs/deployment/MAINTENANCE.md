@@ -46,5 +46,5 @@ until real users or valuable data; confirm those targets at that stage.
 
 Public launch also requires the independent RLS privilege/isolation work, live
 authentication verification, browser/PWA/push device acceptance and hosted
-TLS/firewall/throttling/REST/SSE checks in step seven. Record each as passed,
+TLS/firewall/throttling/REST/SSE checks after step 6. Record each as passed,
 failed, blocked or not run; documentation and mocked tests do not satisfy them.

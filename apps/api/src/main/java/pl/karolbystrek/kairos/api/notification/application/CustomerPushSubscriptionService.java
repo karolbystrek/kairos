@@ -28,7 +28,6 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -62,7 +61,7 @@ public class CustomerPushSubscriptionService {
         if (created != null) {
             subscriptionRepository.saveAndFlush(created);
         }
-        reconcileValidated(validated, trackingReferences);
+        reconcileValidated(validated, trackingReferences, created != null);
     }
 
     @Transactional
@@ -98,7 +97,7 @@ public class CustomerPushSubscriptionService {
         if (!previous.endpointHash().equals(current.endpointHash())) {
             removeSubscription(previous);
         }
-        reconcileValidated(current, trackingReferences);
+        reconcileValidated(current, trackingReferences, created != null);
     }
 
     @Transactional
@@ -130,10 +129,8 @@ public class CustomerPushSubscriptionService {
             return;
         }
         requireMatchingCapability(subscription, validated);
-        var orderIds = trackingReferences.stream()
-                .distinct()
-                .map(orderRepository::findByTrackingReference)
-                .flatMap(Optional::stream)
+        var orderIds = orderRepository
+                .findAllByTrackingReferenceIn(trackingReferences.stream().distinct().toList()).stream()
                 .map(CustomerOrder::getId)
                 .toList();
         if (orderIds.isEmpty()) {
@@ -149,7 +146,8 @@ public class CustomerPushSubscriptionService {
 
     private void reconcileValidated(
             ValidatedPushSubscription validated,
-            Collection<UUID> trackingReferences
+            Collection<UUID> trackingReferences,
+            boolean created
     ) {
         var now = clock.instant();
         if (validated.expirationTime() != null
@@ -168,17 +166,22 @@ public class CustomerPushSubscriptionService {
             throw new InvalidCustomerPushSubscriptionException("Push subscription is unavailable");
         }
         var subscription = refreshSubscription(existing, validated, now);
-        var desiredOrdersById = trackingReferences.stream()
-                .distinct()
-                .sorted()
-                .map(orderRepository::findForUpdateByTrackingReference)
-                .flatMap(Optional::stream)
+        var desiredOrdersById = orderRepository
+                .findAllForUpdateByTrackingReferenceInOrderByTrackingReference(
+                        trackingReferences.stream().distinct().toList()
+                ).stream()
                 .collect(Collectors.toMap(
                         CustomerOrder::getId,
                         order -> order,
                         (first, ignored) -> first,
                         LinkedHashMap::new
                 ));
+        // Unauthenticated callers must not park subscriptions that track nothing.
+        if (created && desiredOrdersById.isEmpty()) {
+            throw new InvalidCustomerPushSubscriptionException(
+                    "Push subscription requires at least one valid tracking reference"
+            );
+        }
         var existingEnrollments = enrollmentRepository.findAllBySubscriptionId(
                 subscription.getId()
         );

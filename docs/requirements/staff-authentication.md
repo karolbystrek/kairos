@@ -56,8 +56,10 @@ counts as completed onboarding. Email verification precedes this same gate.
 
 A new code can be requested after a 60-second cooldown. Codes expire after one
 hour, are stored hashed, only the latest code is valid, and at most five wrong
-attempts are allowed; expired or incorrect codes show
-safe corrective errors. Signing in with an unverified identity without an
+attempts are allowed per code. Requesting a new code does not reset the total:
+after 15 wrong codes for one email (registration and password reset counted
+separately, in Redis) code entry returns HTTP 429 for an hour. Expired or
+incorrect codes show safe corrective errors. Signing in with an unverified identity without an
 Account resumes verification. Registering an email held by such an abandoned
 identity replaces it; an existing Account is never replaced.
 
@@ -66,7 +68,8 @@ Redemption verifies the fixed email without a separate code step.
 
 Forgotten passwords are reset from the login page with an emailed 6-digit code,
 under the same code rules as registration (one-hour lifetime, hashed, latest
-code only, five wrong attempts, 60-second resend cooldown). The request answers
+code only, five wrong attempts per code, 60-second resend cooldown, one-hour
+lock after 15 wrong codes in total). The request answers
 identically whether or not the email belongs to an Account that may sign in, and
 disabled or archived Accounts receive no code. A correct code sets the new
 password, marks the email verified and revokes every existing session of the
@@ -87,10 +90,12 @@ HttpOnly, host-only `__Host-session` cookie with `Path=/` and `SameSite=Lax`
 carries only an opaque session ID. Successful authenticated requests renew the
 30-day inactivity lifetime and cookie retention. There is no absolute deadline
 for active users; service restarts preserve sessions. Browser cookie deletion
-can require login. After 10 failed sign-ins for one email within 15 minutes
-(counted in Redis by email hash), further sign-in attempts for that account
-return HTTP 429 without checking the password until the window expires; other
-accounts are unaffected. Login replaces the previous browser session with a new ID.
+can require login. After 10 failed sign-ins for one email from one client address within 15 minutes
+(counted in Redis by email hash and address), further sign-in attempts from that
+address return HTTP 429 without checking the password until the window expires;
+other accounts and other addresses are unaffected. A per-email ceiling of 100
+failures per window from all addresses together also returns 429. A completed
+password reset clears the email's counters. Login replaces the previous browser session with a new ID.
 The staff identity subject remains server-side in JDBC session attributes.
 Password hashes and passwords never appear in browser
 JavaScript, browser storage, API response bodies, URLs or logs. CSRF metadata is

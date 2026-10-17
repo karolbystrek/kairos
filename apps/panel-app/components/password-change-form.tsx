@@ -31,13 +31,21 @@ export function PasswordChangeForm({
     setError("");
     try {
       await changePassword(current, password, confirmation);
-      await onChanged();
     } catch (failure) {
       setError(
         failure instanceof ApiError && failure.status === 400
           ? "Sprawdź obecne hasło. Nowe hasło musi mieć co najmniej 12 znaków."
           : "Nie udało się zmienić hasła. Spróbuj ponownie.",
       );
+      setPending(false);
+
+      return;
+    }
+    try {
+      await onChanged();
+    } catch {
+      // The password is already changed; only the follow-up navigation failed.
+      setError("Hasło zostało zmienione. Zaloguj się ponownie.");
       setPending(false);
     }
   }

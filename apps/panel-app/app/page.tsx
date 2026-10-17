@@ -7,10 +7,11 @@ import Image from "next/image";
 
 import { LandingDemo } from "@/components/landing-demo";
 import { LandingSessionRedirect } from "@/components/landing-session-redirect";
+import { legalOperator } from "@/src/legal/operator";
 import { publicPageMetadata } from "@/src/seo/metadata";
 
 const TITLE = "Kairos — Wirtualne pagery dla restauracji";
-const CONTACT_EMAIL = "karbystrek@gmail.com";
+const CONTACT_EMAIL = legalOperator.email;
 
 export const metadata: Metadata = {
   ...publicPageMetadata({

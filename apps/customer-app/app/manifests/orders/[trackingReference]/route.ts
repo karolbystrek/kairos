@@ -1,3 +1,4 @@
+import { isTrackingReference } from "@/src/orders/order-route";
 import {
   createKairosManifest,
   getInstallationStartUrl,
@@ -12,6 +13,10 @@ export async function GET(
   },
 ) {
   const { trackingReference } = await params;
+
+  if (!isTrackingReference(trackingReference)) {
+    return new Response(null, { status: 404 });
+  }
 
   return Response.json(
     createKairosManifest(getInstallationStartUrl(trackingReference)),

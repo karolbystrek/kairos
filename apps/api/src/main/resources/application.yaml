@@ -1,8 +1,4 @@
 spring:
-  config:
-    # The host-run API (./mvnw spring-boot:run in apps/api) reads the repository .env;
-    # containers have no such file and receive the same keys as environment variables.
-    import: "optional:file:../../.env[.properties]"
   session:
     timeout: 30d
     jdbc:
@@ -20,16 +16,19 @@ spring:
           time_zone: UTC
   jackson:
     time-zone: UTC
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
   task:
     scheduling:
       pool:
         # A long purge or analytics run must not delay email and heartbeats; kept small for one VPS.
-        size: 2
+        size: 4
   datasource:
     url: "jdbc:postgresql://${POSTGRES_HOST:postgres}:5432/${POSTGRES_DB}"
     username: "${KAIROS_DB_RUNTIME_USER}"
     password: "${KAIROS_DB_RUNTIME_PASSWORD}"
     hikari:
+      maximum-pool-size: 20
       connection-init-sql: SET TIME ZONE 'UTC'
   flyway:
     user: "${KAIROS_DB_OWNER_USER}"
@@ -41,6 +40,8 @@ spring:
       host: "${REDIS_HOST}"
       port: "${REDIS_PORT}"
       password: "${REDIS_PASSWORD}"
+      timeout: 500ms
+      connect-timeout: 1s
       repositories:
         enabled: false
   mvc:
@@ -49,6 +50,7 @@ spring:
 
 server:
   forward-headers-strategy: framework
+  shutdown: graceful
   servlet:
     context-path: /api
 

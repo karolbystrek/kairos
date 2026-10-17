@@ -108,6 +108,11 @@ export function useMinuteClock() {
   return now;
 }
 
+// Owns the minute tick so only this text re-renders, not the whole queue.
+function ElapsedTime({ createdAt }: { createdAt: string }) {
+  return <>{elapsedTime(createdAt, useMinuteClock())}</>;
+}
+
 export function LocationSelect({
   isDisabled = false,
   label,
@@ -209,7 +214,6 @@ function OrderQrCode({
 function OrderCard({
   isUpdating,
   locationName,
-  now,
   onCancel,
   onShowDetails,
   onTransition,
@@ -218,7 +222,6 @@ function OrderCard({
 }: {
   isUpdating: boolean;
   locationName?: string;
-  now: number;
   onCancel: (order: StaffOrder) => void;
   onShowDetails: (order: StaffOrder) => void;
   onTransition: (order: StaffOrder, status: OrderStatus) => void;
@@ -241,7 +244,7 @@ function OrderCard({
             <span className="break-words">{locationName}</span>
           )}
           <span className="flex shrink-0 items-center gap-1.5">
-            {elapsedTime(order.createdAt, now)}
+            <ElapsedTime createdAt={order.createdAt} />
           </span>
         </div>
       }
@@ -305,7 +308,6 @@ export function OrderManagement({
   onSelectLocation: (locationId?: string) => void;
   selectedLocationId?: string;
 }) {
-  const now = useMinuteClock();
   const [createLocationId, setCreateLocationId] = useState<string>();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [createStep, setCreateStep] = useState<"items" | "label">("items");
@@ -360,7 +362,11 @@ export function OrderManagement({
     currentOrdersKey,
     ([, , , scope]) =>
       listOrders(scope === tenantOrderScope ? undefined : scope),
-    { refreshInterval: connectedQueueScope !== queueScope ? 15_000 : 0 },
+    {
+      refreshInterval: connectedQueueScope !== queueScope ? 15_000 : 0,
+      // The stream already delivers every change while connected.
+      revalidateOnFocus: connectedQueueScope !== queueScope,
+    },
   );
 
   useEffect(() => {
@@ -668,7 +674,6 @@ export function OrderManagement({
                             key={order.id}
                             isUpdating={isUpdatingOrder}
                             locationName={locationNames.get(order.locationId)}
-                            now={now}
                             order={order}
                             showLocation={locationId === undefined}
                             onCancel={(selectedOrder) => {
@@ -873,9 +878,9 @@ export function OrderManagement({
                 >
                   <h3 className="pb-2 text-sm secondary-text">Pozycje</h3>
                   <ul className="flex flex-col md:min-h-0 md:flex-1 md:overflow-y-auto">
-                    {detailsOrder.items.map((item) => (
+                    {detailsOrder.items.map((item, index) => (
                       <li
-                        key={item.name}
+                        key={`${index}-${item.name}`}
                         className="flex gap-3 border-t border-separator py-2 text-base text-foreground"
                       >
                         <span className="w-8 shrink-0 text-right font-semibold tabular-nums">

@@ -45,11 +45,13 @@ public class AuthenticationController {
     @PostMapping("/auth/v1/login")
     Object login(@Valid @RequestBody LoginRequest input, HttpServletRequest request, HttpServletResponse response) {
         var email = normalize(input.email());
-        throttle.requireNotThrottled(email);
+        // getRemoteAddr is the real client: server.forward-headers-strategy resolves it from the trusted proxy.
+        var clientAddress = request.getRemoteAddr();
+        throttle.requireNotThrottled(email, clientAddress);
         String subject;
         try { subject = identities.signIn(email, input.password()); }
         catch (InvalidLoginException exception) {
-            throttle.recordFailure(email);
+            throttle.recordFailure(email, clientAddress);
             throw exception;
         }
         StaffPrincipal principal;
@@ -160,7 +162,9 @@ public class AuthenticationController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     void resetPassword(@Valid @RequestBody PasswordResetConfirmationRequest input,
             HttpServletRequest request, HttpServletResponse response) {
-        passwordResets.reset(normalize(input.email()), input.code(), input.password());
+        var email = normalize(input.email());
+        passwordResets.reset(email, input.code(), input.password());
+        throttle.clear(email);
         sessions.logout(request);
         csrf.rotate(request, response);
     }

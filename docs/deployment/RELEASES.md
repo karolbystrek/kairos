@@ -4,7 +4,9 @@ Use [the production runbook](RUNBOOK.md) for prerequisites and the sequence.
 
 ## First install and later releases
 
-CI validates pull requests and main pushes without building images. After
+CI validates pull requests and main pushes, including the Compose files, and builds
+images without pushing them;
+the deployment workflow builds and pushes them. After
 provisioning and authorization, start the deployment workflow from `main`
 (the default branch; other refs are refused):
 

@@ -14,14 +14,18 @@ import pl.karolbystrek.kairos.api.order.application.model.OrderInitiator;
 import pl.karolbystrek.kairos.api.order.application.model.OrderView;
 import pl.karolbystrek.kairos.api.order.application.model.TrackedOrderView;
 import pl.karolbystrek.kairos.api.order.domain.OrderItem;
+import pl.karolbystrek.kairos.api.order.domain.CustomerOrder;
 import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
 import pl.karolbystrek.kairos.api.order.infrastructure.persistence.CustomerOrderRepository;
 import pl.karolbystrek.kairos.api.persistence.infrastructure.DatabaseAccessContext;
 
 import java.time.Clock;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -93,6 +97,14 @@ public class OrderService {
         var order = orderRepository.findByTrackingReference(trackingReference)
                 .orElseThrow(() -> new ResourceNotFoundException("Tracked order was not found"));
         return TrackedOrderView.from(order);
+    }
+
+    // One authority-bound query for many streams; unknown references are absent from the result.
+    @Transactional(readOnly = true)
+    public Map<UUID, TrackedOrderView> findTrackedOrders(Collection<UUID> trackingReferences) {
+        databaseAccess.trackedOrders(trackingReferences);
+        return orderRepository.findAllByTrackingReferenceIn(trackingReferences).stream()
+                .collect(Collectors.toMap(CustomerOrder::getTrackingReference, TrackedOrderView::from));
     }
 
     private Location requireLocation(UUID locationId) {

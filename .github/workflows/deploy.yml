@@ -47,11 +47,34 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # The frontends bake NEXT_PUBLIC_* values into the image, so a changed value needs a new image.
+      - name: Build inputs
+        id: inputs
+        env:
+          SERVICE: ${{ matrix.service }}
+          NEXT_PUBLIC_API_BASE_URL: ${{ vars.NEXT_PUBLIC_API_BASE_URL }}
+          NEXT_PUBLIC_CUSTOMER_APP_URL: ${{ vars.NEXT_PUBLIC_CUSTOMER_APP_URL }}
+          NEXT_PUBLIC_PANEL_APP_URL: ${{ vars.NEXT_PUBLIC_PANEL_APP_URL }}
+        run: |
+          hash=none
+          if [ "$SERVICE" != api ]; then
+            hash="$(printf '%s\n%s\n%s\n' "$NEXT_PUBLIC_API_BASE_URL" "$NEXT_PUBLIC_CUSTOMER_APP_URL" "$NEXT_PUBLIC_PANEL_APP_URL" | sha256sum | cut -d' ' -f1)"
+          fi
+          echo "hash=$hash" >> "$GITHUB_OUTPUT"
+
       # A rebuild changes digests, which the host rejects for an existing revision.
       - name: Check existing image
         id: existing
+        env:
+          BUILD_ARGS_HASH: ${{ steps.inputs.outputs.hash }}
         run: |
-          if skopeo inspect --raw "docker://$IMAGE" >/dev/null 2>&1; then
+          if manifest="$(skopeo inspect "docker://$IMAGE" 2>/dev/null)"; then
+            label="$(printf '%s' "$manifest" | jq -r '.Labels["pl.karolbystrek.kairos.build-args-hash"] // empty')"
+            # Images from before the label existed are reused as before.
+            if [ -n "$label" ] && [ "$label" != "$BUILD_ARGS_HASH" ]; then
+              echo "::error::$IMAGE was built with different NEXT_PUBLIC_* values; the host rejects a rebuilt revision, so deploy a new commit."
+              exit 1
+            fi
             echo "$IMAGE already exists; reusing it."
             echo "found=true" >> "$GITHUB_OUTPUT"
           fi
@@ -76,6 +99,7 @@ jobs:
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.version=sha-${{ github.sha }}
+            pl.karolbystrek.kairos.build-args-hash=${{ steps.inputs.outputs.hash }}
           build-args: |
             NEXT_PUBLIC_API_BASE_URL=${{ vars.NEXT_PUBLIC_API_BASE_URL }}
             NEXT_PUBLIC_CUSTOMER_APP_URL=${{ vars.NEXT_PUBLIC_CUSTOMER_APP_URL }}

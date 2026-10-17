@@ -47,6 +47,8 @@ jobs:
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: 22
+          cache: npm
+          cache-dependency-path: apps/${{ matrix.app }}/package-lock.json
 
       - name: Validate build inputs
         shell: bash
@@ -57,15 +59,7 @@ jobs:
           : "${NEXT_PUBLIC_CUSTOMER_APP_URL:?Set the NEXT_PUBLIC_CUSTOMER_APP_URL repository variable.}"
           [[ "$APP" != panel-app ]] || : "${NEXT_PUBLIC_PANEL_APP_URL:?Set the NEXT_PUBLIC_PANEL_APP_URL repository variable.}"
 
-      - name: Dependency cache
-        id: deps
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: apps/${{ matrix.app }}/node_modules
-          key: ${{ runner.os }}-node22-${{ matrix.app }}-${{ hashFiles(format('apps/{0}/package-lock.json', matrix.app)) }}
-
       - name: Install dependencies
-        if: steps.deps.outputs.cache-hit != 'true'
         run: npm ci
 
       - name: Lint & types
@@ -118,6 +112,12 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Pip cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-ansible-core-2.19.14
+
       - name: Install bootstrap validation tools
         run: python3 -m pip install 'ansible-core==2.19.14'
 
@@ -141,7 +141,6 @@ jobs:
     timeout-minutes: 30
     env:
       # Placeholders: only Compose interpolation and the build need them, nothing is pushed.
-      COMPOSE_FILE: compose.yaml:compose.production.yaml
       KAIROS_IMAGE_REGISTRY: ghcr.io/karolbystrek/kairos
       KAIROS_RELEASE_VERSION: ci
       KAIROS_API_USER: "1000:1000"
@@ -167,6 +166,9 @@ jobs:
 
       - name: Validate production Compose
         run: docker compose -f compose.yaml -f compose.production.yaml config -q
+
+      - name: Validate development Compose
+        run: docker compose --env-file .env.example -f compose.yaml -f compose.local.yaml config -q
 
       - name: Build application images
         run: docker compose -f compose.yaml -f compose.production.yaml build api panel-app customer-app

@@ -4,7 +4,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import pl.karolbystrek.kairos.api.integration.application.ExternalIntegrationManagementService;
 import pl.karolbystrek.kairos.api.account.application.exception.StaffAccessDeniedException;
@@ -12,7 +11,6 @@ import pl.karolbystrek.kairos.api.integration.application.exception.IntegrationC
 import pl.karolbystrek.kairos.api.integration.domain.ExternalIntegrationStatus;
 import pl.karolbystrek.kairos.api.integration.testsupport.IntegrationTestFixture;
 import pl.karolbystrek.kairos.api.integration.testsupport.MutableTestClock;
-import pl.karolbystrek.kairos.api.integration.testsupport.MutableTestClockConfiguration;
 import pl.karolbystrek.kairos.api.integration.webhook.application.model.IssuedWebhookSubscriptionView;
 import pl.karolbystrek.kairos.api.integration.webhook.domain.WebhookSubscriptionStatus;
 import pl.karolbystrek.kairos.api.location.application.LocationService;
@@ -35,7 +33,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
-@Import(MutableTestClockConfiguration.class)
 class WebhookSubscriptionIntegrationTests extends RedisListenerIsolatedIntegrationTest {
 
     @Autowired

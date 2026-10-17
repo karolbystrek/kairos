@@ -75,7 +75,8 @@ The webhook pipeline attempts each delivery once at the application-policy level
 Any redirect, timeout, network failure, or non-`2xx` response is durably
 dead-lettered; v1 performs no automatic delivery retry. API process crash recovery
 may result in duplicate delivery, so consumers deduplicate by the stable
-CloudEvent ID and reject stale order snapshots by state and timestamp.
+CloudEvent ID and reject stale order snapshots by state and timestamp. Delivery order is not
+guaranteed; consumers order events by the CloudEvents `time` and `id` fields.
 
 Production webhook destinations require HTTPS and public network addresses.
 DNS is revalidated for delivery, redirects are not followed, and connection,

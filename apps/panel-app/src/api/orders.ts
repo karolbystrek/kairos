@@ -41,18 +41,40 @@ export function subscribeToOrderQueue(
   const url = new URL("/api/orders/v1/events", apiBaseUrl);
 
   if (locationId) url.searchParams.set("locationId", locationId);
-  const events = new EventSource(url, { withCredentials: true });
-
-  events.addEventListener("order-queue", (event) => {
-    try {
-      onSnapshot(staffOrdersSchema.parse(JSON.parse(event.data)));
-    } catch {
+  let events: EventSource;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let delay = 2_000;
+  let attempts = 0;
+  const connect = () => {
+    events = new EventSource(url, { withCredentials: true });
+    events.addEventListener("order-queue", (event) => {
+      // The server sends a full snapshot on every (re)connection.
+      delay = 2_000;
+      attempts = 0;
+      try {
+        onSnapshot(staffOrdersSchema.parse(JSON.parse(event.data)));
+      } catch {
+        onDisconnected();
+      }
+    });
+    events.onerror = () => {
       onDisconnected();
-    }
-  });
-  events.onerror = onDisconnected;
+      // A closed source (HTTP error) never retries by itself.
+      if (events.readyState !== EventSource.CLOSED) return;
+      events.close();
+      // Persistent refusals (401, 403) leave the queue to the polling fallback.
+      if (++attempts > 10) return;
+      timer = setTimeout(connect, delay);
+      delay = Math.min(delay * 2, 30_000);
+    };
+  };
 
-  return () => events.close();
+  connect();
+
+  return () => {
+    clearTimeout(timer);
+    events.close();
+  };
 }
 
 export const maximumOrderLabelLength = 80;

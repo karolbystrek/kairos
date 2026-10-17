@@ -1,14 +1,18 @@
-import { beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 import { subscribeToOrderQueue } from "@/src/api/orders";
 
 class FakeEventSource {
+  static CLOSED = 2;
   static last: FakeEventSource;
+  static count = 0;
+  readyState = 1;
   listeners: Record<string, (event: { data: string }) => void> = {};
   onerror?: () => void;
   close = vi.fn();
   constructor(public url: URL, public options: EventSourceInit) {
     FakeEventSource.last = this;
+    FakeEventSource.count++;
   }
   addEventListener(name: string, listener: (event: { data: string }) => void) {
     this.listeners[name] = listener;
@@ -19,8 +23,11 @@ class FakeEventSource {
 }
 
 beforeEach(() => {
+  FakeEventSource.count = 0;
   vi.stubGlobal("EventSource", FakeEventSource);
 });
+
+afterEach(() => vi.useRealTimers());
 
 const order = {
   id: "00000000-0000-4000-8000-000000000001",
@@ -63,4 +70,29 @@ it("tenant stream omits location and invalid snapshots or disconnects request RE
   expect(snapshots).not.toHaveBeenCalled();
   source.emit(JSON.stringify([order]));
   expect(snapshots).toHaveBeenCalledWith([order]);
+});
+
+it("recreates a permanently closed stream with backoff and stops after cleanup", () => {
+  vi.useFakeTimers();
+  const close = subscribeToOrderQueue(undefined, vi.fn(), vi.fn());
+
+  FakeEventSource.last.readyState = FakeEventSource.CLOSED;
+  FakeEventSource.last.onerror?.();
+  vi.advanceTimersByTime(1_999);
+  expect(FakeEventSource.count).toBe(1);
+  vi.advanceTimersByTime(1);
+  expect(FakeEventSource.count).toBe(2);
+
+  FakeEventSource.last.readyState = FakeEventSource.CLOSED;
+  FakeEventSource.last.onerror?.();
+  vi.advanceTimersByTime(3_999);
+  expect(FakeEventSource.count).toBe(2);
+  vi.advanceTimersByTime(1);
+  expect(FakeEventSource.count).toBe(3);
+
+  FakeEventSource.last.readyState = FakeEventSource.CLOSED;
+  FakeEventSource.last.onerror?.();
+  close();
+  vi.advanceTimersByTime(60_000);
+  expect(FakeEventSource.count).toBe(3);
 });

@@ -2,7 +2,6 @@ package pl.karolbystrek.kairos.api.order.application;
 
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -24,15 +23,13 @@ import pl.karolbystrek.kairos.api.order.domain.OrderItem;
 import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
 import pl.karolbystrek.kairos.api.order.infrastructure.persistence.CustomerOrderRepository;
 import pl.karolbystrek.kairos.api.persistence.infrastructure.DatabaseAccessContext;
+import pl.karolbystrek.kairos.api.util.Hashing;
 
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -75,18 +72,12 @@ public class ExternalOrderService {
                 status,
                 cursor
         );
-        var page = orderRepository.findAll(
+        var sort = Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"));
+        // findBy avoids the COUNT query that findAll(spec, Pageable) runs on full pages.
+        var content = orderRepository.findBy(
                 specification,
-                PageRequest.of(
-                        0,
-                        limit + 1,
-                        Sort.by(
-                                Sort.Order.desc("createdAt"),
-                                Sort.Order.desc("id")
-                        )
-                )
+                query -> query.sortBy(sort).limit(limit + 1).all()
         );
-        var content = page.getContent();
         var hasNext = content.size() > limit;
         var visibleOrders = hasNext ? content.subList(0, limit) : content;
         var items = visibleOrders.stream()
@@ -249,13 +240,7 @@ public class ExternalOrderService {
                 .collect(Collectors.joining("\n"));
         var canonicalInput = locationId + "\n" + (label == null ? "NO_LABEL" : "LABEL\n" + label)
                 + "\nITEMS\n" + canonicalItems;
-        try {
-            var digest = MessageDigest.getInstance("SHA-256")
-                    .digest(canonicalInput.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(digest);
-        } catch (NoSuchAlgorithmException exception) {
-            throw new IllegalStateException("SHA-256 is unavailable", exception);
-        }
+        return Hashing.sha256Hex(canonicalInput);
     }
 
     private static OrderInitiator integrationInitiator(ApiKeyPrincipal principal) {

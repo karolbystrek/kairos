@@ -30,7 +30,8 @@ export const customerOrderSchema = z.object({
   label: z.string().nullable(),
   status: orderStatusSchema,
   updatedAt: z.iso.datetime({ offset: true }),
-  reviewInvitation: reviewInvitationSchema.nullish(),
+  // An unexpected review host must not fail the whole order.
+  reviewInvitation: reviewInvitationSchema.nullish().catch(undefined),
 });
 
 export const orderStatusChangedEventSchema = customerOrderSchema.extend({

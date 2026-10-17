@@ -42,6 +42,9 @@ public class StaffSessionFilter extends OncePerRequestFilter {
             try {
                 var signedIn = (Instant) session.getAttribute(AuthenticationSessionService.SIGNED_IN_AT);
                 var principal = authentication.authenticate(subject, signedIn);
+                // Long-lived streams re-run this check later, so they need the sign-in this request proved.
+                request.setAttribute(AuthenticationSessionService.IDENTITY, subject);
+                request.setAttribute(AuthenticationSessionService.SIGNED_IN_AT, signedIn);
                 var context = SecurityContextHolder.createEmptyContext();
                 context.setAuthentication(UsernamePasswordAuthenticationToken.authenticated(principal, null,
                     List.of(new SimpleGrantedAuthority("ROLE_TENANT_ACCOUNT"))));

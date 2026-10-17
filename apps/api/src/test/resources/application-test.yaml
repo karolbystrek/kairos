@@ -1,30 +1,12 @@
+# Overrides only: the main application.yaml is loaded too (profile "test", activated by PostgresLauncherSessionListener).
 spring:
-  profiles:
-    active: test
-  session:
-    timeout: 30d
-    jdbc:
-      initialize-schema: never
-      platform: postgresql
-  application:
-    name: api
-  jpa:
-    hibernate:
-      ddl-auto: validate
-    open-in-view: false
-  mvc:
-    problemdetails:
-      enabled: true
-  flyway:
-    enabled: true
   data:
     redis:
-      repositories:
-        enabled: false
-
-server:
-  servlet:
-    context-path: /api
+      # The main file requires these from the environment. Nothing listens on port 1, so tests never reach a
+      # developer's Redis; tests that need Redis set the container's values.
+      host: localhost
+      port: 1
+      password: ""
 
 kairos:
   email:
@@ -41,24 +23,14 @@ kairos:
   webhooks:
     signing:
       encryption-key-location: "classpath:keys/test-webhook-encryption.bin"
-      rotation-overlap: 24h
-    delivery:
-      total-timeout: 10s
-      maximum-response-body-bytes: 16384
     worker:
       batch-size: 10
-      claim-lease: 30s
-      recovery-poll-delay: 5s
       initial-delay: 24h
     destination-policy: LOCAL_DEVELOPMENT
   live-updates:
     resync-interval: 24h
   retention:
-    grace-period: 30d
-    order-expiry: 24h
-    cycle-budget: 60s
     batch-size: 10
-    purge-delay: 1h
     purge-initial-delay: 24h
   customer-notifications:
     vapid:
@@ -67,22 +39,8 @@ kairos:
       subject: "mailto:test@kairos.local"
     subscription:
       encryption-key-location: "classpath:keys/test-webhook-encryption.bin"
-      maximum-enrollments-per-order: 10
-      dormant-retention: 30d
-    delivery:
-      freshness-window: 10m
-      maximum-attempts: 8
-      initial-retry-delay: 5s
-      maximum-retry-delay: 2m
-      total-timeout: 10s
-      successful-retention: 7d
-      failed-retention: 30d
-      maximum-payload-bytes: 3072
     worker:
       batch-size: 10
-      claim-lease: 30s
-      recovery-poll-delay: 5s
       initial-delay: 24h
-      cleanup-delay: 1h
       cleanup-initial-delay: 24h
     destination-policy: LOCAL_DEVELOPMENT

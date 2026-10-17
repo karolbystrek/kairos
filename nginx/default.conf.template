@@ -42,7 +42,12 @@ map $uri $kairos_external_client {
     default "";
     ~^/api/external/ $binary_remote_addr;
 }
+map $uri $kairos_customer_notification_client {
+    default "";
+    ~^/api/customer-notifications/ $binary_remote_addr;
+}
 limit_req_zone $kairos_auth_client zone=kairos_auth:10m rate=5r/m;
+limit_req_zone $kairos_customer_notification_client zone=kairos_customer_notifications:10m rate=60r/m;
 limit_req_zone $kairos_external_client zone=kairos_external:10m rate=10r/s;
 limit_req_status 429;
 
@@ -100,7 +105,7 @@ server {
     add_header X-Frame-Options "DENY" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
     add_header Permissions-Policy "camera=(self), microphone=(), geolocation=(), payment=(), usb=()" always;
-    add_header Content-Security-Policy-Report-Only "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://${KAIROS_API_HOST}; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://${KAIROS_API_HOST}; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" always;
 
     location = /api {
         return 404;
@@ -126,7 +131,7 @@ server {
     add_header X-Frame-Options "DENY" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
     add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()" always;
-    add_header Content-Security-Policy-Report-Only "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://${KAIROS_API_HOST}; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://${KAIROS_API_HOST}; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" always;
 
     location = /api {
         return 404;
@@ -185,6 +190,8 @@ server {
     # Staff of one restaurant often share an IP, so allow a burst of sign-ins at once.
     limit_req zone=kairos_auth burst=20 nodelay;
     limit_req zone=kairos_external burst=20 nodelay;
+    # Unauthenticated customer notification subscriptions; guests on one Wi-Fi share an IP, so keep a small burst.
+    limit_req zone=kairos_customer_notifications burst=30 nodelay;
 
     location /api/ {
         proxy_pass http://kairos_api;

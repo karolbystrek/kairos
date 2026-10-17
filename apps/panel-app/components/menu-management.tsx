@@ -81,7 +81,7 @@ export function MenuManagement({
     location ? staffLocationMenuKey(accountId, location.id) : null,
     ([, , , locationId]) => getLocationMenu(locationId),
     // A focus refresh with another editor's save would remount and drop the draft.
-    { revalidateOnFocus: false },
+    { revalidateOnFocus: false, revalidateOnReconnect: false },
   );
   const loadError = locationsError ?? menuError;
 

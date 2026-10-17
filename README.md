@@ -13,7 +13,7 @@ The system consists of three applications:
 
 ## Local development
 
-Install [Docker](https://docs.docker.com/get-docker/) with Compose and OpenSSL, then run:
+Install [Docker](https://docs.docker.com/get-docker/) with Compose 2.30 or newer and OpenSSL, then run:
 
 ```bash
 ./setup.sh --dev

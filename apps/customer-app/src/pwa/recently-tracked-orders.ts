@@ -67,7 +67,10 @@ export function consumeInstallationBootstrap(
       CONSUMED_INSTALLATION_BOOTSTRAPS_STORAGE_KEY,
       JSON.stringify({
         version: 1,
-        trackingReferences: [trackingReference, ...consumedTrackingReferences],
+        trackingReferences: [
+          trackingReference,
+          ...consumedTrackingReferences,
+        ].slice(0, 20),
       }),
     );
 

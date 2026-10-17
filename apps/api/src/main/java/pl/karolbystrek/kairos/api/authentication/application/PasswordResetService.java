@@ -27,12 +27,14 @@ public class PasswordResetService {
     static final Duration CODE_LIFETIME = Duration.ofHours(1);
     static final Duration RESEND_DELAY = Duration.ofSeconds(60);
     static final int MAXIMUM_ATTEMPTS = 5;
+    private static final String GUESS_PURPOSE = "password-reset";
     private final JdbcTemplate database;
     private final DatabaseAccessContext access;
     private final StaffIdentityStore identities;
     private final OneTimeBearerTokenService tokens;
     private final EmailDeliveryService mail;
     private final PlatformTransactionManager transactions;
+    private final CodeGuessLimiter guesses;
     private final Clock clock;
     private final SecureRandom random = new SecureRandom();
 
@@ -62,6 +64,7 @@ public class PasswordResetService {
 
     /** Sets the password when the latest code is correct, then ends every session of the account. */
     public void reset(String email, String code, String password) {
+        guesses.requireNotLocked(GUESS_PURPOSE, email);
         var error = new TransactionTemplate(transactions).execute(status -> {
             var subject = lockedSubject(email);
             if (subject == null) return invalidCode();
@@ -86,7 +89,11 @@ public class PasswordResetService {
             database.update("DELETE FROM password_resets WHERE subject=?", subject);
             return null;
         });
-        if (error != null) throw error;
+        if (error != null) {
+            guesses.recordFailure(GUESS_PURPOSE, email);
+            throw error;
+        }
+        guesses.clear(GUESS_PURPOSE, email);
     }
 
     // Shares the registration lock, so a reset and a registration for one email never interleave.

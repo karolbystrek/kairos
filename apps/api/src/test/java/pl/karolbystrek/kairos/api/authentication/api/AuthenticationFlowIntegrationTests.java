@@ -13,6 +13,7 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.web.server.ResponseStatusException;
 import pl.karolbystrek.kairos.api.account.application.AccountInvitationService;
 import pl.karolbystrek.kairos.api.account.domain.assignment.AssignmentRole;
@@ -103,6 +104,18 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
         mvc.perform(csrf(postApi("/auth/v1/login").content("{\"email\":\"" + email + "\",\"password\":\"password-12345\"}")))
             .andExpect(status().isTooManyRequests());
         login(other);
+    }
+
+    @Test
+    void signInFailuresFromOneAddressDoNotLockTheAccountForOthers() throws Exception {
+        var email = email();
+        register(email);
+        var wrong = "{\"email\":\"" + email + "\",\"password\":\"wrong-password-1\"}";
+        var correct = "{\"email\":\"" + email + "\",\"password\":\"password-12345\"}";
+        for (var attempt = 0; attempt < 10; attempt++)
+            mvc.perform(csrf(postApi("/auth/v1/login").content(wrong).with(from("203.0.113.9")))).andExpect(status().isUnauthorized());
+        mvc.perform(csrf(postApi("/auth/v1/login").content(correct).with(from("203.0.113.9")))).andExpect(status().isTooManyRequests());
+        mvc.perform(csrf(postApi("/auth/v1/login").content(correct).with(from("203.0.113.10")))).andExpect(status().isOk());
     }
 
     @Test
@@ -393,6 +406,25 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
     }
 
     @Test
+    void reissuingResetCodesDoesNotRestoreGuessesAfterFifteenWrongCodes() throws Exception {
+        var email = email();
+        register(email);
+        for (var code = 0; code < 3; code++) {
+            database.update("DELETE FROM password_resets");
+            mvc.perform(csrf(postApi("/auth/v1/password-reset").content("{\"email\":\"" + email + "\"}"))).andExpect(status().isAccepted());
+            for (var attempt = 0; attempt < 5; attempt++)
+                mvc.perform(csrf(postApi("/auth/v1/password-reset/confirmation").content(reset(email, "000000"))))
+                    .andExpect(status().isBadRequest());
+        }
+        database.update("DELETE FROM password_resets");
+        mvc.perform(csrf(postApi("/auth/v1/password-reset").content("{\"email\":\"" + email + "\"}"))).andExpect(status().isAccepted());
+        useResetCode(email, "123456");
+        // The fresh code has used no attempts, yet the lock from earlier failures refuses even the right code.
+        mvc.perform(csrf(postApi("/auth/v1/password-reset/confirmation").content(reset(email, "123456"))))
+            .andExpect(status().isTooManyRequests());
+    }
+
+    @Test
     void passwordResetRecoversAnAccountWithoutStoredCredentials() throws Exception {
         var email = email();
         register(email);
@@ -443,6 +475,12 @@ class AuthenticationFlowIntegrationTests extends RedisListenerIsolatedIntegratio
     private Cookie login(String email, String password) throws Exception {
         return mvc.perform(csrf(postApi("/auth/v1/login").content("{\"email\":\"" + email + "\",\"password\":\"" + password + "\"}")))
             .andExpect(status().isOk()).andReturn().getResponse().getCookie("__Host-session");
+    }
+    private static RequestPostProcessor from(String address) {
+        return request -> {
+            request.setRemoteAddr(address);
+            return request;
+        };
     }
     private static String email() { return UUID.randomUUID() + "@example.com"; }
     private static String registration(String email, String token) {

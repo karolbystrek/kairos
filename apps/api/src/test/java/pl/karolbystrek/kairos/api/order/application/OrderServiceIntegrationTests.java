@@ -4,31 +4,23 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
 import pl.karolbystrek.kairos.api.account.application.model.StaffPrincipal;
 import pl.karolbystrek.kairos.api.account.domain.TenantRole;
+import pl.karolbystrek.kairos.api.integration.testsupport.MutableTestClock;
 import pl.karolbystrek.kairos.api.order.domain.InvalidOrderTransitionException;
 import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
 import pl.karolbystrek.kairos.api.testsupport.PostgresTestDatabase;
 import pl.karolbystrek.kairos.api.testsupport.RedisListenerIsolatedIntegrationTest;
 
 import java.sql.Timestamp;
-import java.time.Clock;
 import java.time.Instant;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @SpringBootTest
-@Import(OrderServiceIntegrationTests.ClockConfiguration.class)
 class OrderServiceIntegrationTests extends RedisListenerIsolatedIntegrationTest {
 
     @Autowired
@@ -37,7 +29,7 @@ class OrderServiceIntegrationTests extends RedisListenerIsolatedIntegrationTest 
     private final JdbcTemplate jdbcTemplate = PostgresTestDatabase.ownerDatabase();
 
     @Autowired
-    private MutableClock clock;
+    private MutableTestClock clock;
 
     private UUID locationId;
     private StaffPrincipal principal;
@@ -149,40 +141,5 @@ class OrderServiceIntegrationTests extends RedisListenerIsolatedIntegrationTest 
 
         assertThat(List.of(utcOrder.number(), warsawOrder.number(), nextUtcDayOrder.number(), sameWarsawDayOrder.number()))
                 .containsExactly(1L, 1L, 1L, 2L);
-    }
-
-    @TestConfiguration
-    static class ClockConfiguration {
-
-        @Bean
-        @Primary
-        MutableClock mutableClock() {
-            return new MutableClock();
-        }
-    }
-
-    static class MutableClock extends Clock {
-
-        private final AtomicReference<Instant> instant =
-                new AtomicReference<>(Instant.parse("2026-07-24T12:00:00Z"));
-
-        void setInstant(Instant value) {
-            instant.set(value);
-        }
-
-        @Override
-        public ZoneId getZone() {
-            return ZoneOffset.UTC;
-        }
-
-        @Override
-        public Clock withZone(ZoneId zone) {
-            return Clock.fixed(instant(), zone);
-        }
-
-        @Override
-        public Instant instant() {
-            return instant.get();
-        }
     }
 }

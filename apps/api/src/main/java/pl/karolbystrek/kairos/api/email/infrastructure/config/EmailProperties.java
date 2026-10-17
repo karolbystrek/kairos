@@ -7,7 +7,8 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 public record EmailProperties(
     @DefaultValue("RESEND") Mode mode,
     @DefaultValue("") String apiKey,
-    @DefaultValue("file:/run/secrets/email-encryption.bin") String encryptionKeyLocation
+    @DefaultValue("file:/run/secrets/email-encryption.bin") String encryptionKeyLocation,
+    @DefaultValue("Kairos <no-reply@kairos.karolbystrek.pl>") String sender
 ) {
     public enum Mode { RESEND, LOG }
     @Override public String toString() { return "EmailProperties[redacted]"; }

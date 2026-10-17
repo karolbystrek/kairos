@@ -20,6 +20,7 @@ const iconDefaults = { "aria-hidden": true } as const;
 
 // Client errors will not succeed on retry; other failures retry a few times.
 const swrDefaults: SWRConfiguration = {
+  dedupingInterval: 10_000,
   errorRetryCount: 3,
   shouldRetryOnError: (error) =>
     !(error instanceof ApiError && error.status >= 400 && error.status < 500),

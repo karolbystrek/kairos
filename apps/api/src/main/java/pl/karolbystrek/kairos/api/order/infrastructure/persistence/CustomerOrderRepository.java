@@ -29,6 +29,8 @@ public interface CustomerOrderRepository
 
     Optional<CustomerOrder> findByTrackingReference(UUID trackingReference);
 
+    List<CustomerOrder> findAllByTrackingReferenceIn(Collection<UUID> trackingReferences);
+
     Optional<CustomerOrder> findByIdAndLocationIdIn(UUID orderId, Collection<UUID> locationIds);
 
     Optional<CustomerOrder> findByExternalIntegrationIdAndLocationIdAndExternalIdempotencyKey(
@@ -57,6 +59,12 @@ public interface CustomerOrderRepository
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<CustomerOrder> findForUpdateByTrackingReference(UUID trackingReference);
+
+    // Locks all referenced orders in one query, in a stable order so concurrent enrollments cannot deadlock.
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    List<CustomerOrder> findAllForUpdateByTrackingReferenceInOrderByTrackingReference(
+            Collection<UUID> trackingReferences
+    );
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<CustomerOrder> findForUpdateByIdAndLocationIdIn(

@@ -6,13 +6,12 @@ import pl.karolbystrek.kairos.api.notification.application.exception.InvalidCust
 import pl.karolbystrek.kairos.api.notification.application.model.CustomerPushSubscriptionInput;
 import pl.karolbystrek.kairos.api.notification.application.model.ValidatedPushSubscription;
 import pl.karolbystrek.kairos.api.notification.infrastructure.http.PushDestinationPolicy;
+import pl.karolbystrek.kairos.api.util.Hashing;
 
 import java.math.BigInteger;
-import java.nio.charset.StandardCharsets;
 import java.security.AlgorithmParameters;
 import java.security.GeneralSecurityException;
 import java.security.KeyFactory;
-import java.security.MessageDigest;
 import java.security.spec.ECGenParameterSpec;
 import java.security.spec.ECParameterSpec;
 import java.security.spec.ECPoint;
@@ -20,7 +19,6 @@ import java.security.spec.ECFieldFp;
 import java.security.spec.ECPublicKeySpec;
 import java.util.Arrays;
 import java.util.Base64;
-import java.util.HexFormat;
 
 @Component
 @RequiredArgsConstructor
@@ -42,7 +40,7 @@ class CustomerPushSubscriptionValidator {
         var endpoint = destination.uri().toString();
         return new ValidatedPushSubscription(
                 endpoint,
-                sha256(endpoint),
+                Hashing.sha256Hex(endpoint),
                 PushDestinationPolicy.origin(destination.uri()),
                 p256dh,
                 auth,
@@ -96,16 +94,6 @@ class CustomerPushSubscriptionValidator {
                     "Push subscription p256dh is not a valid P-256 public key",
                     exception
             );
-        }
-    }
-
-    private static String sha256(String value) {
-        try {
-            var digest = MessageDigest.getInstance("SHA-256")
-                    .digest(value.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(digest);
-        } catch (GeneralSecurityException exception) {
-            throw new IllegalStateException("SHA-256 is unavailable", exception);
         }
     }
 

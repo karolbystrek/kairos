@@ -25,6 +25,8 @@ done
 
 # .env is read last so it overrides .env.example, as in the --env-file order.
 compose_file="$(cat ${configuration_files} | sed -n 's/^COMPOSE_FILE=//p' | tail -n 1)"
+# COMPOSE_FILE exported in the environment overrides --env-file.
+compose_file="${COMPOSE_FILE:-${compose_file}}"
 case "${compose_file}" in
     *compose.production.yaml*)
         echo "Refusing to reset: COMPOSE_FILE selects production. reset.sh deletes volumes and keys; it only runs in development." >&2

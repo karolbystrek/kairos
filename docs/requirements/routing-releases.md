@@ -31,13 +31,14 @@ API origin `http://localhost:8080` directly; there is no local gateway.
   10 requests/second with burst 20. Bursts are accepted immediately (`nodelay`);
   excess requests return `429`. CSRF bootstrap, browser reads, preflight, logout,
   invitation preview, and customer and staff SSE do not consume the authentication budget.
-  These are initial operational defaults; tune the shared template through a
-  reviewed source change. The existing 100 concurrent connections/client bound
-  remains in place.
+  Unauthenticated `/api/customer-notifications/` requests use 60 requests/minute
+  with burst 30. These are initial operational defaults; tune the shared template
+  through a reviewed source change. Connections are bounded at 1000 per client
+  (guests on one restaurant Wi-Fi share an IP); the API refuses a sixth concurrent stream for one tracking reference with HTTP 429.
 * Request-body, header, connection, and timeout bounds apply. Customer and staff SSE disable
   proxy buffering and use a read timeout longer than the 30-minute emitter lifetime.
-* The customer and panel hosts add HSTS, `X-Content-Type-Options: nosniff` and
-  `X-Frame-Options: DENY`; the API sends the same through Spring Security.
+* The customer and panel hosts add HSTS, `X-Content-Type-Options: nosniff`,
+  `X-Frame-Options: DENY` and an enforcing `Content-Security-Policy`; the API sends the same through Spring Security.
 * `compose.yaml` owns PostgreSQL and Redis; `compose.local.yaml` adds development
   application builds, source mounts and isolated dependency/build volumes.
   Next.js provides Fast Refresh; the API development image uses `watchexec`
@@ -59,7 +60,8 @@ API origin `http://localhost:8080` directly; there is no local gateway.
 
 GitHub Actions validates pull requests and `main` with frontend lint, type checks,
 configured tests and production `npm run build`, and the complete Maven `verify`
-lifecycle. CI builds no images. Frontend validation requires the non-secret
+lifecycle, and validates the production and development Compose files. CI builds
+images without pushing them; the deployment workflow builds and pushes release images. Frontend validation requires the non-secret
 `NEXT_PUBLIC_API_BASE_URL`, `NEXT_PUBLIC_CUSTOMER_APP_URL` and
 `NEXT_PUBLIC_PANEL_APP_URL` inputs. Main CI keeps dependency caches warm for
 pull requests.

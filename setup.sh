@@ -103,9 +103,29 @@ while [ "$#" -gt 0 ]; do
     esac
 done
 
+# Write the directory into .env only when it was chosen now or .env had none; an existing value stays as written.
+write_secrets_directory=false
+[ -z "${secrets_argument}" ] || write_secrets_directory=true
+
 checkout_mode=false
 if [ -n "${preset}" ] && [ -f "${repository_directory}/compose.yaml" ]; then
     checkout_mode=true
+fi
+
+if [ "${checkout_mode}" = true ]; then
+    # `config --environment` and `!reset` in compose.production.yaml need Compose 2.30.
+    compose_version="$(docker compose version --short 2>/dev/null || true)"
+    compose_version="${compose_version#v}"
+    case "${compose_version}" in
+        [0-9]*.[0-9]*) ;;
+        *) fail "Docker Compose v2.30 or newer is required; \`docker compose version\` did not report a version." ;;
+    esac
+    compose_major="${compose_version%%.*}"
+    compose_minor="${compose_version#*.}"
+    compose_minor="${compose_minor%%.*}"
+    if [ "${compose_major}" -lt 2 ] || { [ "${compose_major}" -eq 2 ] && [ "${compose_minor%%[!0-9]*}" -lt 30 ]; }; then
+        fail "Docker Compose v2.30 or newer is required; found ${compose_version}."
+    fi
 fi
 
 case "${preset}" in
@@ -131,6 +151,7 @@ if [ -n "${preset}" ] && [ -z "${secrets_argument}" ]; then
     if [ -f "${environment_file}" ]; then
         secrets_argument="$(sed -n 's/^KAIROS_APPLICATION_SECRETS_DIRECTORY=//p' "${environment_file}" | tail -n 1 | sed "s/^['\"]//;s/['\"]$//")"
     fi
+    [ -n "${secrets_argument}" ] || write_secrets_directory=true
     : "${secrets_argument:=secrets}"
 fi
 
@@ -558,17 +579,21 @@ fi
 
 
 if [ "${checkout_mode}" = true ]; then
-    set_environment_value KAIROS_APPLICATION_SECRETS_DIRECTORY "${secrets_directory}"
+    if [ "${write_secrets_directory}" = true ]; then
+        set_environment_value KAIROS_APPLICATION_SECRETS_DIRECTORY "${secrets_directory}"
+    fi
     docker compose --project-directory "${repository_directory}" config --quiet ||
         fail "The ${preset} stack is selected but configuration is incomplete. Update .env and TLS paths, then retry --${preset}; existing values and keys were preserved."
     if [ "${preset}" = prod ]; then
         # Preserved development settings must never relax production boundaries.
         docker compose --project-directory "${repository_directory}" config --environment | awk -F= '
+            FNR == NR { if ($1 ~ /^(POSTGRES_PASSWORD|KAIROS_DB_OWNER_PASSWORD|KAIROS_DB_RUNTIME_PASSWORD|REDIS_PASSWORD)$/) example[$1]=$2; next }
             $1 ~ /^(WEBHOOK_DESTINATION_POLICY|PUSH_DESTINATION_POLICY)$/ && $2 != "PUBLIC_HTTPS" { invalid=1 }
             $1 == "EMAIL_VERIFICATION_ENABLED" && tolower($2) != "true" { invalid=1 }
             $1 ~ /^(NEXT_PUBLIC_CUSTOMER_APP_URL|PANEL_APP_URL|NEXT_PUBLIC_API_BASE_URL)$/ && $2 !~ "^https://[^/]+/?$" { invalid=1 }
+            $1 ~ /^(POSTGRES_PASSWORD|KAIROS_DB_OWNER_PASSWORD|KAIROS_DB_RUNTIME_PASSWORD|REDIS_PASSWORD)$/ { if ($2 == "" || $2 == example[$1]) invalid=1 }
             END { exit invalid }
-        ' || fail "Production requires HTTPS origins, PUBLIC_HTTPS delivery policies and email verification. Update .env, then retry --prod; existing settings were preserved."
+        ' "${repository_directory}/.env.example" - || fail "Production requires HTTPS origins, PUBLIC_HTTPS delivery policies, email verification and non-default database and Redis passwords. Update .env, then retry --prod; existing settings were preserved."
     fi
     docker compose --project-directory "${repository_directory}" up --build -d --wait
     echo
