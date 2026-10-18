@@ -20,7 +20,8 @@ are required. Setup selects `compose.yaml` plus `compose.local.yaml` in `.env`;
 `docker compose up --build -d` subsequently starts or rebuilds that mode.
 
 - Customer: `http://localhost:3000`; panel: `http://localhost:3001`;
-  API: `http://localhost:8080/api`.
+  API: `http://localhost:8080/api`. Each frontend's `next dev` proxies its own
+  `/api` to the API, as NGINX does in production.
 - Source files are mounted from the checkout. Next.js provides Fast Refresh;
   the API development image uses `watchexec` to rebuild and restart after Java
   or resource edits. A compile error leaves the API unavailable until the next

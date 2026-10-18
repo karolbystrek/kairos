@@ -9,6 +9,9 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:3000:3000"
+    # next dev proxies /api here, as NGINX does in production.
+    environment:
+      API_PROXY_URL: http://api:8080
     volumes:
       - ./apps/customer-app:/app
       - customer_node_modules:/app/node_modules
@@ -31,6 +34,9 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:3001:3001"
+    # next dev proxies /api here, as NGINX does in production.
+    environment:
+      API_PROXY_URL: http://api:8080
     volumes:
       - ./apps/panel-app:/app
       - panel_node_modules:/app/node_modules
@@ -60,8 +66,7 @@ services:
       REDIS_PORT:
       REDIS_PASSWORD:
       KAIROS_SECRETS_DIRECTORY: /run/secrets
-      NEXT_PUBLIC_API_BASE_URL: http://localhost:8080
-      NEXT_PUBLIC_CUSTOMER_APP_URL: http://localhost:3000
+      CUSTOMER_APP_URL: http://localhost:3000
       PANEL_APP_URL: http://localhost:3001
       VAPID_SUBJECT:
       WEBHOOK_DESTINATION_POLICY: LOCAL_DEVELOPMENT

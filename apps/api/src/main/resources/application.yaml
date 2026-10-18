@@ -72,7 +72,7 @@ kairos:
   monitoring:
     token-location: "${KAIROS_MONITORING_TOKEN_LOCATION:file:/run/secrets/metrics-token}"
   origins:
-    customer: "${NEXT_PUBLIC_CUSTOMER_APP_URL}"
+    customer: "${CUSTOMER_APP_URL}"
     panel: "${PANEL_APP_URL}"
   authentication:
     email-verification-enabled: ${EMAIL_VERIFICATION_ENABLED:true}

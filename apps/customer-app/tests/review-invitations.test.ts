@@ -47,7 +47,6 @@ it("keeps a dismissed invitation hidden after the order is remembered again", as
 
 it("recovers completion through REST on return and keeps invitations hidden until due", async () => {
   const { vi } = await import("vitest");
-  vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "https://api.kairos.test");
   const { readInvitations } = await import("@/src/pwa/review-invitations");
   const now = vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-10-10T10:00:00Z"));
   const fetchMock = vi.fn().mockImplementation(async () => new Response(JSON.stringify({
@@ -66,13 +65,11 @@ it("recovers completion through REST on return and keeps invitations hidden unti
   } finally {
     now.mockRestore();
     vi.unstubAllGlobals();
-    vi.unstubAllEnvs();
   }
 });
 
 it("suppresses revoked invitations and never shows cached eligibility when offline", async () => {
   const { vi } = await import("vitest");
-  vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "https://api.kairos.test");
   const { readInvitations } = await import("@/src/pwa/review-invitations");
   await rememberReviewReference(reference);
   const fetchMock = vi.fn().mockRejectedValueOnce(new Error("offline"))
@@ -85,13 +82,11 @@ it("suppresses revoked invitations and never shows cached eligibility when offli
     expect(await readReviewReferences()).not.toContain(reference);
   } finally {
     vi.unstubAllGlobals();
-    vi.unstubAllEnvs();
   }
 });
 
 it("hides remembered invitations while offline without contacting the API", async () => {
   const { vi } = await import("vitest");
-  vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "https://api.kairos.test");
   const { readInvitations } = await import("@/src/pwa/review-invitations");
   const fetchMock = vi.fn();
   vi.stubGlobal("fetch", fetchMock);
@@ -102,6 +97,5 @@ it("hides remembered invitations while offline without contacting the API", asyn
     expect(fetchMock).not.toHaveBeenCalled();
   } finally {
     vi.unstubAllGlobals();
-    vi.unstubAllEnvs();
   }
 });

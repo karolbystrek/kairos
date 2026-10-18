@@ -107,7 +107,8 @@ def main():
                     '-p', '127.0.0.1::443',
                     '-v', f'{ROOT / "nginx/default.conf.template"}:/etc/nginx/templates/default.conf.template:ro',
                     '-v', f'{work}:/run/secrets/tls:ro',
-                    '-v', f'{trust}:/etc/nginx/cloudflare-real-ip.conf:ro']
+                    '-v', f'{trust}:/etc/nginx/cloudflare-real-ip.conf:ro',
+                    '-v', f'{ROOT / "nginx/api-locations.conf"}:/etc/nginx/api-locations.conf:ro']
             for key, value in nginx['environment'].items():
                 args += ['-e', f'{key}={value}']
             run(*args, IMAGE)
@@ -140,12 +141,17 @@ def main():
             assert status == 200 and fields == ['8080', peer, peer, 'https', '443', '', '', 'api.kairos.localhost'], body
             assert request('/', 'customer.kairos.localhost')[1].startswith('3000|')
             assert request('/', 'panel.kairos.localhost')[1].startswith('3000|')
-            for path in ('/api', '/api/orders/v1'):
-                assert request(path, 'customer.kairos.localhost')[0] == 404
-                assert request(path, 'panel.kairos.localhost')[0] == 404
-            for path in ('/', '/health', '/actuator/health', '/api/actuator', '/api/actuator/health',
-                         '/api/actuator/env', '/api/actuator/prometheus/extra'):
+            hosts = ('api.kairos.localhost', 'customer.kairos.localhost', 'panel.kairos.localhost')
+            # Browsers reach the API through /api on their own site, keeping their Host.
+            for host in hosts[1:]:
+                status, body, _ = request('/api/orders/v1', host)
+                assert status == 200 and body.startswith('8080|') and body.endswith('|' + host), body
+            for path in ('/', '/health', '/actuator/health'):
                 assert request(path)[0] == 404, path
+            for host in hosts:
+                for path in ('/api', '/api/actuator', '/api/actuator/health', '/api/actuator/env',
+                             '/api/actuator/prometheus/extra'):
+                    assert request(path, host)[0] == 404, (host, path)
             status, body, headers = request('/api/actuator/prometheus')
             assert status == 200 and body.startswith('8080|'), 'metrics route did not reach API'
             assert headers['Cache-Control'] == 'no-store'
@@ -172,9 +178,10 @@ def main():
                 ('/api/account-invitation-previews/v1', 'POST'),
             ):
                 assert request(path, method=method)[0] == 200, (path, method)
-            for path in ('/api/tracked-orders/v1/test/events', '/api/orders/v1/events'):
-                status, _, headers = request(path)
-                assert status == 200 and headers['X-Accel-Buffering'] == 'no', path
+            for host in hosts:
+                for path in ('/api/tracked-orders/v1/test/events', '/api/orders/v1/events'):
+                    status, _, headers = request(path, host)
+                    assert status == 200 and headers['X-Accel-Buffering'] == 'no', (host, path)
             for host in ('customer.kairos.localhost', 'panel.kairos.localhost'):
                 headers = request('/', host)[2]
                 assert headers['Strict-Transport-Security'].startswith('max-age=') and headers['X-Frame-Options'] == 'DENY'
@@ -189,9 +196,10 @@ def main():
             run('docker', 'exec', gateway, 'nginx', '-s', 'reload')
             time.sleep(0.3)
             assert request('/api/auth/v1/csrf', client='2001:db8::1')[1].split('|')[1:3] == ['2001:db8::1'] * 2
+            # One client's budget is shared across every hostname.
             for i, path in enumerate(protected):
                 client = f'203.0.113.{100 + i}'
-                statuses = [request(path, client=client, method='POST')[0] for _ in range(22)]
+                statuses = [request(path, hosts[j % 3], client, 'POST')[0] for j in range(22)]
                 assert statuses == [200] * 21 + [429], statuses
             assert request('/api/auth/v1/csrf', client='203.0.113.100')[0] == 200
             print(f'{mode}: Compose, TLS, routing, header trust, throttling and SSE checks passed')

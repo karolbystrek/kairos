@@ -41,13 +41,12 @@ const order = {
   updatedAt: "2026-10-12T10:01:00Z",
 };
 
-it("credentialed queue stream accepts validated full snapshots including removals and closes on cleanup", () => {
+it("same-origin queue stream accepts validated full snapshots including removals and closes on cleanup", () => {
   const snapshots = vi.fn();
   const close = subscribeToOrderQueue(order.locationId, snapshots, vi.fn());
   const source = FakeEventSource.last;
 
-  expect(source.url.href).toBe(`https://api.example.test/api/orders/v1/events?locationId=${order.locationId}`);
-  expect(source.options).toEqual({ withCredentials: true });
+  expect(source.url.href).toBe(`${location.origin}/api/orders/v1/events?locationId=${order.locationId}`);
   source.emit(JSON.stringify([order]));
   source.emit("[]");
   expect(snapshots.mock.calls).toEqual([[[order]], [[]]]);

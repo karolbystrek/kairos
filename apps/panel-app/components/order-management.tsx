@@ -9,7 +9,7 @@ import {
   XIcon as CloseIcon,
 } from "@phosphor-icons/react";
 import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 import useSWRMutation from "swr/mutation";
 
@@ -38,7 +38,7 @@ import {
   type OrderStatus,
   type StaffOrder,
 } from "@/src/api/orders";
-import { customerAppUrl } from "@/src/config/public-environment";
+import { CustomerAppUrlContext } from "@/src/config/customer-app-url-context";
 import { recordPanelAction } from "@/src/api/usage-analytics";
 import { errorMessage } from "@/src/messages";
 import { orderQrCode } from "@/src/order-qr-code";
@@ -160,7 +160,7 @@ function OrderQrCode({
   accountId: string;
   order: StaffOrder;
 }) {
-  const trackingUrl = `${customerAppUrl}/orders/${order.trackingReference}`;
+  const trackingUrl = `${use(CustomerAppUrlContext)}/orders/${order.trackingReference}`;
   const {
     data: qrCode,
     error,

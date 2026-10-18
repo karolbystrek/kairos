@@ -16,7 +16,7 @@ SERVICES = ("customer-app", "panel-app", "api")
 DOCKER = shutil.which("docker")
 RUNTIME_FILES = (
     "compose.yaml", "compose.production.yaml", "nginx/default.conf.template",
-    "nginx/cloudflare-real-ip.conf",
+    "nginx/cloudflare-real-ip.conf", "nginx/api-locations.conf",
     "deployment/postgres/bootstrap.sh",
 )
 
@@ -49,9 +49,8 @@ class DeployTest(unittest.TestCase):
                      "push-subscription-encryption.bin", "tls.crt", "tls.key"):
             (self.secrets / name).write_text("fixture-private-material")
         origins = {
-            "NEXT_PUBLIC_CUSTOMER_APP_URL": "https://customer.example.com",
+            "CUSTOMER_APP_URL": "https://customer.example.com",
             "PANEL_APP_URL": "https://panel.example.com",
-            "NEXT_PUBLIC_API_BASE_URL": "https://api.example.com",
         }
         self.config = {"services": {
             name: {"image": self.manifest["images"].get(name, "fixture:infra"), "environment": {}}
@@ -207,7 +206,8 @@ sys.exit(deploy.main(sys.argv[1:]))
         override = json.loads((self.release / "compose.images.json").read_text())
         self.assertEqual(override, {"services": {service: {"image": image} for service, image in self.manifest["images"].items()}})
         self.assertEqual([call[-1] for call in calls if call[0] == "curl"], [
-            "https://customer.example.com/", "https://panel.example.com/", "https://api.example.com/api/auth/v1/csrf"])
+            "https://customer.example.com/", "https://panel.example.com/",
+            "https://panel.example.com/api/auth/v1/csrf", "https://api.example.com/api/auth/v1/csrf"])
         self.assertEqual(self.env_file.read_text(), "POSTGRES_PASSWORD=do-not-print-this-secret\n")
 
     def test_failed_stage_stops_rollout_and_preserves_previous_record(self):
@@ -332,9 +332,8 @@ sys.exit(deploy.main(sys.argv[1:]))
             "KAIROS_APPLICATION_SECRETS_DIRECTORY=" + str(self.secrets),
             "KAIROS_TLS_DIRECTORY=" + str(self.secrets),
             # Local .env.example has no gateway; supply the production-only NGINX values and origins.
-            "NEXT_PUBLIC_CUSTOMER_APP_URL=https://customer.kairos.localhost",
+            "CUSTOMER_APP_URL=https://customer.kairos.localhost",
             "PANEL_APP_URL=https://panel.kairos.localhost",
-            "NEXT_PUBLIC_API_BASE_URL=https://api.kairos.localhost",
             "KAIROS_CUSTOMER_APP_HOST=customer.kairos.localhost",
             "KAIROS_PANEL_APP_HOST=panel.kairos.localhost",
             "KAIROS_API_HOST=api.kairos.localhost",
@@ -393,8 +392,8 @@ sys.exit(deploy.main(sys.argv[1:]))
 
     def test_unsafe_resolved_configuration_never_mutates_docker(self):
         for key, value in (("WEBHOOK_DESTINATION_POLICY", "LOCAL_DEVELOPMENT"),
-                           ("NEXT_PUBLIC_API_BASE_URL", "http://api.example.com"),
-                           ("NEXT_PUBLIC_API_BASE_URL", "https://wrong.example.com")):
+                           ("CUSTOMER_APP_URL", "http://customer.example.com"),
+                           ("PANEL_APP_URL", "https://wrong.example.com")):
             with self.subTest(key=key):
                 original = self.config["services"]["api"]["environment"][key]
                 self.config["services"]["api"]["environment"][key] = value
@@ -402,6 +401,11 @@ sys.exit(deploy.main(sys.argv[1:]))
                 self.assert_failed_safely(result)
                 self.assertTrue(all("config" in call for call in self.commands()))
                 self.config["services"]["api"]["environment"][key] = original
+
+    def test_shared_gateway_hostname_never_mutates_docker(self):
+        self.config["services"]["nginx"]["environment"]["KAIROS_API_HOST"] = "panel.example.com"
+        self.assert_failed_safely(self.run_deploy())
+        self.assertTrue(all("config" in call for call in self.commands()))
 
 
 if __name__ == "__main__":

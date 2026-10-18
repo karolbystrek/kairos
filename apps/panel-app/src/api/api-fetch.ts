@@ -2,8 +2,6 @@ import { z } from "zod";
 
 import { notifyAuthenticationRequired } from "./auth-state";
 
-import { apiBaseUrl } from "@/src/config/public-environment";
-
 const csrfHeaderName = "X-XSRF-TOKEN";
 // Keep in sync with apps/customer-app/src/api/customer-notifications.ts.
 const csrfProblemTypes = new Set([
@@ -31,10 +29,6 @@ type ProblemDetails = z.infer<typeof problemDetailsSchema>;
 
 let csrfInitialization: Promise<string> | undefined;
 let csrfToken: string | undefined;
-
-function apiUrl(path: string): string {
-  return new URL(path, apiBaseUrl).toString();
-}
 
 // A stalled request aborts after 10 s and fails like any other network error.
 function requestSignal(signal?: AbortSignal | null): AbortSignal {
@@ -111,8 +105,7 @@ function isUnsafeRequest(init?: RequestInit): boolean {
 
 async function fetchCsrfMetadata(): Promise<string> {
   try {
-    const response = await fetch(apiUrl("/api/auth/v1/csrf"), {
-      credentials: "include",
+    const response = await fetch("/api/auth/v1/csrf", {
       headers: { Accept: "application/json" },
       signal: requestSignal(),
     });
@@ -166,9 +159,8 @@ async function send(url: string, init?: RequestInit): Promise<Response> {
     headers.set(csrfHeaderName, token);
   }
 
-  return fetch(apiUrl(url), {
+  return fetch(url, {
     ...init,
-    credentials: "include",
     headers,
     signal: requestSignal(init?.signal),
   });

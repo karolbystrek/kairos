@@ -105,15 +105,9 @@ server {
     add_header X-Frame-Options "DENY" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
     add_header Permissions-Policy "camera=(self), microphone=(), geolocation=(), payment=(), usb=()" always;
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://${KAIROS_API_HOST}; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" always;
 
-    location = /api {
-        return 404;
-    }
-
-    location ^~ /api/ {
-        return 404;
-    }
+    include /etc/nginx/api-locations.conf;
 
     location / {
         proxy_pass http://kairos_customer;
@@ -131,15 +125,9 @@ server {
     add_header X-Frame-Options "DENY" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
     add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()" always;
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://${KAIROS_API_HOST}; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" always;
 
-    location = /api {
-        return 404;
-    }
-
-    location ^~ /api/ {
-        return 404;
-    }
+    include /etc/nginx/api-locations.conf;
 
     location / {
         proxy_pass http://kairos_panel;
@@ -166,36 +154,7 @@ server {
         add_header Referrer-Policy "same-origin" always;
     }
 
-    location = /api/actuator {
-        return 404;
-    }
-
-    location ^~ /api/actuator/ {
-        return 404;
-    }
-
-    # Customer and staff event streams must reach the browser as soon as the API writes them.
-    location ~ ^/api/(tracked-orders/v1/[^/]+|orders/v1)/events$ {
-        proxy_pass http://kairos_api;
-        proxy_buffering off;
-        proxy_cache off;
-        proxy_read_timeout 31m;
-        add_header X-Accel-Buffering "no" always;
-        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-        add_header X-Content-Type-Options "nosniff" always;
-        add_header Referrer-Policy "same-origin" always;
-    }
-
-    # Apply at the API server so all proxy locations keep the same policy.
-    # Staff of one restaurant often share an IP, so allow a burst of sign-ins at once.
-    limit_req zone=kairos_auth burst=20 nodelay;
-    limit_req zone=kairos_external burst=20 nodelay;
-    # Unauthenticated customer notification subscriptions; guests on one Wi-Fi share an IP, so keep a small burst.
-    limit_req zone=kairos_customer_notifications burst=30 nodelay;
-
-    location /api/ {
-        proxy_pass http://kairos_api;
-    }
+    include /etc/nginx/api-locations.conf;
 
     location / {
         return 404;

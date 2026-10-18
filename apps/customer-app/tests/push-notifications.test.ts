@@ -36,7 +36,6 @@ const showNotification = vi.fn().mockResolvedValue(undefined);
 const openWindow = vi.fn().mockResolvedValue(undefined);
 
 beforeAll(async () => {
-  vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "https://api.kairos.example");
   vi.stubGlobal("self", {
     location: { origin: "https://customer.kairos.example" },
     addEventListener: (type: string, listener: (event: unknown) => void) =>
@@ -49,7 +48,6 @@ beforeAll(async () => {
 
 afterAll(() => {
   vi.unstubAllGlobals();
-  vi.unstubAllEnvs();
 });
 
 beforeEach(async () => {

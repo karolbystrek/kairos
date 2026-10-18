@@ -21,14 +21,10 @@ gh api repos/karolbystrek/kairos/environments/production/deployment-branch-polic
 
 See [GitHub Environment protection](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments).
 
-Set non-secret **repository** variables `NEXT_PUBLIC_API_BASE_URL`,
-`NEXT_PUBLIC_CUSTOMER_APP_URL` and `NEXT_PUBLIC_PANEL_APP_URL` to the production
-values using `gh variable set`. `NEXT_PUBLIC_PANEL_APP_URL` must equal the
-runtime `PANEL_APP_URL`; the panel uses it for canonical and link-preview URLs.
-Validation and image build jobs run outside the Environment and cannot read
-Environment variables. Frontend URLs are compiled into images; changing these
-variables requires a new source revision/build, because existing revision tags
-are immutable. Keep runtime origins consistent with those build inputs.
+Image builds need no repository variables: the images contain no URLs, and
+the site URLs come from the host's runtime environment file. The former
+`NEXT_PUBLIC_API_BASE_URL`, `NEXT_PUBLIC_CUSTOMER_APP_URL` and
+`NEXT_PUBLIC_PANEL_APP_URL` repository variables are unused and can be deleted.
 
 Install these deployment-connection secrets with `gh secret set --env production` from protected
 files or secure prompts, never literal secret arguments or repository-level copies:

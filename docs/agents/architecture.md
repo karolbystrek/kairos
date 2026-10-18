@@ -8,9 +8,10 @@
 - Keep REST as the boundary between frontends, External Integrations, and the
   API. Browser families use `/api/{resource-family}/v1`; external families use
   `/api/external/{resource-family}/v1`.
-- Browser-facing API and SSE traffic goes directly to the dedicated API origin
-  (through NGINX HTTPS in production, `http://localhost:8080` locally), with
-  explicit credentialed CORS scoped by frontend origin and browser resource family.
+- Browser-facing API and SSE traffic uses `/api` on the frontend's own origin,
+  so browsers never make cross-origin API requests and the API has no CORS
+  policy. NGINX routes it in production; `next dev` proxies it locally. The
+  separate API hostname serves External Integrations, webhooks and metrics.
 - Frontends use small handwritten request modules and response types with
   native `fetch`. Use SWR for REST-backed client state and Zod for
   frontend-owned input and event validation.

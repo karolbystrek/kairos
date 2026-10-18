@@ -34,7 +34,7 @@ counts once; arbitrary counts, timestamps and labels are not accepted.
 `POST /api/tracked-orders/v1/{trackingReference}/review-actions` accepts one
 predefined review `event`. Accepted requests return `204`. Both use server
 receipt time and reject invalid requests atomically. Unsafe browser requests
-retain CSRF protection and origin-scoped CORS.
+retain CSRF protection and are same-origin only.
 
 Bodies are limited to 8 KiB, including bodies without Content-Length. A budget
 of 60 requests per clock minute per staff account or tracking reference is

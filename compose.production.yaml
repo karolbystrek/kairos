@@ -35,6 +35,12 @@ services:
         read_only: true
         bind:
           create_host_path: false
+      - type: bind
+        source: ./nginx/api-locations.conf
+        target: /etc/nginx/api-locations.conf
+        read_only: true
+        bind:
+          create_host_path: false
     depends_on:
       api:
         condition: service_healthy
@@ -65,9 +71,9 @@ services:
       dockerfile: ../panel-app/Dockerfile
       target: runner
       args:
-        NEXT_PUBLIC_API_BASE_URL:
-        NEXT_PUBLIC_CUSTOMER_APP_URL:
         NEXT_TELEMETRY_DISABLED:
+    environment:
+      CUSTOMER_APP_URL:
     depends_on:
       api:
         condition: service_healthy
@@ -94,10 +100,10 @@ services:
       dockerfile: Dockerfile
       target: runner
       args:
-        NEXT_PUBLIC_API_BASE_URL:
-        NEXT_PUBLIC_CUSTOMER_APP_URL:
-        NEXT_PUBLIC_PANEL_APP_URL: ${PANEL_APP_URL}
         NEXT_TELEMETRY_DISABLED:
+    environment:
+      CUSTOMER_APP_URL:
+      PANEL_APP_URL:
     depends_on:
       api:
         condition: service_healthy
@@ -130,8 +136,7 @@ services:
       EMAIL_VERIFICATION_ENABLED: "${EMAIL_VERIFICATION_ENABLED:-true}"
       RESEND_API_KEY: ${RESEND_API_KEY:?Set RESEND_API_KEY for production email delivery}
       REVIEW_INVITATION_DELAY: "${REVIEW_INVITATION_DELAY:-30m}"
-      NEXT_PUBLIC_API_BASE_URL:
-      NEXT_PUBLIC_CUSTOMER_APP_URL:
+      CUSTOMER_APP_URL:
       PANEL_APP_URL:
       POSTGRES_HOST:
       POSTGRES_DB:

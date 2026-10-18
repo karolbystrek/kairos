@@ -8,8 +8,8 @@ import { customerAppUrl } from "@/src/config/customer-app-url";
 import { PWA_THEME_COLOR } from "@/src/pwa/manifest";
 import { SHARED_OPEN_GRAPH } from "@/src/seo/metadata";
 
-export const metadata: Metadata = {
-  metadataBase: customerAppUrl,
+export const generateMetadata = async (): Promise<Metadata> => ({
+  metadataBase: await customerAppUrl(),
   applicationName: "Kairos",
   title: {
     default: siteConfig.name,
@@ -37,7 +37,7 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
     title: "Kairos",
   },
-};
+});
 
 export const viewport: Viewport = {
   colorScheme: "light dark",

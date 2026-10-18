@@ -35,9 +35,6 @@ jobs:
     env:
       CI: "true"
       NEXT_TELEMETRY_DISABLED: "1"
-      NEXT_PUBLIC_API_BASE_URL: ${{ vars.NEXT_PUBLIC_API_BASE_URL }}
-      NEXT_PUBLIC_CUSTOMER_APP_URL: ${{ vars.NEXT_PUBLIC_CUSTOMER_APP_URL }}
-      NEXT_PUBLIC_PANEL_APP_URL: ${{ vars.NEXT_PUBLIC_PANEL_APP_URL }}
     defaults:
       run:
         working-directory: apps/${{ matrix.app }}
@@ -53,15 +50,6 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: apps/${{ matrix.app }}/package-lock.json
-
-      - name: Validate build inputs
-        shell: bash
-        env:
-          APP: ${{ matrix.app }}
-        run: |
-          : "${NEXT_PUBLIC_API_BASE_URL:?Set the NEXT_PUBLIC_API_BASE_URL repository variable.}"
-          : "${NEXT_PUBLIC_CUSTOMER_APP_URL:?Set the NEXT_PUBLIC_CUSTOMER_APP_URL repository variable.}"
-          [[ "$APP" != panel-app ]] || : "${NEXT_PUBLIC_PANEL_APP_URL:?Set the NEXT_PUBLIC_PANEL_APP_URL repository variable.}"
 
       - name: Install dependencies
         run: npm ci
@@ -152,9 +140,8 @@ jobs:
       KAIROS_CUSTOMER_APP_HOST: customer.example.com
       KAIROS_PANEL_APP_HOST: panel.example.com
       KAIROS_API_HOST: api.example.com
-      NEXT_PUBLIC_CUSTOMER_APP_URL: https://customer.example.com
+      CUSTOMER_APP_URL: https://customer.example.com
       PANEL_APP_URL: https://panel.example.com
-      NEXT_PUBLIC_API_BASE_URL: https://api.example.com
       POSTGRES_PASSWORD: placeholder
       KAIROS_DB_OWNER_PASSWORD: placeholder
       KAIROS_DB_RUNTIME_PASSWORD: placeholder

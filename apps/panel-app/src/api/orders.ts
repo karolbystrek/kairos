@@ -2,8 +2,6 @@ import { z } from "zod";
 
 import { request } from "./api-fetch";
 
-import { apiBaseUrl } from "@/src/config/public-environment";
-
 const orderStatusSchema = z.enum([
   "IN_PREPARATION",
   "READY",
@@ -38,7 +36,7 @@ export function subscribeToOrderQueue(
   onSnapshot: (orders: StaffOrder[]) => void,
   onDisconnected: () => void,
 ): () => void {
-  const url = new URL("/api/orders/v1/events", apiBaseUrl);
+  const url = new URL("/api/orders/v1/events", location.origin);
 
   if (locationId) url.searchParams.set("locationId", locationId);
   let events: EventSource;
@@ -46,7 +44,7 @@ export function subscribeToOrderQueue(
   let delay = 2_000;
   let attempts = 0;
   const connect = () => {
-    events = new EventSource(url, { withCredentials: true });
+    events = new EventSource(url);
     events.addEventListener("order-queue", (event) => {
       // The server sends a full snapshot on every (re)connection.
       delay = 2_000;

@@ -192,41 +192,13 @@ class SecurityFilterChainIntegrationTests extends RedisListenerIsolatedIntegrati
     }
 
     @Test
-    void restrictsCredentialedCorsToTheOwningFrontendAndBrowserResourceFamily() throws Exception {
-        assertCorsAllowed("http://localhost:3000", "/tracked-orders/v1/reference", "GET");
-        assertCorsAllowed("http://localhost:3001", "/orders/v1", "POST");
-        for (var method : new String[]{"GET", "POST", "PUT", "DELETE"}) {
-            assertCorsAllowed("http://localhost:3001", "/locations/v1/" + UUID.randomUUID() + "/menu", method);
-            assertCorsRejected("http://localhost:3000", "/locations/v1/" + UUID.randomUUID() + "/menu", method);
-            assertCorsRejected("https://unknown.example.org", "/locations/v1/" + UUID.randomUUID() + "/menu", method);
+    void grantsNoCrossOriginBrowserAccessBecauseFrontendsCallTheirOwnOrigin() throws Exception {
+        for (var origin : new String[]{"http://localhost:3000", "http://localhost:3001", "https://unknown.example.org"}) {
+            assertCorsRejected(origin, "/auth/v1/csrf", "GET");
+            assertCorsRejected(origin, "/tracked-orders/v1/reference", "GET");
+            assertCorsRejected(origin, "/orders/v1", "POST");
+            assertCorsRejected(origin, "/external/orders/v1", "GET");
         }
-        assertCorsAllowed(
-                "http://localhost:3001",
-                "/account-invitation-redemptions/v1",
-                "POST"
-        );
-        assertCorsAllowed(
-                "http://localhost:3001",
-                "/account-invitation-previews/v1",
-                "POST"
-        );
-        assertCorsAllowed(
-                "http://localhost:3001",
-                "/tenant-registrations/v1",
-                "POST"
-        );
-        assertCorsAllowed("http://localhost:3000", "/auth/v1/csrf", "GET");
-        assertCorsAllowed("http://localhost:3001", "/auth/v1/csrf", "GET");
-
-        assertCorsRejected("http://localhost:3000", "/orders/v1", "POST");
-        assertCorsRejected(
-                "http://localhost:3000",
-                "/account-invitation-previews/v1",
-                "POST"
-        );
-        assertCorsRejected("http://localhost:3001", "/tracked-orders/v1/reference", "GET");
-        assertCorsRejected("http://localhost:3001", "/external/orders/v1", "GET");
-        assertCorsRejected("https://unknown.example.org", "/orders/v1", "GET");
     }
 
     @Test
@@ -249,17 +221,6 @@ class SecurityFilterChainIntegrationTests extends RedisListenerIsolatedIntegrati
 
     private static MockHttpServletRequestBuilder apiPut(String path) {
         return put(API_CONTEXT_PATH + path).contextPath(API_CONTEXT_PATH);
-    }
-
-    private void assertCorsAllowed(String origin, String path, String method) throws Exception {
-        mockMvc.perform(corsPreflight(origin, path, method))
-                .andExpect(status().isOk())
-                .andExpect(result -> assertThat(
-                        result.getResponse().getHeader("Access-Control-Allow-Origin")
-                ).isEqualTo(origin))
-                .andExpect(result -> assertThat(
-                        result.getResponse().getHeader("Access-Control-Allow-Credentials")
-                ).isEqualTo("true"));
     }
 
     private void assertCorsRejected(String origin, String path, String method) throws Exception {

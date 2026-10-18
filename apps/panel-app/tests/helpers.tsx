@@ -11,7 +11,7 @@ export function stubFetch(handler: Handler) {
   const calls: { url: URL; init: RequestInit }[] = [];
 
   vi.stubGlobal("fetch", vi.fn(async (input: string | URL, init: RequestInit = {}) => {
-    const url = new URL(String(input));
+    const url = new URL(String(input), window.location.origin);
 
     calls.push({ url, init });
 
@@ -43,6 +43,7 @@ export function stubNavigation() {
   vi.stubGlobal("location", {
     assign,
     get href() { return real.href; },
+    get origin() { return real.origin; },
     get hash() { return real.hash; },
     set hash(value: string) { real.hash = value; },
   });

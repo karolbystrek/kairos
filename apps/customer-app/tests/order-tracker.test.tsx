@@ -4,16 +4,10 @@ import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { SWRConfig } from "swr";
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { OrderTracker } from "@/app/orders/[trackingReference]/order-tracker";
 import { CustomerPwaProvider } from "@/src/pwa/notification-provider";
-
-vi.hoisted(() => {
-  vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "https://api.kairos.example");
-});
-
-afterAll(() => vi.unstubAllEnvs());
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: vi.fn() }),

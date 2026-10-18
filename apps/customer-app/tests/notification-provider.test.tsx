@@ -8,8 +8,6 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { CustomerPwaProvider, useCustomerNotifications } from "@/src/pwa/notification-provider";
 import { readNotificationMetadata, rememberTrackedOrder, updateNotificationMetadata } from "@/src/pwa/storage";
 
-vi.hoisted(() => vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "https://api.kairos.example"));
-
 function deferred<T>() {
   let resolve!: (value: T) => void;
   const promise = new Promise<T>((complete) => { resolve = complete; });
