@@ -5,7 +5,6 @@ import type { PrecacheEntry, SerwistGlobalConfig } from "serwist";
 import { NavigationRoute, NetworkOnly, Serwist } from "serwist";
 import * as z from "zod/mini";
 
-import { apiOrigin } from "@/src/api/api-url";
 import {
   replacePushSubscription,
   serializePushSubscription,
@@ -57,9 +56,8 @@ const serwist = new Serwist({
 });
 
 serwist.registerCapture(
-  ({ url }) =>
-    url.origin === apiOrigin &&
-    url.pathname.startsWith("/api/tracked-orders/v1/"),
+  ({ sameOrigin, url }) =>
+    sameOrigin && url.pathname.startsWith("/api/tracked-orders/v1/"),
   new NetworkOnly(),
   "GET",
 );

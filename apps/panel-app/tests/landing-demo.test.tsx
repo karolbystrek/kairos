@@ -36,5 +36,5 @@ it("runs one order from the queue to the guest's phone without calling the API",
   fireEvent.click(phone.getByRole("button", { name: "Zamknij zamówienie" }));
   phone.getByRole("button", { name: "Zeskanuj kod QR" });
 
-  expect(calls.filter(({ url }) => url.origin === "https://api.example.test")).toEqual([]);
+  expect(calls.filter(({ url }) => url.pathname.startsWith("/api/"))).toEqual([]);
 });

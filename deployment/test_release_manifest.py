@@ -47,7 +47,7 @@ class ReleaseManifestTest(unittest.TestCase):
         with tarfile.open(self.output / "release.tar.gz") as archive:
             self.assertEqual(set(archive.getnames()), {
                 "release.json", "compose.yaml", "compose.production.yaml",
-                "nginx/default.conf.template", "nginx/cloudflare-real-ip.conf",
+                "nginx/default.conf.template", "nginx/cloudflare-real-ip.conf", "nginx/api-locations.conf",
                 "deployment/deploy.py",
                 "deployment/postgres/bootstrap.sh",
             })

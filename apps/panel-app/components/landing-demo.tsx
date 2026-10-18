@@ -13,7 +13,6 @@ import Image from "next/image";
 import { useReducer } from "react";
 import useSWR from "swr";
 
-import { panelAppUrl } from "@/src/config/public-environment";
 import { orderQrCode } from "@/src/order-qr-code";
 
 type DemoStatus = "IN_PREPARATION" | "READY" | "COMPLETED";
@@ -351,8 +350,8 @@ function PhoneView({
 
 function DemoQrCode() {
   // The encoder loads only after the first demo order is added.
-  const { data: qrCode } = useSWR(["landing-demo-qr", panelAppUrl], ([, url]) =>
-    orderQrCode(url),
+  const { data: qrCode } = useSWR("landing-demo-qr", () =>
+    orderQrCode(location.origin),
   );
 
   return (

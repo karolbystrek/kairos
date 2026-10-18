@@ -1,7 +1,13 @@
-const configuredCustomerAppUrl = process.env.NEXT_PUBLIC_CUSTOMER_APP_URL;
+import { connection } from "next/server";
 
-if (!configuredCustomerAppUrl) {
-  throw new Error("NEXT_PUBLIC_CUSTOMER_APP_URL is not configured.");
+/** The public site URL, read per request so one image serves any hostname. */
+export async function customerAppUrl(): Promise<URL> {
+  await connection();
+  const configured = process.env.CUSTOMER_APP_URL;
+
+  if (!configured) {
+    throw new Error("CUSTOMER_APP_URL is not configured.");
+  }
+
+  return new URL(configured);
 }
-
-export const customerAppUrl = new URL(configuredCustomerAppUrl);

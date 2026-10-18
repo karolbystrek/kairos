@@ -2,7 +2,7 @@ import type { SerializedPushSubscription } from "@/src/pwa/storage";
 
 import { z } from "zod";
 
-import { apiUrl, requestSignal } from "@/src/api/api-url";
+import { requestSignal } from "@/src/api/api-url";
 
 const CSRF_HEADER_NAME = "X-XSRF-TOKEN";
 // Keep in sync with apps/panel-app/src/api/api-fetch.ts.
@@ -69,10 +69,9 @@ export function serializePushSubscription(
 export async function getNotificationConfiguration(): Promise<{
   applicationServerKey: string;
 }> {
-  const response = await fetch(
-    apiUrl("/api/customer-notifications/v1/configuration"),
-    { signal: requestSignal() },
-  );
+  const response = await fetch("/api/customer-notifications/v1/configuration", {
+    signal: requestSignal(),
+  });
 
   if (!response.ok) {
     throw await notificationApiError(response);
@@ -137,8 +136,7 @@ async function getCsrfToken(): Promise<string> {
 }
 
 async function bootstrapCsrfToken(): Promise<string> {
-  const response = await fetch(apiUrl("/api/auth/v1/csrf"), {
-    credentials: "include",
+  const response = await fetch("/api/auth/v1/csrf", {
     headers: { Accept: "application/json" },
     signal: requestSignal(),
   });
@@ -188,9 +186,8 @@ function sendNotificationMutation(
   body: unknown,
   token: string,
 ): Promise<Response> {
-  return fetch(apiUrl(url), {
+  return fetch(url, {
     method,
-    credentials: "include",
     headers: {
       "Content-Type": "application/json",
       [CSRF_HEADER_NAME]: token,

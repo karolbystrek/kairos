@@ -18,7 +18,6 @@ import {
   orderStatusChangedEventSchema,
   type CustomerOrder,
 } from "@/src/api/orders";
-import { apiUrl } from "@/src/api/api-url";
 import { createOrderState } from "@/src/orders/order-state";
 import {
   isActiveOrderStatus,
@@ -72,9 +71,7 @@ function useOrderEventStream({
   useSWRSubscription(
     enabled ? (["tracked-order-events", trackingReference] as const) : null,
     ([, reference]) => {
-      const url = apiUrl(
-        `/api/tracked-orders/v1/${encodeURIComponent(reference)}/events`,
-      );
+      const url = `/api/tracked-orders/v1/${encodeURIComponent(reference)}/events`;
       let eventSource: EventSource;
       let timer: number | undefined;
       let delay = reconnectDelays.initial;

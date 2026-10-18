@@ -4,11 +4,11 @@ import type { Metadata, Viewport } from "next";
 import { Providers } from "./providers";
 
 import { siteConfig } from "@/config/site";
-import { panelAppUrl } from "@/src/config/public-environment";
+import { customerAppUrl, panelAppUrl } from "@/src/config/site-urls";
 import { SHARED_OPEN_GRAPH } from "@/src/seo/metadata";
 
-export const metadata: Metadata = {
-  metadataBase: new URL(panelAppUrl),
+export const generateMetadata = async (): Promise<Metadata> => ({
+  metadataBase: new URL(await panelAppUrl()),
   applicationName: "Kairos",
   title: {
     default: siteConfig.name,
@@ -24,7 +24,7 @@ export const metadata: Metadata = {
   icons: {
     icon: "/favicon.ico",
   },
-};
+});
 
 export const viewport: Viewport = {
   themeColor: [
@@ -33,7 +33,7 @@ export const viewport: Viewport = {
   ],
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -42,6 +42,7 @@ export default function RootLayout({
     <html suppressHydrationWarning lang="pl">
       <body className="flex min-h-dvh flex-col bg-background text-foreground antialiased">
         <Providers
+          customerAppUrl={await customerAppUrl()}
           themeProps={{
             attribute: "class",
             defaultTheme: "system",

@@ -2,10 +2,6 @@ import { afterEach, expect, it, vi } from "vitest";
 
 import { getTrackedOrder } from "@/src/api/orders";
 
-vi.hoisted(() => {
-  vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "https://api.kairos.example");
-});
-
 afterEach(() => vi.restoreAllMocks());
 
 it("a stalled order request is aborted after 10 s so the stored snapshot is shown", async () => {

@@ -31,7 +31,7 @@ function requests() {
 
 it("invitation history requests the complete array without query parameters", async () => {
   expect(await listAccountInvitations()).toEqual([invitation]);
-  expect(requests()[0].url.href).toBe("https://api.example.test/api/account-invitations/v1");
+  expect(requests()[0].url.href).toBe(`${location.origin}/api/account-invitations/v1`);
 });
 
 it("creating an invitation requires explicit opt-in to replacement and receives no bearer secret", async () => {

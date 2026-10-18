@@ -10,9 +10,11 @@ import { ThemeProvider as NextThemesProvider } from "next-themes";
 import { SWRConfig, type SWRConfiguration } from "swr";
 
 import { ApiError } from "@/src/api/api-fetch";
+import { CustomerAppUrlContext } from "@/src/config/customer-app-url-context";
 
 interface ProvidersProps {
   children: React.ReactNode;
+  customerAppUrl: string;
   themeProps?: ThemeProviderProps;
 }
 
@@ -49,7 +51,11 @@ function useToastPlacement() {
   return isWide ? "bottom" : "top";
 }
 
-export function Providers({ children, themeProps }: ProvidersProps) {
+export function Providers({
+  children,
+  customerAppUrl,
+  themeProps,
+}: ProvidersProps) {
   const toastPlacement = useToastPlacement();
   // The public landing page is always light; the stored preference still applies elsewhere.
   const forcedTheme = usePathname() === "/" ? "light" : undefined;
@@ -58,7 +64,9 @@ export function Providers({ children, themeProps }: ProvidersProps) {
     <I18nProvider locale="pl-PL">
       <IconContext.Provider value={iconDefaults}>
         <NextThemesProvider {...themeProps} forcedTheme={forcedTheme}>
-          <SWRConfig value={swrDefaults}>{children}</SWRConfig>
+          <CustomerAppUrlContext value={customerAppUrl}>
+            <SWRConfig value={swrDefaults}>{children}</SWRConfig>
+          </CustomerAppUrlContext>
           <ToastProvider placement={toastPlacement} />
         </NextThemesProvider>
       </IconContext.Provider>

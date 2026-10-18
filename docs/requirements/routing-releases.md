@@ -4,22 +4,30 @@
 
 Production Compose (`compose.yaml` plus `compose.production.yaml`) uses NGINX
 HTTPS ingress. Application and data services do not publish host ports. Browser
-REST and SSE requests go directly to the dedicated API origin through the gateway.
-Local development adds `compose.local.yaml`: all five services run in Docker
-with hot reload, publishing only loopback ports over HTTP. Browsers call the
-API origin `http://localhost:8080` directly; there is no local gateway.
+REST and SSE requests use `/api` on the customer or panel hostname they were
+loaded from, which the gateway forwards to the API, so the browser stays
+same-origin. Local development adds `compose.local.yaml`: all five services run
+in Docker with hot reload, publishing only loopback ports over HTTP. There is no
+local gateway; `next dev` proxies `/api` to the API (`API_PROXY_URL`, default
+`http://localhost:8080`).
 
-* Local development uses the committed localhost origins in frontend development
-  settings and the local Compose overlay. Production configures public origins
-  and exact gateway hostnames in the root environment file. `.env.example` records the local
-  configuration surface and `deployment/production.env.example` the hosted one.
-* Spring scopes credentialed CORS by frontend origin and browser resource family.
-  External Integration APIs and internal management endpoints have no browser
-  CORS policy. Next.js services render frontend concerns only.
-* NGINX rejects unknown hosts, keeps frontend and API path spaces separate, and
-  forwards only the dedicated bearer-protected Prometheus Actuator resource;
-  other management resources stay limited to container-internal health checks. The API hostname
-  forwards `/api/`; frontend hostnames reject that namespace.
+* Frontend images contain no deployment-specific URLs. The frontends read
+  `CUSTOMER_APP_URL` and `PANEL_APP_URL` at request time, for canonical URLs,
+  sitemaps, share images, order QR codes and cross-app links, so their pages
+  render per request. Local development uses the committed localhost values in
+  frontend development settings and the local Compose overlay. Production
+  configures public URLs and exact gateway hostnames in the root environment
+  file. `.env.example` records the local configuration surface and
+  `deployment/production.env.example` the hosted one.
+* The API has no CORS policy: browsers only call their own origin, and External
+  Integration and management clients are not browsers. Next.js services render
+  frontend concerns only.
+* NGINX rejects unknown hosts and forwards only the dedicated bearer-protected
+  Prometheus Actuator resource, on the API hostname only; other management
+  resources stay limited to container-internal health checks. Every hostname
+  forwards `/api/` through `nginx/api-locations.conf`, so throttling, SSE
+  buffering and management blocking are identical on all of them. The API
+  hostname serves nothing else.
 * NGINX and applications share the gateway network. Only the API also joins the
   internal data network containing PostgreSQL and Redis.
 * NGINX does not trust supplied forwarding headers, except the Cloudflare client
@@ -60,10 +68,9 @@ API origin `http://localhost:8080` directly; there is no local gateway.
 GitHub Actions validates pull requests and `main` with frontend lint, type checks,
 configured tests and production `npm run build`, and the complete Maven `verify`
 lifecycle, and validates the production and development Compose files. CI builds
-images without pushing them; the deployment workflow builds and pushes release images. Frontend validation requires the non-secret
-`NEXT_PUBLIC_API_BASE_URL`, `NEXT_PUBLIC_CUSTOMER_APP_URL` and
-`NEXT_PUBLIC_PANEL_APP_URL` inputs. Main CI keeps dependency caches warm for
-pull requests.
+images without pushing them; the deployment workflow builds and pushes release images. Builds take
+no URL or environment inputs, so one image serves any deployment. Main CI keeps
+dependency caches warm for pull requests.
 
 Only the manual production deployment builds and publishes images. It first runs
 the full CI workflow for the dispatch revision; failed validation stops before

@@ -16,7 +16,7 @@ REVISION = r"[0-9a-f]{40}"
 IMAGE_DIGEST = r"ghcr\.io/karolbystrek/kairos/%s@sha256:[0-9a-f]{64}"
 RUNTIME_FILES = (
     "compose.yaml", "compose.production.yaml", "nginx/default.conf.template",
-    "nginx/cloudflare-real-ip.conf",
+    "nginx/cloudflare-real-ip.conf", "nginx/api-locations.conf",
     "deployment/postgres/bootstrap.sh",
 )
 
@@ -96,20 +96,17 @@ def configuration(config, release, images):
     if any(api.get(name) != "PUBLIC_HTTPS" for name in ("WEBHOOK_DESTINATION_POLICY", "PUSH_DESTINATION_POLICY")):
         raise ValidationError("hosted delivery policies must require public HTTPS")
     gateway = services["nginx"]["environment"]
-    origins = []
     for origin_key, host_key in (
-        ("NEXT_PUBLIC_CUSTOMER_APP_URL", "KAIROS_CUSTOMER_APP_HOST"),
+        ("CUSTOMER_APP_URL", "KAIROS_CUSTOMER_APP_HOST"),
         ("PANEL_APP_URL", "KAIROS_PANEL_APP_HOST"),
-        ("NEXT_PUBLIC_API_BASE_URL", "KAIROS_API_HOST"),
     ):
-        origin = api[origin_key]
-        url = urlsplit(origin)
+        url = urlsplit(api[origin_key])
         if (url.scheme != "https" or not url.hostname or url.netloc != gateway[host_key]
                 or url.path not in ("", "/") or url.query or url.fragment or url.username):
             raise ValidationError("public HTTPS origins must match exact gateway hostnames")
-        origins.append(origin.rstrip("/"))
+    origins = [f"https://{gateway[key]}" for key in ("KAIROS_CUSTOMER_APP_HOST", "KAIROS_PANEL_APP_HOST", "KAIROS_API_HOST")]
     if len(set(origins)) != 3:
-        raise ValidationError("three distinct public origins are required")
+        raise ValidationError("three distinct public hostnames are required")
     # Compose file secrets are read-only binds; persistent key/certificate
     # material must already exist outside the checkout at an absolute path.
     for name, secret in config["secrets"].items():
@@ -192,6 +189,8 @@ def rollout(release, env_file, manifest, base_env, report):
     probe(origins[0] + "/", env)
     report("panel HTTPS probe")
     probe(origins[1] + "/", env)
+    report("panel same-origin API CSRF HTTPS probe")
+    probe(origins[1] + "/api/auth/v1/csrf", env, csrf=True)
     report("API CSRF HTTPS probe")
     probe(origins[2] + "/api/auth/v1/csrf", env, csrf=True)
 

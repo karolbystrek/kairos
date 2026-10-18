@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { ImageResponse } from "next/og";
 
-import { panelAppUrl } from "@/src/config/public-environment";
+import { panelAppUrl } from "@/src/config/site-urls";
 import { PREVIEW_IMAGE } from "@/src/seo/metadata";
 
 export const alt = PREVIEW_IMAGE.alt;
@@ -61,7 +61,7 @@ export default async function OpenGraphImage() {
             }}
           />
           <span style={{ fontSize: 28, color: "#6e6e73" }}>
-            {new URL(panelAppUrl).host}
+            {new URL(await panelAppUrl()).host}
           </span>
         </div>
       </div>

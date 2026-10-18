@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 import { LegalDocument } from "@/components/legal-document";
-import { customerAppUrl } from "@/src/config/public-environment";
+import { customerAppUrl } from "@/src/config/site-urls";
 import { legalOperator } from "@/src/legal/operator";
 import { publicPageMetadata } from "@/src/seo/metadata";
 
@@ -11,14 +11,14 @@ export const metadata: Metadata = publicPageMetadata({
   path: "/polityka-prywatnosci",
 });
 
-export default function PrivacyPolicyPage() {
+export default async function PrivacyPolicyPage() {
   return (
     <LegalDocument title="Polityka prywatności">
       <p>
         Ta informacja dotyczy osób korzystających z panelu Kairos i jego strony
         głównej. Klienci restauracji, którzy śledzą zamówienia, znajdą osobną
         informację w{" "}
-        <a href={new URL("/prywatnosc", customerAppUrl).toString()}>
+        <a href={new URL("/prywatnosc", await customerAppUrl()).toString()}>
           aplikacji klienta
         </a>
         .

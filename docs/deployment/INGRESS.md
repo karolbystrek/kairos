@@ -36,8 +36,9 @@ Maintain firewall allowlists and `nginx/cloudflare-real-ip.conf` together using
 NGINX trusts `CF-Connecting-IP` only from those ranges and replaces upstream
 forwarding headers. Never add arbitrary VM/Docker subnets to restore forwarding.
 
-Set Cloudflare Cache Rules to **Bypass cache** for the entire API hostname and
-for `/sw.js` on the customer hostname. Do not apply cache-everything to application
+Set Cloudflare Cache Rules to **Bypass cache** for the entire API hostname, for
+URI paths starting with `/api/` on the customer and panel hostnames, and for
+`/sw.js` on the customer hostname. Do not apply cache-everything to application
 pages. Exclude anonymous customer and External Integration API traffic from
 interactive challenges/Access login, while retaining the origin gateway limits.
 The shared limits are authentication/registration/redemption/password POSTs at
@@ -45,4 +46,5 @@ The shared limits are authentication/registration/redemption/password POSTs at
 burst 20, returning `429`. CSRF/read/SSE paths remain outside auth throttling.
 See [Cache Rules settings](https://developers.cloudflare.com/cache/how-to/cache-rules/settings/).
 Verify edge REST cache bypass, service-worker update behavior, cross-origin
-cookies/CORS/CSRF and long-lived SSE heartbeats/reconnects on the selected host.
+same-origin `/api` cookies/CSRF and long-lived SSE heartbeats/reconnects on the
+selected host.

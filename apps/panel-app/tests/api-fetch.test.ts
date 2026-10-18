@@ -44,7 +44,6 @@ it.each([true, false])("CSRF rejection retries once after retrieving a fresh tok
 
   stubFetch((url, init) => {
     if (csrf(url)) return Response.json({ token: `csrf-${++tokens}` });
-    expect(init.credentials).toBe("include");
     writes++;
     expect(new Headers(init.headers).get("X-XSRF-TOKEN")).toBe(`csrf-${writes}`);
     if (writes === 1 || !recovered)

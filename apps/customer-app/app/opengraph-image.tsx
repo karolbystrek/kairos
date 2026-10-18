@@ -53,7 +53,7 @@ export default async function OpenGraphImage() {
             }}
           />
           <span style={{ fontSize: 28, color: "#6e6e73" }}>
-            {customerAppUrl.host}
+            {(await customerAppUrl()).host}
           </span>
         </div>
       </div>

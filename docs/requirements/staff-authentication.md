@@ -100,8 +100,9 @@ The staff identity subject remains server-side in JDBC session attributes.
 Password hashes and passwords never appear in browser
 JavaScript, browser storage, API response bodies, URLs or logs. CSRF metadata is
 separate: `__Host-XSRF-TOKEN` and the `X-XSRF-TOKEN` header protect unsafe browser
-requests, including login/registration/logout. Credentialed CORS remains scoped
-by frontend and resource family. No request-body logging is
+requests, including login/registration/logout. Browsers send these requests to
+`/api` on the panel's own origin, so session and CSRF cookies stay first-party
+and host-only on any domain, and the API grants no CORS access. No request-body logging is
 used for authentication.
 
 #### Session validation and revocation

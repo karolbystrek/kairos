@@ -11,19 +11,18 @@ export function getTrackedOrderHref(trackingReference: string): string {
 
 export function parseScannedOrderUrl(
   value: string,
-  configuredCustomerUrl = process.env.NEXT_PUBLIC_CUSTOMER_APP_URL,
+  customerOrigin = globalThis.location?.origin,
 ): string | null {
-  if (!configuredCustomerUrl) {
+  if (!customerOrigin) {
     return null;
   }
 
   try {
-    const configuredUrl = new URL(configuredCustomerUrl);
     const candidate = new URL(value);
     const match = candidate.pathname.match(/^\/orders\/([^/]+)$/);
 
     if (
-      candidate.origin !== configuredUrl.origin ||
+      candidate.origin !== customerOrigin ||
       candidate.username ||
       candidate.password ||
       candidate.search ||

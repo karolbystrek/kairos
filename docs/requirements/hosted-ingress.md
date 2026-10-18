@@ -39,11 +39,11 @@ To maintain the ranges:
    then deploy that revision and recreate NGINX so the bind mount uses the new
    include. Verify real client addresses and blocked direct-origin access.
 
-Cloudflare must bypass caching on the complete API hostname and customer service
-worker script, avoid interactive challenges for anonymous customer and External
+Cloudflare must bypass caching on the complete API hostname, `/api/` on the
+customer and panel hostnames, and the customer service worker script, avoid interactive challenges for anonymous customer and External
 Integration access, and avoid broad cache-everything rules on application pages.
 Origin certificate expiry/replacement, edge SSE heartbeat/reconnect behavior,
-cross-origin cookies/CSRF, and origin-bypass blocking require operator acceptance.
+same-origin `/api` cookies/CSRF, and origin-bypass blocking require operator acceptance.
 The isolated gateway test covers TLS/configuration, routing/management rejection,
 header replacement/trust, shared throttling, and the SSE buffering response;
 it does not establish behavior through the live edge proxy.

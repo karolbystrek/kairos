@@ -94,7 +94,7 @@ The Spring API retains domain authority. Frontend controls and redirects provide
 
 #### Search indexing and link previews
 
-Only public service information is indexable: the panel landing page, terms and privacy policy, and the customer home and privacy notice. Each has a canonical URL, Polish Open Graph metadata and a build-time preview image, and appears in its application's sitemap. Order pages, order manifests, scanning, the offline fallback, login, registration and the dashboard carry `noindex, nofollow`; order pages and manifests also send `X-Robots-Tag`. `robots.txt` does not block private paths, so crawlers can read their noindex rules. Order-page titles and previews are generic and never include the tracking reference, order label or status. Absolute URLs come from the build-time `NEXT_PUBLIC_CUSTOMER_APP_URL` and `NEXT_PUBLIC_PANEL_APP_URL` origins. Structured data and ranking work are out of scope.
+Only public service information is indexable: the panel landing page, terms and privacy policy, and the customer home and privacy notice. Each has a canonical URL, Polish Open Graph metadata and a generated preview image, and appears in its application's sitemap. Order pages, order manifests, scanning, the offline fallback, login, registration and the dashboard carry `noindex, nofollow`; order pages and manifests also send `X-Robots-Tag`. `robots.txt` does not block private paths, so crawlers can read their noindex rules. Order-page titles and previews are generic and never include the tracking reference, order label or status. Absolute URLs come from the runtime `CUSTOMER_APP_URL` and `PANEL_APP_URL` settings. Structured data and ranking work are out of scope.
 
 ### Backend
 
@@ -110,10 +110,10 @@ The backend uses Java 25 and Spring Boot 4. It is the only system of record and 
 * transactional order-event outbox processing;
 * anonymous customer notification enrollment and durable Web Push delivery.
 
-Browser-facing API requests go directly to the Spring API origin, through the
-NGINX gateway in production and to `http://localhost:8080` locally. Both use
-credentialed CORS scoped by frontend origin and browser resource family. Next.js route handlers are
-limited to frontend rendering concerns.
+Browser-facing API requests use `/api` on the frontend's own origin: the NGINX
+gateway forwards it to the Spring API in production and `next dev` proxies it
+locally. Browsers therefore never call the API cross-origin, and the API has no
+CORS policy. Next.js route handlers are limited to frontend rendering concerns.
 
 ### API contracts
 
