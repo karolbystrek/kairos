@@ -67,17 +67,19 @@ local gateway; `next dev` proxies `/api` to the API (`API_PROXY_URL`, default
 
 GitHub Actions validates pull requests and `main` with frontend lint, type checks,
 configured tests and production `npm run build`, and the complete Maven `verify`
-lifecycle, and validates the production and development Compose files. CI builds
-images without pushing them; the deployment workflow builds and pushes release images. Builds take
-no URL or environment inputs, so one image serves any deployment. Main CI keeps
-dependency caches warm for pull requests.
+lifecycle, and validates the production and development Compose files. Pull
+requests and other branches build all three images without pushing them,
+reusing image build caches from `main`. Builds take no URL or environment
+inputs, so one image serves any deployment. Main CI keeps dependency and image
+caches warm for pull requests.
 
-Only the manual production deployment builds and publishes images. It first runs
-the full CI workflow for the dispatch revision; failed validation stops before
-any image is built. Each image is then built with provenance for `linux/amd64`
-and pushed to GHCR under its full-revision tag, serialized per revision and
-service. An existing full-revision tag is reused unchanged and never rebuilt,
-because a rebuild changes digests. The `Publish release` job pulls and inspects
+Only CI on `main` publishes images, and only after every other check for the
+push passes. Each image is built with provenance for `linux/amd64` and pushed
+to public GHCR packages under its full-revision tag, serialized per revision
+and service. An existing full-revision tag is kept unchanged and never rebuilt,
+because a rebuild changes digests. Deployment neither reruns CI nor builds
+images; its `Publish release` job fails with a clear message when the images
+for the dispatch revision are not published yet, then pulls and inspects
 all three images for the matching source-revision label and a repository-owned
 GHCR registry digest before uploading the `release-manifest` artifact. Failed or
 incomplete publication cannot produce an eligible release.
