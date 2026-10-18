@@ -66,7 +66,6 @@ class RetentionPurgeIntegrationTests extends RedisListenerIsolatedIntegrationTes
         purgeService.purge();
         assertThat(jdbcTemplate.queryForObject("SELECT status FROM orders WHERE id = ?", String.class, stale.id())).isEqualTo("EXPIRED");
         assertThat(jdbcTemplate.queryForObject("SELECT status FROM orders WHERE id = ?", String.class, recent.id())).isEqualTo("IN_PREPARATION");
-        assertThat(count("SELECT count(*) FROM order_history WHERE order_id = ? AND status = 'EXPIRED' AND initiator_type = 'SYSTEM'", stale.id())).isOne();
         assertThat(count("SELECT count(*) FROM order_outbox_events WHERE order_id = ? AND event_type = 'ORDER_EXPIRED'", stale.id())).isOne();
 
         jdbcTemplate.update("UPDATE order_outbox_events SET webhook_fanout_completed_at = created_at, push_fanout_completed_at = created_at WHERE order_id = ?",
@@ -119,7 +118,6 @@ class RetentionPurgeIntegrationTests extends RedisListenerIsolatedIntegrationTes
         })).rootCause().hasMessageContaining("Only deleted data can be purged");
 
         assertThat(count("SELECT count(*) FROM orders WHERE id = ?", order.id())).isOne();
-        assertThat(count("SELECT count(*) FROM order_history WHERE order_id = ?", order.id())).isOne();
     }
 
     @Test
@@ -158,15 +156,13 @@ class RetentionPurgeIntegrationTests extends RedisListenerIsolatedIntegrationTes
         purgeService.purge();
         assertThat(count("SELECT count(*) FROM locations WHERE id = ?", tenant.secondLocationId())).isZero();
         assertThat(count("SELECT count(*) FROM orders WHERE id = ?", archivedOrder.id())).isZero();
-        assertThat(count("SELECT count(*) FROM order_history WHERE order_id = ?", archivedOrder.id())).isZero();
         assertThat(count("SELECT count(*) FROM order_outbox_events WHERE order_id = ?", archivedOrder.id())).isZero();
         assertThat(count("SELECT count(*) FROM customer_push_enrollments WHERE order_id = ?", archivedOrder.id())).isZero();
         assertThat(count("SELECT count(*) FROM customer_push_deliveries WHERE order_id = ?", archivedOrder.id())).isZero();
         assertThat(count("SELECT count(*) FROM account_invitations WHERE location_id = ?", tenant.secondLocationId())).isZero();
         for (var order : new UUID[]{keptOrder.id(), otherTenantOrder.id()}) {
             assertThat(count("SELECT count(*) FROM orders WHERE id = ?", order)).isOne();
-            // Unchanged for days, the kept orders were also expired, which adds one history entry each.
-            assertThat(count("SELECT count(*) FROM order_history WHERE order_id = ?", order)).isEqualTo(2);
+            // Unchanged for days, the kept orders were also expired.
             assertThat(count("SELECT count(*) FROM orders WHERE id = ? AND status = 'EXPIRED'", order)).isOne();
         }
         assertThat(count("SELECT count(*) FROM locations WHERE id = ?", otherTenant.secondLocationId())).isOne();

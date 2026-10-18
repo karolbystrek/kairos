@@ -182,8 +182,8 @@ and `items`; customer representations include `number` and nullable `label`
 but not items. External integrations read a location's menu through
 `GET /api/external/locations/v1/{locationId}/menu` with the staff menu
 response shape. Desired-state updates use idempotent `PUT`; a same-state
-request returns the unchanged representation without another history, customer
-event, or outbox event.
+request returns the unchanged representation without another customer event or
+outbox event.
 
 Tracked-order representations include nullable `reviewInvitation` with `dueAt`,
 `locationName`, and `googleReviewUrl` only while completion remains eligible.

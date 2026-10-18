@@ -69,7 +69,6 @@ class DatabaseIsolationIntegrationTests extends RedisListenerIsolatedIntegration
         transaction.executeWithoutResult(status -> {
             context.staff(own.manager());
             assertThat(repository.findAll()).extracting(CustomerOrder::getId).containsExactly(first.id());
-            assertThat(runtime.queryForObject("SELECT count(*) FROM order_history",Integer.class)).isEqualTo(1);
             assertThat(runtime.queryForObject("SELECT count(*) FROM order_items",Integer.class)).isEqualTo(1);
             assertThat(runtime.queryForObject("SELECT count(*) FROM order_number_counters",Integer.class)).isEqualTo(1);
             assertThat(runtime.update("UPDATE orders SET status='READY' WHERE id=?",foreign.id())).isZero();
@@ -87,7 +86,6 @@ class DatabaseIsolationIntegrationTests extends RedisListenerIsolatedIntegration
         transaction.executeWithoutResult(status -> {
             context.trackedOrders(List.of(first.trackingReference()));
             assertThat(runtime.queryForObject("SELECT count(*) FROM orders",Integer.class)).isEqualTo(1);
-            assertThat(runtime.queryForObject("SELECT count(*) FROM order_history",Integer.class)).isZero();
             assertThat(runtime.queryForObject("SELECT count(*) FROM order_items",Integer.class)).isZero();
         });
         assertThatThrownBy(() -> transaction.executeWithoutResult(status -> {

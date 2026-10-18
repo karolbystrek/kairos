@@ -83,17 +83,6 @@ class OrderServiceIntegrationTests extends RedisListenerIsolatedIntegrationTest 
         assertThat(completed.status()).isEqualTo(OrderStatus.COMPLETED);
         assertThat(tracked.number()).isEqualTo(1);
         assertThat(tracked.status()).isEqualTo(OrderStatus.COMPLETED);
-        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM order_history", Long.class)).isEqualTo(3);
-        assertThat(jdbcTemplate.queryForList(
-            "SELECT initiator_type FROM order_history WHERE order_id = ? ORDER BY id",
-            String.class,
-            created.id()
-        )).containsOnly("USER");
-        assertThat(jdbcTemplate.queryForList(
-            "SELECT initiator_id FROM order_history WHERE order_id = ? ORDER BY id",
-            UUID.class,
-            created.id()
-        )).containsOnly(principal.accountId());
     }
 
     @Test

@@ -156,7 +156,6 @@ class WebhookDeliveryProcessorIntegrationTests
         jdbcTemplate.update("DELETE FROM webhook_delivery_signing_versions WHERE delivery_id IN (SELECT id FROM webhook_deliveries WHERE outbox_event_id IN (SELECT id FROM order_outbox_events WHERE tenant_id = ?))", tenantId);
         jdbcTemplate.update("DELETE FROM webhook_deliveries WHERE outbox_event_id IN (SELECT id FROM order_outbox_events WHERE tenant_id = ?)", tenantId);
         jdbcTemplate.update("DELETE FROM order_outbox_events WHERE tenant_id = ?", tenantId);
-        jdbcTemplate.update("DELETE FROM order_history WHERE order_id IN (SELECT id FROM orders WHERE location_id IN (SELECT id FROM locations WHERE tenant_id = ?))", tenantId);
         jdbcTemplate.update("DELETE FROM orders WHERE location_id IN (SELECT id FROM locations WHERE tenant_id = ?)", tenantId);
         jdbcTemplate.update("DELETE FROM webhook_signing_secret_versions WHERE subscription_id IN (SELECT id FROM webhook_subscriptions WHERE tenant_id = ?)", tenantId);
         jdbcTemplate.update("DELETE FROM webhook_subscription_event_types WHERE subscription_id IN (SELECT id FROM webhook_subscriptions WHERE tenant_id = ?)", tenantId);

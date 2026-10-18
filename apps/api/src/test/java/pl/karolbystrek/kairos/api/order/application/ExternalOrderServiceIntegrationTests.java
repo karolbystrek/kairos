@@ -207,7 +207,7 @@ class ExternalOrderServiceIntegrationTests extends RedisListenerIsolatedIntegrat
     }
 
     @Test
-    void keepsSameStateCommandsIdempotentAndPreservesExactAuditIdentity() {
+    void keepsSameStateCommandsIdempotent() {
         var created = orderService.create(
                 principal,
                 tenant.firstLocationId(),
@@ -215,7 +215,6 @@ class ExternalOrderServiceIntegrationTests extends RedisListenerIsolatedIntegrat
                 List.of(),
                 "audit-order"
         );
-        var initialHistoryCount = countRows("order_history", created.order().id());
         var initialOutboxCount = countRows("order_outbox_events", created.order().id());
 
         var unchanged = orderService.updateStatus(
@@ -225,8 +224,6 @@ class ExternalOrderServiceIntegrationTests extends RedisListenerIsolatedIntegrat
         );
 
         assertThat(unchanged.status()).isEqualTo(OrderStatus.IN_PREPARATION);
-        assertThat(countRows("order_history", created.order().id()))
-                .isEqualTo(initialHistoryCount);
         assertThat(countRows("order_outbox_events", created.order().id()))
                 .isEqualTo(initialOutboxCount);
 
@@ -236,30 +233,8 @@ class ExternalOrderServiceIntegrationTests extends RedisListenerIsolatedIntegrat
                 OrderStatus.READY
         );
         assertThat(ready.status()).isEqualTo(OrderStatus.READY);
-        assertThat(countRows("order_history", created.order().id()))
-                .isEqualTo(initialHistoryCount + 1);
         assertThat(countRows("order_outbox_events", created.order().id()))
                 .isEqualTo(initialOutboxCount + 1);
-        assertThat(jdbcTemplate.queryForList(
-                """
-                SELECT initiator_id
-                FROM order_history
-                WHERE order_id = ?
-                ORDER BY id
-                """,
-                UUID.class,
-                created.order().id()
-        )).containsOnly(integration.id());
-        assertThat(jdbcTemplate.queryForList(
-                """
-                SELECT initiator_api_key_id
-                FROM order_history
-                WHERE order_id = ?
-                ORDER BY id
-                """,
-                UUID.class,
-                created.order().id()
-        )).containsOnly(issuedKey.apiKey().id());
 
         assertThatThrownBy(() -> orderService.updateStatus(
                 principal,

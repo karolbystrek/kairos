@@ -103,16 +103,11 @@ class OrderAuthorizationIntegrationTests extends RedisListenerIsolatedIntegratio
     }
 
     @Test
-    void authorizesTheStoredOrderLocationAndRecordsTheAuthenticatedInitiator() {
+    void authorizesTheStoredOrderLocation() {
         var order = orderService.createOrder(admin, locationId, null, List.of());
 
         var updated = orderService.updateStatus(operator, order.id(), OrderStatus.READY);
         assertThat(updated.status()).isEqualTo(OrderStatus.READY);
-        assertThat(jdbcTemplate.queryForObject(
-            "SELECT initiator_id FROM order_history WHERE order_id = ? ORDER BY id DESC LIMIT 1",
-            UUID.class,
-            order.id()
-        )).isEqualTo(operator.accountId());
 
         var otherOrder = orderService.createOrder(otherAdmin, otherLocationId, null, List.of());
         assertThatThrownBy(() -> orderService.updateStatus(manager, otherOrder.id(), OrderStatus.READY))
