@@ -21,7 +21,7 @@ type DemoStatus = "IN_PREPARATION" | "READY" | "COMPLETED";
 type DemoState = {
   order: { number: number; status: DemoStatus; inQueue: boolean } | null;
   nextNumber: number;
-  phone: "home" | "scanning" | "order";
+  phone: "home" | "order";
   notificationsEnabled: boolean;
   phoneDark: boolean;
   notification: { id: number; text: string } | null;
@@ -30,7 +30,6 @@ type DemoState = {
 type DemoAction =
   | { type: "add" }
   | { type: "scan" }
-  | { type: "scanned" }
   | { type: "advance"; status: "READY" | "COMPLETED"; id: number }
   | { type: "leaveQueue"; number: number }
   | { type: "dismissNotification"; id: number }
@@ -39,7 +38,6 @@ type DemoAction =
   | { type: "togglePhoneTheme" };
 
 const DEMO_LABEL = "2× Pierogi ruskie, lemoniada";
-const SCAN_DURATION_MS = 1100;
 const NOTIFICATION_DURATION_MS = 5000;
 const QUEUE_EXIT_DELAY_MS = 1500;
 
@@ -93,9 +91,7 @@ function reducer(state: DemoState, action: DemoAction): DemoState {
         return state;
       }
 
-      return { ...state, phone: "scanning" };
-    case "scanned":
-      return state.phone === "scanning" ? { ...state, phone: "order" } : state;
+      return { ...state, phone: "order" };
     case "advance": {
       if (!state.order) return state;
       const tracked = state.phone === "order";
@@ -138,10 +134,7 @@ export function LandingDemo() {
   const queuedOrder = order?.inQueue ? order : null;
   const tracked = phone === "order";
 
-  const scan = () => {
-    dispatch({ type: "scan" });
-    setTimeout(() => dispatch({ type: "scanned" }), SCAN_DURATION_MS);
-  };
+  const scan = () => dispatch({ type: "scan" });
 
   const advance = (status: "READY" | "COMPLETED") => {
     if (!order) return;
@@ -308,15 +301,6 @@ function PhoneView({
   onScan: () => void;
 }) {
   const { order, phone } = state;
-
-  if (phone === "scanning") {
-    return (
-      <div className="landing-phone-camera">
-        <QrCodeIcon aria-hidden="true" size={96} />
-        <p>Skanowanie kodu…</p>
-      </div>
-    );
-  }
 
   if (phone === "order" && order) {
     return (
