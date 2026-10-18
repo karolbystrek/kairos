@@ -605,19 +605,6 @@ body {
 	line-height: 1.15;
 }
 
-.landing-phone-camera {
-	display: flex;
-	flex: 1;
-	flex-direction: column;
-	align-items: center;
-	justify-content: center;
-	gap: var(--space-3);
-	margin: -2.75rem calc(-1 * var(--space-3)) calc(-1 * var(--space-4));
-	background: var(--black);
-	color: var(--white);
-	font-size: var(--type-caption);
-}
-
 .landing-phone-order-number {
 	font-size: 3.5rem;
 	font-weight: 650;

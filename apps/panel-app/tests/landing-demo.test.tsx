@@ -21,7 +21,6 @@ it("runs one order from the queue to the guest's phone without calling the API",
   expect(add.hasAttribute("disabled")).toBe(true);
 
   fireEvent.click(phone.getByRole("button", { name: "Zeskanuj kod QR" }));
-  act(() => vi.advanceTimersByTime(1100));
   phone.getByText("Przygotowujemy Twoje zamówienie");
 
   fireEvent.click(panel.getByRole("button", { name: "Gotowe" }));
