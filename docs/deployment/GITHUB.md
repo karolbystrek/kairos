@@ -41,10 +41,11 @@ Redis passwords, `RESEND_API_KEY`, `VAPID_SUBJECT`) that deployment writes to
 the host; see [configuration](CONFIGURATION.md) for required keys.
 
 Do not reuse the GitHub publication token as host GHCR credentials. For a
-release, manually start [the deployment workflow](RELEASES.md). It validates the
-dispatch revision with CI, builds and publishes its images and creates the
-release bundle before `Deploy production` runs. CI validates the Compose files and builds the
-images but never publishes them. Only the `Deploy production` job reads Environment secrets; verify the
+release, manually start [the deployment workflow](RELEASES.md) once CI on
+`main` has passed for the revision. CI on `main` publishes the three public GHCR
+images after every check passes; pull requests only build them. Deployment
+inspects those images and creates the release bundle before `Deploy production`
+runs, without rerunning CI or building. Only the `Deploy production` job reads Environment secrets; verify the
 main-only policy and record results without secrets. Merging a PR does not
 authorize dispatching a deployment.
 

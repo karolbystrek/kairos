@@ -6,17 +6,11 @@ on:
     branches:
       - main
   workflow_dispatch:
-  workflow_call:
-    inputs:
-      skip-production-images:
-        type: boolean
-        default: false
 
 permissions:
   contents: read
 
-# Only pull requests share a group, so superseded PR pushes cancel; other runs
-# (including deploy.yml's call, which has no workflow-level group) never queue.
+# Only pull requests share a group, so superseded PR pushes cancel; other runs never queue.
 concurrency:
   group: ci-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
   cancel-in-progress: true
@@ -104,6 +98,30 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Validate production Compose
+        env:
+          # Placeholders: only Compose interpolation needs them.
+          KAIROS_IMAGE_REGISTRY: ghcr.io/karolbystrek/kairos
+          KAIROS_RELEASE_VERSION: ci
+          KAIROS_API_USER: "1000:1000"
+          KAIROS_CUSTOMER_APP_HOST: customer.example.com
+          KAIROS_PANEL_APP_HOST: panel.example.com
+          KAIROS_API_HOST: api.example.com
+          CUSTOMER_APP_URL: https://customer.example.com
+          PANEL_APP_URL: https://panel.example.com
+          POSTGRES_PASSWORD: placeholder
+          KAIROS_DB_OWNER_PASSWORD: placeholder
+          KAIROS_DB_RUNTIME_PASSWORD: placeholder
+          REDIS_PASSWORD: placeholder
+          VAPID_SUBJECT: mailto:ci@example.com
+          RESEND_API_KEY: placeholder
+          KAIROS_APPLICATION_SECRETS_DIRECTORY: ./secrets
+          KAIROS_TLS_DIRECTORY: ./tls
+        run: docker compose -f compose.yaml -f compose.production.yaml config -q
+
+      - name: Validate development Compose
+        run: docker compose --env-file .env.example -f compose.yaml -f compose.local.yaml config -q
+
       - name: Pip cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -127,40 +145,107 @@ jobs:
       - name: Test manifest
         run: python3 -m unittest discover -s deployment -p 'test_*.py' -v
 
-  production-images:
-    name: Production images
-    if: ${{ !inputs.skip-production-images }}
-    runs-on: ubuntu-latest
+  images:
+    name: Image (${{ matrix.service }})
+    # main publishes the images below instead, after every other check passes.
+    if: github.ref != 'refs/heads/main'
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
-    env:
-      # Placeholders: only Compose interpolation and the build need them, nothing is pushed.
-      KAIROS_IMAGE_REGISTRY: ghcr.io/karolbystrek/kairos
-      KAIROS_RELEASE_VERSION: ci
-      KAIROS_API_USER: "1000:1000"
-      KAIROS_CUSTOMER_APP_HOST: customer.example.com
-      KAIROS_PANEL_APP_HOST: panel.example.com
-      KAIROS_API_HOST: api.example.com
-      CUSTOMER_APP_URL: https://customer.example.com
-      PANEL_APP_URL: https://panel.example.com
-      POSTGRES_PASSWORD: placeholder
-      KAIROS_DB_OWNER_PASSWORD: placeholder
-      KAIROS_DB_RUNTIME_PASSWORD: placeholder
-      REDIS_PASSWORD: placeholder
-      VAPID_SUBJECT: mailto:ci@example.com
-      RESEND_API_KEY: placeholder
-      KAIROS_APPLICATION_SECRETS_DIRECTORY: ./secrets
-      KAIROS_TLS_DIRECTORY: ./tls
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - customer-app
+          - panel-app
+          - api
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           persist-credentials: false
 
-      - name: Validate production Compose
-        run: docker compose -f compose.yaml -f compose.production.yaml config -q
+      - name: Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
 
-      - name: Validate development Compose
-        run: docker compose --env-file .env.example -f compose.yaml -f compose.local.yaml config -q
+      - name: Build image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: apps/${{ matrix.service }}
+          # Both frontends share the panel app's Next.js Dockerfile.
+          file: apps/${{ matrix.service == 'api' && 'api' || 'panel-app' }}/Dockerfile
+          target: runner
+          platforms: linux/amd64
+          pull: true
+          build-args: |
+            NEXT_TELEMETRY_DISABLED=1
+          cache-from: type=gha,scope=${{ matrix.service }}
 
-      - name: Build application images
-        run: docker compose -f compose.yaml -f compose.production.yaml build api panel-app customer-app
+  publish-images:
+    name: Publish image (${{ matrix.service }})
+    if: github.ref == 'refs/heads/main'
+    needs: [frontend, api, release-checks]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - customer-app
+          - panel-app
+          - api
+    concurrency:
+      group: publish-image-${{ github.sha }}-${{ matrix.service }}
+      cancel-in-progress: false
+    env:
+      IMAGE: ghcr.io/${{ github.repository }}/${{ matrix.service }}:sha-${{ github.sha }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      - name: GHCR login
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # A rebuild changes digests, which the host rejects for an existing revision.
+      - name: Check existing image
+        id: existing
+        run: |
+          if skopeo inspect --raw "docker://$IMAGE" > /dev/null 2>&1; then
+            echo "$IMAGE already exists; keeping it."
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Buildx
+        if: steps.existing.outputs.found != 'true'
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      - name: Build & push image
+        if: steps.existing.outputs.found != 'true'
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: apps/${{ matrix.service }}
+          # Both frontends share the panel app's Next.js Dockerfile.
+          file: apps/${{ matrix.service == 'api' && 'api' || 'panel-app' }}/Dockerfile
+          target: runner
+          platforms: linux/amd64
+          pull: true
+          build-args: |
+            NEXT_TELEMETRY_DISABLED=1
+          cache-from: type=gha,scope=${{ matrix.service }}
+          # min keeps image layers from evicting the dependency caches pull requests use.
+          cache-to: type=gha,mode=min,scope=${{ matrix.service }}
+          push: true
+          tags: ${{ env.IMAGE }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=sha-${{ github.sha }}
+          provenance: mode=max

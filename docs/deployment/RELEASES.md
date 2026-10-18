@@ -4,9 +4,9 @@ Use [the production runbook](RUNBOOK.md) for prerequisites and the sequence.
 
 ## First install and later releases
 
-CI validates pull requests and main pushes, including the Compose files, and builds
-images without pushing them;
-the deployment workflow builds and pushes them. After
+CI validates pull requests and main pushes, including the Compose files. Pull
+requests build all three images without pushing them; after every check passes
+on a `main` push, CI builds and pushes them to GHCR. After
 provisioning and authorization, start the deployment workflow from `main`
 (the default branch; other refs are refused):
 
@@ -16,9 +16,11 @@ gh workflow run deploy.yml --ref main
 
 Deployment always uses the latest `main` revision captured when the workflow
 is dispatched; there is no revision input, and dispatching is the production
-approval. It runs the full CI workflow for that revision, then builds and pushes
-all three images to GHCR. An image that already exists for the revision is reused
-unchanged, so retries keep the same digests. The `Publish release` job inspects
+approval. It neither reruns CI nor builds images: it uses the images CI published
+for that revision and fails with a clear message when they do not exist yet
+(CI still running or failed), so wait for CI on `main` to pass before
+dispatching. Published tags are never overwritten, so retries and redeployments
+keep the same digests. The `Publish release` job inspects
 the images and creates the `release-manifest` artifact, regenerating a
 byte-identical bundle for an existing revision. Changing runtime files cannot
 replace an existing host release under that revision; use a new revision. The
