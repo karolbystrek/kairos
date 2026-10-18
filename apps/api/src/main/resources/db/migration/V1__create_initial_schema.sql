@@ -297,7 +297,7 @@ CREATE TABLE account_invitations
     CONSTRAINT account_invitations_state_check
         CHECK (state IN ('PENDING', 'REDEEMED', 'REVOKED', 'REPLACED', 'EXPIRED')),
     CONSTRAINT account_invitations_expiry_check
-        CHECK (expires_at = created_at + INTERVAL '7' DAY),
+        CHECK (expires_at = created_at + INTERVAL '168' HOUR),
     CONSTRAINT account_invitations_updated_at_check
         CHECK (updated_at >= created_at),
     CONSTRAINT account_invitations_terminal_time_check CHECK (
