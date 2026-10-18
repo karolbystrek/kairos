@@ -77,7 +77,6 @@ class OrderAnalyticsIntegrationTests extends RedisListenerIsolatedIntegrationTes
         assertSummary("CANCELED", "2026-07-26T13:00:00Z", 1, 0, 0);
         assertThat(analytics.processAvailable()).isZero();
         assertThat(owner.queryForObject("SELECT sum(transition_count) FROM order_hourly_analytics", Long.class)).isEqualTo(5);
-        assertThat(count("order_history")).isEqualTo(5);
         assertThat(count("order_outbox_events")).isEqualTo(5);
     }
 

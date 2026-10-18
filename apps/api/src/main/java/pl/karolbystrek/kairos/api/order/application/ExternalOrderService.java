@@ -17,7 +17,6 @@ import pl.karolbystrek.kairos.api.order.application.model.ExternalOrderCreation;
 import pl.karolbystrek.kairos.api.order.application.model.ExternalOrderCreationResult;
 import pl.karolbystrek.kairos.api.order.application.model.ExternalOrderPage;
 import pl.karolbystrek.kairos.api.order.application.model.OrderView;
-import pl.karolbystrek.kairos.api.order.application.model.OrderInitiator;
 import pl.karolbystrek.kairos.api.order.domain.CustomerOrder;
 import pl.karolbystrek.kairos.api.order.domain.OrderItem;
 import pl.karolbystrek.kairos.api.order.domain.OrderStatus;
@@ -144,7 +143,6 @@ public class ExternalOrderService {
                 location,
                 label,
                 items,
-                integrationInitiator(principal),
                 new ExternalOrderCreation(
                         principal.integrationId(),
                         validatedIdempotencyKey,
@@ -175,12 +173,7 @@ public class ExternalOrderService {
         if (!principal.tenantId().equals(order.getLocation().getTenantId())) {
             throw orderNotFound();
         }
-        commandService.updateStatus(
-                order,
-                target,
-                integrationInitiator(principal),
-                clock.instant()
-        );
+        commandService.updateStatus(order, target, clock.instant());
         return OrderView.from(order);
     }
 
@@ -243,13 +236,6 @@ public class ExternalOrderService {
         var canonicalInput = locationId + "\n" + (label == null ? "NO_LABEL" : "LABEL\n" + label)
                 + "\nITEMS\n" + canonicalItems;
         return Hashing.sha256Hex(canonicalInput);
-    }
-
-    private static OrderInitiator integrationInitiator(ApiKeyPrincipal principal) {
-        return OrderInitiator.integration(
-                principal.integrationId(),
-                principal.apiKeyId()
-        );
     }
 
     private static ResourceNotFoundException orderNotFound() {

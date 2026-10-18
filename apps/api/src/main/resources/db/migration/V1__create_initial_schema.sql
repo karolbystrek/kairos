@@ -116,12 +116,11 @@ CREATE TABLE api_keys
     CONSTRAINT api_keys_expiry_check CHECK (expires_at IS NULL OR expires_at > created_at),
     CONSTRAINT api_keys_deleted_at_check CHECK (deleted_at IS NULL OR deleted_at >= created_at),
     CONSTRAINT api_keys_last_used_at_check CHECK (last_used_at IS NULL OR last_used_at >= created_at),
-    CONSTRAINT api_keys_id_tenant_key UNIQUE (id, tenant_id),
-    CONSTRAINT api_keys_id_integration_key UNIQUE (id, integration_id)
+    CONSTRAINT api_keys_id_tenant_key UNIQUE (id, tenant_id)
 );
 
 CREATE INDEX api_keys_integration_id_idx ON api_keys (integration_id, created_at);
--- Deleted keys stay as tombstones for order history, so only active keys reserve their name.
+-- Deleted keys stay as tombstones, so only active keys reserve their name.
 CREATE UNIQUE INDEX api_keys_integration_name_key ON api_keys (integration_id, normalized_name) WHERE deleted_at IS NULL;
 
 CREATE TABLE api_key_scopes
@@ -468,36 +467,6 @@ CREATE TABLE order_number_counters
     PRIMARY KEY (location_id, business_date),
     CONSTRAINT order_number_counters_last_number_check CHECK (last_number > 0)
 );
-
-CREATE TABLE order_history
-(
-    id                           BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    order_id                     UUID                     NOT NULL REFERENCES orders (id),
-    status                       VARCHAR(32)              NOT NULL,
-    created_at                   TIMESTAMP WITH TIME ZONE NOT NULL,
-    initiator_type               VARCHAR(32),
-    initiator_id                 UUID,
-    initiator_api_key_id         UUID,
-    CONSTRAINT order_history_integration_key_fk
-        FOREIGN KEY (initiator_api_key_id, initiator_id)
-            REFERENCES api_keys (id, integration_id),
-    CONSTRAINT order_history_initiator_check CHECK (
-        (initiator_type IS NULL
-            AND initiator_id IS NULL
-            AND initiator_api_key_id IS NULL)
-        OR (initiator_type IS NOT NULL AND initiator_type = 'SYSTEM'
-            AND initiator_id IS NULL
-            AND initiator_api_key_id IS NULL)
-        OR (initiator_type IS NOT NULL AND initiator_type = 'USER'
-            AND initiator_id IS NOT NULL
-            AND initiator_api_key_id IS NULL)
-        OR (initiator_type IS NOT NULL AND initiator_type = 'INTEGRATION'
-            AND initiator_id IS NOT NULL
-            AND initiator_api_key_id IS NOT NULL)
-        )
-);
-
-CREATE INDEX order_history_order_id_idx ON order_history (order_id, id);
 
 CREATE TABLE customer_push_subscriptions
 (
@@ -1121,9 +1090,6 @@ ALTER TABLE order_number_counters ENABLE ROW LEVEL SECURITY;
 CREATE POLICY scoped_select ON order_number_counters FOR SELECT USING (kairos_security.staff_location(location_id) OR kairos_security.integration_location(location_id,true));
 CREATE POLICY scoped_insert ON order_number_counters FOR INSERT WITH CHECK (kairos_security.staff_location(location_id) OR kairos_security.integration_location(location_id,true));
 CREATE POLICY scoped_update ON order_number_counters FOR UPDATE USING (kairos_security.staff_location(location_id) OR kairos_security.integration_location(location_id,true)) WITH CHECK (kairos_security.staff_location(location_id) OR kairos_security.integration_location(location_id,true));
-ALTER TABLE order_history ENABLE ROW LEVEL SECURITY;
-CREATE POLICY scoped_select ON order_history FOR SELECT USING (kairos_security.order_access(order_id,false,false));
-CREATE POLICY scoped_insert ON order_history FOR INSERT WITH CHECK (kairos_security.order_access(order_id,true,false));
 ALTER TABLE order_outbox_events ENABLE ROW LEVEL SECURITY;
 CREATE POLICY scoped_select ON order_outbox_events FOR SELECT USING (kairos_security.staff_location(location_id)
     OR kairos_security.integration_location(location_id,true) OR kairos_security.event_access(id)
@@ -1298,7 +1264,6 @@ BEGIN
         DELETE FROM public.customer_push_deliveries d USING public.orders o WHERE d.order_id=o.id AND o.location_id=resource;
         DELETE FROM public.customer_push_enrollments x USING public.orders o WHERE x.order_id=o.id AND o.location_id=resource;
         DELETE FROM public.order_outbox_events e WHERE e.location_id=resource;
-        DELETE FROM public.order_history h USING public.orders o WHERE h.order_id=o.id AND o.location_id=resource;
         DELETE FROM public.orders o WHERE o.location_id=resource;
         DELETE FROM public.account_invitations i WHERE i.location_id=resource;
         DELETE FROM public.api_key_location_access g WHERE g.location_id=resource;
@@ -1627,11 +1592,10 @@ GRANT USAGE ON SCHEMA public,kairos_security TO "${runtimeUser}";
 GRANT SELECT,INSERT,UPDATE,DELETE ON tenants,locations,location_menus,menu_items,accounts,location_assignments,account_invitations,
     external_integrations,api_keys,api_key_scopes,api_key_location_access,
     webhook_subscriptions,webhook_subscription_location_access,webhook_subscription_event_types,webhook_signing_secret_versions,
-    order_measurements,order_hourly_analytics,usage_hourly_analytics,platform_administrators,orders,order_items,order_number_counters,order_history,order_outbox_events,webhook_deliveries,webhook_delivery_signing_versions,
+    order_measurements,order_hourly_analytics,usage_hourly_analytics,platform_administrators,orders,order_items,order_number_counters,order_outbox_events,webhook_deliveries,webhook_delivery_signing_versions,
     customer_push_subscriptions,customer_push_enrollments,customer_push_deliveries,email_deliveries,
     spring_session,spring_session_attributes TO "${runtimeUser}";
 GRANT SELECT ON order_hourly_reports TO "${runtimeUser}";
-GRANT USAGE ON SEQUENCE order_history_id_seq TO "${runtimeUser}";
 GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA kairos_security TO "${runtimeUser}";
 GRANT EXECUTE ON FUNCTION public.operational_backlog(),public.valid_staff(uuid,uuid,text),public.lock_staff_location(),public.lock_account_location(uuid),
     public.api_key_authentication(uuid,timestamptz),public.record_api_key_use(uuid,timestamptz,timestamptz),

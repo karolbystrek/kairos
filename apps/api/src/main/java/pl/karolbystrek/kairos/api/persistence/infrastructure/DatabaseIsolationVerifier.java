@@ -36,7 +36,7 @@ public class DatabaseIsolationVerifier implements ApplicationRunner {
                     ('api_key_scopes','adrw'),('api_key_location_access','adrw'),
                     ('webhook_subscriptions','arw'),('webhook_subscription_location_access','adrw'),
                     ('webhook_subscription_event_types','adrw'),('webhook_signing_secret_versions','adrw'),
-                    ('usage_hourly_analytics','arw'),('platform_administrators','r'),('order_measurements','adr'),('order_hourly_analytics','arw'),('orders','arw'),('order_history','ar'),('order_outbox_events','arw'),
+                    ('usage_hourly_analytics','arw'),('platform_administrators','r'),('order_measurements','adr'),('order_hourly_analytics','arw'),('orders','arw'),('order_outbox_events','arw'),
                     ('webhook_deliveries','arw'),('webhook_delivery_signing_versions','ar'),
                     ('email_deliveries','arw'),('customer_push_subscriptions','adrw'),('customer_push_enrollments','adr'),('customer_push_deliveries','adrw')
                 ) expected(table_name,commands) WHERE expected.commands IS DISTINCT FROM (

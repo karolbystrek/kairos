@@ -15,7 +15,7 @@ Every order receives a stable, non-editable number unique per location and local
 
 There is no separate `CREATED` state: every created order is automatically accepted into `IN_PREPARATION`. From there it may become `READY` or `CANCELED`; a ready order may become `COMPLETED` or `CANCELED`. An active order whose status has not changed for 24 hours (`kairos.retention.order-expiry`) becomes `EXPIRED`, set only by the hourly retention worker as a `SYSTEM` transition: staff and External Integrations cannot choose it. Completed, canceled and expired orders are terminal. Expiry emits `order.expired` to webhooks and live streams, but sends no customer push, schedules no review invitation and records no analytics input. The customer cannot request transitions.
 
-The backend validates every transition regardless of whether it originates from the panel or an External Integration. Every accepted resulting state is recorded in an append-only history. The prior state is derived from the preceding history entry, with the first `IN_PREPARATION` entry representing creation.
+The backend validates every transition regardless of whether it originates from the panel or an External Integration.
 
 ### Customer application
 

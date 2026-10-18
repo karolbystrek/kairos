@@ -146,18 +146,6 @@ class CustomerPushSubscriptionIntegrationTests extends RedisListenerIsolatedInte
         );
         jdbcTemplate.update(
                 """
-                DELETE FROM order_history
-                WHERE order_id IN (
-                    SELECT orders.id
-                    FROM orders
-                    JOIN locations ON locations.id = orders.location_id
-                    WHERE locations.tenant_id = ?
-                )
-                """,
-                tenantId
-        );
-        jdbcTemplate.update(
-                """
                 DELETE FROM orders
                 WHERE location_id IN (
                     SELECT id FROM locations WHERE tenant_id = ?
@@ -418,7 +406,6 @@ class CustomerPushSubscriptionIntegrationTests extends RedisListenerIsolatedInte
         new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
             databaseAccessContext.pushCapability(List.of(subscriptionId), List.of(secondOrder.trackingReference()));
             assertThat(runtimeJdbc.queryForList("SELECT id FROM orders", UUID.class)).containsExactly(secondOrder.id());
-            assertThat(runtimeJdbc.queryForObject("SELECT count(*) FROM order_history", Integer.class)).isZero();
             assertThat(runtimeJdbc.queryForObject("SELECT count(*) FROM customer_push_deliveries", Integer.class)).isZero();
         });
 

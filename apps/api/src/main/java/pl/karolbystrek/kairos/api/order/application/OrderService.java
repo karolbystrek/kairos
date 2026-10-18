@@ -10,7 +10,6 @@ import pl.karolbystrek.kairos.api.location.domain.Location;
 import pl.karolbystrek.kairos.api.location.infrastructure.persistence.LocationRepository;
 import pl.karolbystrek.kairos.api.order.application.exception.InvalidOrderRequestException;
 import pl.karolbystrek.kairos.api.order.application.exception.ResourceNotFoundException;
-import pl.karolbystrek.kairos.api.order.application.model.OrderInitiator;
 import pl.karolbystrek.kairos.api.order.application.model.OrderView;
 import pl.karolbystrek.kairos.api.order.application.model.TrackedOrderView;
 import pl.karolbystrek.kairos.api.order.domain.OrderItem;
@@ -79,8 +78,7 @@ public class OrderService {
     ) {
         var access = staffAccessService.resolveForUpdate(principal);
         var location = requireAccessibleLocationForUpdate(access, locationId);
-        var initiator = OrderInitiator.user(access.accountId());
-        return OrderView.from(commandService.create(location, label, items, initiator, null, clock.instant()));
+        return OrderView.from(commandService.create(location, label, items, null, clock.instant()));
     }
 
     @Transactional
@@ -97,12 +95,7 @@ public class OrderService {
                 order.getLocation().getId()
         );
         var now = clock.instant();
-        commandService.updateStatus(
-                order,
-                target,
-                OrderInitiator.user(access.accountId()),
-                now
-        );
+        commandService.updateStatus(order, target, now);
         return OrderView.from(order);
     }
 

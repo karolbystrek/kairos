@@ -16,8 +16,8 @@ immutable expiration. `orders:write` includes `orders:read`. There is no manual
 rotation, secret versioning, grace period, or enable/disable switch for a key;
 an administrator replaces a key by creating a new one and deleting the old one.
 Deleting a key is immediate and irreversible: it stops authenticating and
-disappears from management, while its record is retained so order history keeps
-identifying it, and its name becomes available again. An integration's own
+disappears from management, while its record is retained, and its name becomes
+available again. An integration's own
 enable/disable switch still stops all of its keys and webhooks at once.
 
 The full high-entropy secret is revealed once and only a non-reversible hash is
@@ -41,7 +41,7 @@ order for an exact replay or `409` when the same value is reused with different
 creation input. The value is opaque, case-sensitive, and limited to 255 UTF-8
 bytes. Lists use an opaque cursor over descending creation time and order
 identity, default to 50 results, and accept at most 100. A same-state status
-request changes no history and emits no event. Creation accepts the same
+request changes nothing and emits no event. Creation accepts the same
 optional label and [menu items](menus.md#ordering-from-a-menu) as staff
 creation; items are part of the replay comparison. Every external order
 representation carries its daily number, nullable label and items. A key with
@@ -68,7 +68,7 @@ carry signatures from both the current and immediately preceding versions. The
 covers the UTF-8 bytes of `<epoch-seconds>.<exact-body>`.
 
 Order changes create one immutable, channel-neutral outbox event in the same
-database transaction as the order and history mutation. Independent background
+database transaction as the order mutation. Independent background
 pipelines inside the Spring API fan out recipient-specific webhook and
 customer-push delivery rows.
 Transient webhook failures retry automatically under the bounded

@@ -40,7 +40,7 @@
   `main` workflow repeats those checks before it may publish images.
 * Each frontend's handwritten request code and response types match the REST behavior covered by integration tests during the walking vertical slice.
 * REST-backed Client Components use keyed SWR state rather than effects for request orchestration, retain cached data during background revalidation, and do not apply order transitions before the Spring API accepts them.
-* New orders start in `IN_PREPARATION`, receive an immutable number, optional label and items, and create exactly one initial history entry for that resulting state.
+* New orders start in `IN_PREPARATION`, receive an immutable number, optional label and items.
 * Numbers are unique per location and local business day under concurrent creation, restart at 1 after the location's local midnight and are independent of labels; labels are validated, optional and may duplicate existing labels.
 * Menu items require the location's current menu, reject stale or repeated items and locations without a menu, and stay unchanged after menu edits; changing items in the panel regenerates the editable label.
 * Each location owns an independent menu; only administrators or the location's manager create, edit or delete it, and copying another location's items leaves the two menus independent.
@@ -227,7 +227,7 @@
 
 * A valid transition from either the staff panel or an External Integration produces the same persisted state, history record, customer event, and transactional outbox event.
 * Integration, API Key, webhook subscription, and signing-secret lifecycle changes preserve one-time secret handling and historical audit attribution.
-* Exact idempotent creation replays and same-state status commands create no duplicate order, history, outbox, customer event or analytics measurement.
+* Exact idempotent creation replays and same-state status commands create no duplicate order, outbox, customer event or analytics measurement.
 * Focused PostgreSQL checks verify anonymous analytics rollback/retry, concurrent processing, duration/hour/bucket calculations, collection without backfill, tenant isolation, location-purge survival and permanent tenant-deletion races; see [analytics invariants](order-analytics.md).
 * Focused usage checks verify predefined actions, atomic invalid-batch rejection, body/rate limits, eligible review attribution, tenant/location isolation, concurrent increments/deletion and representative panel/review collection; see [usage counts](usage-analytics.md).
 * Focused reporting checks verify role and RLS scope, manual platform grant/revocation, merged means and empty samples, DST and fractional-offset day assignment, range bounds, purged-location identity, tenant-deletion removal and sanitized health; see [analytics reporting](analytics-reporting.md).

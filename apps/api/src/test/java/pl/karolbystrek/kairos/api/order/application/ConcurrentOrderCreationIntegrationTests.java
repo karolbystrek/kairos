@@ -39,18 +39,6 @@ class ConcurrentOrderCreationIntegrationTests extends RedisListenerIsolatedInteg
                     tenantId
             );
             jdbcTemplate.update(
-            """
-                    DELETE FROM order_history
-                    WHERE order_id IN (
-                        SELECT orders.id
-                        FROM orders
-                        JOIN locations ON locations.id = orders.location_id
-                        WHERE locations.tenant_id = ?
-                    )
-                    """,
-                    tenantId
-            );
-            jdbcTemplate.update(
                     """
                     DELETE FROM orders
                     WHERE location_id IN (

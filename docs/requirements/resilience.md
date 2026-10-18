@@ -9,7 +9,6 @@
   one delivery. Sent/failed rows retain safe outcome metadata and erase secrets.
   Delivery wakes after commit on an asynchronous worker, with a 30-second
   recovery poll; see [worker timing](real-time.md).
-* Order transitions and their history are committed atomically.
 * Concurrent commands for the same order are serialized before validating and persisting a transition, preventing stale state decisions without duplicating an application-managed version value.
 * Order transitions, required outbox events and anonymous measurement inputs are committed atomically. Analytics merge/consumption is retry-safe and independent of retained orders; see [anonymous order analytics](order-analytics.md).
 * SSE or Redis event loss does not prevent later REST recovery.
@@ -35,7 +34,7 @@
   seven days by default; expired and terminal dead-letter rows are retained for
   30 days. Unenrolled dormant subscriptions are removed after 30 days by
   default.
-* An order remains associated with its original location for its entire lifecycle and history.
+* An order remains associated with its original location for its entire lifecycle.
 * Terminal orders remain readable to the holder of the tracking reference until the [retention purge](#retention-purge) of an archived location, but cannot re-enter an active lifecycle.
 
 ### Retention purge
@@ -49,7 +48,7 @@
   its staff identity, assignment and the invitations it issued or redeemed, in
   one transaction.
 * An archived location is removed once no account is assigned to it, together
-  with its orders, order history, outbox events, webhook and push deliveries,
+  with its orders, outbox events, webhook and push deliveries,
   push enrollments, invitations and remaining integration selections.
 * Anonymous order and usage aggregates and self-contained business inputs survive location purge; permanent tenant deletion erases them. Usage ingestion and business processing coordinate through tenant locks.
 * Finished invitations are deleted 30 days after revocation, replacement or expiry.
@@ -59,8 +58,8 @@
   invitation or pending registration references them.
 * Succeeded and dead-lettered webhook deliveries are deleted 30 days after
   completion. Order outbox events are deleted once both fan-outs finished more
-  than 30 days ago and no webhook or push delivery references them. Orders and
-  their history remain.
+  than 30 days ago and no webhook or push delivery references them. Orders
+  remain.
 * The same worker expires orders left active and unchanged for 24 hours (see
   [order lifecycle](orders-customer.md)).
 * Invitation creation/replacement and its email outbox acceptance commit
