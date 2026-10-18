@@ -11,6 +11,14 @@ The system consists of three applications:
 * `apps/panel-app` — staff Next.js panel
 * `apps/api` — Spring Boot API
 
+## Architecture
+
+![Kairos services overview](docs/diagrams/svg/services.svg)
+
+### Order status notifications
+
+![Order status notification flow](docs/diagrams/svg/status-change-flow.svg)
+
 ## Local development
 
 Install [Docker](https://docs.docker.com/get-docker/) with Compose 2.30 or newer and OpenSSL, then run:
