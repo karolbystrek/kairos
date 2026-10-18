@@ -89,7 +89,7 @@ else:
             if not path.exists():
                 path.write_text('import os, pathlib, sys\n'
                                 'pathlib.Path(sys.argv[1]).parent.joinpath("invoked").write_text(" ".join(sys.argv[1:]))\n'
-                                'sys.exit(int(os.environ.get("FAIL_DEPLOY", "0")))\n'
+                                'if os.environ.get("FAIL_DEPLOY"): sys.exit("Deployment failed at health check: api unhealthy.")\n'
                                 if name == 'deployment/deploy.py' else '# fixture\n')
         import shutil
         shutil.rmtree(self.artifact)
@@ -142,7 +142,11 @@ else:
 
     def test_deployment_failure_is_propagated(self):
         self.env['FAIL_DEPLOY'] = '1'
-        self.assertNotEqual(self.run_upload().returncode, 0)
+        result = self.run_upload()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('Deployment failed at health check: api unhealthy.', result.stderr)
+        self.assertIn('activation and deployment', result.stderr)
+        self.assertNotIn('secret-', result.stderr)
 
     def test_ssh_failure_never_transfers(self):
         self.env['FAIL_SSH'] = '1'

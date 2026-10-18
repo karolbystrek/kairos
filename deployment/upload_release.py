@@ -89,9 +89,9 @@ def main():
                        '-o', f'UserKnownHostsFile={scratch / "known_hosts"}']
             destination = f'{user}@{host}'
 
-            def ssh(command, **kwargs):
+            def ssh(command, stderr=subprocess.DEVNULL, **kwargs):
                 return subprocess.run(['ssh', *options, destination, command],
-                                      check=True, text=True, stderr=subprocess.DEVNULL, **kwargs)
+                                      check=True, text=True, stderr=stderr, **kwargs)
 
             stage = 'remote staging'
             incoming = ssh('umask 077; mkdir -p /srv/kairos/releases && '
@@ -123,7 +123,7 @@ cat > "$configuration" <<'KAIROS_PRODUCTION_ENV'
 ''' + configuration + '''KAIROS_PRODUCTION_ENV
 mv -f "$configuration" /srv/kairos/production.env
 python3 "$release/deployment/deploy.py" "$release" /srv/kairos/production.env
-''', timeout=3600)
+''', stderr=None, timeout=3600)  # deploy.py reports its failed stage without secrets
             finally:
                 # Only a validated temporary path is removed; activated releases persist.
                 try:
