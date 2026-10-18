@@ -30,8 +30,11 @@ same_inode "${test_directory}/secrets" 3 || { echo "Setup replaced the secrets d
 same_inode "${test_directory}/secrets/webhook-encryption.bin" 5 || { echo "Setup replaced a reused key." >&2; exit 1; }
 cmp "${test_directory}/expected-email" "${test_directory}/secrets/email-encryption.bin"
 cmp "${test_directory}/expected-webhook" "${test_directory}/secrets/webhook-encryption.bin"
+# Leftover directories in the checkout's dedicated secrets/ never block setup.
+mkdir -p "${test_directory}/secrets/leftover/nested"
 sh "${test_directory}/setup.sh" --non-interactive --keep-env --replace-keys --secrets-directory secrets > "${test_directory}/output"
 same_inode "${test_directory}/secrets" 3
+[ -d "${test_directory}/secrets/leftover/nested" ]
 cmp "${test_directory}/expected-credential" "${test_directory}/secrets/external-secret.txt"
 if cmp -s "${test_directory}/expected-webhook" "${test_directory}/secrets/webhook-encryption.bin"; then
     echo "Application key replacement did not replace its keys." >&2
