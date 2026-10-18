@@ -335,6 +335,8 @@ if [ -d "${secrets_directory}" ]; then
             if [ -L "${entry}" ] || [ ! -d "${entry}" ]; then
                 fail "The secrets entry must be a regular directory: ${entry_name}"
             fi
+        elif [ "${secrets_directory}" = "${repository_directory}/secrets" ]; then
+            : # The checkout's Git-ignored secrets/ is dedicated, so leftovers there stay untouched.
         else
             fail "The secrets directory contains an unrelated entry: ${entry_name}"
         fi
