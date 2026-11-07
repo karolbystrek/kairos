@@ -17,20 +17,15 @@ concurrency:
 
 jobs:
   frontend:
-    name: Frontend (${{ matrix.app }})
+    name: Frontend
     runs-on: ubuntu-latest
     timeout-minutes: 40
-    strategy:
-      fail-fast: false
-      matrix:
-        app:
-          - web
     env:
       CI: "true"
       NEXT_TELEMETRY_DISABLED: "1"
     defaults:
       run:
-        working-directory: apps/${{ matrix.app }}
+        working-directory: apps/web
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
@@ -42,7 +37,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: apps/${{ matrix.app }}/package-lock.json
+          cache-dependency-path: apps/web/package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -56,9 +51,9 @@ jobs:
       - name: Next.js cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: apps/${{ matrix.app }}/.next/cache
-          key: ${{ runner.os }}-next-${{ matrix.app }}-${{ hashFiles(format('apps/{0}/package-lock.json', matrix.app)) }}-${{ github.sha }}
-          restore-keys: ${{ runner.os }}-next-${{ matrix.app }}-${{ hashFiles(format('apps/{0}/package-lock.json', matrix.app)) }}-
+          path: apps/web/.next/cache
+          key: ${{ runner.os }}-next-web-${{ hashFiles('apps/web/package-lock.json') }}-${{ github.sha }}
+          restore-keys: ${{ runner.os }}-next-web-${{ hashFiles('apps/web/package-lock.json') }}-
 
       - name: Build
         run: npm run build
