@@ -2,10 +2,19 @@
 
 ### Staff panel
 
-The dashboard keeps its selected workspace in the URL fragment (for example,
-`#integrations`). Refresh, direct links and browser Back/Forward retain that
-selection. Missing, unknown, unavailable or onboarding-disabled workspaces fall
-back to Orders. Loaded content remains visible during background refreshes;
+Panel URLs follow the domain; the session supplies the tenant, so it never
+appears in a URL. Location-scoped work lives at
+`/panel/locations/{locationId}/orders`, `/panel/locations/{locationId}/orders/{orderId}`
+(order details) and `/panel/locations/{locationId}/menu`; `/panel/orders`
+and `/panel/orders/{orderId}` show orders before a location is chosen (all
+locations with tenant-wide order access, otherwise the first location), and
+`/panel/menu` the default location's menu. Tenant-wide workspaces are
+`/panel/locations`, `/panel/staff`, `/panel/integrations`, `/panel/analytics`
+and `/panel/platform`; `/panel` opens `/panel/orders`. Workspace tabs keep the
+current location when switching between Orders and Menu. Refresh, direct links
+and browser Back/Forward retain the workspace, location and open order.
+Unknown, unavailable or onboarding-disabled workspaces and unknown or disabled
+locations fall back to Orders or the default location. Loaded content remains visible during background refreshes;
 empty states appear only after loading completes.
 
 The staff panel must:
@@ -43,7 +52,7 @@ The staff panel must:
 
 #### Navigation and onboarding
 
-The panel application provides a public restaurant-owner landing page at `/`
+Kairos provides a public restaurant-owner landing page at `/`
 explaining QR-based order tracking and queue management without physical
 pagers or a customer app download. Its plain-language Polish copy covers how
 it works in three steps, benefits for owners and guests, a short FAQ and a
@@ -55,10 +64,11 @@ demo runs entirely in the browser without API calls: it holds one order at a
 time that the visitor adds, scans with a simulated guest phone mirroring the
 customer application, and marks ready and picked up while the phone shows the
 resulting notifications. Public registration lives at
-`/registration`, sign-in at `/login`, the staff workspace at `/dashboard` and
-password change at `/dashboard/password`. Signed-in visitors to `/` or `/login`
-are redirected to `/dashboard`; signed-out visitors to staff routes go to
-`/login` after the session check. Authentication failures leave the public
+`/panel/registration`, invitation acceptance at `/panel/account-registration`,
+sign-in at `/panel/login`, password reset at `/panel/password-reset`, the staff
+workspaces below `/panel` and password change at `/panel/password`. Signed-in
+visitors to `/` or `/panel/login` are redirected to `/panel/orders`; signed-out
+visitors to staff routes go to `/panel/login` after the session check. Authentication failures leave the public
 landing page usable and keep the existing recovery state on staff routes.
 Contacting the creator or receiving an invitation is not required to register.
 
@@ -82,7 +92,7 @@ current device immediately without confirmation; a failure keeps the session
 and shows a dismissible error, and a pending logout prevents repeat
 submissions. There is no separate sign-out-everywhere action: changing the
 password ends every session. The Change password page retains validation errors
-and explains that success signs out every device; success leads to `/login`,
+and explains that success signs out every device; success leads to `/panel/login`,
 which confirms the change.
 
 The Menu page edits the menu of a selected location as one item per line, with

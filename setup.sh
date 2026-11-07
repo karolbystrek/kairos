@@ -517,10 +517,10 @@ if [ "${checkout_mode}" = true ]; then
             FNR == NR { if ($1 ~ /^(POSTGRES_PASSWORD|KAIROS_DB_OWNER_PASSWORD|KAIROS_DB_RUNTIME_PASSWORD|REDIS_PASSWORD)$/) example[$1]=$2; next }
             $1 ~ /^(WEBHOOK_DESTINATION_POLICY|PUSH_DESTINATION_POLICY)$/ && $2 != "PUBLIC_HTTPS" { invalid=1 }
             $1 == "EMAIL_VERIFICATION_ENABLED" && tolower($2) != "true" { invalid=1 }
-            $1 ~ /^(CUSTOMER_APP_URL|PANEL_APP_URL)$/ && $2 !~ "^https://[^/]+/?$" { invalid=1 }
+            $1 == "APP_URL" && $2 !~ "^https://[^/]+/?$" { invalid=1 }
             $1 ~ /^(POSTGRES_PASSWORD|KAIROS_DB_OWNER_PASSWORD|KAIROS_DB_RUNTIME_PASSWORD|REDIS_PASSWORD)$/ { if ($2 == "" || $2 == example[$1]) invalid=1 }
             END { exit invalid }
-        ' "${repository_directory}/.env.example" - || fail "Production requires HTTPS origins, PUBLIC_HTTPS delivery policies, email verification and non-default database and Redis passwords. Update .env, then retry --prod; existing settings were preserved."
+        ' "${repository_directory}/.env.example" - || fail "Production requires an HTTPS APP_URL origin, PUBLIC_HTTPS delivery policies, email verification and non-default database and Redis passwords. Update .env, then retry --prod; existing settings were preserved."
     fi
     docker compose --project-directory "${repository_directory}" up --build -d --wait
     echo

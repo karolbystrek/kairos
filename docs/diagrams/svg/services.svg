@@ -45,12 +45,10 @@
     <text class="sub" x="575" y="368">event Pub/Sub</text>
   </g>
   <g class="app" text-anchor="middle" dominant-baseline="central">
-    <rect x="300" y="30" width="160" height="56" rx="8" stroke-width="0.5"/>
-    <text class="title" x="380" y="48">customer-app</text>
-    <text class="sub" x="380" y="68">Next.js PWA</text>
-    <rect x="300" y="100" width="160" height="56" rx="8" stroke-width="0.5"/>
-    <text class="title" x="380" y="118">panel-app</text>
-    <text class="sub" x="380" y="138">Next.js</text>
+    <rect x="300" y="30" width="160" height="126" rx="8" stroke-width="0.5"/>
+    <text class="title" x="380" y="73">web</text>
+    <text class="sub" x="380" y="93">Next.js</text>
+    <text class="sub" x="380" y="111">/o PWA, /panel</text>
   </g>
   <g class="core" text-anchor="middle" dominant-baseline="central">
     <rect x="300" y="180" width="160" height="100" rx="8" stroke-width="0.5"/>

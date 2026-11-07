@@ -5,13 +5,15 @@
 - Spring Boot owns business rules, authentication, authorization, tenant
   isolation, persistence, browser and external APIs, SSE, Web Push, webhooks,
   and outbox processing.
-- Keep REST as the boundary between frontends, External Integrations, and the
+- Keep REST as the boundary between the web application, External Integrations, and the
   API. Browser families use `/api/{resource-family}/v1`; external families use
   `/api/external/{resource-family}/v1`.
-- Browser-facing API and SSE traffic uses `/api` on the frontend's own origin,
-  so browsers never make cross-origin API requests and the API has no CORS
-  policy. NGINX routes it in production; `next dev` proxies it locally. The
-  separate API hostname serves External Integrations, webhooks and metrics.
+- One origin serves the public pages, the customer PWA under `/o`, the staff
+  panel under `/panel` and the API under `/api`
+  ([path map](../requirements/routing-releases.md#local-and-hosted-routing)).
+  Browsers never make cross-origin API requests and the API has no CORS
+  policy. NGINX routes `/api` in production; `next dev` proxies it locally.
+  External Integrations and metrics use `/api` on the same origin.
 - Frontends use small handwritten request modules and response types with
   native `fetch`. Use SWR for REST-backed client state and Zod for
   frontend-owned input and event validation.

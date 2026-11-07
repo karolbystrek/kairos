@@ -6,11 +6,11 @@ Use [the production runbook](RUNBOOK.md) for prerequisites and the sequence.
 
 ## Choose and prepare the host
 
-Record the provider, supported Linux release, region, capacity, three hostnames
-under one parent domain, administrator access path, and operational owner.
+Record the provider, supported Linux release, region, capacity, the application
+hostname, administrator access path, and operational owner.
 AWS Lightsail is a possible provider, not a requirement. Use x86-64 to match
 `linux/amd64` images. Allow memory/CPU/disk headroom for PostgreSQL,
-Java and both frontends; the overlay's limits are bounds, not a VM sizing target.
+Java and the web application; the overlay's limits are bounds, not a VM sizing target.
 
 Install Docker Engine and its Compose plugin using the
 [official distribution instructions](https://docs.docker.com/engine/install/).

@@ -3,18 +3,28 @@
 ## Local and hosted routing
 
 Production Compose (`compose.yaml` plus `compose.production.yaml`) uses NGINX
-HTTPS ingress. Application and data services do not publish host ports. Browser
-REST and SSE requests use `/api` on the customer or panel hostname they were
-loaded from, which the gateway forwards to the API, so the browser stays
-same-origin. Local development adds `compose.local.yaml`: all five services run
-in Docker with hot reload, publishing only loopback ports over HTTP. There is no
-local gateway; `next dev` proxies `/api` to the API (`API_PROXY_URL`, default
-`http://localhost:8080`).
+HTTPS ingress. Application and data services do not publish host ports. One
+Next.js application (`apps/web`, Compose service `web`) serves customers and
+staff from one origin, `kairos.karolbystrek.pl`. Browser REST and SSE requests
+use `/api` on that origin, which the gateway forwards to the API, so the browser
+stays same-origin. Local development adds `compose.local.yaml`: all four
+services run in Docker with hot reload, publishing only loopback ports over
+HTTP. There is no local gateway; `next dev` proxies `/api` to the API
+(`API_PROXY_URL`, default `http://localhost:8080`).
 
-* Frontend images contain no deployment-specific URLs. The frontends read
-  `CUSTOMER_APP_URL` and `PANEL_APP_URL` at request time, for canonical URLs,
-  sitemaps, share images, order QR codes and cross-app links, so their pages
-  render per request. Local development uses the committed localhost values in
+| Path | Purpose |
+| --- | --- |
+| `/`, `/regulamin`, `/prywatnosc` | Public landing and legal pages |
+| `/o`, `/o/scan`, `/o/{trackingReference}` | Customer PWA: launcher, QR scanner, order tracking |
+| `/panel/...` | Staff authentication, account and location-scoped work |
+| `/api/...` | API, including `/api/external/...` and bearer-protected `/api/actuator/prometheus` |
+
+URLs follow tenant, locations, orders; the staff session supplies the tenant,
+so it never appears in a URL. Old hostnames and paths are not redirected.
+
+* Images contain no deployment-specific URLs. The web application and the API
+  read `APP_URL` at request time, for canonical URLs, sitemaps, share images,
+  order QR codes and emailed links, so pages render per request. Local development uses the committed localhost values in
   frontend development settings and the local Compose overlay. Production
   configures public URLs and exact gateway hostnames in the root environment
   file. `.env.example` records the local configuration surface and
@@ -22,12 +32,12 @@ local gateway; `next dev` proxies `/api` to the API (`API_PROXY_URL`, default
 * The API has no CORS policy: browsers only call their own origin, and External
   Integration and management clients are not browsers. Next.js services render
   frontend concerns only.
-* NGINX rejects unknown hosts and forwards only the dedicated bearer-protected
-  Prometheus Actuator resource, on the API hostname only; other management
-  resources stay limited to container-internal health checks. Every hostname
-  forwards `/api/` through `nginx/api-locations.conf`, so throttling, SSE
-  buffering and management blocking are identical on all of them. The API
-  hostname serves nothing else.
+* NGINX serves only `KAIROS_APP_HOST` and rejects every other host, including
+  the retired panel and API hostnames. It forwards `/api/` through
+  `nginx/api-locations.conf` (throttling, SSE buffering and management
+  blocking) and only the dedicated bearer-protected Prometheus Actuator
+  resource; other management resources stay limited to container-internal
+  health checks. Every other path goes to the web application.
 * NGINX and applications share the gateway network. Only the API also joins the
   internal data network containing PostgreSQL and Redis.
 * NGINX does not trust supplied forwarding headers, except the Cloudflare client
@@ -45,8 +55,10 @@ local gateway; `next dev` proxies `/api` to the API (`API_PROXY_URL`, default
   (guests on one restaurant Wi-Fi share an IP); the API refuses a sixth concurrent stream for one tracking reference with HTTP 429.
 * Request-body, header, connection, and timeout bounds apply. Customer and staff SSE disable
   proxy buffering and use a read timeout longer than the 30-minute emitter lifetime.
-* The customer and panel hosts add HSTS, `X-Content-Type-Options: nosniff`,
-  `X-Frame-Options: DENY` and an enforcing `Content-Security-Policy`; the API sends the same through Spring Security.
+* NGINX adds HSTS, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`,
+  an enforcing `Content-Security-Policy` and `Permissions-Policy` to every
+  path, varying them per path group as described in
+  [hosted ingress](hosted-ingress.md#single-origin-path-groups); the API sends the same through Spring Security.
 * `compose.yaml` owns PostgreSQL and Redis; `compose.local.yaml` adds development
   application builds, source mounts and isolated dependency/build volumes.
   Next.js provides Fast Refresh; the API development image uses `watchexec`
@@ -68,7 +80,7 @@ local gateway; `next dev` proxies `/api` to the API (`API_PROXY_URL`, default
 GitHub Actions validates pull requests and `main` with frontend lint, type checks,
 configured tests and production `npm run build`, and the complete Maven `verify`
 lifecycle, and validates the production and development Compose files. Pull
-requests and other branches build all three images without pushing them,
+requests and other branches build both images without pushing them,
 reusing image build caches from `main`. Builds take no URL or environment
 inputs, so one image serves any deployment. Main CI keeps dependency and image
 caches warm for pull requests.
@@ -80,12 +92,12 @@ and service. An existing full-revision tag is kept unchanged and never rebuilt,
 because a rebuild changes digests. Deployment neither reruns CI nor builds
 images; its `Publish release` job fails with a clear message when the images
 for the dispatch revision are not published yet, then pulls and inspects
-all three images for the matching source-revision label and a repository-owned
+both images for the matching source-revision label and a repository-owned
 GHCR registry digest before uploading the `release-manifest` artifact. Failed or
 incomplete publication cannot produce an eligible release.
 
 That artifact contains `release.json` with a full 40-character lowercase Git
-`revision` and `images` entries for `customer-app`, `panel-app`, and `api`, each
+`revision` and `images` entries for `web` and `api`, each
 using `ghcr.io/karolbystrek/kairos/<service>@sha256:<64 lowercase hex>`.
 `release.tar.gz` contains the same manifest plus the exact checkout's shared and
 hosted Compose files, both NGINX configuration files, the PostgreSQL entrypoint
@@ -139,7 +151,7 @@ job. The upload activates the complete bundle at `/srv/kairos/releases/<revision
 from a private temporary directory, retaining existing revision directories;
 a retry requires an identical archive. It invokes the bundled host command with
 `/srv/kairos/production.env` and retains the host deployment lock. Actions reports
-the validated revision, three digests and deployment result without credentials.
+the validated revision, both digests and deployment result without credentials.
 The host needs GNU `tar`, `mv`, and `cmp` alongside the deployment prerequisites.
 Main-only Environment protection and operator secrets must be provisioned
 before releases are allowed; the workflow cannot install those protections.
@@ -159,7 +171,7 @@ deployment.
 
 The command validates the complete repository-owned digest manifest and resolved
 hosted Compose configuration before container mutation. A release-owned JSON
-Compose override pins all three application images to their recorded digests.
+Compose override pins both application images to their recorded digests.
 The Compose project is always `kairos`, preserving named volumes across release
 directories. A nonblocking host-wide `flock` at `/srv/kairos/deploy.lock` rejects
 concurrent deployments; Python's stdlib `fcntl.flock` provides the lock without
@@ -170,12 +182,13 @@ starting the API. Fresh PostgreSQL initializes the restricted database roles
 through its standard entrypoint; Spring Flyway applies migrations automatically. Existing database volumes do
 not rerun initialization; see [database initialization](../deployment/DATABASE.md).
 Ordinary deployment never resets volumes or repairs Flyway history. Only after API health
-passes does it replace the frontends and recreate NGINX so configuration bind
-mounts follow the deployed revision. Each readiness stage has a 300-second bound;
+passes does it replace the web application and recreate NGINX so configuration
+bind mounts follow the deployed revision; the NGINX step also removes containers
+of services the release no longer defines. Each readiness stage has a 300-second bound;
 bootstrap execution has a 360-second bound and image pulls a 900-second bound.
 Compose's internal health checks include the actual API Actuator endpoint.
 
-Public HTTPS probes require `200` from both frontend roots and the API CSRF
+Public HTTPS probes require `200` from the application root and the API CSRF
 endpoint, including a nonempty application CSRF token. Probes use normal TLS
 verification, direct DNS-routed requests without local proxies or redirects, and
 at most five attempts
@@ -197,7 +210,8 @@ Each attempt snapshots the supplied environment under `/srv/kairos/environments`
 directory and snapshot path, plus the preceding distinct successful release;
 retrying the same revision retains that preceding recovery point. Legacy
 image-only metadata cannot safely restore configuration: one successful
-hardened deployment establishes full recovery. External keys, certificates and
+hardened deployment establishes full recovery. Releases from before the
+single-origin merge ran other services, so they are not rollback targets either. External keys, certificates and
 database credentials must remain compatible; snapshots preserve references,
 not copies of those external resources. Use the bounded
 [release/image cleanup procedure](../deployment/MAINTENANCE.md#bounded-release-and-image-cleanup)

@@ -25,18 +25,23 @@ REST and SSE tracking remains the primary experience.
 
 ### Frontend applications
 
-Both frontends use Next.js 16, React 19, TypeScript, Tailwind CSS 4, HeroUI 3,
-and Phosphor Icons. They remain separate because they serve different audiences
-and have different authentication, PWA, caching, and release concerns. The
-customer application uses a custom TypeScript service worker built with Serwist
-in configurator mode and owns its offline snapshots in IndexedDB.
+One Next.js 16 application (`apps/web`) serves customers and staff from one
+origin, built with React 19, TypeScript, Tailwind CSS 4, HeroUI 3 and Phosphor
+Icons. The landing page and terms live at `/` and `/regulamin`, the customer
+PWA under `/o/` with its privacy notice at `/prywatnosc`, and the staff panel
+under `/panel`. Customer and staff pages use separate root layouts and
+stylesheets, so navigating between them is a full page load. The customer PWA
+uses a custom TypeScript service worker built with Serwist in configurator
+mode, served from `/o/sw.js` with scope `/o/`, so it never controls or caches
+the landing page, the panel or the API outside customer pages; it owns its
+offline snapshots in IndexedDB.
 
-Both frontends share one coherent, Apple-inspired web design language while
+Customer and staff pages share one coherent, Apple-inspired web design language while
 retaining browser-native behavior. Differences in information density reflect
 the customer and staff tasks rather than different brand or role-specific
 styling. The **Kairos** name is the only visual-brand artifact that must be
 preserved during the redesign; icons, colors, typography and other visual
-assets may be replaced. The visual system itself lives in each application's
+assets may be replaced. The visual system itself lives in the application's
 shared stylesheet and components rather than in these requirements.
 
 #### Appearance and popup behavior
@@ -62,7 +67,7 @@ creation while its request is pending does not cancel accepted email delivery.
 Success revalidates invitation history; no link or once-revealed secret is
 displayed in the panel.
 
-Both frontends provide one Dark mode toggle. Until it is first pressed, the
+Customer and staff pages provide one Dark mode toggle. Until it is first pressed, the
 appearance follows the browser's color-scheme preference; pressing it stores an
 explicit Light or Dark choice. Each browser stores its own preference;
 appearance is not account data and does not synchronize between devices. The
@@ -84,17 +89,17 @@ The staff panel is designed primarily for tablet use, especially 11- to
 14-inch touch-and-pointer devices, while remaining complete and responsive on
 desktop and mobile; mobile staff use is expected to be infrequent. Staff roles
 use the same interface; capabilities determine which operations are available.
-Product copy in both frontends is Polish, and layouts must tolerate long labels.
+Product copy is Polish, and layouts must tolerate long labels.
 
 #### Frontend state and API ownership
 
-HeroUI is the component library for both applications. Zod validates frontend-owned form input and server-sent event payloads. Native `fetch` is the HTTP transport inside small handwritten REST request modules. SWR manages REST-backed client state in both frontends where caching, request deduplication, mutations, focus revalidation, or reconnect revalidation applies. React effects are reserved for synchronization with external systems rather than routine REST request orchestration.
+HeroUI is the component library. Zod validates frontend-owned form input and server-sent event payloads. Native `fetch` is the HTTP transport inside small handwritten REST request modules. SWR manages REST-backed client state where caching, request deduplication, mutations, focus revalidation, or reconnect revalidation applies. React effects are reserved for synchronization with external systems rather than routine REST request orchestration.
 
 The Spring API retains domain authority. Frontend controls and redirects provide user experience, while the backend enforces authorization.
 
 #### Search indexing and link previews
 
-Only public service information is indexable: the panel landing page, terms and privacy policy, and the customer home and privacy notice. Each has a canonical URL, Polish Open Graph metadata and a generated preview image, and appears in its application's sitemap. Order pages, order manifests, scanning, the offline fallback, login, registration and the dashboard carry `noindex, nofollow`; order pages and manifests also send `X-Robots-Tag`. `robots.txt` does not block private paths, so crawlers can read their noindex rules. Order-page titles and previews are generic and never include the tracking reference, order label or status. Absolute URLs come from the runtime `CUSTOMER_APP_URL` and `PANEL_APP_URL` settings. Structured data and ranking work are out of scope.
+Only public service information is indexable: the landing page `/`, the terms `/regulamin`, the staff privacy policy `/panel/prywatnosc`, the customer home `/o/` and the customer privacy notice `/prywatnosc`. Each has a canonical URL, Polish Open Graph metadata and the landing page's generated preview image, and appears in the one sitemap. Order pages, order manifests, scanning, the offline fallback, login, registration and the dashboard carry `noindex, nofollow`; every path below `/o/` also sends `X-Robots-Tag`. `robots.txt` does not block private paths, so crawlers can read their noindex rules. Order-page titles and previews are generic and never include the tracking reference, order label or status. Absolute URLs come from the runtime `APP_URL` setting. Structured data and ranking work are out of scope.
 
 ### Backend
 

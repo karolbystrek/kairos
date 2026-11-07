@@ -1,9 +1,8 @@
 # Selected by ./setup.sh --dev. Applications and their build tools stay in Docker.
 services:
-  customer-app:
+  web:
     build:
-      context: ./apps/customer-app
-      dockerfile: ../panel-app/Dockerfile
+      context: ./apps/web
       target: development
     # next dev grows until the Docker VM kills it; come back instead of staying down.
     restart: unless-stopped
@@ -13,38 +12,13 @@ services:
     environment:
       API_PROXY_URL: http://api:8080
     volumes:
-      - ./apps/customer-app:/app
-      - customer_node_modules:/app/node_modules
-      - customer_next:/app/.next
+      - ./apps/web:/app
+      - web_node_modules:/app/node_modules
+      - web_next:/app/.next
     networks:
       - data
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/ || exit 1"]
-      interval: 30s
-      timeout: 5s
-      retries: 30
-      start_period: 60s
-
-  panel-app:
-    build:
-      context: ./apps/panel-app
-      dockerfile: Dockerfile
-      target: development
-    # next dev grows until the Docker VM kills it; come back instead of staying down.
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:3001:3001"
-    # next dev proxies /api here, as NGINX does in production.
-    environment:
-      API_PROXY_URL: http://api:8080
-    volumes:
-      - ./apps/panel-app:/app
-      - panel_node_modules:/app/node_modules
-      - panel_next:/app/.next
-    networks:
-      - data
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3001/ || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 30
@@ -66,8 +40,7 @@ services:
       REDIS_PORT:
       REDIS_PASSWORD:
       KAIROS_SECRETS_DIRECTORY: /run/secrets
-      CUSTOMER_APP_URL: http://localhost:3000
-      PANEL_APP_URL: http://localhost:3001
+      APP_URL: http://localhost:3000
       VAPID_SUBJECT:
       WEBHOOK_DESTINATION_POLICY: LOCAL_DEVELOPMENT
       PUSH_DESTINATION_POLICY: PUBLIC_HTTPS
@@ -113,8 +86,6 @@ secrets:
     file: ${KAIROS_APPLICATION_SECRETS_DIRECTORY:-./secrets}/push-subscription-encryption.bin
 
 volumes:
-  customer_node_modules:
-  customer_next:
-  panel_node_modules:
-  panel_next:
+  web_node_modules:
+  web_next:
   api_maven:

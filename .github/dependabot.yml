@@ -8,14 +8,7 @@ updates:
       actions:
         patterns: ["*"]
   - package-ecosystem: npm
-    directory: /apps/panel-app
-    schedule:
-      interval: weekly
-    groups:
-      npm:
-        patterns: ["*"]
-  - package-ecosystem: npm
-    directory: /apps/customer-app
+    directory: /apps/web
     schedule:
       interval: weekly
     groups:
@@ -28,9 +21,8 @@ updates:
     groups:
       maven:
         patterns: ["*"]
-  # The customer app builds from the panel app Dockerfile.
   - package-ecosystem: docker
-    directories: [/apps/api, /apps/panel-app]
+    directories: [/apps/api, /apps/web]
     schedule:
       interval: weekly
     groups:

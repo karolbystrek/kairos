@@ -57,8 +57,8 @@ outside the VPS for a fresh rebuild; runtime configuration already lives in GitH
 | `KAIROS_DB_RUNTIME_USER`, `KAIROS_DB_RUNTIME_PASSWORD` | Restricted application datasource role; separate unique role/password |
 | `POSTGRES_HOST` | `postgres`, the Compose service name the API connects to |
 | `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD` | `redis`, `6379`, and a unique strong password |
-| `CUSTOMER_APP_URL`, `PANEL_APP_URL` | `https://` site URLs without path/query/fragment; match the exact gateway hosts; read at runtime by the API and frontends |
-| `KAIROS_CUSTOMER_APP_HOST`, `KAIROS_PANEL_APP_HOST`, `KAIROS_API_HOST` | Three distinct hostnames only; chosen customer, panel and API names |
+| `APP_URL` | `https://` origin without path/query/fragment, matching `KAIROS_APP_HOST`; read at runtime by the API and web application |
+| `KAIROS_APP_HOST` | The one hostname NGINX serves; every other host is rejected |
 | `KAIROS_SECRETS_DIRECTORY` | `/run/secrets`, where the API reads the mounted secret files in its container |
 | `KAIROS_APPLICATION_SECRETS_DIRECTORY`, `KAIROS_TLS_DIRECTORY` | `/srv/kairos/secrets`, `/srv/kairos/tls`; Compose file secrets mounted read-only under `/run/secrets/` (local default `./secrets`) |
 | `WEBHOOK_DESTINATION_POLICY`, `PUSH_DESTINATION_POLICY` | Both `PUBLIC_HTTPS`; never carry the local webhook relaxation into production |

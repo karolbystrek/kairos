@@ -31,7 +31,7 @@ class UploadTests(unittest.TestCase):
         self.bin.mkdir()
         self.manifest = {'revision': REVISION, 'images': {
             service: f'ghcr.io/karolbystrek/kairos/{service}@sha256:' + 'b' * 64
-            for service in ('customer-app', 'panel-app', 'api')}}
+            for service in ('web', 'api')}}
         self.bundle()
         fake = '''#!/usr/bin/env python3
 import json, os, pathlib, subprocess, sys

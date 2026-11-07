@@ -583,7 +583,8 @@ class CustomerPushSubscriptionIntegrationTests extends RedisListenerIsolatedInte
         assertThat(count("customer_push_enrollments")).isZero();
         var claimed = claimService.claimAvailable();
         assertThat(claimed).hasSize(1);
-        assertThat(claimed.getFirst().payload()).contains("\"status\":\"" + terminalStatus + "\"");
+        assertThat(claimed.getFirst().payload()).contains("\"status\":\"" + terminalStatus + "\"")
+                .contains("\"orderUrl\":\"/o/" + order.trackingReference() + "\"");
     }
 
     private OrderView createOrder() {

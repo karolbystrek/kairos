@@ -71,9 +71,8 @@ kairos:
     encryption-key-location: "file:${KAIROS_SECRETS_DIRECTORY:/run/secrets}/email-encryption.bin"
   monitoring:
     token-location: "${KAIROS_MONITORING_TOKEN_LOCATION:file:/run/secrets/metrics-token}"
-  origins:
-    customer: "${CUSTOMER_APP_URL}"
-    panel: "${PANEL_APP_URL}"
+  app:
+    url: "${APP_URL}"
   authentication:
     email-verification-enabled: ${EMAIL_VERIFICATION_ENABLED:true}
     sign-in-throttle:

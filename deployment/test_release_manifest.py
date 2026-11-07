@@ -10,7 +10,7 @@ import unittest
 
 SCRIPT = Path(__file__).with_name("release_manifest.py")
 REVISION = "a" * 40
-SERVICES = ("customer-app", "panel-app", "api")
+SERVICES = ("web", "api")
 
 
 class ReleaseManifestTest(unittest.TestCase):

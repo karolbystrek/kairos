@@ -1,12 +1,13 @@
 # Kairos
 
 A virtual pager for restaurants. Customers scan a QR code to follow their
-order without an account or app; staff manage orders in a separate panel, and
-point-of-sale systems integrate through a REST API and webhooks.
+order without an account or app; staff manage orders in the panel, and
+point-of-sale systems integrate through a REST API and webhooks. Everything is
+served from one origin.
 
-* `apps/customer-app`: customer Next.js PWA
-* `apps/panel-app`: staff Next.js panel
-* `apps/api`: Spring Boot API
+* `apps/web`: Next.js application: landing page, customer PWA under `/o`, staff
+  panel under `/panel`
+* `apps/api`: Spring Boot API under `/api`
 
 ## Architecture
 
@@ -24,7 +25,7 @@ Requires [Docker](https://docs.docker.com/get-docker/) with Compose 2.30+ and Op
 ./setup.sh --dev
 ```
 
-Customer app: http://localhost:3000, panel: http://localhost:3001,
+Customer app: http://localhost:3000/o, panel: http://localhost:3000/panel,
 API: http://localhost:8080/api. More in [local development](docs/agents/local-development.md).
 
 ## Documentation

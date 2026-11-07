@@ -11,7 +11,7 @@ import time
 from urllib.parse import urlsplit
 
 STATE_DIRECTORY = Path("/srv/kairos")
-SERVICES = ("customer-app", "panel-app", "api")
+SERVICES = ("web", "api")
 REVISION = r"[0-9a-f]{40}"
 IMAGE_DIGEST = r"ghcr\.io/karolbystrek/kairos/%s@sha256:[0-9a-f]{64}"
 RUNTIME_FILES = (
@@ -56,7 +56,7 @@ def inputs(arguments):
     if not isinstance(revision, str) or not re.fullmatch(REVISION, revision):
         raise ValidationError("invalid release revision")
     if not isinstance(images, dict) or set(images) != set(SERVICES):
-        raise ValidationError("release requires exactly three application images")
+        raise ValidationError("release requires exactly the web and API images")
     for service, image in images.items():
         if not isinstance(image, str) or not re.fullmatch(IMAGE_DIGEST % service, image):
             raise ValidationError("invalid repository-owned image digest")
@@ -96,17 +96,10 @@ def configuration(config, release, images):
     if any(api.get(name) != "PUBLIC_HTTPS" for name in ("WEBHOOK_DESTINATION_POLICY", "PUSH_DESTINATION_POLICY")):
         raise ValidationError("hosted delivery policies must require public HTTPS")
     gateway = services["nginx"]["environment"]
-    for origin_key, host_key in (
-        ("CUSTOMER_APP_URL", "KAIROS_CUSTOMER_APP_HOST"),
-        ("PANEL_APP_URL", "KAIROS_PANEL_APP_HOST"),
-    ):
-        url = urlsplit(api[origin_key])
-        if (url.scheme != "https" or not url.hostname or url.netloc != gateway[host_key]
-                or url.path not in ("", "/") or url.query or url.fragment or url.username):
-            raise ValidationError("public HTTPS origins must match exact gateway hostnames")
-    origins = [f"https://{gateway[key]}" for key in ("KAIROS_CUSTOMER_APP_HOST", "KAIROS_PANEL_APP_HOST", "KAIROS_API_HOST")]
-    if len(set(origins)) != 3:
-        raise ValidationError("three distinct public hostnames are required")
+    url = urlsplit(api["APP_URL"])
+    if (url.scheme != "https" or not url.hostname or url.netloc != gateway["KAIROS_APP_HOST"]
+            or url.path not in ("", "/") or url.query or url.fragment or url.username):
+        raise ValidationError("APP_URL must be the HTTPS origin of the exact gateway hostname")
     # Compose file secrets are read-only binds; persistent key/certificate
     # material must already exist outside the checkout at an absolute path.
     for name, secret in config["secrets"].items():
@@ -121,7 +114,7 @@ def configuration(config, release, images):
                 raise ValidationError("external TLS certificate and key are required")
         elif not source.is_file():
             raise ValidationError("application key secrets must be regular files")
-    return origins
+    return f"https://{gateway['KAIROS_APP_HOST']}"
 
 
 def probe(url, env, csrf=False):
@@ -162,7 +155,7 @@ def rollout(release, env_file, manifest, base_env, report):
                "-f", str(release / "compose.production.yaml"), "-f", str(override)]
     report("Compose validation")
     resolved = json.loads(command([*compose, "config", "--format", "json", "--no-path-resolution"], env, capture=True, timeout=60))
-    origins = configuration(resolved, release, manifest["images"])
+    origin = configuration(resolved, release, manifest["images"])
     report("pull")
     command([*compose, "pull", "--policy", "missing"], env)
     up = [*compose, "up", "--no-deps", "--no-build", "--pull", "never"]
@@ -170,8 +163,8 @@ def rollout(release, env_file, manifest, base_env, report):
     for stage, args in (
         ("postgres/redis", [*healthy, "postgres", "redis"]),
         ("api", [*healthy, "--force-recreate", "api"]),
-        ("frontends", [*healthy, "--force-recreate", "customer-app", "panel-app"]),
-        ("nginx", [*healthy, "--force-recreate", "nginx"]),
+        ("web", [*healthy, "--force-recreate", "web"]),
+        ("nginx", [*healthy, "--force-recreate", "--remove-orphans", "nginx"]),
     ):
         report(stage)
         print(f"Deployment stage: {stage}", flush=True)
@@ -185,14 +178,10 @@ def rollout(release, env_file, manifest, base_env, report):
             except (subprocess.SubprocessError, OSError):
                 pass  # The stage failure below is the error that matters.
             raise
-    report("customer HTTPS probe")
-    probe(origins[0] + "/", env)
-    report("panel HTTPS probe")
-    probe(origins[1] + "/", env)
-    report("panel same-origin API CSRF HTTPS probe")
-    probe(origins[1] + "/api/auth/v1/csrf", env, csrf=True)
+    report("web HTTPS probe")
+    probe(origin + "/", env)
     report("API CSRF HTTPS probe")
-    probe(origins[2] + "/api/auth/v1/csrf", env, csrf=True)
+    probe(origin + "/api/auth/v1/csrf", env, csrf=True)
 
 
 def previous_release():
@@ -210,6 +199,9 @@ def previous_release():
         if "previous" in record and (not isinstance(record["previous"], dict)
                 or set(record["previous"]) != {"revision", "images", "release_directory", "env_file"}):
             raise ValidationError("invalid previous recovery metadata")
+        # Releases from before the single-origin merge ran other services and cannot be restored.
+        if set(record["images"]) != set(SERVICES):
+            return None
         release = Path(record["release_directory"])
         snapshot = Path(record["env_file"])
         if (snapshot.is_symlink() or not snapshot.is_absolute()

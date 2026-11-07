@@ -48,7 +48,7 @@ The current walking vertical slice is implemented for local development:
 * one API configuration with externally supplied private keys;
 * repository-owned local setup for configuration, complete key validation,
   restrictive permissions, and explicit existing-key handling;
-* production hostname-routing NGINX HTTPS ingress, unbuffered SSE, internal health
+* production single-origin NGINX HTTPS ingress with per-path security headers, unbuffered SSE, internal health
   paths, health-gated dependencies, persistent PostgreSQL,
   and nondurable Redis;
 * restricted PostgreSQL runtime identity, transaction-local tenant/location and

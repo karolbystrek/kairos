@@ -58,12 +58,12 @@ service; existing explicit approval remains valid within its stated scope.
 - `compose.yaml`: shared infrastructure (PostgreSQL, Redis) on loopback ports;
   `compose.production.yaml` adds the application images and NGINX HTTPS ingress.
   `compose.local.yaml` adds the complete Docker development stack with hot reload.
-  Applications own their manifests and Dockerfiles; the two frontends share
-  `apps/panel-app/Dockerfile`.
+  Applications own their manifests and Dockerfiles: `apps/web` (customers and
+  staff on one origin) and `apps/api`.
 
 ## Local development
 
-- `./setup.sh --dev`: first run; prepares config and keys, starts all five
+- `./setup.sh --dev`: first run; prepares config and keys, starts all four
   services in Docker with hot reload. `--prod` selects production instead.
 - `docker compose up --build -d`: start or rebuild the selected mode.
 - `docker compose stop`: stop and keep data; `docker compose logs -f`: follow logs.

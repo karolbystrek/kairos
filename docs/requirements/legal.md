@@ -15,9 +15,9 @@ electronic service.
 
 | Document | Route | Audience |
 | --- | --- | --- |
-| Regulamin | panel `/regulamin` | Restaurants and staff |
-| Polityka prywatności | panel `/polityka-prywatnosci` | Staff and landing visitors |
-| Prywatność | customer `/prywatnosc` | Restaurant customers |
+| Regulamin | `/regulamin` | Restaurants and staff |
+| Polityka prywatności | `/panel/prywatnosc` | Staff and landing visitors |
+| Prywatność | `/prywatnosc` | Restaurant customers |
 
 - The operator (Karol Bystrek) is the **controller** of staff account,
   invitation, session and contact data.

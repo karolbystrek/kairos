@@ -2,14 +2,14 @@
 
 ## Verification and acceptance criteria
 
-* Both frontends build and lint independently.
-* Both frontends expose Light, Dark, and System appearance choices, default to
+* The single frontend application builds, lints and type-checks.
+* Customer and staff pages expose Light, Dark, and System appearance choices, default to
   System, maintain semantic contrast in both resolved appearances, and remain
   usable with reduced motion, increased contrast, keyboard navigation, screen
   readers, and enlarged text at a WCAG 2.2 AA target.
 * A locally selected appearance survives a reload in the same browser without
   becoming account data or synchronizing to another browser.
-* Both frontends use one coherent visual and interaction system. Staff roles do
+* Customer and staff pages use one coherent visual and interaction system. Staff roles do
   not receive different visual styling, while authorization and capabilities
   continue to control available operations.
 * The customer view makes the current order state understandable at a glance,
@@ -176,9 +176,10 @@
 * Committed order changes wake push/webhook fanout and delivery immediately;
   rollback wakes nothing, and five-second recovery preserves multi-instance
   claims, abandoned work and due retries.
-* The customer application exposes a valid globally branded manifest and the
-  required regular, maskable, Apple touch, and favicon assets supplied for the
-  project.
+* The customer application exposes a valid globally branded manifest, scoped
+  to `/o/` with id `/o/`, and the required regular, maskable, Apple touch, and
+  favicon assets supplied for the project. Its service worker at `/o/sw.js`
+  controls only `/o/` pages.
 * Android Chrome and iOS Safari can install the customer application and launch
   it in standalone mode without changing the ordinary desktop-browser
   experience.
@@ -188,14 +189,15 @@
   IndexedDB order snapshots in most-recently-opened order and removes terminal
   orders without allowing a stale response to resurrect them.
 * The default page offers one Scan QR code action with Notifications
-  and Appearance, without an order collection or history. The root route
+  and Appearance, without an order collection or history. The launcher `/o/`
   restores the current unclosed order in browser and installed contexts,
   including terminal orders, and tolerates unavailable or invalid local storage.
 * Active and loading orders expose no Home or close action. Completed and
   canceled orders remain visible until Close order returns to the default page;
   invalid or missing orders provide scanner recovery. Network errors preserve
   the current destination.
-* The in-app scanner accepts only exact customer-origin order URLs, keeps
+* The in-app scanner at `/o/scan` opens with a full page load and accepts only
+  exact same-origin `/o/{trackingReference}` URLs, keeps
   scanning after invalid codes, stops every camera track on exit, supports
   camera switching, retains valid offline scans only in memory for retry, and
   provides device-Camera guidance when browser camera access fails.

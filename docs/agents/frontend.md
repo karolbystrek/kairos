@@ -16,8 +16,9 @@ including typography, status presentation and icon restraint in the following se
 
 - Use HeroUI (`@heroui/react`) for UI components. Charts are the exception:
   use shadcn chart components on Recharts, themed with shared semantic tokens.
-  Each app's `styles/globals.css` imports only the `@heroui/styles` component
-  sheets it renders: when a page starts using another HeroUI component, add its
+  Each root layout's stylesheet (`apps/web/styles/customer.css` for the
+  `(customer)` group, `panel.css` for `(panel)`) imports only the
+  `@heroui/styles` component sheets it renders: when a page starts using another HeroUI component, add its
   sheet and those of the components it composes (its `@heroui/react` source
   imports them from `../<name>/`), in the upstream `components/index.css` order.
 - Use Phosphor Icons (`@phosphor-icons/react`, `*Icon` exports) for interface

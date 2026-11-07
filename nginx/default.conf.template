@@ -3,14 +3,9 @@ server_tokens off;
 # Follow Docker service addresses when application containers are recreated.
 resolver 127.0.0.11 valid=5s ipv6=off;
 
-upstream kairos_customer {
-    zone kairos_customer 64k;
-    server customer-app:3000 resolve;
-}
-
-upstream kairos_panel {
-    zone kairos_panel 64k;
-    server panel-app:3000 resolve;
+upstream kairos_web {
+    zone kairos_web 64k;
+    server web:3000 resolve;
 }
 
 upstream kairos_api {
@@ -94,9 +89,20 @@ server {
     return 444;
 }
 
+# Customer pages share the origin with staff cookies, so only the scanner may use the camera
+# and only customer pages may start blob: workers.
+map $uri $kairos_permissions_policy {
+    default "camera=(), microphone=(), geolocation=(), payment=(), usb=()";
+    ~^/o/scan/?$ "camera=(self), microphone=(), geolocation=(), payment=(), usb=()";
+}
+map $uri $kairos_worker_src {
+    default "'self' blob:";
+    ~^/panel(/|$) "'self'";
+}
+
 server {
     listen ${KAIROS_NGINX_LISTEN};
-    server_name ${KAIROS_CUSTOMER_APP_HOST};
+    server_name ${KAIROS_APP_HOST};
 
     ${KAIROS_NGINX_TLS_CONFIGURATION}
 
@@ -104,50 +110,13 @@ server {
     add_header X-Content-Type-Options "nosniff" always;
     add_header X-Frame-Options "DENY" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-    add_header Permissions-Policy "camera=(self), microphone=(), geolocation=(), payment=(), usb=()" always;
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" always;
-
-    include /etc/nginx/api-locations.conf;
-
-    location / {
-        proxy_pass http://kairos_customer;
-    }
-}
-
-server {
-    listen ${KAIROS_NGINX_LISTEN};
-    server_name ${KAIROS_PANEL_APP_HOST};
-
-    ${KAIROS_NGINX_TLS_CONFIGURATION}
-
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-Frame-Options "DENY" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-    add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()" always;
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" always;
-
-    include /etc/nginx/api-locations.conf;
-
-    location / {
-        proxy_pass http://kairos_panel;
-    }
-}
-
-server {
-    listen ${KAIROS_NGINX_LISTEN};
-    server_name ${KAIROS_API_HOST};
-
-    ${KAIROS_NGINX_TLS_CONFIGURATION}
-
-    # Locations that set their own headers drop these, so they repeat them (add_header does not merge).
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header Referrer-Policy "same-origin" always;
+    add_header Permissions-Policy $kairos_permissions_policy always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; worker-src $kairos_worker_src; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" always;
 
     # Only this management resource reaches its dedicated API authentication chain.
     location = /api/actuator/prometheus {
         proxy_pass http://kairos_api;
+        # Setting a header here drops the server-level ones (add_header does not merge), so restate the essentials.
         add_header Cache-Control "no-store" always;
         add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
         add_header X-Content-Type-Options "nosniff" always;
@@ -157,6 +126,6 @@ server {
     include /etc/nginx/api-locations.conf;
 
     location / {
-        return 404;
+        proxy_pass http://kairos_web;
     }
 }
