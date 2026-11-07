@@ -2,7 +2,7 @@
 
 set -eu
 
-repository_directory="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+repository_directory="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 
 if [ "$#" -ne 0 ]; then
     echo "Usage: $0" >&2
@@ -29,7 +29,7 @@ compose_file="$(cat ${configuration_files} | sed -n 's/^COMPOSE_FILE=//p' | tail
 compose_file="${COMPOSE_FILE:-${compose_file}}"
 case "${compose_file}" in
     *compose.production.yaml*)
-        echo "Refusing to reset: COMPOSE_FILE selects production. reset.sh deletes volumes and keys; it only runs in development." >&2
+        echo "Refusing to reset: COMPOSE_FILE selects production. make reset deletes volumes and keys; it only runs in development." >&2
         exit 1
         ;;
 esac
@@ -61,4 +61,4 @@ rm -f \
 echo "Removed generated keys from ${secrets_directory}."
 
 echo
-echo "Reset complete. Run ./setup.sh --dev (or --prod)."
+echo "Reset complete. Run make dev (or make prod)."

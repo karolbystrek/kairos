@@ -67,13 +67,13 @@ so it never appears in a URL. Old hostnames and paths are not redirected.
   production builds/images, NGINX, private networking and limits. Hosted releases
   use manifest-pinned images with `--no-build`. Redis Pub/Sub is nondurable;
   PostgreSQL data remains persistent.
-* `setup.sh --dev` prepares configuration and keys and starts the entire Docker
-  development stack. `--prod` selects and starts production after checking its
+* `make dev` prepares configuration and keys and starts the entire Docker
+  development stack. `make prod` selects and starts production after checking its
   supplied configuration. Both persist their Compose selection in `.env`.
   Existing credentials, custom configuration and keys are preserved. Copies of
   setup without Compose retain the VM bootstrap's keys-only production behavior.
   Secret directories use `0700` and application key files `0400`. Daily commands
-  and `reset.sh`: [local development](../agents/local-development.md).
+  and `make reset`: [local development](../agents/local-development.md).
 
 ### Validation and immutable publication
 
@@ -232,7 +232,7 @@ It refuses unsupported hosts, invalid public keys and conflicting Docker package
 rather than removing existing infrastructure. Installed packages are retained on
 reruns; upgrades remain deliberately scheduled maintenance.
 
-Host preparation reuses this checkout's `setup.sh --prod`, preserves existing key bytes, rejects invalid/partial key sets, and
+Host preparation reuses this checkout's `scripts/setup.sh --prod`, preserves existing key bytes, rejects invalid/partial key sets, and
 removes temporary setup inputs even on failure. Bootstrap never creates or
 changes `production.env`. The GitHub `production` Environment owns production
 configuration: each deployment writes `/srv/kairos/production.env` atomically
@@ -245,7 +245,7 @@ naming keys only. Values reach the host only
 over the deploy job's SSH connection, never images, bundles or artifacts; image
 build/publish jobs have no Environment access. The local `.env.example` remains
 unchanged.
-Bootstrap does not run `reset.sh`, start applications, configure provider/network
+Bootstrap does not run `make reset`, start applications, configure provider/network
 firewalls, DNS, TLS or GitHub Environment settings. Those remain separate operator
 steps. See [VM bootstrap](../deployment/BOOTSTRAP.md); actual host and repeat-run
 acceptance remain operator verification.

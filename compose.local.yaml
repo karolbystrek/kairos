@@ -1,4 +1,4 @@
-# Selected by ./setup.sh --dev. Applications and their build tools stay in Docker.
+# Selected by make dev. Applications and their build tools stay in Docker.
 services:
   web:
     build:

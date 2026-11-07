@@ -24,7 +24,7 @@ committed `deployment/production.env.example` plus that Environment's values:
 - Values reach the host only over the deploy job's SSH connection, never
   images, release bundles or artifacts.
 
-For a source checkout outside the hosted release workflow, `./setup.sh --prod`
+For a source checkout outside the hosted release workflow, `make prod`
 creates or preserves `.env`, selects the production Compose overlay, and starts
 it once required values and TLS files are supplied. Production source builds use
 the same Dockerfiles; the hosted deployer continues to use pinned images with
@@ -65,7 +65,7 @@ outside the VPS for a fresh rebuild; runtime configuration already lives in GitH
 | `EMAIL_DELIVERY_MODE`, `RESEND_API_KEY` | Hosted mode `RESEND` and a Resend sending key; the API refuses production startup without it. Local/test mode `LOG` sends no mail and logs no message secrets. |
 | `VAPID_SUBJECT` | Operator-owned `mailto:` contact or public HTTPS contact URL |
 | `KAIROS_IMAGE_REGISTRY`, `KAIROS_RELEASE_VERSION` | deploy.py supplies repository registry and manifest revision; operator values are not used for its digest selection |
-| `KAIROS_API_USER` | `uid:gid` the API container runs as so it can read the owner-only secret files; deploy.py and `setup.sh --prod` set it to the current user |
+| `KAIROS_API_USER` | `uid:gid` the API container runs as so it can read the owner-only secret files; deploy.py and `make prod` set it to the current user |
 | `REVIEW_INVITATION_DELAY` | Delay between order completion and the optional Google review invitation; default `30m` |
 | `EMAIL_VERIFICATION_ENABLED` | Not in the template; the API defaults to `true`. Keep verification enabled in production (`false` is for local development) |
 | `NEXT_TELEMETRY_DISABLED` | `1`; disables Next.js telemetry in the frontend images |

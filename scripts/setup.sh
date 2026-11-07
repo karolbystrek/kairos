@@ -2,7 +2,7 @@
 
 set -eu
 
-repository_directory="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)"
+repository_directory="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd -P)"
 environment_example="${repository_directory}/.env.example"
 environment_file="${repository_directory}/.env"
 
@@ -510,7 +510,7 @@ if [ "${checkout_mode}" = true ]; then
         set_environment_value KAIROS_APPLICATION_SECRETS_DIRECTORY "${secrets_directory}"
     fi
     docker compose --project-directory "${repository_directory}" config --quiet ||
-        fail "The ${preset} stack is selected but configuration is incomplete. Update .env and TLS paths, then retry --${preset}; existing values and keys were preserved."
+        fail "The ${preset} stack is selected but configuration is incomplete. Update .env and TLS paths, then retry make ${preset}; existing values and keys were preserved."
     if [ "${preset}" = prod ]; then
         # Preserved development settings must never relax production boundaries.
         docker compose --project-directory "${repository_directory}" config --environment | awk -F= '
@@ -520,11 +520,11 @@ if [ "${checkout_mode}" = true ]; then
             $1 == "APP_URL" && $2 !~ "^https://[^/]+/?$" { invalid=1 }
             $1 ~ /^(POSTGRES_PASSWORD|KAIROS_DB_OWNER_PASSWORD|KAIROS_DB_RUNTIME_PASSWORD|REDIS_PASSWORD)$/ { if ($2 == "" || $2 == example[$1]) invalid=1 }
             END { exit invalid }
-        ' "${repository_directory}/.env.example" - || fail "Production requires an HTTPS APP_URL origin, PUBLIC_HTTPS delivery policies, email verification and non-default database and Redis passwords. Update .env, then retry --prod; existing settings were preserved."
+        ' "${repository_directory}/.env.example" - || fail "Production requires an HTTPS APP_URL origin, PUBLIC_HTTPS delivery policies, email verification and non-default database and Redis passwords. Update .env, then retry make prod; existing settings were preserved."
     fi
     docker compose --project-directory "${repository_directory}" up --build -d --wait
     echo
-    echo "The ${preset} Docker stack is running. Rebuild: docker compose up --build -d"
-    echo "Stop and keep data: docker compose stop"
+    echo "The ${preset} Docker stack is running. Rebuild: make up"
+    echo "Stop and keep data: make stop"
 fi
 trap - EXIT HUP INT TERM

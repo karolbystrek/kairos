@@ -22,7 +22,7 @@ served from one origin.
 Requires [Docker](https://docs.docker.com/get-docker/) with Compose 2.30+ and OpenSSL.
 
 ```bash
-./setup.sh --dev
+make dev
 ```
 
 Customer app: http://localhost:3000/orders, panel: http://localhost:3000/panel,

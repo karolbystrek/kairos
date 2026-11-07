@@ -177,15 +177,15 @@
 
         - name: Copy the setup command from this checkout
           ansible.builtin.copy:
-            src: "{{ playbook_dir }}/../setup.sh"
-            dest: "{{ bootstrap_workspace.path }}/setup.sh"
+            src: "{{ playbook_dir }}/../scripts/setup.sh"
+            dest: "{{ bootstrap_workspace.path }}/scripts/"
             mode: '0600'
 
         - name: Generate or validate application keys without replacing them
           ansible.builtin.command:
             argv:
               - sh
-              - "{{ bootstrap_workspace.path }}/setup.sh"
+              - "{{ bootstrap_workspace.path }}/scripts/setup.sh"
               - --prod
               - --secrets-directory
               - "{{ kairos_directory }}/secrets"

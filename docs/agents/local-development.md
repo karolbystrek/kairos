@@ -14,10 +14,11 @@
 
 ## Setup
 
-Run `./setup.sh --dev` to prepare `.env` and development keys and start the API,
+Run `make dev` to prepare `.env` and development keys and start the API,
 the web application, PostgreSQL and Redis in Docker. No host application commands
 are required. Setup selects `compose.yaml` plus `compose.local.yaml` in `.env`;
-`docker compose up --build -d` subsequently starts or rebuilds that mode.
+`make up` subsequently starts or rebuilds that mode. `make` alone lists the
+commands; `scripts/setup.sh --help` lists the setup options behind them.
 
 - Web application: `http://localhost:3000` (customer PWA under `/orders`, staff
   panel under `/panel`); API: `http://localhost:8080/api`. `next dev` proxies
@@ -29,12 +30,11 @@ are required. Setup selects `compose.yaml` plus `compose.local.yaml` in `.env`;
 - Dependencies and frontend build output use container-owned volumes; API build
   output stays inside its container. Host artifacts do not interfere. Rebuild
   after changing dependency descriptors or Dockerfiles.
-- `docker compose logs -f` follows logs; `docker compose stop` stops all services
-  without deleting data.
-- `./setup.sh --prod` selects `compose.yaml` plus `compose.production.yaml`,
+- `make logs` follows logs; `make stop` stops all services without deleting data.
+- `make prod` selects `compose.yaml` plus `compose.production.yaml`,
   validates the supplied configuration and starts the production stack. Existing
   settings and keys are preserved; supply missing production values and TLS
-  material before retrying. A copied setup script without Compose retains the
+  material before retrying. A copied `scripts/setup.sh` without Compose retains the
   VM bootstrap's keys-only behavior.
 
 ## First start and daily use
@@ -56,7 +56,7 @@ are required. Setup selects `compose.yaml` plus `compose.local.yaml` in `.env`;
     `panel-app` containers; `docker compose up -d --remove-orphans` removes
     them once the user approves.
   - `docker compose ps` shows state and health.
-- `./reset.sh` deletes containers, volumes and keys, without asking
+- `make reset` deletes containers, volumes and keys, without asking
   and refuses to run when `COMPOSE_FILE`, in `.env` or exported in the environment, selects
   production.
 

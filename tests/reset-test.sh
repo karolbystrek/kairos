@@ -4,7 +4,7 @@ set -eu
 repository_directory="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd -P)"
 test_directory="$(mktemp -d "${TMPDIR:-/tmp}/kairos-reset-test.XXXXXX")"
 trap 'rm -rf -- "${test_directory}"' EXIT HUP INT TERM
-cp "${repository_directory}/reset.sh" "${test_directory}/"
+mkdir "${test_directory}/scripts" && cp "${repository_directory}/scripts/reset.sh" "${test_directory}/scripts/"
 mkdir "${test_directory}/bin"
 export KAIROS_TEST_DOCKER="$(command -v docker)"
 cat > "${test_directory}/.env.example" <<'ENV'
@@ -50,11 +50,11 @@ mkdir -p "${test_directory}/secrets"
 keys="$(sed -n 's|.*:-\./secrets}/||p' "${repository_directory}/compose.production.yaml")"
 [ "$(echo "${keys}" | wc -w)" -ge 5 ]
 for key in ${keys}; do echo fixture > "${test_directory}/secrets/${key}"; done
-PATH="${test_directory}/bin:${PATH}" sh "${test_directory}/reset.sh" > "${test_directory}/output"
+PATH="${test_directory}/bin:${PATH}" sh "${test_directory}/scripts/reset.sh" > "${test_directory}/output"
 cmp "${test_directory}/expected-env" "${test_directory}/.env.old"
 [ ! -e "${test_directory}/.env" ]
 for key in ${keys}; do
-    [ ! -e "${test_directory}/secrets/${key}" ] || { echo "reset.sh kept secrets/${key}" >&2; exit 1; }
+    [ ! -e "${test_directory}/secrets/${key}" ] || { echo "make reset kept secrets/${key}" >&2; exit 1; }
 done
 # A production selection is refused before Docker or any file is touched.
 echo 'COMPOSE_FILE="compose.yaml:compose.production.yaml"' > "${test_directory}/.env"
@@ -64,8 +64,8 @@ cat > "${test_directory}/bin/docker" <<'SH'
 echo "docker must not run for production" >&2
 exit 99
 SH
-if PATH="${test_directory}/bin:${PATH}" sh "${test_directory}/reset.sh" > "${test_directory}/output" 2> "${test_directory}/error"; then
-    echo "reset.sh ran against production" >&2; exit 1
+if PATH="${test_directory}/bin:${PATH}" sh "${test_directory}/scripts/reset.sh" > "${test_directory}/output" 2> "${test_directory}/error"; then
+    echo "make reset ran against production" >&2; exit 1
 fi
 grep -q 'Refusing to reset' "${test_directory}/error"
 [ -f "${test_directory}/.env" ] && [ -f "${test_directory}/secrets/webhook-encryption.bin" ]
