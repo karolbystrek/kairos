@@ -127,7 +127,7 @@ jobs:
           ansible-playbook -i deployment/inventory.example.ini deployment/bootstrap.yml --syntax-check
           sh tests/bootstrap-test.sh
 
-      - name: Test gateway and secret preservation
+      - name: Test gateway
         run: |
           python3 tests/gateway-test.py
 
