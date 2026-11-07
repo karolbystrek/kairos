@@ -63,9 +63,8 @@ service; existing explicit approval remains valid within its stated scope.
 
 ## Local development
 
-- `make dev`: first run; prepares config and keys, starts all four services in
-  Docker with hot reload. `make prod` selects production instead.
-- `make up`: start or rebuild the selected mode.
+- `make dev`: creates missing config and keys, then starts or rebuilds all four
+  services in Docker with hot reload.
 - `make stop`: stop and keep data; `make logs`: follow logs.
 - `make reset`: delete containers, volumes and keys; refuses production; run only
   when the user asks.

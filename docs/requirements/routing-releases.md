@@ -67,11 +67,8 @@ so it never appears in a URL. Old hostnames and paths are not redirected.
   production builds/images, NGINX, private networking and limits. Hosted releases
   use manifest-pinned images with `--no-build`. Redis Pub/Sub is nondurable;
   PostgreSQL data remains persistent.
-* `make dev` prepares configuration and keys and starts the entire Docker
-  development stack. `make prod` selects and starts production after checking its
-  supplied configuration. Both persist their Compose selection in `.env`.
-  Existing credentials, custom configuration and keys are preserved. Copies of
-  setup without Compose retain the VM bootstrap's keys-only production behavior.
+* `make dev` creates missing configuration and keys and starts the entire
+  Docker development stack. Existing configuration and keys are never replaced.
   Secret directories use `0700` and application key files `0400`. Daily commands
   and `make reset`: [local development](../agents/local-development.md).
 
@@ -232,8 +229,8 @@ It refuses unsupported hosts, invalid public keys and conflicting Docker package
 rather than removing existing infrastructure. Installed packages are retained on
 reruns; upgrades remain deliberately scheduled maintenance.
 
-Host preparation reuses this checkout's `scripts/setup.sh --prod`, preserves existing key bytes, rejects invalid/partial key sets, and
-removes temporary setup inputs even on failure. Bootstrap never creates or
+Host preparation generates each missing application key with OpenSSL and
+preserves existing key bytes; it does not validate existing keys. Bootstrap never creates or
 changes `production.env`. The GitHub `production` Environment owns production
 configuration: each deployment writes `/srv/kairos/production.env` atomically
 (mode `0600`) from repository-owned `deployment/production.env.example` plus

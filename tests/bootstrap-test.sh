@@ -55,21 +55,5 @@ for path in [root, root/'secrets', root/'releases', root/'tls']:
     assert stat.S_IMODE(path.stat().st_mode) == 0o700, path
 for path in (root/'secrets').iterdir():
     assert stat.S_IMODE(path.stat().st_mode) == 0o400, path
-assert not list(root.glob('.bootstrap.*')), 'Temporary setup files leaked'
 PY
-# Invalid material must fail rather than silently regenerating credentials.
-chmod 0600 "$test_directory/host/secrets/webhook-encryption.bin"
-printf '%s' broken > "$test_directory/host/secrets/webhook-encryption.bin"
-if run_configuration; then
-    echo 'Bootstrap accepted an invalid key set.' >&2
-    exit 1
-fi
-cmp "$test_directory/expected.env" "$test_directory/host/production.env"
-test "$(cat "$test_directory/host/secrets/webhook-encryption.bin")" = broken
-rm "$test_directory/host/secrets/vapid-public.pem"
-if run_configuration; then
-    echo 'Bootstrap accepted a partial key set.' >&2
-    exit 1
-fi
-test ! -e "$test_directory/host/secrets/vapid-public.pem"
-printf '%s\n' 'Bootstrap generation, permissions, rerun preservation and invalid/partial-key refusal passed.'
+printf '%s\n' 'Bootstrap generation, permissions and rerun preservation passed.'

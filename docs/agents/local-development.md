@@ -14,11 +14,13 @@
 
 ## Setup
 
-Run `make dev` to prepare `.env` and development keys and start the API,
-the web application, PostgreSQL and Redis in Docker. No host application commands
-are required. Setup selects `compose.yaml` plus `compose.local.yaml` in `.env`;
-`make up` subsequently starts or rebuilds that mode. `make` alone lists the
-commands; `scripts/setup.sh --help` lists the setup options behind them.
+Run `make dev` to start the API, the web application, PostgreSQL and Redis in
+Docker. No host application commands are required. It copies `.env.example` to
+`.env` and generates development keys in `secrets/` only when they are missing,
+so rerunning it rebuilds the stack without touching existing configuration or
+keys. `.env.example` selects `compose.yaml` plus `compose.local.yaml`. New
+settings added to `.env.example` later are not merged into an existing `.env`;
+copy them by hand or run `make reset`. `make` alone lists the commands.
 
 - Web application: `http://localhost:3000` (customer PWA under `/orders`, staff
   panel under `/panel`); API: `http://localhost:8080/api`. `next dev` proxies
@@ -31,11 +33,6 @@ commands; `scripts/setup.sh --help` lists the setup options behind them.
   output stays inside its container. Host artifacts do not interfere. Rebuild
   after changing dependency descriptors or Dockerfiles.
 - `make logs` follows logs; `make stop` stops all services without deleting data.
-- `make prod` selects `compose.yaml` plus `compose.production.yaml`,
-  validates the supplied configuration and starts the production stack. Existing
-  settings and keys are preserved; supply missing production values and TLS
-  material before retrying. A copied `scripts/setup.sh` without Compose retains the
-  VM bootstrap's keys-only behavior.
 
 ## First start and daily use
 

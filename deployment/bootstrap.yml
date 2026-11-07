@@ -161,43 +161,30 @@
         state: directory
         owner: "{{ kairos_deploy_user }}"
         mode: '0700'
-      loop: ['', releases, tls]
+      loop: ['', releases, tls, secrets]
       tags: [host, configuration]
 
-    - name: Prepare application configuration using the existing setup command
+    - name: Generate missing application keys without replacing existing ones
+      ansible.builtin.command:
+        argv: "{{ item.argv }}"
+        creates: "{{ kairos_directory }}/secrets/{{ item.name }}"
+        chdir: "{{ kairos_directory }}/secrets"
       become_user: "{{ kairos_deploy_user }}"
+      loop:
+        - {name: webhook-encryption.bin, argv: [openssl, rand, -out, webhook-encryption.bin, '32']}
+        - {name: email-encryption.bin, argv: [openssl, rand, -out, email-encryption.bin, '32']}
+        - {name: push-subscription-encryption.bin, argv: [openssl, rand, -out, push-subscription-encryption.bin, '32']}
+        - {name: vapid-private.pem, argv: [openssl, genpkey, -algorithm, EC, -pkeyopt, 'ec_paramgen_curve:P-256', -out, vapid-private.pem]}
+        - {name: vapid-public.pem, argv: [openssl, pkey, -in, vapid-private.pem, -pubout, -out, vapid-public.pem]}
       tags: configuration
-      block:
-        - name: Allocate temporary setup directory
-          ansible.builtin.tempfile:
-            state: directory
-            path: "{{ kairos_directory }}"
-            prefix: .bootstrap.
-          register: bootstrap_workspace
 
-        - name: Copy the setup command from this checkout
-          ansible.builtin.copy:
-            src: "{{ playbook_dir }}/../scripts/setup.sh"
-            dest: "{{ bootstrap_workspace.path }}/scripts/"
-            mode: '0600'
-
-        - name: Generate or validate application keys without replacing them
-          ansible.builtin.command:
-            argv:
-              - sh
-              - "{{ bootstrap_workspace.path }}/scripts/setup.sh"
-              - --prod
-              - --secrets-directory
-              - "{{ kairos_directory }}/secrets"
-          register: setup_result
-          changed_when: "'Generated and validated the complete application key set' in setup_result.stdout"
-
-      always:
-        - name: Remove temporary setup files even after failure
-          ansible.builtin.file:
-            path: "{{ bootstrap_workspace.path }}"
-            state: absent
-          when: bootstrap_workspace.path is defined
+    - name: Make application keys owner read-only
+      ansible.builtin.file:
+        path: "{{ kairos_directory }}/secrets/{{ item }}"
+        mode: '0400'
+      become_user: "{{ kairos_deploy_user }}"
+      loop: [webhook-encryption.bin, email-encryption.bin, push-subscription-encryption.bin, vapid-private.pem, vapid-public.pem]
+      tags: configuration
 
     - name: Verify deployment account can reach Docker
       ansible.builtin.command: docker version
