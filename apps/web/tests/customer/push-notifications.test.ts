@@ -29,7 +29,7 @@ const payload = {
   trackingReference: REFERENCE,
   status: "READY",
   transitionedAt: TRANSITION_TIME,
-  orderUrl: `/o/${REFERENCE}`,
+  orderUrl: `/orders/${REFERENCE}`,
 };
 const listeners = new Map<string, (event: unknown) => void>();
 const showNotification = vi.fn().mockResolvedValue(undefined);
@@ -95,17 +95,17 @@ it("shows a background transition once and opens its order on click", async () =
     body: "Twoje zamówienie jest gotowe do odbioru",
     tag: `kairos-order-${REFERENCE}`,
     renotify: true,
-    data: { eventId: payload.eventId, orderUrl: `/o/${REFERENCE}` },
+    data: { eventId: payload.eventId, orderUrl: `/orders/${REFERENCE}` },
   });
   expect((await readTrackedOrder(REFERENCE))?.status).toBe("READY");
   await dispatch("notificationclick", {
     notification: {
       close: () => {},
-      data: { orderUrl: `/o/${REFERENCE}` },
+      data: { orderUrl: `/orders/${REFERENCE}` },
     },
   });
   expect(openWindow).toHaveBeenCalledWith(
-    `https://customer.kairos.example/o/${REFERENCE}`,
+    `https://customer.kairos.example/orders/${REFERENCE}`,
   );
 });
 
@@ -136,7 +136,7 @@ it.each(["READY", "COMPLETED", "CANCELED"] as const)(
 
     expect(showNotification).toHaveBeenCalledTimes(1);
     expect(showNotification.mock.calls[0][1].data.orderUrl).toBe(
-      `/o/${REFERENCE}`,
+      `/orders/${REFERENCE}`,
     );
     expect(
       (await readNotificationMetadata()).enrolledTrackingReferences,
@@ -196,6 +196,6 @@ it("shows a privacy-preserving fallback for an invalid payload", async () => {
     body: "Status zamówienia się zmienił. Otwórz Kairos, aby sprawdzić aktualny status.",
     tag: "kairos-generic-order-update",
     renotify: true,
-    data: { orderUrl: "/o/" },
+    data: { orderUrl: "/orders" },
   });
 });

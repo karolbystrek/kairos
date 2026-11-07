@@ -27,12 +27,12 @@ REST and SSE tracking remains the primary experience.
 
 One Next.js 16 application (`apps/web`) serves customers and staff from one
 origin, built with React 19, TypeScript, Tailwind CSS 4, HeroUI 3 and Phosphor
-Icons. The landing page and terms live at `/` and `/regulamin`, the customer
-PWA under `/o/` with its privacy notice at `/prywatnosc`, and the staff panel
-under `/panel`. Customer and staff pages use separate root layouts and
-stylesheets, so navigating between them is a full page load. The customer PWA
+Icons. The landing page, terms and privacy policy live at `/`, `/regulamin` and
+`/prywatnosc`, the customer PWA under `/orders`, and the staff panel under
+`/panel`. All pages share one root layout and one stylesheet; only entering
+`/orders/scan` needs a full page load, for its camera permission. The customer PWA
 uses a custom TypeScript service worker built with Serwist in configurator
-mode, served from `/o/sw.js` with scope `/o/`, so it never controls or caches
+mode, served from `/orders/sw.js` with scope `/orders`, so it never controls or caches
 the landing page, the panel or the API outside customer pages; it owns its
 offline snapshots in IndexedDB.
 
@@ -99,7 +99,7 @@ The Spring API retains domain authority. Frontend controls and redirects provide
 
 #### Search indexing and link previews
 
-Only public service information is indexable: the landing page `/`, the terms `/regulamin`, the staff privacy policy `/panel/prywatnosc`, the customer home `/o/` and the customer privacy notice `/prywatnosc`. Each has a canonical URL, Polish Open Graph metadata and the landing page's generated preview image, and appears in the one sitemap. Order pages, order manifests, scanning, the offline fallback, login, registration and the dashboard carry `noindex, nofollow`; every path below `/o/` also sends `X-Robots-Tag`. `robots.txt` does not block private paths, so crawlers can read their noindex rules. Order-page titles and previews are generic and never include the tracking reference, order label or status. Absolute URLs come from the runtime `APP_URL` setting. Structured data and ranking work are out of scope.
+Only public service information is indexable: the landing page `/`, the terms `/regulamin`, the privacy policy `/prywatnosc` and the customer home `/orders`. Each has a canonical URL, Polish Open Graph metadata and the landing page's generated preview image, and appears in the one sitemap. Order pages, order manifests, scanning, the offline fallback, login, registration and the dashboard carry `noindex, nofollow`; every path below `/orders/` also sends `X-Robots-Tag`. `robots.txt` does not block private paths, so crawlers can read their noindex rules. Order-page titles and previews are generic and never include the tracking reference, order label or status. Absolute URLs come from the runtime `APP_URL` setting. Structured data and ranking work are out of scope.
 
 ### Backend
 

@@ -19,28 +19,28 @@ const LOCATION = "00000000-0000-4000-8000-000000000001";
 const ORDER = "00000000-0000-4000-8000-000000000002";
 
 describe("customer routes", () => {
-  it("builds order tracking, manifest and installation paths under /o/", () => {
-    expect(orderTrackingPath(TRACKING_REFERENCE)).toBe(`/o/${TRACKING_REFERENCE}`);
+  it("builds order tracking, manifest and installation paths under /orders", () => {
+    expect(orderTrackingPath(TRACKING_REFERENCE)).toBe(`/orders/${TRACKING_REFERENCE}`);
     expect(orderManifestPath(TRACKING_REFERENCE)).toBe(
-      `/o/${TRACKING_REFERENCE}/manifest.webmanifest`,
+      `/orders/${TRACKING_REFERENCE}/manifest.webmanifest`,
     );
     expect(installationStartPath(TRACKING_REFERENCE)).toBe(
-      `/o/?install-order=${TRACKING_REFERENCE}`,
+      `/orders?install-order=${TRACKING_REFERENCE}`,
     );
   });
 
   it("recognizes only tracking references as order paths", () => {
-    expect(parseOrderTrackingPath(`/o/${TRACKING_REFERENCE}`)).toBe(TRACKING_REFERENCE);
-    expect(parseOrderTrackingPath("/o/scan")).toBeNull();
-    expect(parseOrderTrackingPath("/o/~offline")).toBeNull();
-    expect(parseOrderTrackingPath(`/orders/${TRACKING_REFERENCE}`)).toBeNull();
+    expect(parseOrderTrackingPath(`/orders/${TRACKING_REFERENCE}`)).toBe(TRACKING_REFERENCE);
+    expect(parseOrderTrackingPath("/orders/scan")).toBeNull();
+    expect(parseOrderTrackingPath("/orders/~offline")).toBeNull();
+    expect(parseOrderTrackingPath(`/o/${TRACKING_REFERENCE}`)).toBeNull();
   });
 
-  it("keeps the installed app inside the /o/ scope", () => {
+  it("keeps the installed app inside the /orders scope", () => {
     const manifest = createKairosManifest(installationStartPath(TRACKING_REFERENCE));
 
-    expect(manifest.id).toBe("/o/");
-    expect(manifest.scope).toBe("/o/");
+    expect(manifest.id).toBe("/orders");
+    expect(manifest.scope).toBe("/orders");
     expect(manifest.start_url?.startsWith(manifest.scope!)).toBe(true);
     expect(paths.customerHome.startsWith(paths.serviceWorkerScope)).toBe(true);
     expect(paths.serviceWorker.startsWith(paths.serviceWorkerScope)).toBe(true);
@@ -50,19 +50,19 @@ describe("customer routes", () => {
 describe("scanned order URLs", () => {
   it("accepts an exact Kairos order URL", () => {
     expect(
-      parseScannedOrderUrl(`${CUSTOMER_URL}/o/${TRACKING_REFERENCE}`, CUSTOMER_URL),
+      parseScannedOrderUrl(`${CUSTOMER_URL}/orders/${TRACKING_REFERENCE}`, CUSTOMER_URL),
     ).toBe(TRACKING_REFERENCE);
   });
 
   it.each([
-    `${CUSTOMER_URL}/orders/${TRACKING_REFERENCE}`,
-    `https://other.test/o/${TRACKING_REFERENCE}`,
-    `${CUSTOMER_URL}/o/not-a-uuid`,
-    `${CUSTOMER_URL}/o/${TRACKING_REFERENCE}/`,
-    `${CUSTOMER_URL}/o/${TRACKING_REFERENCE}?source=qr`,
-    `${CUSTOMER_URL}/o/${TRACKING_REFERENCE}#status`,
-    `${CUSTOMER_URL}/panel/o/${TRACKING_REFERENCE}`,
-    `/o/${TRACKING_REFERENCE}`,
+    `${CUSTOMER_URL}/o/${TRACKING_REFERENCE}`,
+    `https://other.test/orders/${TRACKING_REFERENCE}`,
+    `${CUSTOMER_URL}/orders/not-a-uuid`,
+    `${CUSTOMER_URL}/orders/${TRACKING_REFERENCE}/`,
+    `${CUSTOMER_URL}/orders/${TRACKING_REFERENCE}?source=qr`,
+    `${CUSTOMER_URL}/orders/${TRACKING_REFERENCE}#status`,
+    `${CUSTOMER_URL}/panel/orders/${TRACKING_REFERENCE}`,
+    `/orders/${TRACKING_REFERENCE}`,
   ])("rejects non-canonical scanned values: %s", (value) => {
     expect(parseScannedOrderUrl(value, CUSTOMER_URL)).toBeNull();
   });

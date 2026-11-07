@@ -318,7 +318,7 @@ export default function Landing() {
             <Link className="secondary-text min-h-11" href={paths.terms}>
               Regulamin
             </Link>
-            <Link className="secondary-text min-h-11" href={paths.panelPrivacy}>
+            <Link className="secondary-text min-h-11" href={paths.privacy}>
               Polityka prywatności
             </Link>
           </nav>

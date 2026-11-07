@@ -3,14 +3,13 @@ export const paths = {
   home: "/",
   terms: "/regulamin",
   privacy: "/prywatnosc",
-  panelPrivacy: "/panel/prywatnosc",
-  // The trailing slash keeps the launcher inside the service worker scope.
-  customerHome: "/o/",
-  orderScanner: "/o/scan",
-  offlineFallback: "/o/~offline",
-  customerManifest: "/o/manifest.webmanifest",
-  serviceWorker: "/o/sw.js",
-  serviceWorkerScope: "/o/",
+  customerHome: "/orders",
+  orderScanner: "/orders/scan",
+  offlineFallback: "/orders/~offline",
+  customerManifest: "/orders/manifest.webmanifest",
+  serviceWorker: "/orders/sw.js",
+  // Without a trailing slash the scope covers the launcher; the worker's header allows it.
+  serviceWorkerScope: "/orders",
   login: "/panel/login",
   loginAfterPasswordChange: "/panel/login?password-changed",
   registration: "/panel/registration",
@@ -28,7 +27,7 @@ export function isTrackingReference(value: string): boolean {
 }
 
 export function orderTrackingPath(trackingReference: string): string {
-  return `/o/${encodeURIComponent(trackingReference)}`;
+  return `/orders/${encodeURIComponent(trackingReference)}`;
 }
 
 export function orderManifestPath(trackingReference: string): string {
@@ -45,7 +44,7 @@ export function installationStartPath(trackingReference: string): string {
 
 /** The tracking reference of an order tracking path, or null for any other path. */
 export function parseOrderTrackingPath(pathname: string): string | null {
-  const reference = pathname.match(/^\/o\/([^/]+)$/)?.[1];
+  const reference = pathname.match(/^\/orders\/([^/]+)$/)?.[1];
 
   return reference && isTrackingReference(reference) ? reference : null;
 }

@@ -16,16 +16,18 @@ electronic service.
 | Document | Route | Audience |
 | --- | --- | --- |
 | Regulamin | `/regulamin` | Restaurants and staff |
-| Polityka prywatności | `/panel/prywatnosc` | Staff and landing visitors |
-| Prywatność | `/prywatnosc` | Restaurant customers |
+| Polityka prywatności | `/prywatnosc` | Restaurant customers; staff and landing visitors |
 
 - The operator (Karol Bystrek) is the **controller** of staff account,
   invitation, session and contact data.
 - For customer order-tracking data each restaurant is the **controller** and
   the operator is its **processor**. The Art. 28 GDPR processing terms are
   § 8 of the Regulamin rather than a separate agreement.
-- Operator details live in one constant per app
-  (`apps/*/src/legal/operator.ts`).
+- The privacy policy is one page with a shared operator introduction and one
+  section per audience. Each section keeps its own controller or processor
+  statement, data, purposes, legal bases, storage notes, retention and rights;
+  the supervisory-authority complaint is shared.
+- Operator details live in one constant (`apps/web/src/legal/operator.ts`).
 - Entry points: landing footer, a required terms checkbox on public and
   invitation registration, the customer home screen and the notification
   prompt. Terms acceptance is enforced in the browser only; no acceptance
@@ -101,7 +103,7 @@ them. The trade-off is that customers who close the app never see it.
   10 MB files per service.
 - Anonymous business aggregates and pending inputs survive location purge; aggregates are retained indefinitely until permanent tenant deletion erases both. The test-period deletion commitment still applies to the tenant.
 - Other orders and accounts are kept until the end of the test period. The
-  notices commit to deleting all data within 30 days after the test period
+  privacy policy commits to deleting all data within 30 days after the test period
   ends, or within 30 days of a restaurant's deletion request (Regulamin § 5 and
   § 8); deleting a whole restaurant or an administrator account is a manual
   operator action.
@@ -109,9 +111,9 @@ them. The trade-off is that customers who close the app never see it.
 
 ## Launch blockers
 
-- Replace the placeholders in `apps/*/src/legal/operator.ts`: correspondence
+- Replace the placeholders in `apps/web/src/legal/operator.ts`: correspondence
   address, effective date and test-period end date.
-- Have a lawyer review the three documents and the open questions below.
+- Have a lawyer review the two documents and the open questions below.
 - Delete all data within 30 days after the test period ends, and a whole
   restaurant's data within 30 days of its request, as promised (manual).
 

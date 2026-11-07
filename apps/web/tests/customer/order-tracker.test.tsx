@@ -6,7 +6,7 @@ import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { SWRConfig } from "swr";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { OrderTracker } from "@/app/(customer)/o/[trackingReference]/order-tracker";
+import { OrderTracker } from "@/app/(customer)/orders/[trackingReference]/order-tracker";
 import { CustomerPwaProvider } from "@/src/pwa/notification-provider";
 
 vi.mock("next/navigation", () => ({

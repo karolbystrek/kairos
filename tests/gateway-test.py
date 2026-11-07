@@ -136,7 +136,7 @@ def main():
             peer = fields[1]
             ipaddress.ip_address(peer)
             assert status == 200 and fields == ['8080', peer, peer, 'https', '443', '', '', 'app.kairos.localhost'], body
-            for path in ('/', '/o', '/o/scan', '/panel/login', '/health', '/actuator/health'):
+            for path in ('/', '/orders', '/orders/scan', '/panel/login', '/health', '/actuator/health'):
                 assert request(path)[1].startswith('3000|'), path
             for path in ('/api', '/api/actuator', '/api/actuator/health', '/api/actuator/env',
                          '/api/actuator/prometheus/extra'):
@@ -174,12 +174,13 @@ def main():
                 assert status == 200 and headers['X-Accel-Buffering'] == 'no', path
             # Customer pages share the origin with staff cookies: only the scanner gets the camera,
             # and only non-panel pages may start blob: workers.
-            for path in ('/', '/o', '/o/scan', '/o/scan/', '/o/scanner', '/o/1/scan', '/panel/login', '/panel/o/scan',
+            for path in ('/', '/orders', '/orders/scan', '/orders/scan/', '/orders/scanner', '/orders/1/scan', '/o/scan',
+                         '/panel/login', '/panel/orders/scan',
                          '/api/auth/v1/csrf'):
                 headers = request(path)[2]
                 assert headers['Strict-Transport-Security'].startswith('max-age=') and headers['X-Frame-Options'] == 'DENY'
                 assert headers['X-Content-Type-Options'] == 'nosniff', path
-                camera = 'camera=(self)' if path in ('/o/scan', '/o/scan/') else 'camera=()'
+                camera = 'camera=(self)' if path in ('/orders/scan', '/orders/scan/') else 'camera=()'
                 assert headers['Permissions-Policy'].startswith(camera + ','), (path, headers['Permissions-Policy'])
                 worker = "worker-src 'self';" if path.startswith('/panel/') else "worker-src 'self' blob:;"
                 assert worker in headers['Content-Security-Policy'], (path, headers['Content-Security-Policy'])

@@ -6,7 +6,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { OrderLoadingIndicator } from "@/components/order-loading-indicator";
 import { CustomerToolbar } from "@/components/customer-toolbar";
 import { OrderSummary } from "@/components/order-summary";
-import { CustomerHome } from "@/app/(customer)/o/customer-home";
+import { CustomerHome } from "@/app/(customer)/orders/customer-home";
 import {
   readTrackedOrder,
   rememberLastStableDestination,

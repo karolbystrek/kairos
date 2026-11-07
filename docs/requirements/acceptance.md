@@ -177,9 +177,9 @@
   rollback wakes nothing, and five-second recovery preserves multi-instance
   claims, abandoned work and due retries.
 * The customer application exposes a valid globally branded manifest, scoped
-  to `/o/` with id `/o/`, and the required regular, maskable, Apple touch, and
-  favicon assets supplied for the project. Its service worker at `/o/sw.js`
-  controls only `/o/` pages.
+  to `/orders` with id `/orders`, and the required regular, maskable, Apple touch, and
+  favicon assets supplied for the project. Its service worker at `/orders/sw.js`
+  controls only `/orders` pages.
 * Android Chrome and iOS Safari can install the customer application and launch
   it in standalone mode without changing the ordinary desktop-browser
   experience.
@@ -189,15 +189,15 @@
   IndexedDB order snapshots in most-recently-opened order and removes terminal
   orders without allowing a stale response to resurrect them.
 * The default page offers one Scan QR code action with Notifications
-  and Appearance, without an order collection or history. The launcher `/o/`
+  and Appearance, without an order collection or history. The launcher `/orders`
   restores the current unclosed order in browser and installed contexts,
   including terminal orders, and tolerates unavailable or invalid local storage.
 * Active and loading orders expose no Home or close action. Completed and
   canceled orders remain visible until Close order returns to the default page;
   invalid or missing orders provide scanner recovery. Network errors preserve
   the current destination.
-* The in-app scanner at `/o/scan` opens with a full page load and accepts only
-  exact same-origin `/o/{trackingReference}` URLs, keeps
+* The in-app scanner at `/orders/scan` opens with a full page load and accepts only
+  exact same-origin `/orders/{trackingReference}` URLs, keeps
   scanning after invalid codes, stops every camera track on exit, supports
   camera switching, retains valid offline scans only in memory for retry, and
   provides device-Camera guidance when browser camera access fails.

@@ -13,16 +13,41 @@
 @import "@heroui/styles/base/base.css" layer(base);
 @import "@heroui/styles/base/scrollbar.css" layer(base);
 @import "@heroui/styles/components/close-button.css" layer(components);
+@import "@heroui/styles/components/description.css" layer(components);
+@import "@heroui/styles/components/field-error.css" layer(components);
+@import "@heroui/styles/components/label.css" layer(components);
+@import "@heroui/styles/components/accordion.css" layer(components);
 @import "@heroui/styles/components/link.css" layer(components);
+@import "@heroui/styles/components/tabs.css" layer(components);
 @import "@heroui/styles/components/button.css" layer(components);
 @import "@heroui/styles/components/button-group.css" layer(components);
 @import "@heroui/styles/components/toggle-button.css" layer(components);
 @import "@heroui/styles/components/toggle-button-group.css" layer(components);
+@import "@heroui/styles/components/dropdown.css" layer(components);
+@import "@heroui/styles/components/list-box-item.css" layer(components);
+@import "@heroui/styles/components/list-box-section.css" layer(components);
+@import "@heroui/styles/components/list-box.css" layer(components);
+@import "@heroui/styles/components/menu-item.css" layer(components);
+@import "@heroui/styles/components/menu-section.css" layer(components);
+@import "@heroui/styles/components/chip.css" layer(components);
 @import "@heroui/styles/components/alert.css" layer(components);
 @import "@heroui/styles/components/spinner.css" layer(components);
+@import "@heroui/styles/components/toast.css" layer(components);
+@import "@heroui/styles/components/checkbox-group.css" layer(components);
+@import "@heroui/styles/components/checkbox.css" layer(components);
+@import "@heroui/styles/components/input.css" layer(components);
+@import "@heroui/styles/components/radio-group.css" layer(components);
+@import "@heroui/styles/components/radio.css" layer(components);
+@import "@heroui/styles/components/textfield.css" layer(components);
+@import "@heroui/styles/components/textarea.css" layer(components);
+@import "@heroui/styles/components/separator.css" layer(components);
 @import "@heroui/styles/components/surface.css" layer(components);
+@import "@heroui/styles/components/alert-dialog.css" layer(components);
 @import "@heroui/styles/components/modal.css" layer(components);
 @import "@heroui/styles/components/tooltip.css" layer(components);
+@import "@heroui/styles/components/combo-box.css" layer(components);
+@import "@heroui/styles/components/select.css" layer(components);
+@import "@heroui/styles/components/scroll-shadow.css" layer(components);
 @import "@heroui/styles/themes/default" layer(theme);
 @import "@heroui/styles/utilities";
 @import "@heroui/styles/variants";
@@ -76,13 +101,14 @@
 
 	--type-caption: 0.8125rem;
 	--type-body: 1rem;
-	--type-callout: 1.125rem;
-	--type-heading: 1.375rem;
-	--type-title: clamp(1.75rem, 5vw, 2.25rem);
-	--type-display: clamp(2.25rem, 7vw, 3.5rem);
+	--type-callout: 1.0625rem;
+	--type-heading: 1.25rem;
+	--type-title: clamp(1.75rem, 3vw, 2.25rem);
+	--type-display: clamp(2.5rem, 6vw, 4rem);
 	--type-brand: clamp(2.5rem, 7vw, 3rem);
 
 	--content-customer: 40rem;
+	--content-panel: 90rem;
 	--popup-backdrop: color-mix(in srgb, var(--foreground) 20%, transparent);
 	--popup-backdrop-blur: 8px;
 	--shadow-floating: 0 18px 48px rgb(0 0 0 / 14%);
@@ -163,6 +189,7 @@
 	--accent-soft-foreground: var(--system-blue);
 	--success: var(--system-green);
 	--success-foreground: var(--white);
+	--invitation-status: var(--system-orange);
 	--warning: var(--system-orange);
 	--warning-foreground: var(--black);
 	--warning-soft: color-mix(in srgb, var(--system-orange) 15%, var(--system-background));
@@ -174,6 +201,7 @@
 	--separator: var(--system-gray-4);
 	--text-secondary: color-mix(in srgb, var(--label) 65%, var(--system-background));
 	--selection: color-mix(in srgb, var(--system-blue) 15%, var(--system-background));
+	--selection-hover: color-mix(in srgb, var(--system-blue) 25%, var(--system-background));
 	--muted: var(--text-secondary);
 	--default: var(--system-gray-6);
 	--default-foreground: var(--label);
@@ -184,6 +212,7 @@
 	--overlay: var(--system-background);
 	--overlay-foreground: var(--label);
 	--segment: var(--system-background);
+	--toast: var(--overlay);
 }
 
 /* Elevated surfaces lighten in dark mode, as on iOS. */
@@ -191,6 +220,7 @@
 	--field-background: var(--system-gray-5);
 	--overlay: var(--system-gray-6);
 	--segment: var(--system-gray-5);
+	--toast: var(--system-gray-5);
 }
 
 /* Keep utility classes and HeroUI surfaces on the same rectangular radius. */
@@ -242,7 +272,7 @@ html {
 
 body {
 	min-width: 320px;
-	font-feature-settings: "kern", "liga", "calt";
+	font-feature-settings: "kern", "liga", "calt", "tnum";
 	font-size: var(--type-body);
 	line-height: 1.55;
 	text-rendering: optimizeLegibility;
@@ -270,7 +300,7 @@ body {
 	line-height: 1;
 }
 
-.order-number {
+.tracked-order-number {
 	max-width: 100%;
 	overflow-wrap: anywhere;
 	font-size: clamp(3rem, 12vw, 4.5rem);
@@ -285,6 +315,418 @@ body {
 	font-weight: 600;
 	letter-spacing: -0.025em;
 	line-height: 1.25;
+}
+
+/* Auth pages do not reserve space for the signed-in bottom navigation. */
+.panel-page:has(.auth-form-layout) {
+	padding-block: 0;
+}
+
+.panel-page:has(.landing-page) {
+	padding-block: 0;
+}
+
+/* Public landing page */
+.landing-page {
+	--landing-width: 67.5rem;
+	display: flex;
+	flex-direction: column;
+}
+
+.landing-container {
+	width: 100%;
+	max-width: var(--landing-width);
+	margin-inline: auto;
+}
+
+.landing-page section[id] {
+	scroll-margin-top: 4.5rem;
+}
+
+.landing-header {
+	position: sticky;
+	top: 0;
+	z-index: 20;
+	background: color-mix(in srgb, var(--background) 82%, transparent);
+	-webkit-backdrop-filter: saturate(180%) blur(20px);
+	backdrop-filter: saturate(180%) blur(20px);
+	border-bottom: 1px solid var(--separator);
+}
+
+.landing-nav-link {
+	min-height: var(--control-touch);
+	padding-inline: var(--space-2);
+	color: var(--text-secondary);
+	font-size: var(--type-caption);
+	text-decoration: none;
+}
+
+.landing-hero {
+	padding: 5.5rem 0 var(--space-8);
+	text-align: center;
+}
+
+.landing-title {
+	max-width: 14ch;
+	margin-inline: auto;
+	font-size: clamp(2.5rem, 7vw, 4.75rem);
+	font-weight: 700;
+	letter-spacing: -0.04em;
+	line-height: 1.04;
+	text-wrap: balance;
+}
+
+.landing-lead {
+	max-width: 40ch;
+	margin: var(--space-6) auto 0;
+	color: var(--text-secondary);
+	font-size: clamp(1.125rem, 2.2vw, 1.375rem);
+	line-height: 1.45;
+}
+
+.landing-actions {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: var(--space-4);
+	margin-top: var(--space-8);
+}
+
+.landing-action.button {
+	height: auto;
+	min-height: var(--control-touch);
+	padding-block: var(--space-3);
+}
+
+.landing-eyebrow {
+	margin-bottom: var(--space-2);
+	font-size: var(--type-caption);
+	font-weight: 600;
+}
+
+.landing-demo .landing-eyebrow {
+	color: var(--text-secondary);
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+
+.landing-heading {
+	max-width: 18ch;
+	font-size: clamp(2rem, 4.5vw, 3.25rem);
+	font-weight: 700;
+	letter-spacing: -0.03em;
+	line-height: 1.08;
+	text-wrap: balance;
+}
+
+.landing-section {
+	padding-top: 7rem;
+}
+
+.landing-steps {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: var(--space-4);
+	margin-top: var(--space-12);
+}
+
+.landing-step {
+	padding: var(--space-8);
+	background: var(--surface-secondary);
+	border-radius: 1.75rem;
+}
+
+.landing-step-number {
+	display: grid;
+	place-items: center;
+	width: var(--control-regular);
+	height: var(--control-regular);
+	margin-bottom: var(--space-6);
+	border-radius: 999px;
+	background: var(--accent);
+	color: var(--accent-foreground);
+	font-weight: 700;
+}
+
+.landing-benefits {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: var(--space-4);
+	margin-top: var(--space-12);
+}
+
+.landing-benefit-group {
+	padding: 2.25rem;
+	border: 1px solid var(--separator);
+	border-radius: 1.75rem;
+}
+
+.landing-faq {
+	margin-top: var(--space-8);
+}
+
+.landing-cta {
+	padding: 7.5rem 0;
+	text-align: center;
+}
+
+.landing-footer {
+	padding-block: var(--space-6);
+	border-top: 1px solid var(--separator);
+}
+
+/* Landing demo: a simulated staff queue and guest phone, entirely in the browser. */
+.landing-demo-stage {
+	padding: var(--space-12);
+	background: var(--surface-secondary);
+	border-radius: 2.25rem;
+}
+
+.landing-demo {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--space-8);
+}
+
+.landing-demo-panel {
+	flex: 1 1 21rem;
+	min-width: 0;
+	min-height: 26rem;
+	padding: var(--space-6);
+	background: var(--background);
+	border: 1px solid var(--separator);
+	border-radius: 1rem;
+	container-type: inline-size;
+}
+
+.landing-demo-order {
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr) auto;
+	align-items: center;
+	gap: var(--space-4);
+	margin-top: var(--space-4);
+	padding: var(--space-3);
+	background: var(--surface-secondary);
+	border-radius: var(--radius-medium);
+}
+
+.landing-demo-order-number {
+	font-size: 1.75rem;
+	font-weight: 700;
+	line-height: 1;
+	font-variant-numeric: tabular-nums;
+}
+
+.landing-demo-order-actions {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	gap: var(--space-2);
+}
+
+@container (max-width: 27.5rem) {
+	.landing-demo-order {
+		grid-template-columns: auto minmax(0, 1fr);
+	}
+
+	.landing-demo-order-actions {
+		grid-column: 1 / -1;
+	}
+
+	.landing-demo-order-actions .button {
+		flex: 1;
+	}
+}
+
+.landing-demo-qr {
+	display: grid;
+	place-items: center;
+	width: 3.5rem;
+	height: 3.5rem;
+	overflow: hidden;
+	background: var(--white);
+	border-radius: var(--radius-small);
+}
+
+.landing-phone {
+	flex: none;
+	width: 17.5rem;
+	height: 35.5rem;
+	margin-inline: auto;
+	padding: var(--space-3);
+	background: var(--black);
+	border-radius: 3rem;
+	/* The ring keeps the black frame visible on the dark page. */
+	box-shadow: 0 0 0 1px var(--separator), var(--shadow-floating);
+}
+
+.landing-phone-screen {
+	position: relative;
+	height: 100%;
+	overflow: hidden;
+	background: var(--background);
+	border-radius: 2.3rem;
+	color: var(--foreground);
+	transition: background-color var(--interaction-duration) var(--interaction-easing);
+}
+
+.landing-phone-island {
+	position: absolute;
+	top: 0.625rem;
+	left: 50%;
+	z-index: 3;
+	width: 5.25rem;
+	height: 1.5rem;
+	background: var(--black);
+	border-radius: 999px;
+	transform: translateX(-50%);
+}
+
+.landing-phone-app {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	padding: 2.75rem var(--space-3) var(--space-4);
+}
+
+/* The phone keeps its own theme; mirror the customer app's toggle on its scope. */
+.landing-phone-theme {
+	--toggle-button-bg: var(--surface-secondary);
+	--toggle-button-bg-hover: var(--surface-secondary);
+	--toggle-button-bg-pressed: var(--surface-secondary);
+	--toggle-button-bg-selected: var(--accent-soft);
+	--toggle-button-bg-selected-hover: var(--accent-soft);
+	--toggle-button-bg-selected-pressed: var(--accent-soft);
+	--toggle-button-fg-selected: var(--accent-soft-foreground);
+}
+
+.landing-phone-scan.button {
+	flex-direction: column;
+	gap: var(--space-4);
+	width: 12.25rem;
+	height: 12.25rem;
+	background: transparent;
+	color: var(--foreground);
+}
+
+.landing-phone-scan.button > svg {
+	width: 6.5rem;
+	height: 6.5rem;
+	margin: 0;
+}
+
+.landing-phone-scan-label {
+	font-size: 1.25rem;
+	font-weight: 620;
+	letter-spacing: -0.02em;
+	line-height: 1.15;
+}
+
+.landing-phone-order-number {
+	font-size: 3.5rem;
+	font-weight: 650;
+	letter-spacing: -0.035em;
+	line-height: 1.15;
+	font-variant-numeric: tabular-nums;
+}
+
+.landing-phone-status {
+	max-width: 12ch;
+	font-size: 1.5rem;
+	font-weight: 600;
+	letter-spacing: -0.025em;
+	line-height: 1.25;
+}
+
+.landing-phone-notifications {
+	position: absolute;
+	top: 2.875rem;
+	right: var(--space-2);
+	left: var(--space-2);
+	z-index: 2;
+}
+
+.landing-phone-notification {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--space-3);
+	padding: var(--space-3);
+	background: color-mix(in srgb, var(--surface-secondary) 92%, transparent);
+	-webkit-backdrop-filter: blur(12px);
+	backdrop-filter: blur(12px);
+	border-radius: 1.125rem;
+	box-shadow: var(--shadow-floating);
+	line-height: 1.35;
+	animation: landing-notification-in 400ms var(--interaction-release-easing);
+}
+
+@keyframes landing-notification-in {
+	from {
+		opacity: 0;
+		transform: translateY(-1.5rem);
+	}
+}
+
+@media (max-width: 47.999rem) {
+	.landing-hero {
+		padding-top: var(--space-12);
+	}
+
+	.landing-section {
+		padding-top: 5rem;
+	}
+
+	.landing-steps,
+	.landing-benefits {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.landing-benefit-group {
+		padding: var(--space-6);
+	}
+
+	.landing-demo-stage {
+		margin-inline: calc(-1 * var(--space-2));
+		padding: var(--space-6) var(--space-4);
+		border-radius: 1.5rem;
+	}
+
+	.landing-demo-panel {
+		min-height: 0;
+		flex-basis: 100%;
+	}
+}
+
+.auth-form-layout {
+	display: flex;
+	flex: 1;
+	padding-block: var(--space-6);
+}
+
+/* Reserve space after the footer, keeping it next to each form's action. */
+.auth-form-content {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-6);
+	min-height: calc(4 * var(--control-regular) + 3 * var(--space-4) + var(--space-6) + 1lh);
+}
+
+.auth-form-layout form {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-4);
+}
+
+.auth-form-layout :is(.text-field, .button:not(.button--icon-only)) {
+	width: 100%;
+}
+
+.section-title {
+	font-size: var(--type-heading);
+	font-weight: 620;
+	letter-spacing: -0.018em;
+	line-height: 1.2;
 }
 
 .secondary-text {
@@ -303,6 +745,186 @@ body {
 	margin-top: var(--space-4);
 }
 
+/* Keep long popup headings clear of the shared top-right Close control. */
+.panel-popup:has(> .modal__close-trigger) > .modal__header {
+	padding-inline-end: var(--space-12);
+}
+
+.panel-popup > .modal__header:has(> .modal__heading.text-center) {
+	padding-inline-start: var(--space-12);
+}
+
+/* HeroUI stops at lg; the container is fit-content, so xl needs an explicit width. */
+@media (min-width: 40rem) {
+	.panel-popup.panel-popup--xl {
+		width: min(48rem, 100vw - 5rem);
+		max-width: none;
+	}
+}
+
+/* The scrolling body spans the dialog's side padding, so its scrollbar sits at the edge, not over content.
+   Layered so per-popup padding utilities still apply. */
+@layer components {
+	.modal__body--scroll-inside {
+		margin-inline: calc(-1 * var(--space-6));
+		padding-inline: var(--space-6);
+		scrollbar-gutter: stable;
+	}
+}
+
+/* A form wrapping body and footer must pass the dialog's height to the scrolling body. */
+.panel-popup > form {
+	display: flex;
+	min-height: 0;
+	flex: 1;
+	flex-direction: column;
+}
+
+/* The order-creation workspace uses the whole phone screen. */
+@media (max-width: 39.999rem) {
+	.order-create-popup {
+		height: 100%;
+	}
+}
+
+/* Corner room is reserved up front so selecting a tile never reflows its name. */
+/* Popup footer actions form one grid of equal-width buttons: lifecycle actions above Cancel/Save. */
+.popup-action-grid {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: var(--space-2);
+}
+
+@media (min-width: 640px) {
+	.popup-action-grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+
+.popup-action-grid > .button {
+	width: 100%;
+}
+
+.order-item-tile__button {
+	width: 100%;
+	height: 100%;
+	min-height: 5.5rem;
+	padding: 2.5rem var(--space-3) var(--space-3);
+	border: 1px solid var(--separator);
+	border-radius: var(--radius-large);
+	white-space: normal;
+	text-align: center;
+	font-weight: 500;
+}
+
+.order-item-tile[data-selected] .order-item-tile__button {
+	background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+	border-color: color-mix(in srgb, var(--accent) 55%, var(--separator));
+}
+
+.order-item-tile__quantity {
+	position: absolute;
+	top: var(--space-2);
+	right: var(--space-2);
+	min-width: 2rem;
+	padding: 0.125rem var(--space-2);
+	border-radius: 999px;
+	background: var(--accent);
+	color: var(--accent-foreground);
+	font-weight: 600;
+	text-align: center;
+	pointer-events: none;
+}
+
+.order-item-tile__decrease {
+	position: absolute;
+	top: var(--space-1);
+	left: var(--space-1);
+}
+
+.order-create-step {
+	animation: order-create-step-in 150ms ease-out;
+}
+
+@keyframes order-create-step-in {
+	from {
+		opacity: 0;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.order-create-step {
+		animation: none;
+	}
+}
+
+.step-progress {
+	display: flex;
+	gap: var(--space-1);
+}
+
+.step-progress__segment {
+	flex: 1;
+	height: 0.25rem;
+	overflow: hidden;
+	border-radius: 999px;
+	background: var(--default);
+}
+
+/* Segments fill along the direction of travel and empty along the same path. */
+.step-progress__segment::after {
+	content: "";
+	display: block;
+	height: 100%;
+	background: var(--accent);
+	transform: scaleX(0);
+	transform-origin: left;
+	transition: transform 250ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.step-progress__segment[data-lit]::after {
+	transform: scaleX(1);
+}
+
+.location-create-step {
+	animation: location-create-step-forward 200ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.location-create-step[data-direction="back"] {
+	animation-name: location-create-step-back;
+}
+
+@keyframes location-create-step-forward {
+	from {
+		opacity: 0;
+		transform: translateX(0.75rem);
+	}
+}
+
+@keyframes location-create-step-back {
+	from {
+		opacity: 0;
+		transform: translateX(-0.75rem);
+	}
+}
+
+@keyframes location-create-step-fade {
+	from {
+		opacity: 0;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.step-progress__segment::after {
+		transition: none;
+	}
+
+	.location-create-step,
+	.location-create-step[data-direction="back"] {
+		animation-name: location-create-step-fade;
+	}
+}
+
 /* Shared backdrop treatment for every modal, confirmation, and drawer. */
 .modal__backdrop,
 .alert-dialog__backdrop,
@@ -310,6 +932,32 @@ body {
 	background-color: var(--popup-backdrop);
 	-webkit-backdrop-filter: blur(var(--popup-backdrop-blur));
 	backdrop-filter: blur(var(--popup-backdrop-blur));
+}
+
+@keyframes popup-backdrop-in {
+	from {
+		background-color: transparent;
+		-webkit-backdrop-filter: blur(0);
+		backdrop-filter: blur(0);
+	}
+}
+
+@keyframes popup-backdrop-out {
+	to {
+		background-color: transparent;
+		-webkit-backdrop-filter: blur(0);
+		backdrop-filter: blur(0);
+	}
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	:is(.modal__backdrop, .alert-dialog__backdrop, .drawer__backdrop)[data-entering="true"] {
+		animation: popup-backdrop-in 150ms cubic-bezier(0.23, 1, 0.32, 1) both;
+	}
+
+	:is(.modal__backdrop, .alert-dialog__backdrop, .drawer__backdrop)[data-exiting="true"] {
+		animation: popup-backdrop-out 100ms cubic-bezier(0.23, 1, 0.32, 1) both;
+	}
 }
 
 .floating-layer {
@@ -337,6 +985,10 @@ body {
 	align-self: center;
 	flex: none;
 	padding: 0;
+}
+
+.notice-dismiss {
+	flex: none;
 }
 
 .notification-region {
@@ -450,10 +1102,6 @@ body {
 	.notification-icon svg { transform: none !important; }
 }
 
-.notification-dismiss {
-	flex: none;
-}
-
 .button {
 	height: var(--control-regular);
 	border-radius: var(--radius-medium);
@@ -509,6 +1157,23 @@ body {
 .control-row .button--icon-only {
 	width: var(--control-row-height);
 	flex: none;
+}
+
+.icon-menu-trigger {
+	display: inline-flex;
+	height: var(--control-regular);
+	width: var(--control-regular);
+	flex: none;
+	align-items: center;
+	justify-content: center;
+	background: var(--surface-secondary);
+	border-radius: var(--radius-medium);
+	outline: none;
+}
+
+.icon-menu-trigger--touch {
+	height: var(--control-touch);
+	width: var(--control-touch);
 }
 
 /* Light and dark looks follow the `.dark` class, so the toggle never flashes before hydration. */
@@ -746,6 +1411,159 @@ body {
 	background: var(--surface-tertiary);
 }
 
+.mobile-navigation {
+	position: fixed;
+	right: 0.75rem;
+	bottom: max(0.75rem, env(safe-area-inset-bottom));
+	left: 0.75rem;
+	z-index: 30;
+	padding: 0.125rem;
+	background: var(--surface-secondary);
+	border: 0;
+	border-radius: var(--radius-large);
+	box-shadow: none;
+}
+
+/* Toasts float over the page, so they need an edge the page background lacks. */
+.toast {
+	background: var(--toast);
+	border: 1px solid var(--separator);
+}
+
+.toast-region--top {
+	top: max(1rem, env(safe-area-inset-top));
+}
+
+.toast-region--bottom {
+	bottom: max(1rem, env(safe-area-inset-bottom));
+}
+
+.panel-navigation .tabs__list {
+	display: grid;
+	grid-auto-flow: column;
+	grid-auto-columns: minmax(4.5rem, 1fr);
+	width: 100%;
+	gap: 0.125rem;
+	padding: 0;
+}
+
+.panel-navigation .tabs__tab {
+	min-width: 0;
+	height: 3.5rem;
+	padding-inline: var(--space-2);
+}
+
+.panel-navigation .tab-motion-content {
+	flex-direction: column;
+	gap: 0.25rem;
+	font-size: 0.6875rem;
+}
+
+.tab-motion-content {
+	display: inline-flex;
+	flex-direction: row;
+	align-items: center;
+	justify-content: center;
+	gap: var(--space-2);
+	white-space: nowrap;
+	scale: 1;
+	transition: scale var(--interaction-release-duration) var(--interaction-release-easing);
+}
+
+@media (hover: hover) and (pointer: fine) {
+	.tabs__tab:not(:disabled, [aria-disabled="true"], [data-disabled]):hover
+		.tab-motion-content {
+		scale: var(--interaction-hover-scale);
+	}
+}
+
+.tabs__tab:not(:disabled, [aria-disabled="true"], [data-disabled]):is(
+	:active,
+	[data-pressed="true"]
+) .tab-motion-content {
+	scale: var(--interaction-press-scale);
+	transition: scale var(--interaction-press-duration) var(--interaction-press-easing);
+}
+
+.panel-navigation .tabs__indicator {
+	box-shadow: none;
+}
+
+.panel-workspace-controls {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	min-height: var(--control-touch);
+}
+
+.panel-workspace-spacer {
+	display: none;
+}
+
+.panel-card {
+	min-height: var(--control-touch);
+	border-radius: var(--radius-medium);
+	scale: 1;
+	transition:
+		background-color var(--interaction-duration) var(--interaction-easing),
+		scale var(--interaction-release-duration) var(--interaction-release-easing);
+}
+
+.panel-card + .panel-card {
+	margin-top: var(--space-2);
+}
+
+.panel-card > .button {
+	height: 100%;
+	width: 100%;
+	padding: 0;
+	border-radius: var(--radius-medium);
+}
+
+.panel-card-content {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	flex-wrap: wrap;
+	gap: var(--space-3);
+}
+
+.order-number {
+	font-size: 1.5rem;
+	font-weight: 650;
+	line-height: 1.2;
+	letter-spacing: -0.025em;
+	font-variant-numeric: tabular-nums;
+}
+
+.panel-card-trailing .button {
+	pointer-events: auto;
+}
+
+.panel-card[data-selected="true"] {
+	background: var(--selection);
+}
+
+.panel-card:has(> .button:active) {
+	background: var(--surface-tertiary);
+}
+
+.panel-card[data-selected="true"]:has(> .button:active) {
+	background: var(--selection-hover);
+}
+
+@media (hover: hover) and (pointer: fine) {
+	.panel-card:has(> .button:hover) {
+		scale: var(--interaction-hover-scale);
+	}
+}
+
+.panel-card:has(> .button:is(:active, [data-pressed="true"])) {
+	scale: var(--interaction-press-scale);
+	transition:
+		background-color var(--interaction-duration) var(--interaction-easing),
+		scale var(--interaction-press-duration) var(--interaction-press-easing);
+}
 
 @media (prefers-reduced-motion: reduce) {
 	html {
@@ -779,9 +1597,77 @@ body {
 		[role="radio"],
 		[role="checkbox"],
 		[role="switch"]
-	) {
+	),
+	.panel-card,
+	.tab-motion-content {
 		scale: 1 !important;
 	}
+}
+
+@media (min-width: 40rem) {
+	.panel-workspace-controls {
+		display: grid;
+		grid-template-columns: calc(2 * var(--control-touch) + var(--space-2)) minmax(0, 1fr) calc(2 * var(--control-touch) + var(--space-2));
+		gap: var(--space-4);
+	}
+
+	.panel-workspace-spacer {
+		display: block;
+	}
+
+	.panel-workspace-utilities {
+		justify-self: end;
+	}
+
+	.mobile-navigation {
+		position: relative;
+		inset: auto;
+		justify-self: center;
+		max-width: 100%;
+	}
+
+	.panel-navigation .tabs__list {
+		grid-auto-columns: minmax(max-content, 1fr);
+		width: max-content;
+	}
+
+	.panel-navigation .tab-motion-content {
+		flex-direction: row;
+		gap: var(--space-2);
+		font-size: inherit;
+	}
+
+	.panel-navigation .tabs__tab {
+		height: var(--control-touch);
+		padding-inline: var(--space-4);
+		border-radius: var(--radius);
+		transition:
+			background-color var(--interaction-duration) var(--interaction-easing),
+			color var(--interaction-duration) var(--interaction-easing),
+			box-shadow var(--interaction-duration) var(--interaction-easing),
+			opacity var(--interaction-duration) var(--interaction-easing);
+	}
+
+	.panel-navigation .tabs__indicator {
+		border-radius: var(--radius);
+		box-shadow: none;
+	}
+}
+
+.entity-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
+  gap: var(--space-3);
+}
+
+.entity-card-grid .panel-card {
+  min-height: 7rem;
+  padding: var(--space-4);
+  border: 1px solid var(--separator);
+}
+
+.entity-card-grid .panel-card + .panel-card {
+  margin-top: 0;
 }
 
 /* Hover keeps each control's resting colours; press feedback remains physical. */
@@ -817,6 +1703,9 @@ body {
   background-color: var(--default);
 }
 
+.icon-menu-trigger:is(:hover, [data-hovered="true"]):not(:active, [data-pressed="true"]) {
+  background-color: var(--surface-secondary);
+}
 
 :is(.tabs__tab, .tabs__list-container__scroll-prev, .tabs__list-container__scroll-next, .link):is(:hover, [data-hovered="true"]):not(:disabled, [aria-disabled="true"], [data-disabled="true"]) {
   opacity: 1;
@@ -866,6 +1755,74 @@ body {
   }
 }
 
+/* Two panel actions share one row at every width, as in Apple's two-button alerts. */
+.panel-popup .modal__footer:has(> .button:nth-child(2):last-child) {
+  flex-direction: row;
+  flex-wrap: nowrap;
+}
+
+@media (max-width: 39.999rem) {
+  .panel-popup .modal__footer:has(> .button:nth-child(2):last-child) > .button {
+    width: auto;
+    flex: 1 1 auto;
+    white-space: nowrap;
+  }
+}
+
+.confirmation-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.confirmation-actions > .button {
+  width: 100%;
+  min-height: var(--control-regular);
+  height: auto;
+  white-space: normal;
+}
+
+.hold-to-confirm {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+}
+
+.hold-to-confirm__fill {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--foreground) 18%, transparent);
+  clip-path: inset(0 100% 0 0);
+  transition: clip-path 180ms var(--interaction-easing);
+}
+
+.hold-to-confirm[data-holding="true"] .hold-to-confirm__fill {
+  clip-path: inset(0 0 0 0);
+  transition: clip-path 1600ms linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hold-to-confirm__fill {
+    clip-path: none;
+    opacity: 0;
+    transition: none;
+  }
+
+  .hold-to-confirm[data-holding="true"] .hold-to-confirm__fill {
+    opacity: 1;
+    transition: none;
+  }
+}
+
+/* Card overlay buttons stay transparent in every pointer state. */
+.panel-card > .button {
+  --button-bg: transparent;
+  --button-bg-hover: transparent;
+  --button-bg-pressed: transparent;
+}
+
 .switch {
   --switch-control-bg-hover: var(--switch-control-bg);
   --switch-control-bg-checked-hover: var(--switch-control-bg-checked);
@@ -884,6 +1841,19 @@ body {
   opacity: 0.6;
 }
 
+.panel-popup > .modal__header:has(> .alert-dialog__icon) {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.panel-popup .modal__header > .alert-dialog__icon {
+  width: var(--control-small);
+  height: var(--control-small);
+  border-radius: var(--radius-medium);
+}
+
 .legal-document-body {
   line-height: 1.65;
 }
@@ -893,6 +1863,12 @@ body {
   font-size: 1.25rem;
   font-weight: 600;
   letter-spacing: -0.01em;
+}
+
+.legal-document-body h3 {
+  margin-top: 1.5rem;
+  font-size: var(--type-callout);
+  font-weight: 600;
 }
 
 .legal-document-body p,

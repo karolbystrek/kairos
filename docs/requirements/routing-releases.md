@@ -15,7 +15,7 @@ HTTP. There is no local gateway; `next dev` proxies `/api` to the API
 | Path | Purpose |
 | --- | --- |
 | `/`, `/regulamin`, `/prywatnosc` | Public landing and legal pages |
-| `/o`, `/o/scan`, `/o/{trackingReference}` | Customer PWA: launcher, QR scanner, order tracking |
+| `/orders`, `/orders/scan`, `/orders/{trackingReference}` | Customer PWA: launcher, QR scanner, order tracking |
 | `/panel/...` | Staff authentication, account and location-scoped work |
 | `/api/...` | API, including `/api/external/...` and bearer-protected `/api/actuator/prometheus` |
 

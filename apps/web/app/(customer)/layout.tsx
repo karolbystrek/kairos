@@ -1,17 +1,13 @@
-import "@/styles/customer.css";
 import { Metadata, Viewport } from "next";
 
-import { Providers } from "./providers";
-
 import { siteConfig } from "@/config/site";
-import { appUrl } from "@/src/config/app-url";
 import { PWA_THEME_COLOR } from "@/src/pwa/manifest";
+import { CustomerPwaProvider } from "@/src/pwa/notification-provider";
+import { ReviewInvitation } from "@/src/pwa/review-invitation";
 import { paths } from "@/src/routes";
 import { SHARED_OPEN_GRAPH } from "@/src/seo/metadata";
 
-export const generateMetadata = async (): Promise<Metadata> => ({
-  metadataBase: await appUrl(),
-  applicationName: "Kairos",
+export const metadata: Metadata = {
   title: {
     default: siteConfig.customer.name,
     template: `%s - ${siteConfig.customer.name}`,
@@ -23,7 +19,6 @@ export const generateMetadata = async (): Promise<Metadata> => ({
     title: siteConfig.customer.name,
     description: siteConfig.customer.description,
   },
-  twitter: { card: "summary_large_image" },
   icons: {
     icon: "/favicon.ico",
     apple: [
@@ -39,7 +34,7 @@ export const generateMetadata = async (): Promise<Metadata> => ({
     statusBarStyle: "default",
     title: "Kairos",
   },
-});
+};
 
 export const viewport: Viewport = {
   colorScheme: "light dark",
@@ -49,27 +44,17 @@ export const viewport: Viewport = {
   ],
 };
 
-export default function RootLayout({
+export default function CustomerLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
-    <html suppressHydrationWarning lang="pl">
-      <head />
-      <body className="flex min-h-dvh flex-col bg-background text-foreground antialiased">
-        <Providers
-          themeProps={{
-            attribute: "class",
-            defaultTheme: "system",
-            enableSystem: true,
-          }}
-        >
-          <main className="mx-auto flex w-full flex-1 flex-col max-w-[var(--content-customer)] px-5 pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-6 sm:pt-6">
-            {children}
-          </main>
-        </Providers>
-      </body>
-    </html>
+    <CustomerPwaProvider>
+      <main className="mx-auto flex w-full flex-1 flex-col max-w-[var(--content-customer)] px-5 pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-6 sm:pt-6">
+        {children}
+      </main>
+      <ReviewInvitation />
+    </CustomerPwaProvider>
   );
 }

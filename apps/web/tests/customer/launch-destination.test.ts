@@ -11,7 +11,7 @@ import {
 } from "@/src/pwa/storage";
 
 const TRACKING_REFERENCE = "930fccf0-c771-4c46-b4fd-ee59ce6e11cc";
-const ORDER_HREF = `/o/${TRACKING_REFERENCE}`;
+const ORDER_HREF = `/orders/${TRACKING_REFERENCE}`;
 
 async function launchHref() {
   return resolveCustomerLaunchHref({
@@ -50,7 +50,7 @@ describe("customer launch restoration", () => {
       expect(await launchHref()).toBe(ORDER_HREF);
 
       await rememberLastStableDestination({ kind: "home" });
-      expect(await launchHref()).toBe("/o/");
+      expect(await launchHref()).toBe("/orders");
     },
   );
 });

@@ -6,13 +6,9 @@ import { paths } from "@/src/routes";
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const siteUrl = await appUrl();
 
-  return [
-    paths.home,
-    paths.terms,
-    paths.privacy,
-    paths.panelPrivacy,
-    paths.customerHome,
-  ].map((path) => ({
-    url: new URL(path, siteUrl).toString(),
-  }));
+  return [paths.home, paths.terms, paths.privacy, paths.customerHome].map(
+    (path) => ({
+      url: new URL(path, siteUrl).toString(),
+    }),
+  );
 }

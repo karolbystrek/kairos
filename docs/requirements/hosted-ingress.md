@@ -40,7 +40,7 @@ To maintain the ranges:
    include. Verify real client addresses and blocked direct-origin access.
 
 Cloudflare must bypass caching for `/api/`, `/panel/` and the customer service
-worker script, avoid interactive challenges on `/o/`,
+worker script, avoid interactive challenges on `/orders`,
 `/api/customer-notifications/` and `/api/external/` so anonymous customers and
 External Integrations are never challenged, and avoid broad cache-everything
 rules on application pages.
@@ -64,16 +64,16 @@ staff member's cookies. These mitigations bound that risk:
   ([staff authentication](staff-authentication.md#browser-cookies-and-durable-sessions)).
   These stop cross-site use and script access to the session ID, not
   same-origin requests, so the measures below carry the isolation.
-* The customer manifest and service worker are scoped to `/o/`, so the worker
+* The customer manifest and service worker are scoped to `/orders`, so the worker
   never controls or caches `/panel` or `/api` navigations. The worker script is
   served with `no-cache`.
 * NGINX sets `Content-Security-Policy` per path group: `/panel/...` allows only
   `'self'` workers, while public and customer pages also allow `blob:` workers
   for the scanner. Every other directive is identical, including
   `object-src 'none'`, `base-uri 'self'` and `form-action 'self'`.
-* `Permissions-Policy` grants `camera=(self)` only on `/o/scan`; every other
+* `Permissions-Policy` grants `camera=(self)` only on `/orders/scan`; every other
   path, `/panel` included, sends `camera=()`. The policy belongs to the loaded
-  document, so the application must reach `/o/scan` with a full document load.
+  document, so the application must reach `/orders/scan` with a full document load.
 * HSTS, `nosniff` and `X-Frame-Options: DENY` apply to every path. Locations
   that set their own headers (SSE streams and Prometheus) restate the
   essentials, because NGINX `add_header` does not merge across levels.

@@ -14,8 +14,8 @@
 **/*.pk8
 
 # Generated service worker
-/apps/web/public/o/sw.js
-/apps/web/public/o/sw.js.map
+/apps/web/public/orders/sw.js
+/apps/web/public/orders/sw.js.map
 
 # IDE and System Files
 .idea/

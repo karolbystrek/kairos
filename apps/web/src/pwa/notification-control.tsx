@@ -100,7 +100,7 @@ export function NotificationControl() {
                   <Button
                     isIconOnly
                     aria-label="Zamknij komunikat"
-                    className="notification-dismiss rounded-md"
+                    className="notice-dismiss rounded-md"
                     variant="tertiary"
                     onPress={dismissMessage}
                   >

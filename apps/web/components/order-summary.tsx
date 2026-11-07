@@ -45,7 +45,7 @@ export function OrderSummary({
         aria-live="polite"
         className="flex flex-1 flex-col items-center justify-center py-12 text-center sm:py-16"
       >
-        <p className="order-number">
+        <p className="tracked-order-number">
           <span className="sr-only">Zamówienie </span>#{order.number}
         </p>
         {order.label && (

@@ -5,7 +5,7 @@ import { IDBFactory } from "fake-indexeddb";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
-import { CustomerHome } from "@/app/(customer)/o/customer-home";
+import { CustomerHome } from "@/app/(customer)/orders/customer-home";
 import { CustomerPwaProvider } from "@/src/pwa/notification-provider";
 
 const router = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
@@ -33,6 +33,6 @@ it("opens the scanner with a full page load so it receives the camera policy", a
   );
   fireEvent.click(await screen.findByRole("button", { name: "Zeskanuj kod QR" }));
 
-  expect(assign).toHaveBeenCalledWith("/o/scan");
+  expect(assign).toHaveBeenCalledWith("/orders/scan");
   expect(router.push).not.toHaveBeenCalled();
 });

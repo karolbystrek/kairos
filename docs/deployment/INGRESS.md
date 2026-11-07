@@ -38,7 +38,7 @@ forwarding headers. Never add arbitrary VM/Docker subnets to restore forwarding.
 
 Set Cloudflare Cache Rules to **Bypass cache** for URI paths starting with
 `/api/` or `/panel/` and for the customer service worker script. Do not apply
-cache-everything to application pages. Exclude `/o/`,
+cache-everything to application pages. Exclude `/orders`,
 `/api/customer-notifications/` and `/api/external/` from interactive
 challenges/Access login, while retaining the origin gateway limits.
 The shared limits are authentication/registration/redemption/password POSTs at
@@ -59,7 +59,7 @@ approval under [cloud operations](../agents/cloud-operations.md):
 
 1. Before deploying, replace the Cache Rules and challenge exclusions above:
    bypass cache for `/api/` and `/panel/` on `kairos.karolbystrek.pl`, and keep
-   `/o/`, `/api/customer-notifications/` and `/api/external/` free of
+   `/orders`, `/api/customer-notifications/` and `/api/external/` free of
    challenges. Remove rules that match only the retired hostnames.
 2. Deploy the release. NGINX then answers only `kairos.karolbystrek.pl`; the
    old hostnames reach the default server, which closes the connection, and no

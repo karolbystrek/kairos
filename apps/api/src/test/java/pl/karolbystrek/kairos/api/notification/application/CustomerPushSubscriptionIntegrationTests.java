@@ -584,7 +584,7 @@ class CustomerPushSubscriptionIntegrationTests extends RedisListenerIsolatedInte
         var claimed = claimService.claimAvailable();
         assertThat(claimed).hasSize(1);
         assertThat(claimed.getFirst().payload()).contains("\"status\":\"" + terminalStatus + "\"")
-                .contains("\"orderUrl\":\"/o/" + order.trackingReference() + "\"");
+                .contains("\"orderUrl\":\"/orders/" + order.trackingReference() + "\"");
     }
 
     private OrderView createOrder() {

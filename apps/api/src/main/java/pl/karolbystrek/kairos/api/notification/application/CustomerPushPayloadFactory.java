@@ -19,7 +19,7 @@ class CustomerPushPayloadFactory {
                 event.getTrackingReference(),
                 event.getStatus(),
                 event.getOccurredAt(),
-                "/o/" + event.getTrackingReference()
+                "/orders/" + event.getTrackingReference()
         ));
     }
 }

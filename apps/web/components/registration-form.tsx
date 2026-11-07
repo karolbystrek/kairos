@@ -372,7 +372,7 @@ export function RegistrationForm({ invited = false }: { invited?: boolean }) {
                 Regulamin
               </Link>{" "}
               i{" "}
-              <Link href={paths.panelPrivacy} target="_blank">
+              <Link href={paths.privacy} target="_blank">
                 Politykę prywatności
               </Link>
               .

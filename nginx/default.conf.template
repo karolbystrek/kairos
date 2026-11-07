@@ -93,7 +93,7 @@ server {
 # and only customer pages may start blob: workers.
 map $uri $kairos_permissions_policy {
     default "camera=(), microphone=(), geolocation=(), payment=(), usb=()";
-    ~^/o/scan/?$ "camera=(self), microphone=(), geolocation=(), payment=(), usb=()";
+    ~^/orders/scan/?$ "camera=(self), microphone=(), geolocation=(), payment=(), usb=()";
 }
 map $uri $kairos_worker_src {
     default "'self' blob:";

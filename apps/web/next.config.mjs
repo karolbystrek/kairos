@@ -4,23 +4,21 @@ import { PHASE_DEVELOPMENT_SERVER } from "next/constants.js";
 const nextConfig = (phase) => ({
   output: "standalone",
   poweredByHeader: false,
-  // The customer launcher lives at /o/ so the /o/ service worker scope covers it.
-  skipTrailingSlashRedirect: true,
   experimental: {
-    // Customer and panel pages have separate root layouts, so unmatched URLs need their own page.
-    globalNotFound: true,
     // A stale persistent cache made Turbopack spawn PostCSS workers without bound and exhaust RAM.
     turbopackFileSystemCacheForDev: false,
   },
   async headers() {
     return [
       {
-        source: "/o/:path+",
+        source: "/orders/:path+",
         headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }],
       },
       {
-        source: "/o/sw.js",
+        source: "/orders/sw.js",
         headers: [
+          // Lets the scope include the /orders launcher, which sits outside the worker's directory.
+          { key: "Service-Worker-Allowed", value: "/orders" },
           {
             key: "Cache-Control",
             value: "no-cache, no-store, must-revalidate",

@@ -8,7 +8,7 @@
 - Keep REST as the boundary between the web application, External Integrations, and the
   API. Browser families use `/api/{resource-family}/v1`; external families use
   `/api/external/{resource-family}/v1`.
-- One origin serves the public pages, the customer PWA under `/o`, the staff
+- One origin serves the public pages, the customer PWA under `/orders`, the staff
   panel under `/panel` and the API under `/api`
   ([path map](../requirements/routing-releases.md#local-and-hosted-routing)).
   Browsers never make cross-origin API requests and the API has no CORS

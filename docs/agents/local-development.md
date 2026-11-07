@@ -19,7 +19,7 @@ the web application, PostgreSQL and Redis in Docker. No host application command
 are required. Setup selects `compose.yaml` plus `compose.local.yaml` in `.env`;
 `docker compose up --build -d` subsequently starts or rebuilds that mode.
 
-- Web application: `http://localhost:3000` (customer PWA under `/o`, staff
+- Web application: `http://localhost:3000` (customer PWA under `/orders`, staff
   panel under `/panel`); API: `http://localhost:8080/api`. `next dev` proxies
   `/api` to the API, as NGINX does in production.
 - Source files are mounted from the checkout. Next.js provides Fast Refresh;

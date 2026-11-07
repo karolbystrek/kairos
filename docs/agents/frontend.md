@@ -16,16 +16,15 @@ including typography, status presentation and icon restraint in the following se
 
 - Use HeroUI (`@heroui/react`) for UI components. Charts are the exception:
   use shadcn chart components on Recharts, themed with shared semantic tokens.
-  Each root layout's stylesheet (`apps/web/styles/customer.css` for the
-  `(customer)` group, `panel.css` for `(panel)`) imports only the
-  `@heroui/styles` component sheets it renders: when a page starts using another HeroUI component, add its
+  The one stylesheet, `apps/web/styles/globals.css`, imports only the
+  `@heroui/styles` component sheets the app renders: when a page starts using another HeroUI component, add its
   sheet and those of the components it composes (its `@heroui/react` source
   imports them from `../<name>/`), in the upstream `components/index.css` order.
 - Use Phosphor Icons (`@phosphor-icons/react`, `*Icon` exports) for interface
   icons: regular weight by default and fill for "on" states. Do not add
   handwritten inline SVG icon components.
-- Colours come from Apple's HIG system colours, kept in two layers in each
-  app's `styles/globals.css`, with an identical primitives block in both apps.
+- Colours come from Apple's HIG system colours, kept in two layers in
+  `styles/globals.css`.
   The `--system-*` primitives are the only place hex values appear; they switch
   between light, dark and `prefers-contrast: more`. HeroUI's semantic tokens
   (`--accent`, `--surface`, …) reference only those primitives. Components use
@@ -44,7 +43,7 @@ including typography, status presentation and icon restraint in the following se
 
 ## Tests
 
-- Both apps test with Vitest. Panel tests render the real components with
+- The app tests with Vitest. Panel tests render the real components with
   Testing Library in jsdom; replace only the network (`fetch` through
   `tests/helpers.tsx`, `EventSource`), browser APIs jsdom lacks (stubbed in
   `tests/setup.ts`) and framework hooks that need a running Next.js app, such

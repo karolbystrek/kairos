@@ -246,7 +246,7 @@ export default function TermsPage() {
       <ol>
         <li>
           Zasady przetwarzania danych osobowych Użytkowników opisuje{" "}
-          <a href={paths.panelPrivacy}>Polityka prywatności</a>.
+          <a href={paths.privacy}>Polityka prywatności</a>.
         </li>
         <li>
           Usługodawca może zmienić Regulamin z ważnych powodów, w szczególności

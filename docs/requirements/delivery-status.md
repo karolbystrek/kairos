@@ -100,7 +100,7 @@ analytics in the panel; a manually granted platform administrator also sees
 cross-tenant totals and current API health. See
 [analytics reporting](analytics-reporting.md).
 
-Draft Polish terms, privacy notices and their in-app entry points are in place;
+Draft Polish terms, the privacy policy and their in-app entry points are in place;
 the remaining [legal readiness gates](legal.md#launch-blockers) must close
 before real users.
 
