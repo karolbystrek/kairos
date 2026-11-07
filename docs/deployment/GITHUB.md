@@ -22,7 +22,7 @@ gh api repos/karolbystrek/kairos/environments/production/deployment-branch-polic
 See [GitHub Environment protection](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments).
 
 Image builds need no repository variables: the images contain no URLs, and
-the site URLs come from the host's runtime environment file. The former
+the application URL comes from the host's runtime environment file. The former
 `NEXT_PUBLIC_API_BASE_URL`, `NEXT_PUBLIC_CUSTOMER_APP_URL` and
 `NEXT_PUBLIC_PANEL_APP_URL` repository variables are unused and can be deleted.
 

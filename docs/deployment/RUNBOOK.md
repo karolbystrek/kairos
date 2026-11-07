@@ -36,4 +36,5 @@ step and check its prerequisites. Public launch still requires every launch gate
 - [Ubuntu VM bootstrap](BOOTSTRAP.md): repeatable host packages, account and keys.
 - [Native Lightsail email alarms](MONITORING.md): reduced development coverage and activation.
 - [AWS OIDC and temporary SSH](AWS-SSH.md): approved firewall lifecycle and recovery.
+- [Single-origin move](INGRESS.md#move-from-three-hostnames-to-one-origin): Cloudflare and DNS steps after retiring the panel and API hostnames.
 - [Requirements topic map](../REQUIREMENTS.md): contracts and outstanding launch gates.

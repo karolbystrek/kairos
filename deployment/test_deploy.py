@@ -12,7 +12,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parent.parent
 REVISION = "a" * 40
-SERVICES = ("customer-app", "panel-app", "api")
+SERVICES = ("web", "api")
 DOCKER = shutil.which("docker")
 RUNTIME_FILES = (
     "compose.yaml", "compose.production.yaml", "nginx/default.conf.template",
@@ -48,21 +48,14 @@ class DeployTest(unittest.TestCase):
         for name in ("webhook-encryption.bin", "email-encryption.bin", "vapid-private.pem", "vapid-public.pem",
                      "push-subscription-encryption.bin", "tls.crt", "tls.key"):
             (self.secrets / name).write_text("fixture-private-material")
-        origins = {
-            "CUSTOMER_APP_URL": "https://customer.example.com",
-            "PANEL_APP_URL": "https://panel.example.com",
-        }
         self.config = {"services": {
             name: {"image": self.manifest["images"].get(name, "fixture:infra"), "environment": {}}
             for name in (*SERVICES, "nginx", "postgres", "redis")
         }}
         self.config["services"]["api"]["environment"] = {
-            **origins, "WEBHOOK_DESTINATION_POLICY": "PUBLIC_HTTPS", "PUSH_DESTINATION_POLICY": "PUBLIC_HTTPS",
+            "APP_URL": "https://app.example.com", "WEBHOOK_DESTINATION_POLICY": "PUBLIC_HTTPS", "PUSH_DESTINATION_POLICY": "PUBLIC_HTTPS",
         }
-        self.config["services"]["nginx"]["environment"] = {
-            "KAIROS_CUSTOMER_APP_HOST": "customer.example.com", "KAIROS_PANEL_APP_HOST": "panel.example.com",
-            "KAIROS_API_HOST": "api.example.com",
-        }
+        self.config["services"]["nginx"]["environment"] = {"KAIROS_APP_HOST": "app.example.com"}
         self.config["secrets"] = {
             name: {"file": str(self.secrets / name)}
             for name in ("webhook-encryption.bin", "email-encryption.bin", "vapid-private.pem", "vapid-public.pem",
@@ -193,8 +186,9 @@ sys.exit(deploy.main(sys.argv[1:]))
         self.assertEqual(result.returncode, 0, result.stderr)
         calls = self.commands()
         stages = [call for call in calls if call[0] == "docker" and "up" in call]
-        self.assertEqual([call[-1] for call in stages], ["redis", "api", "panel-app", "nginx"])
+        self.assertEqual([call[-1] for call in stages], ["redis", "api", "web", "nginx"])
         self.assertEqual(stages[0][-2:], ["postgres", "redis"])
+        self.assertIn("--remove-orphans", stages[-1])
         for call in stages:
             self.assertIn("--wait", call)
             self.assertIn("--wait-timeout", call)
@@ -206,8 +200,7 @@ sys.exit(deploy.main(sys.argv[1:]))
         override = json.loads((self.release / "compose.images.json").read_text())
         self.assertEqual(override, {"services": {service: {"image": image} for service, image in self.manifest["images"].items()}})
         self.assertEqual([call[-1] for call in calls if call[0] == "curl"], [
-            "https://customer.example.com/", "https://panel.example.com/",
-            "https://panel.example.com/api/auth/v1/csrf", "https://api.example.com/api/auth/v1/csrf"])
+            "https://app.example.com/", "https://app.example.com/api/auth/v1/csrf"])
         self.assertEqual(self.env_file.read_text(), "POSTGRES_PASSWORD=do-not-print-this-secret\n")
 
     def test_failed_stage_stops_rollout_and_preserves_previous_record(self):
@@ -222,7 +215,7 @@ sys.exit(deploy.main(sys.argv[1:]))
                     self.assertTrue(any("ps" in call and "-a" in call for call in self.commands()))
                 updates = [call[-1] for call in self.commands() if "up" in call]
                 if stage in ("pull", "redis", "api"):
-                    self.assertNotIn("panel-app", updates)
+                    self.assertNotIn("web", updates)
                     self.assertNotIn("nginx", updates)
                 self.assertFalse(any(call[0] == "curl" for call in self.commands()))
 
@@ -331,12 +324,9 @@ sys.exit(deploy.main(sys.argv[1:]))
             "RESEND_API_KEY=fixture-resend-key",
             "KAIROS_APPLICATION_SECRETS_DIRECTORY=" + str(self.secrets),
             "KAIROS_TLS_DIRECTORY=" + str(self.secrets),
-            # Local .env.example has no gateway; supply the production-only NGINX values and origins.
-            "CUSTOMER_APP_URL=https://customer.kairos.localhost",
-            "PANEL_APP_URL=https://panel.kairos.localhost",
-            "KAIROS_CUSTOMER_APP_HOST=customer.kairos.localhost",
-            "KAIROS_PANEL_APP_HOST=panel.kairos.localhost",
-            "KAIROS_API_HOST=api.kairos.localhost",
+            # Local .env.example has no gateway; supply the production-only NGINX value and origin.
+            "APP_URL=https://app.kairos.localhost",
+            "KAIROS_APP_HOST=app.kairos.localhost",
             "NGINX_ENVSUBST_FILTER=^KAIROS_",
         ]) + "\n")
         result = self.run_deploy(REAL_COMPOSE=DOCKER)
@@ -392,8 +382,9 @@ sys.exit(deploy.main(sys.argv[1:]))
 
     def test_unsafe_resolved_configuration_never_mutates_docker(self):
         for key, value in (("WEBHOOK_DESTINATION_POLICY", "LOCAL_DEVELOPMENT"),
-                           ("CUSTOMER_APP_URL", "http://customer.example.com"),
-                           ("PANEL_APP_URL", "https://wrong.example.com")):
+                           ("APP_URL", "http://app.example.com"),
+                           ("APP_URL", "https://wrong.example.com"),
+                           ("APP_URL", "https://app.example.com/panel")):
             with self.subTest(key=key):
                 original = self.config["services"]["api"]["environment"][key]
                 self.config["services"]["api"]["environment"][key] = value
@@ -402,10 +393,20 @@ sys.exit(deploy.main(sys.argv[1:]))
                 self.assertTrue(all("config" in call for call in self.commands()))
                 self.config["services"]["api"]["environment"][key] = original
 
-    def test_shared_gateway_hostname_never_mutates_docker(self):
-        self.config["services"]["nginx"]["environment"]["KAIROS_API_HOST"] = "panel.example.com"
-        self.assert_failed_safely(self.run_deploy())
-        self.assertTrue(all("config" in call for call in self.commands()))
+    def test_release_with_retired_services_is_not_a_rollback_target(self):
+        self.record.unlink()
+        self.assertEqual(self.run_deploy().returncode, 0)
+        retired = json.loads(self.record.read_text())
+        retired["images"] = {service: f"ghcr.io/karolbystrek/kairos/{service}@sha256:" + "1" * 64
+                             for service in ("customer-app", "panel-app", "api")}
+        self.record.write_text(json.dumps(retired))
+        self.log.unlink()
+        result = self.run_deploy({**self.manifest, "revision": "b" * 40}, FAIL_STAGE="nginx")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn("Rolling back", result.stderr)
+        self.assertEqual(json.loads(self.record.read_text()), retired)
+        self.assertEqual(self.run_deploy({**self.manifest, "revision": "b" * 40}).returncode, 0)
+        self.assertNotIn("previous", json.loads(self.record.read_text()))
 
 
 if __name__ == "__main__":

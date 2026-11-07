@@ -468,7 +468,8 @@ class AccountInvitationApiIntegrationTests extends RedisListenerIsolatedIntegrat
             """, UUID.fromString(created.get("id").asText()));
         var body = objectMapper.readTree(emailCipher.decrypt((UUID) row.get("id"),
             (byte[]) row.get("encrypted_payload"), (byte[]) row.get("payload_nonce"))).get("text").asText();
-        var marker = "#invitation=";
+        var marker = "http://localhost:3000/panel/account-registration#invitation=";
+        assertThat(body).contains(marker);
         var offset = body.indexOf(marker) + marker.length();
         return body.substring(offset, body.indexOf('\n', offset));
     }

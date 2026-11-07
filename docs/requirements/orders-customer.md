@@ -55,10 +55,11 @@ Safari are the required installation targets, while desktop browsers must
 continue to provide the ordinary web experience.
 
 The manifest uses `Kairos Order Tracking` as its full name and `Kairos` as its
-short name. Its stable application ID and scope cover the complete customer
-origin. The scanner default page uses the ordinary root start URL. An order page
+short name. Its stable application ID and scope cover `/orders`, so the manifest and service
+worker never control staff pages. The scanner default page uses the `/orders` start
+URL. An order page
 exposes an order-aware manifest with the same stable identity and a start URL that enters
-through the root route with only the tracking reference required for bootstrap.
+through the `/orders` route with only the tracking reference required for bootstrap.
 The manifest asks supporting browsers to reuse an open installed window for
 in-scope links (`launch_handler` `navigate-existing`). iOS and iPadOS never open
 the Home Screen app from links, so a QR code scanned with the Camera app always
@@ -81,7 +82,7 @@ and Appearance utilities. There is no order collection, history, Home control,
 swipe disclosure, or stop-tracking action.
 
 Opening an order records it as the current destination before REST succeeds.
-The root route restores that unclosed order in ordinary browser and installed
+The `/orders` route restores that unclosed order in ordinary browser and installed
 contexts, including after it becomes terminal. Completion or cancellation does
 not navigate away: the terminal view stays visible until the customer selects
 **Close order**, which clears the current destination and returns to the scanner
@@ -104,7 +105,7 @@ and eligibility for any pending final notification.
 
 The default page opens a dedicated scanner view only after a direct customer
 action. The scanner prefers the rear camera, allows switching when multiple cameras are
-available, decodes locally, and accepts only customer-origin URLs whose exact
+available, decodes locally, and accepts only application-origin URLs whose exact
 path is `/orders/<UUID>`. Invalid codes leave scanning active with an inline
 error. Every camera track stops after success, cancellation, navigation, or
 unmount. Camera failure directs the customer to the device Camera app. A valid
@@ -166,7 +167,7 @@ clears the current message without changing notification settings.
 Order-status notifications are generated for `READY`, `COMPLETED`, and `CANCELED`
 transitions only. Their title is the global Kairos brand, their body describes
 the state without disclosing the order label, and their click target is the
-order route. Notifications use one replacement tag per order. The service worker
+order route `/orders/<trackingReference>`. Notifications use one replacement tag per order. The service worker
 validates a versioned payload, deduplicates its stable event ID, and applies the
 transition only when it is reachable from the locally stored state graph.
 REST or SSE reaching the same state does not consume that notification. Terminal

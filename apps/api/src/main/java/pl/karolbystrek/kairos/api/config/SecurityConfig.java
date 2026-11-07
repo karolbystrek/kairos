@@ -27,7 +27,7 @@ import static pl.karolbystrek.kairos.api.authentication.infrastructure.web.Authe
 
 @Configuration
 @EnableMethodSecurity
-@EnableConfigurationProperties(ApplicationOriginsProperties.class)
+@EnableConfigurationProperties(AppUrlProperties.class)
 public class SecurityConfig {
 
     @Bean

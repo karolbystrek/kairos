@@ -37,7 +37,7 @@ jobs:
       - name: Inspect images
         shell: bash
         run: |
-          for service in customer-app panel-app api; do
+          for service in web api; do
             if ! skopeo inspect --raw "docker://${IMAGE_REGISTRY}/${service}:${IMAGE_TAG}" > /dev/null 2>&1; then
               echo "::error::Images for $GITHUB_SHA are not published yet. Wait for CI on main to pass for this commit, then dispatch again."
               exit 1
@@ -45,7 +45,7 @@ jobs:
           done
           printf 'Deployment revision: `%s`\n' "$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
           mkdir -p image-inspections
-          for service in customer-app panel-app api; do
+          for service in web api; do
             image="${IMAGE_REGISTRY}/${service}:${IMAGE_TAG}"
             docker pull --platform linux/amd64 "$image"
             docker image inspect "$image" > "image-inspections/${service}.json"

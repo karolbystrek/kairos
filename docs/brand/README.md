@@ -49,8 +49,7 @@ unavailable.
 
 ## Application assets
 
-The raster assets in `apps/customer-app/public` and `apps/panel-app/public` are
-rendered from these masters:
+The raster assets in `apps/web/public` are rendered from these masters:
 
 - `icons/kairos-icon-192.png` and `icons/kairos-icon-512.png` render
   `kairos-app-icon.svg`.
@@ -62,7 +61,7 @@ rendered from these masters:
   `kairos-app-icon.svg` at 32 and 48 px.
 - `icons/kairos-lockup.png` (240 px tall) renders `kairos-lockup.svg` for the
   share-preview images.
-- `apps/panel-app/public/icons/kairos-app-icon.svg` is a copy of
+- `apps/web/public/icons/kairos-app-icon.svg` is a copy of
   `kairos-app-icon.svg`, placed in the centre of order tracking QR codes.
 
 ## Misuse

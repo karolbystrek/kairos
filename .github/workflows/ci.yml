@@ -17,21 +17,15 @@ concurrency:
 
 jobs:
   frontend:
-    name: Frontend (${{ matrix.app }})
+    name: Frontend
     runs-on: ubuntu-latest
     timeout-minutes: 40
-    strategy:
-      fail-fast: false
-      matrix:
-        app:
-          - customer-app
-          - panel-app
     env:
       CI: "true"
       NEXT_TELEMETRY_DISABLED: "1"
     defaults:
       run:
-        working-directory: apps/${{ matrix.app }}
+        working-directory: apps/web
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
@@ -43,7 +37,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: apps/${{ matrix.app }}/package-lock.json
+          cache-dependency-path: apps/web/package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -57,9 +51,9 @@ jobs:
       - name: Next.js cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: apps/${{ matrix.app }}/.next/cache
-          key: ${{ runner.os }}-next-${{ matrix.app }}-${{ hashFiles(format('apps/{0}/package-lock.json', matrix.app)) }}-${{ github.sha }}
-          restore-keys: ${{ runner.os }}-next-${{ matrix.app }}-${{ hashFiles(format('apps/{0}/package-lock.json', matrix.app)) }}-
+          path: apps/web/.next/cache
+          key: ${{ runner.os }}-next-web-${{ hashFiles('apps/web/package-lock.json') }}-${{ github.sha }}
+          restore-keys: ${{ runner.os }}-next-web-${{ hashFiles('apps/web/package-lock.json') }}-
 
       - name: Build
         run: npm run build
@@ -104,11 +98,8 @@ jobs:
           KAIROS_IMAGE_REGISTRY: ghcr.io/karolbystrek/kairos
           KAIROS_RELEASE_VERSION: ci
           KAIROS_API_USER: "1000:1000"
-          KAIROS_CUSTOMER_APP_HOST: customer.example.com
-          KAIROS_PANEL_APP_HOST: panel.example.com
-          KAIROS_API_HOST: api.example.com
-          CUSTOMER_APP_URL: https://customer.example.com
-          PANEL_APP_URL: https://panel.example.com
+          KAIROS_APP_HOST: app.example.com
+          APP_URL: https://app.example.com
           POSTGRES_PASSWORD: placeholder
           KAIROS_DB_OWNER_PASSWORD: placeholder
           KAIROS_DB_RUNTIME_PASSWORD: placeholder
@@ -155,8 +146,7 @@ jobs:
       fail-fast: false
       matrix:
         service:
-          - customer-app
-          - panel-app
+          - web
           - api
     steps:
       - name: Checkout
@@ -171,8 +161,6 @@ jobs:
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: apps/${{ matrix.service }}
-          # Both frontends share the panel app's Next.js Dockerfile.
-          file: apps/${{ matrix.service == 'api' && 'api' || 'panel-app' }}/Dockerfile
           target: runner
           platforms: linux/amd64
           pull: true
@@ -193,8 +181,7 @@ jobs:
       fail-fast: false
       matrix:
         service:
-          - customer-app
-          - panel-app
+          - web
           - api
     concurrency:
       group: publish-image-${{ github.sha }}-${{ matrix.service }}
@@ -232,8 +219,6 @@ jobs:
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: apps/${{ matrix.service }}
-          # Both frontends share the panel app's Next.js Dockerfile.
-          file: apps/${{ matrix.service == 'api' && 'api' || 'panel-app' }}/Dockerfile
           target: runner
           platforms: linux/amd64
           pull: true

@@ -30,7 +30,7 @@ response expose no token or Copy link action. The database stores the SHA-256
 hash of a 32-byte random Base64url token; the pending email payload contains the
 recoverable token only in encrypted form and clears it on terminal delivery.
 The emailed link uses
-`/account-registration#invitation=<token>` so the secret is not sent
+`{APP_URL}/panel/account-registration#invitation=<token>` so the secret is not sent
 in the initial navigation URL, gateway logs, or referrer; the client reads the
 fragment and supplies the token only in the API request body.
 

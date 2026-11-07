@@ -20,7 +20,7 @@ Public registration collects email, password, and confirmation in one focused
 account form. Submitting it validates and provisions an unverified identity, then sends a
 6-digit verification code. No tenant, administrator or tenant authority exists
 until the correct code is confirmed. Confirmation commits the tenant and
-administrator, establishes the browser session and opens `/dashboard`. Registration does not collect or
+administrator, establishes the browser session and opens `/panel/orders`. Registration does not collect or
 create a location.
 `EMAIL_VERIFICATION_ENABLED` defaults to `true`. Local `.env.example` sets it to
 `false`: registration and unverified sign-in then mark the identity email verified
@@ -31,15 +31,15 @@ Re-enabling verification does not undo emails already marked verified.
 
 Registration is a single form without steps. Account fields retain submitted
 values on recoverable failure and show corrective errors for the affected
-control. Public sign-in links to `/registration`, and registration links back to
-`/login`.
+control. Public sign-in links to `/panel/registration`, and registration links back to
+`/panel/login`.
 
-The panel root `/` is the public restaurant-owner landing page. It checks the
+The root `/` is the public restaurant-owner landing page. It checks the
 existing API session in the browser and redirects signed-in visitors to
-`/dashboard` without blocking public content when the check fails. `/login`
-also sends signed-in visitors to `/dashboard`. Signed-out access to `/dashboard`
-goes to `/login`, including after sign-out or session expiry; successful sign-in
-opens `/dashboard`. These redirects are navigation conveniences; API
+`/panel/orders` without blocking public content when the check fails.
+`/panel/login` also sends signed-in visitors to `/panel/orders`. Signed-out
+access to staff workspaces goes to `/panel/login`, including after sign-out or
+session expiry; successful sign-in opens `/panel/orders`. These redirects are navigation conveniences; API
 authorization remains authoritative.
 
 In the dashboard, an administrator whose tenant has no non-archived location
@@ -101,7 +101,7 @@ Password hashes and passwords never appear in browser
 JavaScript, browser storage, API response bodies, URLs or logs. CSRF metadata is
 separate: `__Host-XSRF-TOKEN` and the `X-XSRF-TOKEN` header protect unsafe browser
 requests, including login/registration/logout. Browsers send these requests to
-`/api` on the panel's own origin, so session and CSRF cookies stay first-party
+`/api` on the application origin, so session and CSRF cookies stay first-party
 and host-only on any domain, and the API grants no CORS access. No request-body logging is
 used for authentication.
 

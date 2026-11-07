@@ -9,14 +9,12 @@ services:
   nginx:
     image: nginx:1.28-alpine
     environment:
-      KAIROS_API_HOST:
-      KAIROS_CUSTOMER_APP_HOST:
+      KAIROS_APP_HOST:
       KAIROS_NGINX_LISTEN: "443 ssl"
       KAIROS_NGINX_REAL_IP_CONFIGURATION: "include /etc/nginx/cloudflare-real-ip.conf;"
       KAIROS_NGINX_TLS_CONFIGURATION: |-
         ssl_certificate /run/secrets/tls/tls.crt;
         ssl_certificate_key /run/secrets/tls/tls.key;
-      KAIROS_PANEL_APP_HOST:
       NGINX_ENVSUBST_FILTER:
     ports:
       - "443:443"
@@ -44,9 +42,7 @@ services:
     depends_on:
       api:
         condition: service_healthy
-      customer-app:
-        condition: service_healthy
-      panel-app:
+      web:
         condition: service_healthy
     networks:
       - gateway
@@ -64,46 +60,15 @@ services:
     cpus: 0.50
     logging: *deployment-logging
 
-  customer-app:
-    image: ${KAIROS_IMAGE_REGISTRY:?Set KAIROS_IMAGE_REGISTRY}/customer-app:${KAIROS_RELEASE_VERSION:?Set KAIROS_RELEASE_VERSION}
+  web:
+    image: ${KAIROS_IMAGE_REGISTRY:?Set KAIROS_IMAGE_REGISTRY}/web:${KAIROS_RELEASE_VERSION:?Set KAIROS_RELEASE_VERSION}
     build:
-      context: ./apps/customer-app
-      dockerfile: ../panel-app/Dockerfile
+      context: ./apps/web
       target: runner
       args:
         NEXT_TELEMETRY_DISABLED:
     environment:
-      CUSTOMER_APP_URL:
-    depends_on:
-      api:
-        condition: service_healthy
-    networks:
-      - gateway
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/ || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 20s
-    init: true
-    security_opt:
-      - no-new-privileges:true
-    restart: unless-stopped
-    mem_limit: 512m
-    cpus: 0.75
-    logging: *deployment-logging
-
-  panel-app:
-    image: ${KAIROS_IMAGE_REGISTRY:?Set KAIROS_IMAGE_REGISTRY}/panel-app:${KAIROS_RELEASE_VERSION:?Set KAIROS_RELEASE_VERSION}
-    build:
-      context: ./apps/panel-app
-      dockerfile: Dockerfile
-      target: runner
-      args:
-        NEXT_TELEMETRY_DISABLED:
-    environment:
-      CUSTOMER_APP_URL:
-      PANEL_APP_URL:
+      APP_URL:
     depends_on:
       api:
         condition: service_healthy
@@ -136,8 +101,7 @@ services:
       EMAIL_VERIFICATION_ENABLED: "${EMAIL_VERIFICATION_ENABLED:-true}"
       RESEND_API_KEY: ${RESEND_API_KEY:?Set RESEND_API_KEY for production email delivery}
       REVIEW_INVITATION_DELAY: "${REVIEW_INVITATION_DELAY:-30m}"
-      CUSTOMER_APP_URL:
-      PANEL_APP_URL:
+      APP_URL:
       POSTGRES_HOST:
       POSTGRES_DB:
       KAIROS_DB_OWNER_USER:

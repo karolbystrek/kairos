@@ -5,7 +5,7 @@ Use [the production runbook](RUNBOOK.md) for prerequisites and the sequence.
 ## First install and later releases
 
 CI validates pull requests and main pushes, including the Compose files. Pull
-requests build all three images without pushing them; after every check passes
+requests build both images without pushing them; after every check passes
 on a `main` push, CI builds and pushes them to GHCR. After
 provisioning and authorization, start the deployment workflow from `main`
 (the default branch; other refs are refused):

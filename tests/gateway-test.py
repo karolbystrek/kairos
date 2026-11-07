@@ -38,18 +38,16 @@ def main():
             'RESEND_API_KEY=gateway-test-placeholder',
             f'KAIROS_APPLICATION_SECRETS_DIRECTORY={work}',
             f'KAIROS_TLS_DIRECTORY={work}',
-            'KAIROS_CUSTOMER_APP_HOST=customer.kairos.localhost',
-            'KAIROS_PANEL_APP_HOST=panel.kairos.localhost',
-            'KAIROS_API_HOST=api.kairos.localhost',
+            'KAIROS_APP_HOST=app.kairos.localhost',
             'NGINX_ENVSUBST_FILTER=^KAIROS_',
         ]) + '\n')
         local = json.loads(run('docker', 'compose', '--env-file', str(env), '-f', str(ROOT / 'compose.yaml'),
                                '-f', str(ROOT / 'compose.local.yaml'),
                                'config', '--format', 'json'))
-        assert set(local['services']) == {'postgres', 'redis', 'api', 'customer-app', 'panel-app'}
+        assert set(local['services']) == {'postgres', 'redis', 'api', 'web'}
         assert all(port['host_ip'] == '127.0.0.1' for service in local['services'].values()
                    for port in service.get('ports', [])), 'local Compose published a non-loopback port'
-        for app, port in (('api', 8080), ('customer-app', 3000), ('panel-app', 3001)):
+        for app, port in (('api', 8080), ('web', 3000)):
             service = local['services'][app]
             assert service['build']['target'] == 'development'
             assert service['ports'][0]['target'] == port
@@ -66,7 +64,7 @@ def main():
                 assert mounts['/app/node_modules']['type'] == mounts['/app/.next']['type'] == 'volume'
         run('openssl', 'req', '-x509', '-newkey', 'rsa:2048', '-nodes',
             '-keyout', str(work / 'tls.key'), '-out', str(work / 'tls.crt'),
-            '-days', '1', '-subj', '/CN=api.kairos.localhost')
+            '-days', '1', '-subj', '/CN=app.kairos.localhost')
         backend = work / 'backend.conf'
         backend.write_text('''server {
     listen 3000;
@@ -81,8 +79,7 @@ def main():
         try:
             containers.append(name + '-backend')
             run('docker', 'run', '-d', '--name', containers[-1], '--network', name,
-                '--network-alias', 'api', '--network-alias', 'customer-app',
-                '--network-alias', 'panel-app', '-v', f'{backend}:/etc/nginx/conf.d/default.conf:ro', IMAGE)
+                '--network-alias', 'api', '--network-alias', 'web', '-v', f'{backend}:/etc/nginx/conf.d/default.conf:ro', IMAGE)
             mode = 'production'
             compose = ('docker', 'compose', '--env-file', str(env), '-f', str(ROOT / 'compose.yaml'),
                        '-f', str(ROOT / f'compose.{mode}.yaml'))
@@ -115,7 +112,7 @@ def main():
             port = run('docker', 'port', gateway, '443/tcp').rsplit(':', 1)[1]
             context = ssl._create_unverified_context()
 
-            def request(path, host='api.kairos.localhost', client='203.0.113.1', method='GET'):
+            def request(path, host='app.kairos.localhost', client='203.0.113.1', method='GET'):
                 headers = {'Host': host, 'CF-Connecting-IP': client,
                            'X-Forwarded-For': '198.51.100.10', 'Forwarded': 'for=198.51.100.10'}
                 req = urllib.request.Request(f'https://127.0.0.1:{port}{path}', headers=headers, method=method)
@@ -138,30 +135,24 @@ def main():
             fields = body.split('|')
             peer = fields[1]
             ipaddress.ip_address(peer)
-            assert status == 200 and fields == ['8080', peer, peer, 'https', '443', '', '', 'api.kairos.localhost'], body
-            assert request('/', 'customer.kairos.localhost')[1].startswith('3000|')
-            assert request('/', 'panel.kairos.localhost')[1].startswith('3000|')
-            hosts = ('api.kairos.localhost', 'customer.kairos.localhost', 'panel.kairos.localhost')
-            # Browsers reach the API through /api on their own site, keeping their Host.
-            for host in hosts[1:]:
-                status, body, _ = request('/api/orders/v1', host)
-                assert status == 200 and body.startswith('8080|') and body.endswith('|' + host), body
-            for path in ('/', '/health', '/actuator/health'):
+            assert status == 200 and fields == ['8080', peer, peer, 'https', '443', '', '', 'app.kairos.localhost'], body
+            for path in ('/', '/orders', '/orders/scan', '/panel/login', '/health', '/actuator/health'):
+                assert request(path)[1].startswith('3000|'), path
+            for path in ('/api', '/api/actuator', '/api/actuator/health', '/api/actuator/env',
+                         '/api/actuator/prometheus/extra'):
                 assert request(path)[0] == 404, path
-            for host in hosts:
-                for path in ('/api', '/api/actuator', '/api/actuator/health', '/api/actuator/env',
-                             '/api/actuator/prometheus/extra'):
-                    assert request(path, host)[0] == 404, (host, path)
             status, body, headers = request('/api/actuator/prometheus')
             assert status == 200 and body.startswith('8080|'), 'metrics route did not reach API'
             assert headers['Cache-Control'] == 'no-store'
-            for host in ('customer.kairos.localhost', 'panel.kairos.localhost'):
-                assert request('/api/actuator/prometheus', host)[0] == 404
-            try:
-                request('/', 'unknown.invalid')
-                raise AssertionError('unknown host accepted')
-            except (OSError, urllib.error.URLError):
-                pass
+            assert headers['Strict-Transport-Security'].startswith('max-age=') and headers['X-Content-Type-Options'] == 'nosniff'
+            # The retired panel and API hostnames are unknown like any other.
+            for host in ('unknown.invalid', 'kairos-panel.kairos.localhost', 'kairos-api.kairos.localhost',
+                         'panel.kairos.localhost', 'api.kairos.localhost'):
+                try:
+                    request('/api/auth/v1/csrf', host)
+                    raise AssertionError(f'unknown host accepted: {host}')
+                except (OSError, urllib.error.URLError):
+                    pass
             protected = ['/api/auth/v1/login', '/api/auth/v1/password', '/api/auth/v1/password-reset',
                          '/api/auth/v1/password-reset/confirmation',
                          '/api/auth/v1/verification', '/api/auth/v1/verification/resend',
@@ -178,14 +169,21 @@ def main():
                 ('/api/account-invitation-previews/v1', 'POST'),
             ):
                 assert request(path, method=method)[0] == 200, (path, method)
-            for host in hosts:
-                for path in ('/api/tracked-orders/v1/test/events', '/api/orders/v1/events'):
-                    status, _, headers = request(path, host)
-                    assert status == 200 and headers['X-Accel-Buffering'] == 'no', (host, path)
-            for host in ('customer.kairos.localhost', 'panel.kairos.localhost'):
-                headers = request('/', host)[2]
+            for path in ('/api/tracked-orders/v1/test/events', '/api/orders/v1/events'):
+                status, _, headers = request(path)
+                assert status == 200 and headers['X-Accel-Buffering'] == 'no', path
+            # Customer pages share the origin with staff cookies: only the scanner gets the camera,
+            # and only non-panel pages may start blob: workers.
+            for path in ('/', '/orders', '/orders/scan', '/orders/scan/', '/orders/scanner', '/orders/1/scan', '/o/scan',
+                         '/panel/login', '/panel/orders/scan',
+                         '/api/auth/v1/csrf'):
+                headers = request(path)[2]
                 assert headers['Strict-Transport-Security'].startswith('max-age=') and headers['X-Frame-Options'] == 'DENY'
-                assert headers['X-Content-Type-Options'] == 'nosniff', host
+                assert headers['X-Content-Type-Options'] == 'nosniff', path
+                camera = 'camera=(self)' if path in ('/orders/scan', '/orders/scan/') else 'camera=()'
+                assert headers['Permissions-Policy'].startswith(camera + ','), (path, headers['Permissions-Policy'])
+                worker = "worker-src 'self';" if path.startswith('/panel/') else "worker-src 'self' blob:;"
+                assert worker in headers['Content-Security-Policy'], (path, headers['Content-Security-Policy'])
             with concurrent.futures.ThreadPoolExecutor(max_workers=16) as pool:
                 external = list(pool.map(lambda _: request('/api/external/orders/v1')[0], range(60)))
             assert 200 in external and 429 in external and set(external) == {200, 429}, external
@@ -196,10 +194,9 @@ def main():
             run('docker', 'exec', gateway, 'nginx', '-s', 'reload')
             time.sleep(0.3)
             assert request('/api/auth/v1/csrf', client='2001:db8::1')[1].split('|')[1:3] == ['2001:db8::1'] * 2
-            # One client's budget is shared across every hostname.
             for i, path in enumerate(protected):
                 client = f'203.0.113.{100 + i}'
-                statuses = [request(path, hosts[j % 3], client, 'POST')[0] for j in range(22)]
+                statuses = [request(path, client=client, method='POST')[0] for _ in range(22)]
                 assert statuses == [200] * 21 + [429], statuses
             assert request('/api/auth/v1/csrf', client='203.0.113.100')[0] == 200
             print(f'{mode}: Compose, TLS, routing, header trust, throttling and SSE checks passed')

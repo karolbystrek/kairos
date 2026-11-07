@@ -31,7 +31,7 @@ authorized; these instructions do not authorize live resource changes.
 
 ## Collector configuration
 
-Use a trusted collector over HTTPS through the API origin, with path
+Use a trusted collector over HTTPS through the application origin, with path
 `/api/actuator/prometheus` and an Authorization bearer token loaded from the
 collector's secret file. Do not put credentials in URLs, source control, logs,
 command arguments or labels. On a trusted private container network, direct API

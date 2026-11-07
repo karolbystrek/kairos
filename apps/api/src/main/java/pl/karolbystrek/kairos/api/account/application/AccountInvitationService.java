@@ -9,7 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import pl.karolbystrek.kairos.api.account.application.exception.AccountInvitationNotFoundException;
 import pl.karolbystrek.kairos.api.account.application.exception.AccountConflictException;
 import pl.karolbystrek.kairos.api.email.application.EmailDeliveryService;
-import pl.karolbystrek.kairos.api.config.ApplicationOriginsProperties;
+import pl.karolbystrek.kairos.api.config.AppUrlProperties;
 import org.springframework.jdbc.core.JdbcTemplate;
 import pl.karolbystrek.kairos.api.account.application.exception.AccountInvitationUnavailableException;
 import pl.karolbystrek.kairos.api.account.application.exception.AccountNotFoundException;
@@ -59,7 +59,7 @@ public class AccountInvitationService {
     private final OneTimeBearerTokenService tokenService;
     private final Clock clock;
     private final EmailDeliveryService emailDeliveries;
-    private final ApplicationOriginsProperties origins;
+    private final AppUrlProperties app;
     private final JdbcTemplate database;
 
     @Transactional
@@ -129,7 +129,7 @@ public class AccountInvitationService {
         var invitation = AccountInvitation.issue(access.tenantId(), location.getId(), access.accountId(), role, email,
             token.hash(), clock.instant());
         var tenant = "restauracji zarządzanej przez " + administratorEmail;
-        var link = origins.panel().replaceAll("/+$", "") + "/account-registration#invitation=" + token.value();
+        var link = app.url().replaceAll("/+$", "") + "/panel/account-registration#invitation=" + token.value();
         var delivery = emailDeliveries.enqueue(email, "Zaproszenie do " + tenant,
             "Zapraszamy Cię do " + tenant + ".\nLokal: " + location.getName() + "\nRola: " + (role == AssignmentRole.MANAGER ? "kierownik" : "pracownik")
                 + "\nZaprasza: " + issuer.getEmail() + "\n\nUtwórz konto: " + link + "\nZaproszenie wygasa po siedmiu dniach.", location.getId());

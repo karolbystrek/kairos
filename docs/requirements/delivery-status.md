@@ -48,7 +48,7 @@ The current walking vertical slice is implemented for local development:
 * one API configuration with externally supplied private keys;
 * repository-owned local setup for configuration, complete key validation,
   restrictive permissions, and explicit existing-key handling;
-* production hostname-routing NGINX HTTPS ingress, unbuffered SSE, internal health
+* production single-origin NGINX HTTPS ingress with per-path security headers, unbuffered SSE, internal health
   paths, health-gated dependencies, persistent PostgreSQL,
   and nondurable Redis;
 * restricted PostgreSQL runtime identity, transaction-local tenant/location and
@@ -100,7 +100,7 @@ analytics in the panel; a manually granted platform administrator also sees
 cross-tenant totals and current API health. See
 [analytics reporting](analytics-reporting.md).
 
-Draft Polish terms, privacy notices and their in-app entry points are in place;
+Draft Polish terms, the privacy policy and their in-app entry points are in place;
 the remaining [legal readiness gates](legal.md#launch-blockers) must close
 before real users.
 

@@ -193,7 +193,7 @@ class SecurityFilterChainIntegrationTests extends RedisListenerIsolatedIntegrati
 
     @Test
     void grantsNoCrossOriginBrowserAccessBecauseFrontendsCallTheirOwnOrigin() throws Exception {
-        for (var origin : new String[]{"http://localhost:3000", "http://localhost:3001", "https://unknown.example.org"}) {
+        for (var origin : new String[]{"http://localhost:3000", "https://unknown.example.org"}) {
             assertCorsRejected(origin, "/auth/v1/csrf", "GET");
             assertCorsRejected(origin, "/tracked-orders/v1/reference", "GET");
             assertCorsRejected(origin, "/orders/v1", "POST");

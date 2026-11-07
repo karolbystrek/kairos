@@ -8,10 +8,9 @@
   runtime checks remain opt-in and should run only when the user explicitly
   requests them or when they are needed to diagnose a runtime problem.
 - Use repository-owned commands:
-  - Customer frontend: `npm --prefix apps/customer-app run check`
-  - Panel frontend: `npm --prefix apps/panel-app run check`
-  - Frontend tests (Vitest): `npm --prefix apps/<app> test`, or
-    `npm --prefix apps/<app> test -- <file>` for one file
+  - Web application: `npm --prefix apps/web run check`
+  - Web tests (Vitest): `npm --prefix apps/web test`, or
+    `npm --prefix apps/web test -- <file>` for one file
   - Backend: `apps/api/mvnw` from the repository root, or `./mvnw` from
     `apps/api`
   - Frontend dependencies: run `npm install` from the affected application and
