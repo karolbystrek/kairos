@@ -7,7 +7,7 @@ x-deployment-logging: &deployment-logging
 
 services:
   nginx:
-    image: nginx:1.28-alpine
+    image: nginx:1.29-alpine
     environment:
       KAIROS_APP_HOST:
       KAIROS_NGINX_LISTEN: "443 ssl"
