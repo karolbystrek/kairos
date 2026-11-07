@@ -63,11 +63,10 @@ service; existing explicit approval remains valid within its stated scope.
 
 ## Local development
 
-- `./setup.sh --dev`: first run; prepares config and keys, starts all four
-  services in Docker with hot reload. `--prod` selects production instead.
-- `docker compose up --build -d`: start or rebuild the selected mode.
-- `docker compose stop`: stop and keep data; `docker compose logs -f`: follow logs.
-- `./reset.sh`: delete containers, volumes and keys; refuses production; run only
+- `make dev`: creates missing config and keys, then starts or rebuilds all four
+  services in Docker with hot reload.
+- `make stop`: stop and keep data; `make logs`: follow logs.
+- `make reset`: delete containers, volumes and keys; refuses production; run only
   when the user asks.
 
 Details: [local development](docs/agents/local-development.md).

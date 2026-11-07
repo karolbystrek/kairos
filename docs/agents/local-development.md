@@ -14,10 +14,13 @@
 
 ## Setup
 
-Run `./setup.sh --dev` to prepare `.env` and development keys and start the API,
-the web application, PostgreSQL and Redis in Docker. No host application commands
-are required. Setup selects `compose.yaml` plus `compose.local.yaml` in `.env`;
-`docker compose up --build -d` subsequently starts or rebuilds that mode.
+Run `make dev` to start the API, the web application, PostgreSQL and Redis in
+Docker. No host application commands are required. It copies `.env.example` to
+`.env` and generates development keys in `secrets/` only when they are missing,
+so rerunning it rebuilds the stack without touching existing configuration or
+keys. `.env.example` selects `compose.yaml` plus `compose.local.yaml`. New
+settings added to `.env.example` later are not merged into an existing `.env`;
+copy them by hand or run `make reset`. `make` alone lists the commands.
 
 - Web application: `http://localhost:3000` (customer PWA under `/orders`, staff
   panel under `/panel`); API: `http://localhost:8080/api`. `next dev` proxies
@@ -29,13 +32,7 @@ are required. Setup selects `compose.yaml` plus `compose.local.yaml` in `.env`;
 - Dependencies and frontend build output use container-owned volumes; API build
   output stays inside its container. Host artifacts do not interfere. Rebuild
   after changing dependency descriptors or Dockerfiles.
-- `docker compose logs -f` follows logs; `docker compose stop` stops all services
-  without deleting data.
-- `./setup.sh --prod` selects `compose.yaml` plus `compose.production.yaml`,
-  validates the supplied configuration and starts the production stack. Existing
-  settings and keys are preserved; supply missing production values and TLS
-  material before retrying. A copied setup script without Compose retains the
-  VM bootstrap's keys-only behavior.
+- `make logs` follows logs; `make stop` stops all services without deleting data.
 
 ## First start and daily use
 
@@ -56,7 +53,7 @@ are required. Setup selects `compose.yaml` plus `compose.local.yaml` in `.env`;
     `panel-app` containers; `docker compose up -d --remove-orphans` removes
     them once the user approves.
   - `docker compose ps` shows state and health.
-- `./reset.sh` deletes containers, volumes and keys, without asking
+- `make reset` deletes containers, volumes and keys, without asking
   and refuses to run when `COMPOSE_FILE`, in `.env` or exported in the environment, selects
   production.
 

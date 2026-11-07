@@ -7,7 +7,7 @@ The workstation architecture does not need to match the VM.
 The playbook installs Docker Engine/Compose and host tools, enables Docker at
 boot, creates the `kairos-deploy` deployment account, installs its restricted public SSH
 key, and creates private `/srv/kairos/releases`, `/srv/kairos/tls` and application
-keys. It uses the existing `setup.sh` and does not start Kairos.
+keys. It generates only missing keys and does not start Kairos.
 
 ## Workstation preparation
 
@@ -210,7 +210,7 @@ credentials, Cloudflare DNS/certificate/cache
 rules, Lightsail firewall restrictions, GitHub Environment protection and the
 first application deployment are later steps. Existing launch gates, including
 RLS and live acceptance still apply. Backups/restore are deferred for the current
-disposable development VPS under the [operations policy](../requirements/routing-releases.md#development-operations-policy). Do not run `reset.sh` during
+disposable development VPS under the [operations policy](../requirements/routing-releases.md#development-operations-policy). Do not run `make reset` during
 host preparation or ordinary production maintenance: it removes volumes and keys.
 
 ## Repository validation
@@ -220,14 +220,12 @@ With the Ansible environment active, run:
 ```sh
 ansible-playbook -i deployment/inventory.example.ini deployment/bootstrap.yml --syntax-check
 sh tests/bootstrap-test.sh
-sh tests/setup-test.sh
 python3 -m unittest discover -s deployment -p 'test_*.py'
 git diff --check
 ```
 
 The bootstrap test executes only the real `configuration` tasks on the local
 connection in a temporary directory, with privilege escalation disabled. It
-checks generation, permissions, configuration/key preservation and refusal of
-invalid/partial keys. It does not install packages, touch SSH/Docker, or prove
+checks generation, permissions and configuration/key preservation. It does not install packages, touch SSH/Docker, or prove
 real Ubuntu/SSH/reboot behavior; those require the operator's VM verification.
 Use the full playbook for VM preparation, without task tags.

@@ -41,7 +41,7 @@ then start the new release so Flyway creates the schema from V1. All old
 accounts, orders, sessions and delivery records are discarded.
 
 Do not use Flyway repair, checksum overrides or baseline-on-migrate to disguise
-the incompatible history. Do not run the production-refusing local `reset.sh`
+the incompatible history. Do not run the production-refusing local `make reset`
 or delete unrelated volumes. This repository change does not execute the reset.
 The old API images are not compatible rollback targets after this transition;
 establish a successful new-baseline deployment before relying on release
