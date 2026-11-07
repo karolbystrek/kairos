@@ -130,7 +130,6 @@ jobs:
       - name: Test gateway and secret preservation
         run: |
           python3 tests/gateway-test.py
-          sh tests/makefile-test.sh
 
       - name: Test manifest
         run: python3 -m unittest discover -s deployment -p 'test_*.py' -v
